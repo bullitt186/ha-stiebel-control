@@ -39,7 +39,7 @@ It is based on the great work of the Home Assistant community, especially the wo
 
 ### Home Assistant
 #### Entities and Helpers
-* place the file `ha_stiebel_control.yaml` in your `/config/packages/` folder in Home Assistant.
+* place the file `packages/ha_stiebel_control.yaml` in your `/config/packages/` folder in Home Assistant.
 * add the package folder to your `configuration.yaml` under `homeassistant` (if not already set up)
 ```yaml
 homeassistant:
