@@ -1,7 +1,29 @@
+substitutions:
+  can_id_kessel:          "0x180"
+  can_id_atez:            "0x280"
+  can_id_bedienmodul_1:   "0x300"
+  can_id_bedienmodul_2:   "0x301"
+  can_id_bedienmodul_3:   "0x302"
+  can_id_bedienmodul_4:   "0x303"
+  can_id_raumfernfuehler: "0x400"
+  can_id_manager:         "0x480"       
+  can_id_heizmodul:       "0x500"
+  can_id_buskoppler:      "0x580"
+  can_id_mischermodul_1:  "0x600"
+  can_id_mischermodul_2:  "0x601"
+  can_id_mischermodul_3:  "0x602"
+  can_id_mischermodul_4:  "0x603"
+  can_id_pc:              "0x680"
+  can_id_fremdgeraet:     "0x700"
+  can_id_dcf_modul:       "0x780"
+  can_cs_pin:             "GPIO5"
+  can_clk_pin:            "GPIO18"
+  can_mosi_pin:           "GPIO23"
+  can_miso_pin:           "GPIO19"
+  
 esphome:
   name: heatingpump
   friendly_name: "Heating Pump CAN Interface"
-
   platform: ESP32
   board: esp32dev
   includes: 
@@ -12,6 +34,7 @@ esphome:
     - stiebeltools/NUtils.cpp
     - stiebeltools/NTypes.h
     - stiebeltools/heatingpump.h
+
 
 # Enable Home Assistant API
 api:
@@ -141,12 +164,6 @@ sensor:
       readSignal(&CanMembers[cm_kessel], GetElsterIndex("HILFSKESSELSOLL"));
       return {};
 
-  - platform: template
-    name: "INITIALISIERUNG_KESSEL"
-    id: INITIALISIERUNG_KESSEL
-    icon: "mdi:description"
-    accuracy_decimals: 0
-
     #Rücklauftemperatur SOLL  - platform: template
   - platform: template
     name: "KESSELSOLLTEMP"
@@ -233,47 +250,11 @@ sensor:
       readSignal(&CanMembers[cm_kessel], GetElsterIndex("WPVORLAUFIST"));
       return {};
 
-  - platform: template
-    name: "BUSKONTROLLE"
-    id: BUSKONTROLLE
-    icon: "mdi:description"
-    accuracy_decimals: 0
-
 #########################################
 #                                       #
 #   MANAGER SENSOREN                    #
 #                                       #
 #########################################
-  - platform: template
-    name: "ANFAHRENT"
-    id: ANFAHRENT
-    state_class: "measurement"
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "GERAETEKONFIGURATION"
-    id: GERAETEKONFIGURATION
-    icon: "mdi:description"
-    state_class: "measurement"
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "HARDWARE_NUMMER_MANAGER"
-    id: HARDWARE_NUMMER_MANAGER
-    icon: "mdi:description"
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "INDEX_NOT_FOUND_MANAGER"
-    id: INDEX_NOT_FOUND_MANAGER
-    icon: "mdi:description"
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "INITIALISIERUNG_MANAGER"
-    id: INITIALISIERUNG_MANAGER
-    icon: "mdi:description"
-    accuracy_decimals: 0
 
   - platform: template
     name: "LAUFZEIT_VERD_BEI_SPEICHERBEDARF"
@@ -404,24 +385,7 @@ sensor:
     lambda: |-
       readSignal(&CanMembers[cm_manager], GetElsterIndex("LZ_VERD_2_WW_BETRIEB"));
       return {};
-     
-  - platform: template
-    name: "PARAMETERSATZ_MANAGER"
-    id: PARAMETERSATZ_MANAGER
-    icon: "mdi:description"
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "QUELLENPUMPEN_STATUS"
-    id: QUELLENPUMPEN_STATUS
-    unit_of_measurement: "°C"
-    state_class: "measurement"
-    accuracy_decimals: 0
-    update_interval: 10min
-    lambda: |-
-      readSignal(&CanMembers[cm_manager], GetElsterIndex("PARAMETERSATZ"));
-      return {};
-     
+        
   - platform: template
     name: "RAUMISTTEMP"
     id: RAUMISTTEMP
@@ -499,12 +463,6 @@ sensor:
     lambda: |-
       readSignal(&CanMembers[cm_manager], GetElsterIndex("RUECKLAUFISTTEMP"));
       return {};
-     
-  - platform: template
-    name: "SAMMEL_RELAISSTATUS"
-    id: SAMMEL_RELAISSTATUS
-    icon: "mdi:switch"
-    accuracy_decimals: 0
 
   - platform: template
     name: "SOFTWARE_NUMMER_MANAGER"
@@ -516,13 +474,6 @@ sensor:
     name: "SOFTWARE_VERSION"
     id: SOFTWARE_VERSION
     icon: "mdi:wysiwyg"
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "SPEICHERBEDARF"
-    id: SPEICHERBEDARF
-    icon: "mdi:memory"
-    state_class: "measurement"
     accuracy_decimals: 0
 
   - platform: template
@@ -596,12 +547,6 @@ sensor:
       readSignal(&CanMembers[cm_manager], GetElsterIndex("ZWISCHENEINSPRITZUNG_ISTTEMP"));
       return {};
      
-  - platform: template
-    name: "ACCESS_EEPROM"
-    id: ACCESS_EEPROM
-    icon: "mdi:memory"
-    accuracy_decimals: 0
-
   - platform: template
     name: "JAHR"
     id: JAHR
@@ -801,48 +746,6 @@ sensor:
       return {};
 
   - platform: template
-    name: "FATAL_ERROR"
-    id: FATAL_ERROR
-    icon: "mdi:alert-circle"
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "FEHLER_PARAMETERSATZ_IWS"
-    id: FEHLER_PARAMETERSATZ_IWS
-    icon: "mdi:alert-circle"
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "FEHLERMELDUNG"
-    id: FEHLERMELDUNG
-    icon: "mdi:alert-circle"
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "HARDWARE_NUMMER_HEIZMODUL"
-    id: HARDWARE_NUMMER_HEIZMODUL
-    icon: "mdi:description"
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "INDEX_NOT_FOUND_HEIZMODUL"
-    id: INDEX_NOT_FOUND_HEIZMODUL
-    icon: "mdi:description"
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "INITIALISIERUNG_HEIZMODUL"
-    id: INITIALISIERUNG_HEIZMODUL
-    icon: "mdi:description"
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "K_OS_RMX_RESERVE_INFO3"
-    id: K_OS_RMX_RESERVE_INFO3
-    icon: "mdi:description"
-    accuracy_decimals: 0
-
-  - platform: template
     name: "LZ_VERD_1_2_WW_BETRIEB_HEIZMODUL"
     id: LZ_VERD_1_2_WW_BETRIEB_HEIZMODUL
     icon: "mdi:timer"
@@ -877,58 +780,10 @@ sensor:
     lambda: |-
       readSignal(&CanMembers[cm_heizmodul], GetElsterIndex("LZ_VERD_2_WW_BETRIEB"));
       return {};
-     
-  - platform: template
-    name: "PARAMETERSATZ_HEIZMODUL"
-    id: PARAMETERSATZ_HEIZMODUL
-    icon: "mdi:alert-circle"
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "SCHALTFKT_IWS"
-    id: SCHALTFKT_IWS
-    icon: "mdi:description"
-    accuracy_decimals: 0
 
   - platform: template
     name: "SOFTWARE_NUMMER_HEIZMODUL"
     id: SOFTWARE_NUMMER_HEIZMODUL
-    icon: "mdi:description"
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "SOLAR_KOLLEKTOR_3_I_ANTEIL"
-    id: SOLAR_KOLLEKTOR_3_I_ANTEIL
-    icon: "mdi:solar-power-variant"
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "SPEICHER_STATUS"
-    id: SPEICHER_STATUS
-    icon: "mdi:description"
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "STUETZSTELLE_HD1"
-    id: STUETZSTELLE_HD1
-    icon: "mdi:description"
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "STUETZSTELLE_HD2"
-    id: STUETZSTELLE_HD2
-    icon: "mdi:description"
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "STUETZSTELLE_ND1"
-    id: STUETZSTELLE_ND1
-    icon: "mdi:description"
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "STUETZSTELLE_ND2"
-    id: STUETZSTELLE_ND2
     icon: "mdi:description"
     accuracy_decimals: 0
 
@@ -1470,7 +1325,7 @@ text_sensor:
 
 #########################################
 #                                       #
-#   HEIZMODUL TEXT SENSORS             #
+#   HEIZMODUL TEXT SENSORS              #
 #                                       #
 #########################################
   - platform: template
@@ -1480,7 +1335,17 @@ text_sensor:
 
 #########################################
 #                                       #
-#   BERECHNETE TEXT SENSORS            #
+#   KESSEL TEXT SENSORS                 #
+#                                       #
+#########################################
+  - platform: template
+    name: "GERAETE_ID_KESSEL"
+    id: GERAETE_ID_KESSEL
+    icon: "mdi:description"
+
+#########################################
+#                                       #
+#   BERECHNETE TEXT SENSORS             #
 #                                       #
 #########################################
   - platform: template
@@ -1558,7 +1423,15 @@ button:
           writeSignal(&CanMembers[cm_manager], GetElsterIndex("TAG"), cday);
           id(TAG).update();
 
-
+  - platform: template
+    name: "Identify CAN Members"
+    id: identify_can_members
+    on_press:
+      then:      
+        lambda: |-
+          identifyCanMembers();
+          return;
+          
 #########################################
 #                                       #
 #   SPI Konfiguration                   #
@@ -1566,9 +1439,9 @@ button:
 #########################################
 spi:
   id: McpSpi
-  clk_pin: GPIO18
-  mosi_pin: GPIO23
-  miso_pin: GPIO19
+  clk_pin: ${can_clk_pin}
+  mosi_pin: ${can_mosi_pin}
+  miso_pin: ${can_miso_pin}
 
 #########################################
 #                                       #
@@ -1579,629 +1452,72 @@ canbus:
   - platform: mcp2515
     id: my_mcp2515
     spi_id: McpSpi
-    cs_pin: GPIO5
-    can_id: 700
+    cs_pin: ${can_cs_pin}
+    can_id: ${can_id_pc}
     use_extended_id: false
     bit_rate: 20kbps
     on_frame:
-
-#########################################
-#                                       #
-#   KESSEL Nachrichten                  #
-#                                       #
-#########################################
-    - can_id: 0x180
+    - can_id: ${can_id_kessel}
       then:
         - lambda: |-
-            unsigned short canId = 180;
-            std::string value;
-            const ElsterIndex* ei = processCanMessage(canId, value, x);
-
-            if(ei->Name == "AUSSENTEMP") {
-              id(AUSSENTEMP).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "BUSKONTROLLE") {
-              id(BUSKONTROLLE).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "EINSTELL_SPEICHERSOLLTEMP") {
-              id(EINSTELL_SPEICHERSOLLTEMP).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "EINSTELL_SPEICHERSOLLTEMP2") {
-              id(EINSTELL_SPEICHERSOLLTEMP2).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "HILFSKESSELSOLL") {
-              id(HILFSKESSELSOLL).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "INITIALISIERUNG") {
-              id(INITIALISIERUNG_KESSEL).publish_state(std::stoi(value));
-              return;
-            }          
-            if(ei->Name == "KESSELSOLLTEMP") {
-              id(KESSELSOLLTEMP).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "RUECKLAUFISTTEMP") {
-              id(RUECKLAUFISTTEMP_KESSEL).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "SPEICHERISTTEMP") {
-              id(SPEICHERISTTEMP).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "SPEICHERSOLLTEMP") {
-              id(SPEICHERSOLLTEMP).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "VORLAUFSOLLTEMP") {
-              id(VORLAUFSOLLTEMP).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "WPVORLAUFIST") {
-              id(WPVORLAUFIST_KESSEL).publish_state(std::stof(value));
-              return;
-            }            
-
-#########################################
-#                                       #
-#   MANAGER Nachrichten                 #
-#                                       #
-#########################################
-    - can_id: 0x480
+            processAndUpdate(can_id, x);
+    - can_id: ${can_id_atez}
       then:
         - lambda: |-
-            unsigned short canId = 480;
-            std::string value;
-            const ElsterIndex* ei = processCanMessage(canId, value, x);
-
-            if(ei->Name == "ACCESS_EEPROM") {
-              id(ACCESS_EEPROM).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "ANFAHRENT") {
-              id(ANFAHRENT).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "GERAETEKONFIGURATION") {
-              id(GERAETEKONFIGURATION).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "GERAETE_ID") {
-              id(GERAETE_ID_MANAGER).publish_state(value);
-              return;
-            }
-            if(ei->Name == "HARDWARE_NUMMER") {
-              id(HARDWARE_NUMMER_MANAGER).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "INDEX_NOT_FOUND") {
-              id(INDEX_NOT_FOUND_MANAGER).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "INITIALISIERUNG") {
-              id(INITIALISIERUNG_MANAGER).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "JAHR") {
-              id(JAHR).publish_state(std::stoi(value));
-              publishDate();
-              return; 
-            }
-            if(ei->Name == "LAUFZEIT_VERD_BEI_SPEICHERBEDARF") {
-              id(LAUFZEIT_VERD_BEI_SPEICHERBEDARF).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "LUEFT_PASSIVKUEHLUNG_UEBER_FORTLUEFTER") {
-              id(LUEFT_PASSIVKUEHLUNG_UEBER_FORTLUEFTER).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "LZ_VERD_1_2_HEIZBETRIEB") {
-              id(LZ_VERD_1_2_HEIZBETRIEB_MANAGER).publish_state(std::stod(value));
-              return;
-            }
-            if(ei->Name == "LZ_VERD_1_2_KUEHLBETRIEB") {
-              id(LZ_VERD_1_2_KUEHLBETRIEB_MANAGER).publish_state(std::stod(value));
-              return;
-            }
-            if(ei->Name == "LZ_VERD_1_2_WW_BETRIEB") {
-              id(LZ_VERD_1_2_WW_BETRIEB_MANAGER).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "LZ_VERD_1_HEIZBETRIEB") {
-              id(LZ_VERD_1_HEIZBETRIEB_MANAGER).publish_state(std::stod(value));
-              return;
-            }
-            if(ei->Name == "LZ_VERD_1_KUEHLBETRIEB") {
-              id(LZ_VERD_1_KUEHLBETRIEB_MANAGER).publish_state(std::stod(value));
-              return;
-            }
-            if(ei->Name == "LZ_VERD_1_WW_BETRIEB") {
-              id(LZ_VERD_1_WW_BETRIEB_MANAGER).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "LZ_VERD_2_HEIZBETRIEB") {
-              id(LZ_VERD_2_HEIZBETRIEB_MANAGER).publish_state(std::stod(value));
-              return;
-            }
-            if(ei->Name == "LZ_VERD_2_KUEHLBETRIEB") {
-              id(LZ_VERD_2_KUEHLBETRIEB_MANAGER).publish_state(std::stod(value));
-              return;
-            }
-            if(ei->Name == "LZ_VERD_2_WW_BETRIEB") {
-              id(LZ_VERD_2_WW_BETRIEB_MANAGER).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "MINUTE") {
-              id(MINUTE).publish_state(std::stoi(value));
-              publishTime();
-              return;
-            }
-            if(ei->Name == "MONAT") {
-              id(MONAT).publish_state(std::stoi(value));
-              publishDate();
-              return;
-            }
-            if(ei->Name == "PARAMETERSATZ") {
-              id(PARAMETERSATZ_MANAGER).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "PROGRAMMSCHALTER") {
-              id(PROGRAMMSCHALTER).publish_state(value);
-              return;
-            }
-            if(ei->Name == "QUELLENPUMPEN_STATUS") {
-              id(QUELLENPUMPEN_STATUS).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "RAUMISTTEMP") {
-              id(RAUMISTTEMP).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "RAUMSOLLTEMP_I") {
-              id(RAUMSOLLTEMP_I).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "RAUMSOLLTEMP_II") {
-              id(RAUMSOLLTEMP_II).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "RAUMSOLLTEMP_III") {
-              id(RAUMSOLLTEMP_III).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "RAUMSOLLTEMP_NACHT") {
-              id(RAUMSOLLTEMP_NACHT).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "RUECKLAUFISTTEMP") {
-              id(RUECKLAUFISTTEMP_MANAGER).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "SAMMEL_RELAISSTATUS") {
-              id(SAMMEL_RELAISSTATUS).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "SEKUNDE") {
-              id(SEKUNDE).publish_state(std::stoi(value));
-              publishTime();
-              return;
-            }
-            if(ei->Name == "SOFTWARE_NUMMER") {
-              id(SOFTWARE_NUMMER_MANAGER).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "SOFTWARE_VERSION") {
-              id(SOFTWARE_VERSION).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "SOMMERBETRIEB") {
-              id(SOMMERBETRIEB).publish_state(value);
-              return;
-            }
-            if(ei->Name == "SPEICHERBEDARF") {
-              id(SPEICHERBEDARF).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "STUNDE") {
-              id(STUNDE).publish_state(std::stoi(value));
-              publishTime();
-              return;
-            }
-            if(ei->Name == "TAG") {
-              id(TAG).publish_state(std::stoi(value));
-              publishDate();
-              return;
-            }
-            if(ei->Name == "TEILVORRANG_WW") {
-              id(TEILVORRANG_WW).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "TEMPORALE_LUEFTUNGSSTUFE_DAUER") {
-              id(TEMPORALE_LUEFTUNGSSTUFE_DAUER).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "VERDICHTER") {
-              id(VERDICHTER_MANAGER).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "VERSTELLTE_RAUMSOLLTEMP") {
-              id(VERSTELLTE_RAUMSOLLTEMP).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "WP_STATUS") {
-              id(WP_STATUS).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "WPVORLAUFIST") {
-              id(WPVORLAUFIST_MANAGER).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "WW_ECO") {
-              id(WW_ECO).publish_state(value);
-              return;
-            }
-            if(ei->Name == "ZWISCHENEINSPRITZUNG_ISTTEMP") {
-              id(ZWISCHENEINSPRITZUNG_ISTTEMP).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "EVU_SPERRE_AKTIV") {
-              id(EVU_SPERRE_AKTIV_MANAGER).publish_state(std::stoi(value));
-              return;
-            }
-
-#########################################
-#                                       #
-#   HEIZMODUL Nachrichten               #
-#                                       #
-#########################################
-    - can_id: 0x500
+            processAndUpdate(can_id, x);
+    - can_id: ${can_id_bedienmodul_1}
       then:
         - lambda: |-
-            unsigned short canId = 500;
-            std::string value;
-            const ElsterIndex* ei = processCanMessage(canId, value, x);
-
-            if(ei->Name == "VERDAMPFERTEMP") {
-              id(VERDAMPFERTEMP).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "INITIALISIERUNG") {
-              id(INITIALISIERUNG_HEIZMODUL).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "SPEICHER_STATUS") {
-              id(SPEICHER_STATUS).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "RUECKLAUFISTTEMP") {
-              id(RUECKLAUFISTTEMP).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "VERDICHTER") {
-              id(VERDICHTER_HEIZMODUL).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "WPVORLAUFIST") {
-              id(WPVORLAUFIST).publish_state(std::stof(value));
-              return;
-            }
-            if(ei->Name == "ABTAUUNGAKTIV") {
-              id(ABTAUUNGAKTIV).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "BETRIEBSART_WP") {
-              id(ABTAUUNGAKTIV).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH") {
-              id(EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH).publish_state(std::stoi(value));
-              id(EL_AUFNAHMELEISTUNG_HEIZ_SUM).publish_state(id(EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH).state + id(EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH).state / 1000 );
-              update_COP_HEIZ();
-              update_COP_GESAMT();
-              return;
-            }
-            if(ei->Name == "EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH") {
-              id(EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH).publish_state(std::stoi(value));
-              id(EL_AUFNAHMELEISTUNG_HEIZ_TAG).publish_state(id(EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH).state + id(EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH).state / 1000);
-              id(EL_AUFNAHMELEISTUNG_HEIZ_INCREASING).publish_state(id(EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH).state + id(EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH).state / 1000);
-              return;
-            }
-            if(ei->Name == "EL_AUFNAHMELEISTUNG_WW_SUM_KWH") {
-              id(EL_AUFNAHMELEISTUNG_WW_SUM_KWH).publish_state(std::stoi(value));
-              id(EL_AUFNAHMELEISTUNG_WW_SUM).publish_state(id(EL_AUFNAHMELEISTUNG_WW_SUM_MWH).state + id(EL_AUFNAHMELEISTUNG_WW_SUM_KWH).state / 1000);
-              update_COP_WW();
-              update_COP_GESAMT();
-              return;
-            }
-            if(ei->Name == "EL_AUFNAHMELEISTUNG_WW_TAG_WH") {
-              id(EL_AUFNAHMELEISTUNG_WW_TAG_WH).publish_state(std::stoi(value));
-              id(EL_AUFNAHMELEISTUNG_WW_TAG).publish_state(id(EL_AUFNAHMELEISTUNG_WW_TAG_KWH).state + id(EL_AUFNAHMELEISTUNG_WW_TAG_WH).state / 1000);
-              id(EL_AUFNAHMELEISTUNG_WW_INCREASING).publish_state(id(EL_AUFNAHMELEISTUNG_WW_TAG_KWH).state + id(EL_AUFNAHMELEISTUNG_WW_TAG_WH).state / 1000);
-           
-              return;
-            }
-            if(ei->Name == "FATAL_ERROR") {
-              id(FATAL_ERROR).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "FEHLER_PARAMETERSATZ_IWS") {
-              id(FEHLER_PARAMETERSATZ_IWS).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "FEHLERMELDUNG") {
-              id(FEHLERMELDUNG).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "HARDWARE_NUMMER") {
-              id(HARDWARE_NUMMER_HEIZMODUL).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "INDEX_NOT_FOUND") {
-              id(INDEX_NOT_FOUND_HEIZMODUL).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "K_OS_RMX_RESERVE_INFO3") {
-              id(K_OS_RMX_RESERVE_INFO3).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "LZ_VERD_1_2_WW_BETRIEB") {
-              id(LZ_VERD_1_2_WW_BETRIEB_HEIZMODUL).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "LZ_VERD_1_WW_BETRIEB") {
-              id(LZ_VERD_1_WW_BETRIEB_HEIZMODUL).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "LZ_VERD_2_WW_BETRIEB") {
-              id(LZ_VERD_2_WW_BETRIEB_HEIZMODUL).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "PARAMETERSATZ") {
-              id(PARAMETERSATZ_HEIZMODUL).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "SCHALTFKT_IWS") {
-              id(SCHALTFKT_IWS).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "SOFTWARE_NUMMER") {
-              id(SOFTWARE_NUMMER_HEIZMODUL).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "SOLAR_KOLLEKTOR_3_I_ANTEIL") {
-              id(SOLAR_KOLLEKTOR_3_I_ANTEIL).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "STUETZSTELLE_HD1") {
-              id(STUETZSTELLE_HD1).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "STUETZSTELLE_HD2") {
-              id(STUETZSTELLE_HD2).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "STUETZSTELLE_ND1") {
-              id(STUETZSTELLE_ND1).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "STUETZSTELLE_ND2") {
-              id(STUETZSTELLE_ND2).publish_state(std::stoi(value));
-              return;
-            }
-            if(ei->Name == "WAERMEERTRAG_2WE_HEIZ_SUM_KWH") {
-              id(WAERMEERTRAG_2WE_HEIZ_SUM_KWH).publish_state(std::stoi(value));
-              id(WAERMEERTRAG_2WE_HEIZ_SUM).publish_state(id(WAERMEERTRAG_2WE_HEIZ_SUM_MWH).state+id(WAERMEERTRAG_2WE_HEIZ_SUM_KWH).state/1000);           
-              return;
-            }
-            if(ei->Name == "WAERMEERTRAG_2WE_WW_SUM_KWH") {
-              id(WAERMEERTRAG_2WE_WW_SUM_KWH).publish_state(std::stoi(value));
-              id(WAERMEERTRAG_2WE_WW_SUM).publish_state(id(WAERMEERTRAG_2WE_WW_SUM_MWH).state+id(WAERMEERTRAG_2WE_WW_SUM_KWH).state/1000);           
-              return;
-            }
-            if(ei->Name == "WAERMEERTRAG_HEIZ_SUM_KWH") {
-              id(WAERMEERTRAG_HEIZ_SUM_KWH).publish_state(std::stoi(value));
-              id(WAERMEERTRAG_HEIZ_SUM).publish_state(id(WAERMEERTRAG_HEIZ_SUM_MWH).state+id(WAERMEERTRAG_HEIZ_SUM_KWH).state/1000);
-              update_COP_HEIZ();
-              update_COP_GESAMT();
-              return;
-            }
-            if(ei->Name == "WAERMEERTRAG_HEIZ_TAG_WH") {
-              id(WAERMEERTRAG_HEIZ_TAG_WH).publish_state(std::stoi(value));
-              id(WAERMEERTRAG_HEIZ_TAG).publish_state(id(WAERMEERTRAG_HEIZ_TAG_KWH).state+id(WAERMEERTRAG_HEIZ_TAG_WH).state/1000);      
-              id(WAERMEERTRAG_HEIZ_INCREASING).publish_state(id(WAERMEERTRAG_HEIZ_TAG_KWH).state+id(WAERMEERTRAG_HEIZ_TAG_WH).state/1000);           
-     
-              return;
-            }
-            if(ei->Name == "WAERMEERTRAG_WW_SUM_KWH") {
-              id(WAERMEERTRAG_WW_SUM_KWH).publish_state(std::stoi(value));
-              id(WAERMEERTRAG_WW_SUM).publish_state(id(WAERMEERTRAG_WW_SUM_MWH).state+id(WAERMEERTRAG_WW_SUM_KWH).state/1000);
-              update_COP_WW();
-              update_COP_GESAMT();
-              return;
-            }
-            if(ei->Name == "WAERMEERTRAG_WW_TAG_WH") {
-              id(WAERMEERTRAG_WW_TAG_WH).publish_state(std::stoi(value));
-              id(WAERMEERTRAG_WW_TAG).publish_state(id(WAERMEERTRAG_WW_TAG_KWH).state+id(WAERMEERTRAG_WW_TAG_WH).state/1000);
-              id(WAERMEERTRAG_WW_INCREASING).publish_state(id(WAERMEERTRAG_WW_TAG_KWH).state+id(WAERMEERTRAG_WW_TAG_WH).state/1000);           
-           
-              return;
-            }
-            if(ei->Name == "EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH") {
-              id(EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH).publish_state(std::stod(value));
-              id(EL_AUFNAHMELEISTUNG_HEIZ_SUM).publish_state(id(EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH).state+id(EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH).state/1000);
-              update_COP_HEIZ();
-              update_COP_GESAMT();
-              return;
-            }
-            if(ei->Name == "EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH") {
-              id(EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH).publish_state(std::stod(value));
-              id(EL_AUFNAHMELEISTUNG_HEIZ_TAG).publish_state(id(EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH).state+id(EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH).state/1000);      
-              id(EL_AUFNAHMELEISTUNG_HEIZ_INCREASING).publish_state(id(EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH).state + id(EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH).state / 1000);
-              return;
-            }
-            if(ei->Name == "EL_AUFNAHMELEISTUNG_WW_SUM_MWH") {
-              id(EL_AUFNAHMELEISTUNG_WW_SUM_MWH).publish_state(std::stod(value));
-              id(EL_AUFNAHMELEISTUNG_WW_SUM).publish_state(id(EL_AUFNAHMELEISTUNG_WW_SUM_MWH).state+id(EL_AUFNAHMELEISTUNG_WW_SUM_KWH).state/1000);
-              update_COP_WW();
-              update_COP_GESAMT();
-              return;
-            }
-            if(ei->Name == "EL_AUFNAHMELEISTUNG_WW_TAG_KWH") {
-              id(EL_AUFNAHMELEISTUNG_WW_TAG_KWH).publish_state(std::stod(value));
-              id(EL_AUFNAHMELEISTUNG_WW_TAG).publish_state(id(EL_AUFNAHMELEISTUNG_WW_TAG_KWH).state+id(EL_AUFNAHMELEISTUNG_WW_TAG_WH).state/1000);      
-              id(EL_AUFNAHMELEISTUNG_WW_INCREASING).publish_state(id(EL_AUFNAHMELEISTUNG_WW_TAG_KWH).state + id(EL_AUFNAHMELEISTUNG_WW_TAG_WH).state / 1000);
-              return;
-            }
-            if(ei->Name == "WAERMEERTRAG_2WE_HEIZ_SUM_MWH") {
-              id(WAERMEERTRAG_2WE_HEIZ_SUM_MWH).publish_state(std::stod(value));
-              id(WAERMEERTRAG_2WE_HEIZ_SUM).publish_state(id(WAERMEERTRAG_2WE_HEIZ_SUM_MWH).state+id(WAERMEERTRAG_2WE_HEIZ_SUM_KWH).state/1000);           
-              return;
-            }
-            if(ei->Name == "WAERMEERTRAG_2WE_WW_SUM_MWH") {
-              id(WAERMEERTRAG_2WE_WW_SUM_MWH).publish_state(std::stod(value));
-              id(WAERMEERTRAG_2WE_WW_SUM).publish_state(id(WAERMEERTRAG_2WE_WW_SUM_MWH).state+id(WAERMEERTRAG_2WE_WW_SUM_KWH).state/1000);           
-              return;
-            }
-            if(ei->Name == "WAERMEERTRAG_HEIZ_SUM_MWH") {
-              id(WAERMEERTRAG_HEIZ_SUM_MWH).publish_state(std::stod(value));
-              id(WAERMEERTRAG_HEIZ_SUM).publish_state(id(WAERMEERTRAG_HEIZ_SUM_MWH).state+id(WAERMEERTRAG_HEIZ_SUM_KWH).state/1000);
-              update_COP_HEIZ();
-              update_COP_GESAMT();
-              return;
-            }
-            if(ei->Name == "WAERMEERTRAG_HEIZ_TAG_KWH") {
-              id(WAERMEERTRAG_HEIZ_TAG_KWH).publish_state(std::stod(value));
-              id(WAERMEERTRAG_HEIZ_TAG).publish_state(id(WAERMEERTRAG_HEIZ_TAG_KWH).state+id(WAERMEERTRAG_HEIZ_TAG_WH).state/1000);
-              id(WAERMEERTRAG_HEIZ_INCREASING).publish_state(id(WAERMEERTRAG_HEIZ_TAG_KWH).state+id(WAERMEERTRAG_HEIZ_TAG_WH).state/1000);           
-           
-              return;
-            }
-            if(ei->Name == "WAERMEERTRAG_WW_SUM_MWH") {
-              id(WAERMEERTRAG_WW_SUM_MWH).publish_state(std::stod(value));
-              id(WAERMEERTRAG_WW_SUM).publish_state(id(WAERMEERTRAG_WW_SUM_MWH).state+id(WAERMEERTRAG_WW_SUM_KWH).state/1000);           
-              return;
-            }
-            if(ei->Name == "WAERMEERTRAG_WW_TAG_KWH") {
-              id(WAERMEERTRAG_WW_TAG_KWH).publish_state(std::stod(value));
-              id(WAERMEERTRAG_WW_TAG).publish_state(id(WAERMEERTRAG_WW_TAG_KWH).state+id(WAERMEERTRAG_WW_TAG_WH).state/1000);           
-              id(WAERMEERTRAG_WW_INCREASING).publish_state(id(WAERMEERTRAG_WW_TAG_KWH).state+id(WAERMEERTRAG_WW_TAG_WH).state/1000);           
-
-              return;
-            }
-            if(ei->Name == "LZ_VERD_1_2_HEIZBETRIEB") {
-              id(LZ_VERD_1_2_HEIZBETRIEB_HEIZMODUL).publish_state(std::stod(value));
-              return;
-            }
-            if(ei->Name == "LZ_VERD_1_2_KUEHLBETRIEB") {
-              id(LZ_VERD_1_2_KUEHLBETRIEB_HEIZMODUL).publish_state(std::stod(value));
-              return;
-            }
-            if(ei->Name == "LZ_VERD_1_HEIZBETRIEB") {
-              id(LZ_VERD_1_HEIZBETRIEB_HEIZMODUL).publish_state(std::stod(value));
-              return;
-            }
-            if(ei->Name == "LZ_VERD_1_KUEHLBETRIEB") {
-              id(LZ_VERD_1_KUEHLBETRIEB_HEIZMODUL).publish_state(std::stod(value));
-              return;
-            }
-            if(ei->Name == "LZ_VERD_2_HEIZBETRIEB") {
-              id(LZ_VERD_2_HEIZBETRIEB_HEIZMODUL).publish_state(std::stod(value));
-              return;
-            }
-            if(ei->Name == "LZ_VERD_2_KUEHLBETRIEB") {
-              id(LZ_VERD_2_KUEHLBETRIEB_HEIZMODUL).publish_state(std::stod(value));
-              return;
-            }
-            if(ei->Name == "GERAETE_ID") {
-              id(GERAETE_ID_HEIZMODUL).publish_state(value);
-              return;
-            }
-
-#########################################
-#                                       #
-#   Sonstige Nachrichten                #
-#                                       #
-#########################################
-    - can_id: 0x000
+            processAndUpdate(can_id, x);
+    - can_id: ${can_id_bedienmodul_2}
       then:
         - lambda: |-
-            unsigned short canId = 000;
-            std::string value;
-            const ElsterIndex* ei = processCanMessage(canId, value, x);
-
-    - can_id: 0x100
+            processAndUpdate(can_id, x);
+    - can_id: ${can_id_bedienmodul_3}
       then:
         - lambda: |-
-            unsigned short canId = 100;
-            std::string value;
-            const ElsterIndex* ei = processCanMessage(canId, value, x);
-        
-    - can_id: 0x301
+            processAndUpdate(can_id, x);
+    - can_id: ${can_id_bedienmodul_4}
       then:
         - lambda: |-
-            unsigned short canId = 301;
-            std::string value;
-            const ElsterIndex* ei = processCanMessage(canId, value, x);
-
-    - can_id: 0x302
+            processAndUpdate(can_id, x);
+    - can_id: ${can_id_raumfernfuehler}
       then:
         - lambda: |-
-            unsigned short canId = 302;
-            std::string value;
-            const ElsterIndex* ei = processCanMessage(canId, value, x);
-
-    - can_id: 0x509
+            processAndUpdate(can_id, x);
+    - can_id: ${can_id_manager}
       then:
         - lambda: |-
-            unsigned short canId = 509;
-            std::string value;
-            const ElsterIndex* ei = processCanMessage(canId, value, x);
-  
-    - can_id: 0x514
+            processAndUpdate(can_id, x);
+    - can_id: ${can_id_buskoppler}
       then:
         - lambda: |-
-            unsigned short canId = 514;
-            std::string value;
-            const ElsterIndex* ei = processCanMessage(canId, value, x);
-
-    - can_id: 0x601
+            processAndUpdate(can_id, x);
+    - can_id: ${can_id_mischermodul_1}
       then:
         - lambda: |-
-            unsigned short canId = 601;
-            std::string value;
-            const ElsterIndex* ei = processCanMessage(canId, value, x);
-
-    - can_id: 0x602
+            processAndUpdate(can_id, x);
+    - can_id: ${can_id_mischermodul_2}
       then:
         - lambda: |-
-            unsigned short canId = 602;
-            std::string value;
-            const ElsterIndex* ei = processCanMessage(canId, value, x);
-
-    - can_id: 0x603
+            processAndUpdate(can_id, x);
+    - can_id: ${can_id_mischermodul_3}
       then:
         - lambda: |-
-            unsigned short canId = 603;
-            std::string value;
-            const ElsterIndex* ei = processCanMessage(canId, value, x);
-
-    - can_id: 0x680
+            processAndUpdate(can_id, x);
+    - can_id: ${can_id_mischermodul_4}
       then:
         - lambda: |-
-            unsigned short canId = 680;
-            std::string value;
-            const ElsterIndex* ei = processCanMessage(canId, value, x);
-
-    - can_id: 0x700
+            processAndUpdate(can_id, x);
+    - can_id: ${can_id_pc}
       then:
         - lambda: |-
-            unsigned short canId = 700;
-            std::string value;
-            const ElsterIndex* ei = processCanMessage(canId, value, x);
-
-
-
+            processAndUpdate(can_id, x);
+    - can_id: ${can_id_fremdgeraet}
+      then:
+        - lambda: |-
+            processAndUpdate(can_id, x);           
+    - can_id: ${can_id_dcf_modul}
+      then:
+        - lambda: |-
+            processAndUpdate(can_id, x);
