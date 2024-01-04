@@ -53,18 +53,20 @@ typedef struct
 static const CanMember CanMembers[] =
     {
         //  Name              CanId     ReadId          WriteId         ConfirmationID
-        {"ESPCLIENT", 0x700, {0x00, 0x00}, {0x00, 0x00}, {0xE2, 0x00}}, // The ESP Home Client, thus no valid read/write IDs
-        {"KESSEL", 0x180, {0x31, 0x00}, {0x30, 0x00}, {0x00, 0x00}},
+        {"ESPCLIENT", 0x680, {0x00, 0x00}, {0x00, 0x00}, {0xE2, 0x00}}, // The ESP Home Client, thus no valid read/write IDs
+        {"PUMP", 0x180, {0x31, 0x00}, {0x30, 0x00}, {0x00, 0x00}},
+        {"FEK", 0x302, {0x61, 0x02}, {0x00, 0x00}, {0x00, 0x00}},
         {"MANAGER", 0x480, {0x91, 0x00}, {0x90, 0x00}, {0x00, 0x00}},
-        {"HEIZMODUL", 0x302, {0xA1, 0x00}, {0xA0, 0x00}, {0x00, 0x00}}};
+        {"FE7", 0x602, {0xC1, 0x02}, {0x00, 0x00}, {0x00, 0x00}}};
 
 typedef enum
 {
     // Die Reihenfolge muss mit CanMembers übereinstimmen!
     cm_espclient = 0,
-    cm_kessel,
+    cm_pump,
+    cm_fek,
     cm_manager,
-    cm_heizmodul
+    cm_fe7,
 } CanMemberType;
 
 const ElsterIndex *processCanMessage(unsigned short can_id, std::string &signalValue, std::vector<unsigned char> msg)
@@ -114,19 +116,19 @@ const ElsterIndex *processCanMessage(unsigned short can_id, std::string &signalV
     return ei;
 }
 
-void update_COP_WW()
+void update_COP_DHW()
 {
-    id(COP_WW).publish_state((id(WAERMEERTRAG_WW_SUM).state + id(WAERMEERTRAG_2WE_WW_SUM).state) / id(EL_AUFNAHMELEISTUNG_WW_SUM).state);
+    id(cop_water).publish_state((id(HEATING_DHW_DAY_KWH).state) / id(ELECTRICITY_INTAKE_DHW_DAY_KWH).state);
     return;
 }
-void update_COP_HEIZ()
+void update_COP_HEATER()
 {
-    id(COP_HEIZ).publish_state((id(WAERMEERTRAG_HEIZ_SUM).state + id(WAERMEERTRAG_2WE_HEIZ_SUM).state) / id(EL_AUFNAHMELEISTUNG_HEIZ_SUM).state);
+    id(cop_heater).publish_state((id(HEAT_YIELD_HEATING_DAY_KWH).state) / id(ELECTRICITY_INTAKE_HEATING_DAY_KWH).state);
     return;
 }
-void update_COP_GESAMT()
+void update_COP_TOTAL()
 {
-    id(COP_GESAMT).publish_state((id(WAERMEERTRAG_HEIZ_SUM).state + id(WAERMEERTRAG_2WE_HEIZ_SUM).state + id(WAERMEERTRAG_WW_SUM).state + id(WAERMEERTRAG_2WE_WW_SUM).state) / (id(EL_AUFNAHMELEISTUNG_HEIZ_SUM).state + id(EL_AUFNAHMELEISTUNG_WW_SUM).state));
+    id(cop_total).publish_state((id(HEATING_DHW_DAY_KWH).state + id(HEAT_YIELD_HEATING_DAY_KWH).state) / (id(ELECTRICITY_INTAKE_DHW_DAY_KWH).state + id(ELECTRICITY_INTAKE_HEATING_DAY_KWH).state));
     return;
 }
 
@@ -158,8 +160,8 @@ void readSignal(const CanMember *member, const ElsterIndex *ei)
                                  0x00});
     }
 
-    char logmsg[120];
-    sprintf(logmsg, "READ \"%s\" (0x%04x) FROM %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x", ei->Name, ei->Index, member->Name, member->CanId, member->ReadId[0], member->ReadId[1], data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
+    char logmsg[255];
+    sprintf(logmsg, "READ \"%s\" (0x%04x) FROM %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x", ei->EnglishName, ei->Index, member->Name, member->CanId, member->ReadId[0], member->ReadId[1], data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
     ESP_LOGI("readSignal()", "%s", logmsg);
 
     id(my_mcp2515).send_data(CanMembers[cm_espclient].CanId, use_extended_id, data);
@@ -205,105 +207,105 @@ void writeSignal(const CanMember *member, const ElsterIndex *ei, const char *&st
     return;
 }
 
-void publishDate()
-{
-    int ijahr = (int)id(JAHR).state;
-    std::string jahr;
-    if (ijahr >= 0 & ijahr < 99)
-    {
-        if (ijahr < 10)
-            jahr = "0" + to_string(ijahr);
-        else
-            jahr = to_string(ijahr);
-    }
-    else
-    {
-        jahr = "00";
-    }
+// void publishDate()
+// {
+//     int ijahr = (int)id(JAHR).state;
+//     std::string jahr;
+//     if (ijahr >= 0 & ijahr < 99)
+//     {
+//         if (ijahr < 10)
+//             jahr = "0" + to_string(ijahr);
+//         else
+//             jahr = to_string(ijahr);
+//     }
+//     else
+//     {
+//         jahr = "00";
+//     }
 
-    int imonat = (int)id(MONAT).state;
-    std::string monat;
-    if (imonat > 0 & imonat <= 12)
-    {
-        if (imonat < 10)
-            monat = "0" + to_string(imonat);
-        else
-            monat = to_string(imonat);
-    }
-    else
-    {
-        monat = "00";
-    }
+//     int imonat = (int)id(MONAT).state;
+//     std::string monat;
+//     if (imonat > 0 & imonat <= 12)
+//     {
+//         if (imonat < 10)
+//             monat = "0" + to_string(imonat);
+//         else
+//             monat = to_string(imonat);
+//     }
+//     else
+//     {
+//         monat = "00";
+//     }
 
-    int itag = (int)id(TAG).state;
-    std::string tag;
-    if (itag > 0 & itag <= 31)
-    {
-        if (itag < 10)
-            tag = "0" + to_string(itag);
-        else
-            tag = to_string(itag);
-    }
-    else
-    {
-        tag = "00";
-    }
+//     int itag = (int)id(TAG).state;
+//     std::string tag;
+//     if (itag > 0 & itag <= 31)
+//     {
+//         if (itag < 10)
+//             tag = "0" + to_string(itag);
+//         else
+//             tag = to_string(itag);
+//     }
+//     else
+//     {
+//         tag = "00";
+//     }
 
-    id(DATUM).publish_state("20" + jahr + "-" + monat + "-" + tag);
+//     id(DATUM).publish_state("20" + jahr + "-" + monat + "-" + tag);
 
-    return;
+//     return;
 
-    //              id(DATUM).publish_state("20" + to_string((int)id(JAHR).state) + "-" + to_string((int)id(MONAT).state) + "-" + to_string((int)id(TAG).state));
-}
+//     //              id(DATUM).publish_state("20" + to_string((int)id(JAHR).state) + "-" + to_string((int)id(MONAT).state) + "-" + to_string((int)id(TAG).state));
+// }
 
-void publishTime()
-{
-    int istunde = (int)id(STUNDE).state;
-    std::string stunde;
-    if (istunde >= 0 & istunde < 60)
-    {
-        if (istunde < 10)
-            stunde = "0" + to_string(istunde);
-        else
-            stunde = to_string(istunde);
-    }
-    else
-    {
-        stunde = "00";
-    }
+// void publishTime()
+// {
+//     int istunde = (int)id(STUNDE).state;
+//     std::string stunde;
+//     if (istunde >= 0 & istunde < 60)
+//     {
+//         if (istunde < 10)
+//             stunde = "0" + to_string(istunde);
+//         else
+//             stunde = to_string(istunde);
+//     }
+//     else
+//     {
+//         stunde = "00";
+//     }
 
-    int iminute = (int)id(MINUTE).state;
-    std::string minute;
-    if (iminute >= 0 & iminute < 60)
-    {
-        if (iminute < 10)
-            minute = "0" + to_string(iminute);
-        else
-            minute = to_string(iminute);
-    }
-    else
-    {
-        minute = "00";
-    }
+//     int iminute = (int)id(MINUTE).state;
+//     std::string minute;
+//     if (iminute >= 0 & iminute < 60)
+//     {
+//         if (iminute < 10)
+//             minute = "0" + to_string(iminute);
+//         else
+//             minute = to_string(iminute);
+//     }
+//     else
+//     {
+//         minute = "00";
+//     }
 
-    int isekunde = (int)id(SEKUNDE).state;
-    std::string sekunde;
-    if (isekunde >= 0 & isekunde < 60)
-    {
-        if (isekunde < 10)
-            sekunde = "0" + to_string(isekunde);
-        else
-            sekunde = to_string(isekunde);
-    }
-    else
-    {
-        sekunde = "00";
-    }
+//     int isekunde = (int)id(SEKUNDE).state;
+//     std::string sekunde;
+//     if (isekunde >= 0 & isekunde < 60)
+//     {
+//         if (isekunde < 10)
+//             sekunde = "0" + to_string(isekunde);
+//         else
+//             sekunde = to_string(isekunde);
+//     }
+//     else
+//     {
+//         sekunde = "00";
+//     }
 
-    id(ZEIT).publish_state(stunde + ":" + minute + ":" + sekunde);
-    return;
+//     id(ZEIT).publish_state(stunde + ":" + minute + ":" + sekunde);
+//     return;
 
-    //              id(DATUM).publish_state("20" + to_string((int)id(JAHR).state) + "-" + to_string((int)id(MONAT).state) + "-" + to_string((int)id(TAG).state));
-}
+//     //              id(DATUM).publish_state("20" + to_string((int)id(JAHR).state) + "-" + to_string((int)id(MONAT).state) + "-" + to_string((int)id(TAG).state));
+// }
 
 #endif
