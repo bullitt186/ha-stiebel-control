@@ -178,14 +178,7 @@ const ElsterIndex *GetElsterIndex(const char *str)
 {
   for (int i = 0; i <= (int)High(ElsterTable); i++)
   {
-    if (!strcmp(ElsterTable[i].Name, str))
-    {
-      return &ElsterTable[i];
-    }
-  }
-  for (int i = 0; i <= (int)High(ElsterTable); i++)
-  {
-    if (!strcmp(ElsterTable[i].EnglishName, str))
+    if (!strcmp(ElsterTable[i].Name, str) || !strcmp(ElsterTable[i].EnglishName, str))
     {
       return &ElsterTable[i];
     }
