@@ -1,3 +1,9 @@
 settings.json
 .DS_Store
 .vscode
+secrets.yaml
+/venv
+
+# Added by cargo
+
+/target
