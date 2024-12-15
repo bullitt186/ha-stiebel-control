@@ -16,24 +16,6 @@ views:
                 entity: sensor.zeit
                 name: Uhrzeit
                 vertical: false
-          - type: horizontal-stack
-            cards:
-              - type: gauge
-                entity: sensor.cop_gesamt
-                min: 3
-                max: 4
-                needle: false
-                name: COP Gesamt
-              - type: gauge
-                entity: sensor.cop_heiz
-                min: 3
-                max: 4
-                name: COP Heizen
-              - type: gauge
-                entity: sensor.cop_ww
-                min: 3
-                max: 4
-                name: COP Wasser
           - square: false
             type: grid
             cards:
@@ -43,7 +25,7 @@ views:
                 vertical: false
               - type: tile
                 entity: sensor.sommerbetrieb_text
-                'name:': Betriebsart
+                "name:": Betriebsart
                 vertical: false
             columns: 2
       - type: vertical-stack

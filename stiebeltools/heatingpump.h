@@ -22,11 +22,11 @@
 
 typedef struct
 {
-    const char *Name;
-    uint32_t CanId;
-    uint8_t ReadId[2];
-    uint8_t WriteId[2];
-    uint8_t ConfirmationId[2];
+  const char *Name;
+  uint32_t CanId;
+  uint8_t ReadId[2];
+  uint8_t WriteId[2];
+  uint8_t ConfirmationId[2];
 } CanMember;
 
 /*
@@ -62,151 +62,135 @@ static const CanMember CanMembers[] =
 
 typedef enum
 {
-    // Die Reihenfolge muss mit CanMembers übereinstimmen!
-    cm_espclient = 0,
-    cm_pump,
-    cm_fe7x,
-    cm_fek,
-    cm_manager,
-    cm_fe7,
+  // Die Reihenfolge muss mit CanMembers übereinstimmen!
+  cm_espclient = 0,
+  cm_pump,
+  cm_fe7x,
+  cm_fek,
+  cm_manager,
+  cm_fe7,
 } CanMemberType;
 
 const ElsterIndex *processCanMessage(unsigned short can_id, std::string &signalValue, std::vector<unsigned char> msg)
 {
-    // Return if the message is too small
-    if (msg.size() < 7)
-    {
-        return &ElsterTable[0];
-    }
+  // Return if the message is too small
+  if (msg.size() < 7)
+  {
+    return &ElsterTable[0];
+  }
 
-    const ElsterIndex *ei;
-    unsigned char byte1;
-    unsigned char byte2;
-    char charValue[16];
+  const ElsterIndex *ei;
+  unsigned char byte1;
+  unsigned char byte2;
+  char charValue[16];
 
-    if (int(msg[2]) == 0xfa)
-    {
-        byte1 = msg[5];
-        byte2 = msg[6];
-        ei = GetElsterIndex(int((msg[4]) + ((msg[3]) << 8)));
-    }
-    else
-    {
-        byte1 = msg[3];
-        byte2 = msg[4];
-        ei = GetElsterIndex(int(msg[2]));
-    }
+  if (int(msg[2]) == 0xfa)
+  {
+    byte1 = msg[5];
+    byte2 = msg[6];
+    ei = GetElsterIndex(int((msg[4]) + ((msg[3]) << 8)));
+  }
+  else
+  {
+    byte1 = msg[3];
+    byte2 = msg[4];
+    ei = GetElsterIndex(int(msg[2]));
+  }
 
-    switch (ei->Type)
-    {
-    case et_double_val:
-        SetDoubleType(charValue, ei->Type, double(byte2 + (byte1 << 8)));
-        break;
-    case et_triple_val:
-        SetDoubleType(charValue, ei->Type, double(byte2 + (byte1 << 8)));
-        break;
-    default:
-        SetValueType(charValue, ei->Type, int(byte2 + (byte1 << 8)));
-        break;
-    }
+  switch (ei->Type)
+  {
+  case et_double_val:
+    SetDoubleType(charValue, ei->Type, double(byte2 + (byte1 << 8)));
+    break;
+  case et_triple_val:
+    SetDoubleType(charValue, ei->Type, double(byte2 + (byte1 << 8)));
+    break;
+  default:
+    SetValueType(charValue, ei->Type, int(byte2 + (byte1 << 8)));
+    break;
+  }
 
-    // sprintf(logString, "%d;%s;%s;%s", can_id, ei->Name, charValue, ElsterTypeStr[ei->Type]);
-    // id(received_can_signal).publish_state(logString);
-    ESP_LOGI("processCanMessage()", "%d:\t%s:\t%s\t(%s)", can_id, ei->EnglishName, charValue, ElsterTypeStr[ei->Type]);
+  // sprintf(logString, "%d;%s;%s;%s", can_id, ei->Name, charValue, ElsterTypeStr[ei->Type]);
+  // id(received_can_signal).publish_state(logString);
+  ESP_LOGI("processCanMessage()", "%d:\t%s:\t%s\t(%s)", can_id, ei->EnglishName, charValue, ElsterTypeStr[ei->Type]);
 
-    signalValue = (std::string)charValue;
-    return ei;
-}
-
-void update_COP_DHW()
-{
-    id(cop_water).publish_state((id(HEATING_DHW_DAY_KWH).state) / id(ELECTRICITY_INTAKE_DHW_DAY_KWH).state);
-    return;
-}
-void update_COP_HEATER()
-{
-    id(cop_heater).publish_state((id(HEAT_YIELD_HEATING_DAY_KWH).state) / id(ELECTRICITY_INTAKE_HEATING_DAY_KWH).state);
-    return;
-}
-void update_COP_TOTAL()
-{
-    id(cop_total).publish_state((id(HEATING_DHW_DAY_KWH).state + id(HEAT_YIELD_HEATING_DAY_KWH).state) / (id(ELECTRICITY_INTAKE_DHW_DAY_KWH).state + id(ELECTRICITY_INTAKE_HEATING_DAY_KWH).state));
-    return;
+  signalValue = (std::string)charValue;
+  return ei;
 }
 
 void readSignal(const CanMember *member, const ElsterIndex *ei)
 {
-    bool use_extended_id = 0; // No use of extended ID
-    uint8_t IndexByte1 = (uint8_t)(ei->Index >> 8);
-    uint8_t IndexByte2 = (uint8_t)(ei->Index - ((ei->Index >> 8) << 8));
-    std::vector<uint8_t> data;
+  bool use_extended_id = 0; // No use of extended ID
+  uint8_t IndexByte1 = (uint8_t)(ei->Index >> 8);
+  uint8_t IndexByte2 = (uint8_t)(ei->Index - ((ei->Index >> 8) << 8));
+  std::vector<uint8_t> data;
 
-    if (IndexByte1 == 0x00)
-    {
-        data.insert(data.end(), {member->ReadId[0],
-                                 member->ReadId[1],
-                                 IndexByte2,
-                                 0x00,
-                                 0x00,
-                                 0x00,
-                                 0x00});
-    }
-    else
-    {
-        data.insert(data.end(), {member->ReadId[0],
-                                 member->ReadId[1],
-                                 0xfa,
-                                 IndexByte1,
-                                 IndexByte2,
-                                 0x00,
-                                 0x00});
-    }
+  if (IndexByte1 == 0x00)
+  {
+    data.insert(data.end(), {member->ReadId[0],
+                             member->ReadId[1],
+                             IndexByte2,
+                             0x00,
+                             0x00,
+                             0x00,
+                             0x00});
+  }
+  else
+  {
+    data.insert(data.end(), {member->ReadId[0],
+                             member->ReadId[1],
+                             0xfa,
+                             IndexByte1,
+                             IndexByte2,
+                             0x00,
+                             0x00});
+  }
 
-    char logmsg[255];
-    sprintf(logmsg, "READ \"%s\" (0x%04x) FROM %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x", ei->EnglishName, ei->Index, member->Name, member->CanId, member->ReadId[0], member->ReadId[1], data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
-    ESP_LOGI("readSignal()", "%s", logmsg);
+  char logmsg[255];
+  sprintf(logmsg, "READ \"%s\" (0x%04x) FROM %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x", ei->EnglishName, ei->Index, member->Name, member->CanId, member->ReadId[0], member->ReadId[1], data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
+  ESP_LOGI("readSignal()", "%s", logmsg);
 
-    id(my_mcp2515).send_data(CanMembers[cm_espclient].CanId, use_extended_id, data);
+  id(my_mcp2515).send_data(CanMembers[cm_espclient].CanId, use_extended_id, data);
 
-    return;
+  return;
 }
 
 void writeSignal(const CanMember *member, const ElsterIndex *ei, const char *&str)
 {
-    bool use_extended_id = 0; // No use of extended ID
-    int writeValue = TranslateString(str, ei->Type);
-    uint8_t IndexByte1 = (uint8_t)(ei->Index >> 8);
-    uint8_t IndexByte2 = (uint8_t)(ei->Index - ((ei->Index >> 8) << 8));
-    std::vector<uint8_t> data;
+  bool use_extended_id = 0; // No use of extended ID
+  int writeValue = TranslateString(str, ei->Type);
+  uint8_t IndexByte1 = (uint8_t)(ei->Index >> 8);
+  uint8_t IndexByte2 = (uint8_t)(ei->Index - ((ei->Index >> 8) << 8));
+  std::vector<uint8_t> data;
 
-    if (IndexByte1 == 0x00)
-    {
-        data.insert(data.end(), {member->WriteId[0],
-                                 member->WriteId[1],
-                                 IndexByte2,
-                                 ((uint8_t)(writeValue >> 8)),
-                                 ((uint8_t)(writeValue - ((writeValue >> 8) << 8))),
-                                 0x00,
-                                 0x00});
-    }
-    else
-    {
-        data.insert(data.end(), {member->WriteId[0],
-                                 member->WriteId[1],
-                                 0xfa,
-                                 IndexByte1,
-                                 IndexByte2,
-                                 ((uint8_t)(writeValue >> 8)),
-                                 ((uint8_t)(writeValue - ((writeValue >> 8) << 8)))});
-    }
+  if (IndexByte1 == 0x00)
+  {
+    data.insert(data.end(), {member->WriteId[0],
+                             member->WriteId[1],
+                             IndexByte2,
+                             ((uint8_t)(writeValue >> 8)),
+                             ((uint8_t)(writeValue - ((writeValue >> 8) << 8))),
+                             0x00,
+                             0x00});
+  }
+  else
+  {
+    data.insert(data.end(), {member->WriteId[0],
+                             member->WriteId[1],
+                             0xfa,
+                             IndexByte1,
+                             IndexByte2,
+                             ((uint8_t)(writeValue >> 8)),
+                             ((uint8_t)(writeValue - ((writeValue >> 8) << 8)))});
+  }
 
-    char logmsg[120];
-    sprintf(logmsg, "WRITE \"%s\" (0x%04x): \"%d\" TO: %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x", ei->Name, ei->Index, writeValue, member->Name, member->CanId, member->ReadId[0], member->ReadId[1], data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
-    ESP_LOGI("writeSignal()", "%s", logmsg);
+  char logmsg[120];
+  sprintf(logmsg, "WRITE \"%s\" (0x%04x): \"%d\" TO: %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x", ei->Name, ei->Index, writeValue, member->Name, member->CanId, member->ReadId[0], member->ReadId[1], data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
+  ESP_LOGI("writeSignal()", "%s", logmsg);
 
-    id(my_mcp2515).send_data(CanMembers[cm_espclient].CanId, use_extended_id, data);
+  id(my_mcp2515).send_data(CanMembers[cm_espclient].CanId, use_extended_id, data);
 
-    return;
+  return;
 }
 
 // void publishDate()

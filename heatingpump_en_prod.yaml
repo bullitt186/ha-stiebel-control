@@ -1,706 +1,394 @@
 esphome:
+  on_boot:
+    - lambda: |-
+        id(my_ota).set_auth_password("");
   name: heatingpump
-  
+  friendly_name: Heating Pump CAN Interface
   platform: ESP32
-  board: nodemcu-32s
+  board: esp32dev
   includes:
-  - stiebeltools/ElsterTable.h
-  - stiebeltools/KElsterTable.h
-  - stiebeltools/KElsterTable.cpp
-  - stiebeltools/NUtils.h
-  - stiebeltools/NUtils.cpp
-  - stiebeltools/NTypes.h
-  - stiebeltools/heatingpump.h
+    - stiebeltools/ElsterTable.h
+    - stiebeltools/KElsterTable.h
+    - stiebeltools/KElsterTable.cpp
+    - stiebeltools/NUtils.h
+    - stiebeltools/NUtils.cpp
+    - stiebeltools/NTypes.h
+    - stiebeltools/heatingpump.h
+
 api:
-  encryption:
-    key: !secret api_encryption_key
+
 logger:
   level: INFO
 ota:
   - platform: esphome
-    password: !secret ota_password
+    id: my_ota
+    password: "Old password"
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   manual_ip:
-    static_ip: !secret ip_address
-    gateway: !secret ip_gateway
-    subnet: !secret ip_mask
-
-  # Enable fallback hotspot (captive portal) in case wifi connection fails
-  ap:
-    ssid: "Heatpump Fallback Hotspot"
-    password: !secret ap_ssid_fallback
+    static_ip: 192.168.178.126
+    gateway: 192.168.178.1
+    dns1: 192.168.178.1
+    subnet: 255.255.255.0
+  use_address: 192.168.178.126
 captive_portal: null
 
-# FIXME: Need to translate - Adrien
-# select:
-# - platform: template
-#   name: PROGRAMMSCHALTER_SET
-#   id: PROGRAMMSCHALTER_SET
-#   options:
-#   - Notbetrieb
-#   - Bereitschaft
-#   - Automatik
-#   - Tagbetrieb
-#   - Absenkbetrieb
-#   - Warmwasser
-#   - Unbekannt
-#   initial_option: Unbekannt
-#   optimistic: true
-#   on_value:
-#     then:
-#     - lambda: |-
-#         // Prüfe ob Dropdown nicht auf Unbekannt steht
-#         const char* auswahl = id(PROGRAMMSCHALTER_SET).state.c_str();
-#         if(strcmp(auswahl, "Unbekannt") != 0) {
-#           writeSignal(&CanMembers[cm_manager], GetElsterIndex("PROGRAMMSCHALTER"), auswahl);
-#           readSignal(&CanMembers[cm_manager], GetElsterIndex("PROGRAMMSCHALTER"));
-#         }
-#         return;
 sensor:
+  ### FROM PUMP
+  - platform: template
+    name: OUTSIDE_TEMP
+    id: OUTSIDE_TEMP
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_pump], GetElsterIndex("OUTSIDE_TEMP"));
+      return {};
+  - platform: template
+    name: RETURN_FLOW_INTERNAL_TEMP
+    id: RETURN_FLOW_INTERNAL_TEMP
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_pump], GetElsterIndex("RETURN_FLOW_INTERNAL_TEMP"));
+      return {};
 
-### COP
-- platform: template
-  name: "COP value heating"
-  id: cop_heater
-  unit_of_measurement: "a.u."
-  icon: "mdi:chart-bell-curve-cumulative"
-  device_class: "power_factor"
-  state_class: "measurement"
-  accuracy_decimals: 2
+  # HK1 - Heating Circuit Basement
+  - platform: template
+    name: FLOW_INTERNAL_TEMP_HK1
+    id: FLOW_INTERNAL_TEMP_HK1
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_pump], GetElsterIndex("FLOW_INTERNAL_TEMP_HK1"));
+      return {};
 
-- platform: template
-  name: "COP value hot water"
-  id: cop_water
-  unit_of_measurement: "a.u."
-  icon: "mdi:chart-bell-curve-cumulative"
-  device_class: "power_factor"
-  state_class: "measurement"
-  accuracy_decimals: 2
+  # HK1 - Heating Circuit Basement
+  - platform: template
+    name: FLOW_SETPOINT_TEMP_HK1
+    id: FLOW_SETPOINT_TEMP_HK1
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 30sec
+    lambda: |-
+      readSignal(&CanMembers[cm_fe7x], GetElsterIndex("FLOW_SETPOINT_TEMP"));
+      return {};
 
-- platform: template
-  name: "Total COP value"
-  id: cop_total
-  unit_of_measurement: "a.u."
-  icon: "mdi:chart-bell-curve-cumulative"
-  device_class: "power_factor"
-  state_class: "measurement"
-  accuracy_decimals: 2
+  - platform: template
+    name: STORAGE_TANK_INTERNAL_TEMP
+    id: STORAGE_TANK_INTERNAL_TEMP
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_pump], GetElsterIndex("STORAGE_TANK_INTERNAL_TEMP"));
+      return {};
 
-### FROM PUMP
-- platform: template
-  name: OUTSIDE_TEMP
-  id: OUTSIDE_TEMP
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("OUTSIDE_TEMP"));
-    return {};
-- platform: template
-  name: RETURN_FLOW_INTERNAL_TEMP
-  id: RETURN_FLOW_INTERNAL_TEMP
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("RETURN_FLOW_INTERNAL_TEMP"));
-    return {};
+  - platform: template
+    name: SOURCE_ACTUAL
+    id: SOURCE_ACTUAL
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_pump], GetElsterIndex("SOURCE_ACTUAL"));
+      return {};
+  - platform: template
+    name: HOT_GAS_TEMP
+    id: HOT_GAS_TEMP
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_pump], GetElsterIndex("HOT_GAS_TEMP"));
+      return {};
+  - platform: template
+    name: AUXILIARY_BOILER_SETPOINT
+    id: AUXILIARY_BOILER_SETPOINT
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_pump], GetElsterIndex("AUXILIARY_BOILER_SETPOINT"));
+      return {};
 
-# HK1 - Heating Circuit Basement
-- platform: template
-  name: FLOW_INTERNAL_TEMP_HK1
-  id: FLOW_INTERNAL_TEMP_HK1
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("FLOW_INTERNAL_TEMP_HK1"));
-    return {};
+  # Eco Temperature for DHW
+  - platform: template
+    name: SET_STORAGE_TANK_SETPOINT_ECO
+    id: SET_STORAGE_TANK_SETPOINT_TEMPERATURE2
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_pump], GetElsterIndex("SET_STORAGE_TANK_SETPOINT_TEMPERATURE2"));
+      return {};
 
-# HK1 - Heating Circuit Basement
-- platform: template
-  name: FLOW_SETPOINT_TEMP_HK1
-  id: FLOW_SETPOINT_TEMP_HK1
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1
-  update_interval: 30sec
-  lambda: |-
-    readSignal(&CanMembers[cm_fe7x], GetElsterIndex("FLOW_SETPOINT_TEMP"));
-    return {};
+  - platform: template
+    name: HEATING_RETURN_ACTUAL
+    id: HEATING_RETURN_ACTUAL
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_pump], GetElsterIndex("HEATING_RETURN_ACTUAL"));
+      return {};
 
+  # Température Ballon Tampon cible
+  - platform: template
+    name: BUFFER_SETPOINT
+    id: BUFFER_SETPOINT
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_pump], GetElsterIndex("BUFFER_SETPOINT"));
+      return {};
 
-- platform: template
-  name: STORAGE_TANK_INTERNAL_TEMP
-  id: STORAGE_TANK_INTERNAL_TEMP
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("STORAGE_TANK_INTERNAL_TEMP"));
-    return {};
+  # Température Ballon Tampon réel
+  - platform: template
+    name: BUFFER_TEMP_BOTTOM1
+    id: BUFFER_TEMP_BOTTOM1
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_pump], GetElsterIndex("BUFFER_TEMP_BOTTOM1"));
+      return {};
 
-- platform: template
-  name: SOURCE_ACTUAL
-  id: SOURCE_ACTUAL
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("SOURCE_ACTUAL"));
-    return {};
-- platform: template
-  name: HOT_GAS_TEMP
-  id: HOT_GAS_TEMP
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("HOT_GAS_TEMP"));
-    return {};
-- platform: template
-  name: AUXILIARY_BOILER_SETPOINT
-  id: AUXILIARY_BOILER_SETPOINT
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("AUXILIARY_BOILER_SETPOINT"));
-    return {};
+  - platform: template
+    name: CIRCUIT_PRESSURE
+    id: CIRCUIT_PRESSURE
+    unit_of_measurement: bar
+    device_class: pressure
+    state_class: measurement
+    accuracy_decimals: 2
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_pump], GetElsterIndex("CIRCUIT_PRESSURE"));
+      return {};
 
-# Eco Temperature for DHW
-- platform: template
-  name: SET_STORAGE_TANK_SETPOINT_ECO
-  id: SET_STORAGE_TANK_SETPOINT_TEMPERATURE2
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("SET_STORAGE_TANK_SETPOINT_TEMPERATURE2"));
-    return {};
+  - platform: template
+    name: SOURCE_PRESSURE
+    id: SOURCE_PRESSURE
+    unit_of_measurement: bar
+    device_class: pressure
+    state_class: measurement
+    accuracy_decimals: 2
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_pump], GetElsterIndex("SOURCE_PRESSURE"));
+      return {};
 
-- platform: template
-  name: HEATING_RETURN_ACTUAL
-  id: HEATING_RETURN_ACTUAL
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("HEATING_RETURN_ACTUAL"));
-    return {};
+  - platform: template
+    name: FLOW_RATE
+    id: FLOW_RATE
+    icon: mdi:waves-arrow-right
+    unit_of_measurement: l/min
+    state_class: measurement
+    accuracy_decimals: 2
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_pump], GetElsterIndex("FLOW_RATE"));
+      return {};
 
-# Température Ballon Tampon cible
-- platform: template
-  name: BUFFER_SETPOINT
-  id: BUFFER_SETPOINT
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("BUFFER_SETPOINT"));
-    return {};
+  ## FROM FEK (can't read - just listen)
+  - platform: template
+    name: HUMIDITY
+    id: HUMIDITY
+    unit_of_measurement: "%"
+    icon: "mdi:water-percent"
+    device_class: "humidity"
+    state_class: measurement
+    accuracy_decimals: 1
 
-# Température Ballon Tampon réel
-- platform: template
-  name: BUFFER_TEMP_BOTTOM1
-  id: BUFFER_TEMP_BOTTOM1
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("BUFFER_TEMP_BOTTOM1"));
-    return {};
+  - platform: template
+    name: ADJUSTED_ROOM_SET_TEMP
+    id: ADJUSTED_ROOM_SET_TEMP
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
 
-- platform: template
-  name: CIRCUIT_PRESSURE
-  id: CIRCUIT_PRESSURE
-  unit_of_measurement: bar
-  device_class: pressure
-  state_class: measurement
-  accuracy_decimals: 2
-  update_interval: 1min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("CIRCUIT_PRESSURE"));
-    return {};
+  - platform: template
+    name: ROOM_INTERNAL_TEMP
+    id: ROOM_INTERNAL_TEMP
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
 
-- platform: template
-  name: SOURCE_PRESSURE
-  id: SOURCE_PRESSURE
-  unit_of_measurement: bar
-  device_class: pressure
-  state_class: measurement
-  accuracy_decimals: 2
-  update_interval: 1min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("SOURCE_PRESSURE"));
-    return {};
+  - platform: template
+    name: FLOW_INTERNAL_TEMP
+    id: FLOW_INTERNAL_TEMP
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
 
-- platform: template
-  name: FLOW_RATE
-  id: FLOW_RATE
-  icon: mdi:waves-arrow-right
-  unit_of_measurement: l/min
-  state_class: measurement
-  accuracy_decimals: 2
-  update_interval: 1min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("FLOW_RATE"));
-    return {};
+  - platform: template
+    name: BOILER_SET_TEMP
+    id: BOILER_SET_TEMP
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
 
-## POWER METRICS HEATING
-- platform: template
-  name: ELECTRICITY_INTAKE_HEATING_DAY_WH
-  id: ELECTRICITY_INTAKE_HEATING_DAY_WH
-  unit_of_measurement: kWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("ELECTRICITY_INTAKE_HEATING_DAY_WH"));
-    return {};
+  ## FROM FE7
+  - platform: template
+    name: FLOW_INTERNAL_TEMP_BASEMENT
+    id: FLOW_INTERNAL_TEMP_BASEMENT
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
 
-- platform: template
-  name: ELECTRICITY_INTAKE_HEATING_DAY_KWH
-  id: ELECTRICITY_INTAKE_HEATING_DAY_KWH
-  unit_of_measurement: kWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("ELECTRICITY_INTAKE_HEATING_DAY_KWH"));
-    return {};
+  - platform: template
+    name: ADJUSTED_ROOM_SET_TEMP_BASEMENT
+    id: ADJUSTED_ROOM_SET_TEMP_BASEMENT
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
 
-- platform: template
-  name: ELECTRICITY_INTAKE_HEATING_DAY_SUM
-  id: ELECTRICITY_INTAKE_HEATING_DAY_SUM
-  unit_of_measurement: kWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  state_class: total_increasing
+  - platform: template
+    name: MAX_TEMP_BOILER
+    id: MAX_TEMP_BOILER
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
 
-- platform: template
-  name: ELECTRICITY_INTAKE_HEATING_SUM_KWH
-  id: ELECTRICITY_INTAKE_HEATING_SUM_KWH
-  unit_of_measurement: kWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("ELECTRICITY_INTAKE_HEATING_SUM_KWH"));
-    return {};
+  - platform: template
+    name: ROOM_INTERNAL_TEMP_BASEMENT
+    id: ROOM_INTERNAL_TEMP_BASEMENT
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_fe7], GetElsterIndex("ROOM_INTERNAL_TEMP"));
+      return {};
 
-- platform: template
-  name: ELECTRICITY_INTAKE_HEATING_SUM_MWH
-  id: ELECTRICITY_INTAKE_HEATING_SUM_MWH
-  unit_of_measurement: MWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("ELECTRICITY_INTAKE_HEATING_SUM_MWH"));
-    return {};
+  - platform: template
+    name: FLOW_INTERNAL_TEMP_HK2
+    id: FLOW_INTERNAL_TEMP_HK2
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_fe7], GetElsterIndex("FLOW_INTERNAL_TEMP"));
+      return {};
 
-- platform: template
-  name: ELECTRICITY_INTAKE_HEATING_SUM
-  id: ELECTRICITY_INTAKE_HEATING_SUM
-  unit_of_measurement: MWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  state_class: total_increasing
+  - platform: template
+    name: FLOW_SETPOINT_TEMP_HK2
+    id: FLOW_SETPOINT_TEMP_HK2
+    unit_of_measurement: °C
+    icon: mdi:thermometer-lines
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_fe7], GetElsterIndex("FLOW_SETPOINT_TEMP"));
+      return {};
 
-- platform: template
-  name: HEAT_YIELD_HEATING_DAY_WH
-  id: HEAT_YIELD_HEATING_DAY_WH
-  unit_of_measurement: kWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("HEAT_YIELD_HEATING_DAY_WH"));
-    return {};
+  # TEST
 
-- platform: template
-  name: HEAT_YIELD_HEATING_DAY_KWH
-  id: HEAT_YIELD_HEATING_DAY_KWH
-  unit_of_measurement: kWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("HEAT_YIELD_HEATING_DAY_KWH"));
-    return {};
+  ## FROM Manager
+  - platform: template
+    name: FATAL_ERROR
+    id: FATAL_ERROR
+    # unit_of_measurement: °C
+    # icon: mdi:thermometer-lines
+    # device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 5min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], GetElsterIndex("FATAL_ERROR"));
+      return {};
 
-- platform: template
-  name: HEAT_YIELD_HEATING_DAY_SUM
-  id: HEAT_YIELD_HEATING_DAY_SUM
-  unit_of_measurement: kWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  state_class: total_increasing
+  - platform: template
+    name: ERROR_MESSAGE
+    id: ERROR_MESSAGE
+    # unit_of_measurement: °C
+    # icon: mdi:thermometer-lines
+    # device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 5min
+    lambda: |-
+      readSignal(&CanMembers[cm_pump], GetElsterIndex("ERROR_MESSAGE"));
+      return {};
 
-- platform: template
-  name: HEAT_YIELD_HEATING_SUM_KWH
-  id: HEAT_YIELD_HEATING_SUM_KWH
-  unit_of_measurement: kWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("HEAT_YIELD_HEATING_SUM_KWH"));
-    return {};
-
-- platform: template
-  name: HEAT_YIELD_HEATING_SUM_MWH
-  id: HEAT_YIELD_HEATING_SUM_MWH
-  unit_of_measurement: MWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("HEAT_YIELD_HEATING_SUM_MWH"));
-    return {};
-
-- platform: template
-  name: HEAT_YIELD_HEATING_SUM
-  id: HEAT_YIELD_HEATING_SUM
-  unit_of_measurement: MWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  state_class: total_increasing
-
-
-## POWER METRICS DHW
-- platform: template
-  name: ELECTRICITY_INTAKE_DHW_DAY_WH
-  id: ELECTRICITY_INTAKE_DHW_DAY_WH
-  unit_of_measurement: kWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("ELECTRICITY_INTAKE_DHW_DAY_WH"));
-    return {};
-
-- platform: template
-  name: ELECTRICITY_INTAKE_DHW_DAY_KWH
-  id: ELECTRICITY_INTAKE_DHW_DAY_KWH
-  unit_of_measurement: kWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("ELECTRICITY_INTAKE_DHW_DAY_KWH"));
-    return {};
-
-- platform: template
-  name: ELECTRICITY_INTAKE_DHW_DAY_SUM
-  id: ELECTRICITY_INTAKE_DHW_DAY_SUM
-  unit_of_measurement: kWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  state_class: total_increasing
-
-- platform: template
-  name: ELECTRICITY_INTAKE_DHW_SUM_KWH
-  id: ELECTRICITY_INTAKE_DHW_SUM_KWH
-  unit_of_measurement: kWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("ELECTRICITY_INTAKE_DHW_SUM_KWH"));
-    return {};
-
-- platform: template
-  name: ELECTRICITY_INTAKE_DHW_SUM_MWH
-  id: ELECTRICITY_INTAKE_DHW_SUM_MWH
-  unit_of_measurement: MWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("ELECTRICITY_INTAKE_DHW_SUM_MWH"));
-    return {};
-
-- platform: template
-  name: ELECTRICITY_INTAKE_DHW_SUM
-  id: ELECTRICITY_INTAKE_DHW_SUM
-  unit_of_measurement: MWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  state_class: total_increasing
-
-- platform: template
-  name: HEATING_DHW_DAY_WH
-  id: HEATING_DHW_DAY_WH
-  unit_of_measurement: kWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("HEATING_DHW_DAY_WH"));
-    return {};
-
-- platform: template
-  name: HEATING_DHW_DAY_KWH
-  id: HEATING_DHW_DAY_KWH
-  unit_of_measurement: kWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("HEATING_DHW_DAY_KWH"));
-    return {};
-
-- platform: template
-  name: HEATING_DHW_DAY_SUM
-  id: HEATING_DHW_DAY_SUM
-  unit_of_measurement: kWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  state_class: total_increasing
-
-- platform: template
-  name: HEATING_DHW_SUM_KWH
-  id: HEATING_DHW_SUM_KWH
-  unit_of_measurement: kWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("HEATING_DHW_SUM_KWH"));
-    return {};
-
-- platform: template
-  name: HEATING_DHW_SUM_MWH
-  id: HEATING_DHW_SUM_MWH
-  unit_of_measurement: MWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_pump], GetElsterIndex("HEATING_DHW_SUM_MWH"));
-    return {};
-
-- platform: template
-  name: HEATING_DHW_SUM
-  id: HEATING_DHW_SUM
-  unit_of_measurement: MWh
-  device_class: energy
-  icon: mdi:transmission-tower
-  accuracy_decimals: 3
-  state_class: total_increasing
-
-
-## FROM FEK (can't read - just listen)
-- platform: template
-  name: HUMIDITY
-  id: HUMIDITY
-  unit_of_measurement: "%"
-  icon: "mdi:water-percent"
-  device_class: "humidity"
-  state_class: measurement
-  accuracy_decimals: 1
-
-- platform: template
-  name: ADJUSTED_ROOM_SET_TEMP
-  id: ADJUSTED_ROOM_SET_TEMP
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1  
-
-- platform: template
-  name: ROOM_INTERNAL_TEMP
-  id: ROOM_INTERNAL_TEMP
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1  
-
-- platform: template
-  name: FLOW_INTERNAL_TEMP
-  id: FLOW_INTERNAL_TEMP
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1  
-
-- platform: template
-  name: BOILER_SET_TEMP
-  id: BOILER_SET_TEMP
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1  
-
-
-
-## FROM FE7
-- platform: template
-  name: FLOW_INTERNAL_TEMP_BASEMENT
-  id: FLOW_INTERNAL_TEMP_BASEMENT
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1  
-
-- platform: template
-  name: ADJUSTED_ROOM_SET_TEMP_BASEMENT
-  id: ADJUSTED_ROOM_SET_TEMP_BASEMENT
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1  
-
-- platform: template
-  name: MAX_TEMP_BOILER
-  id: MAX_TEMP_BOILER
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-
-- platform: template
-  name: ROOM_INTERNAL_TEMP_BASEMENT
-  id: ROOM_INTERNAL_TEMP_BASEMENT
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_fe7], GetElsterIndex("ROOM_INTERNAL_TEMP"));
-    return {};
-
-- platform: template
-  name: FLOW_INTERNAL_TEMP_HK2
-  id: FLOW_INTERNAL_TEMP_HK2
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_fe7], GetElsterIndex("FLOW_INTERNAL_TEMP"));
-    return {};
-
-- platform: template
-  name: FLOW_SETPOINT_TEMP_HK2
-  id: FLOW_SETPOINT_TEMP_HK2
-  unit_of_measurement: °C
-  icon: mdi:thermometer-lines
-  device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1
-  update_interval: 10min
-  lambda: |-
-    readSignal(&CanMembers[cm_fe7], GetElsterIndex("FLOW_SETPOINT_TEMP"));
-    return {};
-
-# TEST
-
-## FROM Manager
-- platform: template
-  name: FATAL_ERROR
-  id: FATAL_ERROR
-  # unit_of_measurement: °C
-  # icon: mdi:thermometer-lines
-  # device_class: temperature
-  state_class: measurement
-  accuracy_decimals: 1
-  update_interval: 5min
-  lambda: |-
-    readSignal(&CanMembers[cm_manager], GetElsterIndex("FATAL_ERROR"));
-    return {};
-
-- platform: wifi_signal
-  name: WiFi Signal dBm
-  icon: mdi:wifi
-  update_interval: 60s
-  id: wifi_dbm
-- platform: template
-  name: WiFi Signal
-  icon: mdi:signal
-  unit_of_measurement: '%'
-  update_interval: 60s
-  id: wifi_percentage
-  lambda: |-
-    float dBm = id(wifi_dbm).state;
-    float MIN_DBM = -100.0; // Minimum RSSI in dBm
-    float MAX_DBM = -30.0; // Maximum RSSI in dBm
-    if (dBm < MIN_DBM) dBm = MIN_DBM;
-    if (dBm > MAX_DBM) dBm = MAX_DBM;
-    return ((dBm - MIN_DBM) / (MAX_DBM - MIN_DBM)) * 100;
-
+  - platform: wifi_signal
+    name: WiFi Signal dBm
+    icon: mdi:wifi
+    update_interval: 60s
+    id: wifi_dbm
+  - platform: template
+    name: WiFi Signal
+    icon: mdi:signal
+    unit_of_measurement: "%"
+    update_interval: 60s
+    id: wifi_percentage
+    lambda: |-
+      float dBm = id(wifi_dbm).state;
+      float MIN_DBM = -100.0; // Minimum RSSI in dBm
+      float MAX_DBM = -30.0; // Maximum RSSI in dBm
+      if (dBm < MIN_DBM) dBm = MIN_DBM;
+      if (dBm > MAX_DBM) dBm = MAX_DBM;
+      return ((dBm - MIN_DBM) / (MAX_DBM - MIN_DBM)) * 100;
 
 # text_sensor:
 # - platform: homeassistant
@@ -787,23 +475,33 @@ sensor:
 #   icon: mdi:clock
 
 switch:
-# Restart ESP device
+  # Restart ESP device
   - platform: restart
     name: "Boiler room ESP restart"
     id: restart_esp_heatpump
 
-
 time:
   - platform: sntp
-    on_time: 
+    on_time:
       - seconds: 0
         minutes: 0
         hours: 4
-        days_of_week: 1 
+        days_of_week: 1
         then:
           - switch.toggle: restart_esp_heatpump
 
-# button:
+button:
+  - platform: template
+    name: Reset System
+    id: reset_system
+    on_press:
+      then:
+        lambda: |-
+          ESP_LOGI("CURRENT ERROR_MESSAGE VALUE", "%s", id(ERROR_MESSAGE).state.c_str());
+          ESP_LOGI("(SIMULATING) Sending SYSTEM_RESET command to cm_manager (id: 480)");
+#          const char* resetString = "-255";
+#          writeSignal(&CanMembers[cm_manager], GetElsterIndex("SYSTEM_RESET"), resetString);
+
 # - platform: template
 #   name: Update Time
 #   id: update_uhrzeit
@@ -863,313 +561,221 @@ time:
 
 spi:
   id: McpSpi
-  clk_pin: GPIO18
-  mosi_pin: GPIO23
-  miso_pin: GPIO19
+  clk_pin: GPIO18 # SCK
+  mosi_pin: GPIO23 # SI
+  miso_pin: GPIO19 # SO
 
 canbus:
-- platform: mcp2515
-  id: my_mcp2515
-  spi_id: McpSpi
-  cs_pin: GPIO17
-  can_id: 0x680
-  use_extended_id: false
-  bit_rate: 20kbps
-  on_frame:
-  - can_id: 0x180
-    then:
-    - lambda: |-
-        unsigned short canId = 180;
-        std::string value;
-        const ElsterIndex* ei = processCanMessage(canId, value, x);
+  - platform: mcp2515
+    id: my_mcp2515
+    spi_id: McpSpi
+    cs_pin: GPIO4 # CS
+    can_id: 0x680
+    use_extended_id: false
+    bit_rate: 20kbps
+    on_frame:
+      - can_id: 0x180
+        then:
+          - lambda: |-
+              unsigned short canId = 180;
+              std::string value;
+              const ElsterIndex* ei = processCanMessage(canId, value, x);
 
-        if(ei->EnglishName == "OUTSIDE_TEMP") {
-          id(OUTSIDE_TEMP).publish_state(std::stof(value));
-          return;
-        }
-        if(ei->EnglishName == "RETURN_FLOW_INTERNAL_TEMP") {
-          id(RETURN_FLOW_INTERNAL_TEMP).publish_state(std::stof(value));
-          return;
-        }
-        if(ei->EnglishName == "FLOW_INTERNAL_TEMP_HK1") {
-          id(FLOW_INTERNAL_TEMP_HK1).publish_state(std::stof(value));
-          return;
-        }
-        if(ei->EnglishName == "STORAGE_TANK_INTERNAL_TEMP") {
-          id(STORAGE_TANK_INTERNAL_TEMP).publish_state(std::stof(value) + 3);
-          return;
-        }
-        if(ei->EnglishName == "SOURCE_ACTUAL") {
-          id(SOURCE_ACTUAL).publish_state(std::stof(value));
-          return;
-        }
-        if(ei->EnglishName == "HOT_GAS_TEMP") {
-          id(HOT_GAS_TEMP).publish_state(std::stof(value));
-          return;
-        }
-        if(ei->EnglishName == "AUXILIARY_BOILER_SETPOINT") {
-          id(AUXILIARY_BOILER_SETPOINT).publish_state(std::stof(value));
-          return;
-        }
-        if(ei->EnglishName == "HEATING_RETURN_ACTUAL") {
-          id(HEATING_RETURN_ACTUAL).publish_state(std::stof(value));
-          return;
-        }
-        if(ei->EnglishName == "BUFFER_SETPOINT") {
-          id(BUFFER_SETPOINT).publish_state(std::stof(value));
-          return;
-        }
-        if(ei->EnglishName == "BUFFER_TEMP_BOTTOM1") {
-          id(BUFFER_TEMP_BOTTOM1).publish_state(std::stof(value));
-          return;
-        }        
-        if(ei->EnglishName == "FLOW_RATE") {
-          id(FLOW_RATE).publish_state(std::stod(value) / 100);
-          return;
-        }
-        if(ei->EnglishName == "CIRCUIT_PRESSURE") {
-          id(CIRCUIT_PRESSURE).publish_state(std::stod(value) / 100 );
-          return;
-        }
-        if(ei->EnglishName == "SOURCE_PRESSURE") {
-          id(SOURCE_PRESSURE).publish_state(std::stod(value) / 100);
-          return;
-        }
+              if(ei->EnglishName == "ERROR_MESSAGE") {
+                id(ERROR_MESSAGE).publish_state(std::stof(value));
+                return;
+              }
+              if(ei->EnglishName == "OUTSIDE_TEMP") {
+                id(OUTSIDE_TEMP).publish_state(std::stof(value));
+                return;
+              }
+              if(ei->EnglishName == "RETURN_FLOW_INTERNAL_TEMP") {
+                id(RETURN_FLOW_INTERNAL_TEMP).publish_state(std::stof(value));
+                return;
+              }
+              if(ei->EnglishName == "FLOW_INTERNAL_TEMP_HK1") {
+                id(FLOW_INTERNAL_TEMP_HK1).publish_state(std::stof(value));
+                return;
+              }
+              if(ei->EnglishName == "STORAGE_TANK_INTERNAL_TEMP") {
+                id(STORAGE_TANK_INTERNAL_TEMP).publish_state(std::stof(value) + 3);
+                return;
+              }
+              if(ei->EnglishName == "SOURCE_ACTUAL") {
+                id(SOURCE_ACTUAL).publish_state(std::stof(value));
+                return;
+              }
+              if(ei->EnglishName == "HOT_GAS_TEMP") {
+                id(HOT_GAS_TEMP).publish_state(std::stof(value));
+                return;
+              }
+              if(ei->EnglishName == "AUXILIARY_BOILER_SETPOINT") {
+                id(AUXILIARY_BOILER_SETPOINT).publish_state(std::stof(value));
+                return;
+              }
+              if(ei->EnglishName == "HEATING_RETURN_ACTUAL") {
+                id(HEATING_RETURN_ACTUAL).publish_state(std::stof(value));
+                return;
+              }
+              if(ei->EnglishName == "BUFFER_SETPOINT") {
+                id(BUFFER_SETPOINT).publish_state(std::stof(value));
+                return;
+              }
+              if(ei->EnglishName == "BUFFER_TEMP_BOTTOM1") {
+                id(BUFFER_TEMP_BOTTOM1).publish_state(std::stof(value));
+                return;
+              }
+              if(ei->EnglishName == "FLOW_RATE") {
+                id(FLOW_RATE).publish_state(std::stod(value) / 100);
+                return;
+              }
+              if(ei->EnglishName == "CIRCUIT_PRESSURE") {
+                id(CIRCUIT_PRESSURE).publish_state(std::stod(value) / 100 );
+                return;
+              }
+              if(ei->EnglishName == "SOURCE_PRESSURE") {
+                id(SOURCE_PRESSURE).publish_state(std::stod(value) / 100);
+                return;
+              }
 
-        // POWER HEATING
+      - can_id: 0x301
+        then:
+          - lambda: |-
+              unsigned short canId = 301;
+              std::string value;
+              const ElsterIndex* ei = processCanMessage(canId, value, x);
 
-        if(ei->EnglishName == "ELECTRICITY_INTAKE_HEATING_DAY_WH") { 
-          id(ELECTRICITY_INTAKE_HEATING_DAY_WH).publish_state(std::stod(value) / 1000);
-          return;
-        }
+              if(ei->EnglishName == "FLOW_SETPOINT_TEMP") {
+                id(FLOW_SETPOINT_TEMP_HK1).publish_state(std::stof(value));
+                return;
+              }
 
-        if(ei->EnglishName == "ELECTRICITY_INTAKE_HEATING_DAY_KWH") { 
-          id(ELECTRICITY_INTAKE_HEATING_DAY_KWH).publish_state(std::stod(value) + id(ELECTRICITY_INTAKE_HEATING_DAY_WH).state);
-          id(ELECTRICITY_INTAKE_HEATING_DAY_SUM).publish_state(id(ELECTRICITY_INTAKE_HEATING_DAY_KWH).state);
-          update_COP_HEATER();
-          update_COP_TOTAL();
-          return;
-        }
+      - can_id: 0x302
+        then:
+          - lambda: |-
+              unsigned short canId = 302;
+              std::string value;
+              const ElsterIndex* ei = processCanMessage(canId, value, x);
 
-        if(ei->EnglishName == "ELECTRICITY_INTAKE_HEATING_SUM_KWH") {
-          id(ELECTRICITY_INTAKE_HEATING_SUM_KWH).publish_state(std::stod(value));
-          return;
-        }
+              if(ei->EnglishName == "HUMIDITY") {
+                id(HUMIDITY).publish_state(std::stof(value));
+                return;
+              }
+              if(ei->EnglishName == "ADJUSTED_ROOM_SET_TEMP") {
+                id(ADJUSTED_ROOM_SET_TEMP).publish_state(std::stof(value));
+                return;
+              }
+              if(ei->EnglishName == "ROOM_INTERNAL_TEMP") {
+                id(ROOM_INTERNAL_TEMP).publish_state(std::stof(value));
+                return;
+              }
+              if(ei->EnglishName == "BOILER_SET_TEMP") {
+                id(BOILER_SET_TEMP).publish_state(std::stof(value));
+                return;
+              }
 
-        if(ei->EnglishName == "ELECTRICITY_INTAKE_HEATING_SUM_MWH") {
-          id(ELECTRICITY_INTAKE_HEATING_SUM_MWH).publish_state(std::stod(value));
-          id(ELECTRICITY_INTAKE_HEATING_SUM).publish_state(id(ELECTRICITY_INTAKE_HEATING_SUM_KWH).state / 1000 + id(ELECTRICITY_INTAKE_HEATING_SUM_MWH).state);
-          return;
-        }
+      - can_id: 0x602
+        then:
+          - lambda: |-
+              unsigned short canId = 602;
+              std::string value;
+              const ElsterIndex* ei = processCanMessage(canId, value, x);
 
-        if(ei->EnglishName == "HEAT_YIELD_HEATING_DAY_WH") {
-          id(HEAT_YIELD_HEATING_DAY_WH).publish_state(std::stod(value) / 1000);
-          return;
-        }
+              // FLOW_INTERNAL_TEMP_HK2
+              if(ei->EnglishName == "FLOW_INTERNAL_TEMP") {
+                id(FLOW_INTERNAL_TEMP_HK2).publish_state(std::stof(value));
+                return;
+              }
 
-        if(ei->EnglishName == "HEAT_YIELD_HEATING_DAY_KWH") {
-          id(HEAT_YIELD_HEATING_DAY_KWH).publish_state(std::stod(value) +  id(HEAT_YIELD_HEATING_DAY_WH).state);
-          update_COP_HEATER();
-          update_COP_TOTAL();
-          return;
-        }
+              // FLOW_SETPOINT_TEMP_HK2
+              if(ei->EnglishName == "FLOW_SETPOINT_TEMP") {
+                id(FLOW_SETPOINT_TEMP_HK2).publish_state(std::stof(value));
+                return;
+              }
 
-        if(ei->EnglishName == "HEAT_YIELD_HEATING_SUM_KWH") {
-          id(HEAT_YIELD_HEATING_SUM_KWH).publish_state(std::stod(value));
-          return;
-        }        
+              if(ei->EnglishName == "ADJUSTED_ROOM_SET_TEMP") {
+                id(ADJUSTED_ROOM_SET_TEMP_BASEMENT).publish_state(std::stof(value));
+                return;
+              }
+              if(ei->EnglishName == "MAX_TEMP_BOILER") {
+                id(MAX_TEMP_BOILER).publish_state(std::stof(value));
+                return;
+              }
+              if(ei->EnglishName == "ROOM_INTERNAL_TEMP") {
+                id(ROOM_INTERNAL_TEMP_BASEMENT).publish_state(std::stof(value));
+                return;
+              }
 
-        if(ei->EnglishName == "HEAT_YIELD_HEATING_SUM_MWH") {
-          id(HEAT_YIELD_HEATING_SUM_MWH).publish_state(std::stod(value));
-          id(HEAT_YIELD_HEATING_SUM).publish_state(id(HEAT_YIELD_HEATING_SUM_KWH).state  / 1000 + id(HEAT_YIELD_HEATING_SUM_MWH).state);
-          return;
-        }
+      - can_id: 0x480
+        then:
+          - lambda: |-
+              unsigned short canId = 480;
+              std::string value;
+              const ElsterIndex* ei = processCanMessage(canId, value, x);
 
-        // POWER DHW
+              if(ei->EnglishName == "FATAL_ERROR") {
+                id(FATAL_ERROR).publish_state(std::stoi(value));
+                return;
+              }
 
-        if(ei->EnglishName == "ELECTRICITY_INTAKE_DHW_DAY_WH") {
-          id(ELECTRICITY_INTAKE_DHW_DAY_WH).publish_state(std::stod(value) / 1000);
-          return;
-        }
+      - can_id: 0
+        then:
+          - lambda: |-
+              unsigned short canId = 000;
+              std::string value;
+              const ElsterIndex* ei = processCanMessage(canId, value, x);
+      - can_id: 0x100
+        then:
+          - lambda: |-
+              unsigned short canId = 100;
+              std::string value;
+              const ElsterIndex* ei = processCanMessage(canId, value, x);
+      - can_id: 0x301
+        then:
+          - lambda: |-
+              unsigned short canId = 301;
+              std::string value;
+              const ElsterIndex* ei = processCanMessage(canId, value, x);
 
-        if(ei->EnglishName == "ELECTRICITY_INTAKE_DHW_DAY_KWH") {
-          id(ELECTRICITY_INTAKE_DHW_DAY_KWH).publish_state(std::stod(value) + id(ELECTRICITY_INTAKE_DHW_DAY_WH).state);
-          update_COP_DHW();
-          update_COP_TOTAL();
-          return;
-        }
-
-        if(ei->EnglishName == "ELECTRICITY_INTAKE_DHW_SUM_KWH") {
-          id(ELECTRICITY_INTAKE_DHW_SUM_KWH).publish_state(std::stod(value));
-          return;
-        }
-
-        if(ei->EnglishName == "ELECTRICITY_INTAKE_DHW_SUM_MWH") {
-          id(ELECTRICITY_INTAKE_DHW_SUM_MWH).publish_state(std::stod(value));
-          id(ELECTRICITY_INTAKE_DHW_SUM).publish_state(id(ELECTRICITY_INTAKE_DHW_SUM_KWH).state / 1000 + id(ELECTRICITY_INTAKE_DHW_SUM_MWH).state);
-          return;
-        }
-
-        if(ei->EnglishName == "HEATING_DHW_DAY_WH") {
-          id(HEATING_DHW_DAY_WH).publish_state(std::stod(value) / 1000);
-          return;
-        }       
-
-        if(ei->EnglishName == "HEATING_DHW_DAY_KWH") {
-          id(HEATING_DHW_DAY_KWH).publish_state(std::stod(value) + id(HEATING_DHW_DAY_WH).state);
-          update_COP_DHW();
-          update_COP_TOTAL();
-          return;
-        }
-
-        if(ei->EnglishName == "HEATING_DHW_SUM_KWH") {
-          id(HEATING_DHW_SUM_KWH).publish_state(std::stod(value));
-          return;
-        }
-
-        if(ei->EnglishName == "HEATING_DHW_SUM_MWH") {
-          id(HEATING_DHW_SUM_MWH).publish_state(std::stod(value));
-          id(HEATING_DHW_SUM).publish_state(id(HEATING_DHW_SUM_KWH).state  / 1000 + id(HEATING_DHW_SUM_MWH).state);
-          return;
-        }
-  - can_id: 0x301
-    then:
-    - lambda: |-
-        unsigned short canId = 301;
-        std::string value;
-        const ElsterIndex* ei = processCanMessage(canId, value, x);
-
-        if(ei->EnglishName == "FLOW_SETPOINT_TEMP") {
-          id(FLOW_SETPOINT_TEMP_HK1).publish_state(std::stof(value));
-          return;
-        }
-  
-  - can_id: 0x302
-    then:
-    - lambda: |-
-        unsigned short canId = 302;
-        std::string value;
-        const ElsterIndex* ei = processCanMessage(canId, value, x);
-
-        if(ei->EnglishName == "HUMIDITY") {
-          id(HUMIDITY).publish_state(std::stof(value));
-          return;
-        }
-        if(ei->EnglishName == "ADJUSTED_ROOM_SET_TEMP") {
-          id(ADJUSTED_ROOM_SET_TEMP).publish_state(std::stof(value));
-          return;
-        }
-        if(ei->EnglishName == "ROOM_INTERNAL_TEMP") {
-          id(ROOM_INTERNAL_TEMP).publish_state(std::stof(value));
-          return;
-        }
-        if(ei->EnglishName == "BOILER_SET_TEMP") {
-          id(BOILER_SET_TEMP).publish_state(std::stof(value));
-          return;
-        }
-
-  - can_id: 0x602
-    then:
-    - lambda: |-
-        unsigned short canId = 602;
-        std::string value;
-        const ElsterIndex* ei = processCanMessage(canId, value, x);
-
-        // FLOW_INTERNAL_TEMP_HK2
-        if(ei->EnglishName == "FLOW_INTERNAL_TEMP") {
-          id(FLOW_INTERNAL_TEMP_HK2).publish_state(std::stof(value));
-          return;
-        }
-
-        // FLOW_SETPOINT_TEMP_HK2
-        if(ei->EnglishName == "FLOW_SETPOINT_TEMP") {
-          id(FLOW_SETPOINT_TEMP_HK2).publish_state(std::stof(value));
-          return;
-        }
-
-        if(ei->EnglishName == "ADJUSTED_ROOM_SET_TEMP") {
-          id(ADJUSTED_ROOM_SET_TEMP_BASEMENT).publish_state(std::stof(value));
-          return;
-        }
-        if(ei->EnglishName == "MAX_TEMP_BOILER") {
-          id(MAX_TEMP_BOILER).publish_state(std::stof(value));
-          return;
-        }
-        if(ei->EnglishName == "ROOM_INTERNAL_TEMP") {
-          id(ROOM_INTERNAL_TEMP_BASEMENT).publish_state(std::stof(value));
-          return;
-        }
-
-  - can_id: 0x480
-    then:
-    - lambda: |-
-        unsigned short canId = 480;
-        std::string value;
-        const ElsterIndex* ei = processCanMessage(canId, value, x);
-
-        if(ei->EnglishName == "FATAL_ERROR") {
-          id(FATAL_ERROR).publish_state(std::stoi(value));
-          return;
-        }
-
-  - can_id: 0
-    then:
-    - lambda: |-
-        unsigned short canId = 000;
-        std::string value;
-        const ElsterIndex* ei = processCanMessage(canId, value, x);
-  - can_id: 0x100
-    then:
-    - lambda: |-
-        unsigned short canId = 100;
-        std::string value;
-        const ElsterIndex* ei = processCanMessage(canId, value, x);
-  - can_id: 0x301
-    then:
-    - lambda: |-
-        unsigned short canId = 301;
-        std::string value;
-        const ElsterIndex* ei = processCanMessage(canId, value, x);
-
-  - can_id: 0x509
-    then:
-    - lambda: |-
-        unsigned short canId = 509;
-        std::string value;
-        const ElsterIndex* ei = processCanMessage(canId, value, x);
-  - can_id: 0x514
-    then:
-    - lambda: |-
-        unsigned short canId = 514;
-        std::string value;
-        const ElsterIndex* ei = processCanMessage(canId, value, x);
-  - can_id: 0x601
-    then:
-    - lambda: |-
-        unsigned short canId = 601;
-        std::string value;
-        const ElsterIndex* ei = processCanMessage(canId, value, x);
-  - can_id: 0x602
-    then:
-    - lambda: |-
-        unsigned short canId = 602;
-        std::string value;
-        const ElsterIndex* ei = processCanMessage(canId, value, x);
-  - can_id: 0x603
-    then:
-    - lambda: |-
-        unsigned short canId = 603;
-        std::string value;
-        const ElsterIndex* ei = processCanMessage(canId, value, x);
-  - can_id: 0x680
-    then:
-    - lambda: |-
-        unsigned short canId = 680;
-        std::string value;
-        const ElsterIndex* ei = processCanMessage(canId, value, x);
-  - can_id: 0x700
-    then:
-    - lambda: |-
-        unsigned short canId = 700;
-        std::string value;
-        const ElsterIndex* ei = processCanMessage(canId, value, x);
+      - can_id: 0x509
+        then:
+          - lambda: |-
+              unsigned short canId = 509;
+              std::string value;
+              const ElsterIndex* ei = processCanMessage(canId, value, x);
+      - can_id: 0x514
+        then:
+          - lambda: |-
+              unsigned short canId = 514;
+              std::string value;
+              const ElsterIndex* ei = processCanMessage(canId, value, x);
+      - can_id: 0x601
+        then:
+          - lambda: |-
+              unsigned short canId = 601;
+              std::string value;
+              const ElsterIndex* ei = processCanMessage(canId, value, x);
+      - can_id: 0x602
+        then:
+          - lambda: |-
+              unsigned short canId = 602;
+              std::string value;
+              const ElsterIndex* ei = processCanMessage(canId, value, x);
+      - can_id: 0x603
+        then:
+          - lambda: |-
+              unsigned short canId = 603;
+              std::string value;
+              const ElsterIndex* ei = processCanMessage(canId, value, x);
+      - can_id: 0x680
+        then:
+          - lambda: |-
+              unsigned short canId = 680;
+              std::string value;
+              const ElsterIndex* ei = processCanMessage(canId, value, x);
+      - can_id: 0x700
+        then:
+          - lambda: |-
+              unsigned short canId = 700;
+              std::string value;
+              const ElsterIndex* ei = processCanMessage(canId, value, x);
