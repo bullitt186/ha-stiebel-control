@@ -1,0 +1,1301 @@
+#
+#
+#  Copyright (C) 2023 Bastian Stahmer (bastian@stahmer.net)
+#
+#  This program is part of the ESPHome / Home Assistant Program "ha-stiebel-control"
+#  and is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU Lesser General Public License as published by
+#  the Free Software Foundation version 3 of the License.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#  GNU Lesser General Public License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with this program. If not, see http://www.gnu.org/licenses/ .
+#
+
+#########################################
+#                                       #
+#   SELECT                              #
+#                                       #
+#########################################
+select:
+  - platform: template
+    name: "PROGRAMMSCHALTER_SET"
+    id: PROGRAMMSCHALTER_SET
+    options:
+      - "Notbetrieb"
+      - "Bereitschaft"
+      - "Automatik"
+      - "Tagbetrieb"
+      - "Absenkbetrieb"
+      - "Warmwasser"
+      - "Unbekannt"
+    initial_option: "Unbekannt"
+    optimistic: true
+    on_value:
+      then:
+        - lambda: |-
+            // Prüfe ob Dropdown nicht auf Unbekannt steht
+            const char* auswahl = id(PROGRAMMSCHALTER_SET).state.c_str();
+            if(strcmp(auswahl, "Unbekannt") != 0) {
+              writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", auswahl);
+              readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
+            }
+            return;
+
+#########################################
+#                                       #
+#   SENSORS                             #
+#                                       #
+#########################################
+sensor:
+  #########################################
+  #                                       #
+  #   KESSEL SENSOREN                      #
+  #                                       #
+  #########################################
+  - platform: template
+    name: "AUSSENTEMP"
+    id: AUSSENTEMP
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_kessel], "AUSSENTEMP");
+      return {};
+
+    #Warmwasser SOLL Komfort Temperatur
+  - platform: template
+    name: "EINSTELL_SPEICHERSOLLTEMP"
+    id: EINSTELL_SPEICHERSOLLTEMP
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_kessel], "EINSTELL_SPEICHERSOLLTEMP");
+      return {};
+
+    # Warmwasser SOLL Eco Temperatur
+  - platform: template
+    name: "EINSTELL_SPEICHERSOLLTEMP2"
+    id: EINSTELL_SPEICHERSOLLTEMP2
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_kessel], "EINSTELL_SPEICHERSOLLTEMP2");
+      return {};
+
+    #T Heizkreis Soll Abfrage
+  - platform: template
+    name: "HILFSKESSELSOLL"
+    id: HILFSKESSELSOLL
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_kessel], "HILFSKESSELSOLL");
+      return {};
+
+    #Rücklauftemperatur SOLL  - platform: template
+  - platform: template
+    name: "KESSELSOLLTEMP"
+    id: KESSELSOLLTEMP
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_kessel], "KESSELSOLLTEMP");
+      return {};
+
+    #Warmwasser-Temperaturabfrage + Gerätespezifischer Offset 3.9 °C
+  - platform: template
+    name: "SPEICHERISTTEMP"
+    id: SPEICHERISTTEMP
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    filters:
+      - offset: 3.9
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_kessel], "SPEICHERISTTEMP");
+      return {};
+
+    #Warmwasser SOLL Temperatur
+  - platform: template
+    name: "SPEICHERSOLLTEMP"
+    id: SPEICHERSOLLTEMP
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_kessel], "SPEICHERSOLLTEMP");
+      return {};
+
+  - platform: template
+    name: "SPEICHER_UNTEN_TEMP"
+    id: SPEICHER_UNTEN_TEMP
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "SPEICHER_UNTEN_TEMP");
+      return {};
+
+  - platform: template
+    name: "SPEICHER_OBEN_TEMP"
+    id: SPEICHER_OBEN_TEMP
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "SPEICHER_OBEN_TEMP");
+      return {};
+
+    #Vorlauftemperatur SOLL Heizung
+  - platform: template
+    name: "VORLAUFSOLLTEMP"
+    id: VORLAUFSOLLTEMP
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_kessel], "VORLAUFSOLLTEMP");
+      return {};
+
+    #Vorlauftemperatur IST Heizung
+  - platform: template
+    name: "VORLAUFISTTEMP_KESSEL"
+    id: VORLAUFISTTEMP_KESSEL
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_kessel], "VORLAUFISTTEMP");
+      return {};
+
+  #########################################
+  #                                       #
+  #   MANAGER SENSOREN                    #
+  #                                       #
+  #########################################
+
+    #Vorlauftemperatur IST Heizung
+  - platform: template
+    name: "VORLAUFISTTEMP_MANAGER"
+    id: VORLAUFISTTEMP_MANAGER
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "VORLAUFISTTEMP");
+      return {};
+
+  - platform: template
+    name: "LAUFZEIT_VERD_BEI_SPEICHERBEDARF"
+    id: LAUFZEIT_VERD_BEI_SPEICHERBEDARF
+    icon: "mdi:timer"
+    device_class: "duration"
+    unit_of_measurement: "h"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "LAUFZEIT_VERD_BEI_SPEICHERBEDARF");
+      return {};
+
+  - platform: template
+    name: "LUEFT_PASSIVKUEHLUNG_UEBER_FORTLUEFTER"
+    id: LUEFT_PASSIVKUEHLUNG_UEBER_FORTLUEFTER
+    state_class: "measurement"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "LUEFT_PASSIVKUEHLUNG_UEBER_FORTLUEFTER");
+      return {};
+
+  - platform: template
+    name: "LZ_VERD_1_2_HEIZBETRIEB_MANAGER"
+    id: LZ_VERD_1_2_HEIZBETRIEB_MANAGER
+    icon: "mdi:timer"
+    device_class: "duration"
+    unit_of_measurement: "h"
+    state_class: "measurement"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "LZ_VERD_1_2_HEIZBETRIEB");
+      return {};
+
+  - platform: template
+    name: "LZ_VERD_1_2_KUEHLBETRIEB_MANAGER"
+    id: LZ_VERD_1_2_KUEHLBETRIEB_MANAGER
+    icon: "mdi:timer"
+    device_class: "duration"
+    unit_of_measurement: "h"
+    state_class: "measurement"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "LZ_VERD_1_2_KUEHLBETRIEB");
+      return {};
+
+  - platform: template
+    name: "LZ_VERD_1_2_WW_BETRIEB_MANAGER"
+    id: LZ_VERD_1_2_WW_BETRIEB_MANAGER
+    icon: "mdi:timer"
+    device_class: "duration"
+    unit_of_measurement: "h"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "LZ_VERD_1_2_WW_BETRIEB");
+      return {};
+
+  - platform: template
+    name: "LZ_VERD_1_HEIZBETRIEB_MANAGER"
+    id: LZ_VERD_1_HEIZBETRIEB_MANAGER
+    icon: "mdi:timer"
+    device_class: "duration"
+    unit_of_measurement: "h"
+    state_class: "measurement"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "LZ_VERD_1_HEIZBETRIEB");
+      return {};
+
+  - platform: template
+    name: "LZ_VERD_1_KUEHLBETRIEB_MANAGER"
+    id: LZ_VERD_1_KUEHLBETRIEB_MANAGER
+    icon: "mdi:timer"
+    device_class: "duration"
+    unit_of_measurement: "h"
+    state_class: "measurement"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "LZ_VERD_1_KUEHLBETRIEB");
+      return {};
+
+  - platform: template
+    name: "LZ_VERD_1_WW_BETRIEB_MANAGER"
+    id: LZ_VERD_1_WW_BETRIEB_MANAGER
+    icon: "mdi:timer"
+    device_class: "duration"
+    unit_of_measurement: "h"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "LZ_VERD_1_WW_BETRIEB");
+      return {};
+
+  - platform: template
+    name: "LZ_VERD_2_HEIZBETRIEB_MANAGER"
+    id: LZ_VERD_2_HEIZBETRIEB_MANAGER
+    icon: "mdi:timer"
+    device_class: "duration"
+    unit_of_measurement: "h"
+    state_class: "measurement"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "LZ_VERD_2_HEIZBETRIEB");
+      return {};
+
+  - platform: template
+    name: "LZ_VERD_2_KUEHLBETRIEB_MANAGER"
+    id: LZ_VERD_2_KUEHLBETRIEB_MANAGER
+    icon: "mdi:timer"
+    device_class: "duration"
+    unit_of_measurement: "h"
+    state_class: "measurement"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "LZ_VERD_2_KUEHLBETRIEB");
+      return {};
+
+  - platform: template
+    name: "LZ_VERD_2_WW_BETRIEB_MANAGER"
+    id: LZ_VERD_2_WW_BETRIEB_MANAGER
+    icon: "mdi:timer"
+    device_class: "duration"
+    unit_of_measurement: "h"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "LZ_VERD_2_WW_BETRIEB");
+      return {};
+
+  - platform: template
+    name: "RAUMISTTEMP"
+    id: RAUMISTTEMP
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_kessel], "RAUMISTTEMP");
+      return {};
+
+  - platform: template
+    name: "RAUMSOLLTEMP_I"
+    id: RAUMSOLLTEMP_I
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I");
+      return {};
+
+  - platform: template
+    name: "RAUMSOLLTEMP_II"
+    id: RAUMSOLLTEMP_II
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_II");
+      return {};
+
+  - platform: template
+    name: "RAUMSOLLTEMP_III"
+    id: RAUMSOLLTEMP_III
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_III");
+      return {};
+
+  - platform: template
+    name: "RAUMSOLLTEMP_NACHT"
+    id: RAUMSOLLTEMP_NACHT
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_NACHT");
+      return {};
+
+  - platform: template
+    name: "SAMMLERISTTEMP"
+    id: SAMMLERISTTEMP
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_kessel], "SAMMLERISTTEMP");
+      return {};
+
+  - platform: template
+    name: "SAMMLERSOLLTEMP"
+    id: SAMMLERSOLLTEMP
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_kessel], "SAMMLERSOLLTEMP");
+      return {};
+
+  - platform: template
+    name: "SOFTWARE_NUMMER_MANAGER"
+    id: SOFTWARE_NUMMER_MANAGER
+    icon: "mdi:wysiwyg"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "SOFTWARE_VERSION"
+    id: SOFTWARE_VERSION
+    icon: "mdi:wysiwyg"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "TEILVORRANG_WW"
+    id: TEILVORRANG_WW
+    state_class: "measurement"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "TEILVORRANG_WW");
+      return {};
+
+  - platform: template
+    name: "TEMPORALE_LUEFTUNGSSTUFE_DAUER"
+    id: TEMPORALE_LUEFTUNGSSTUFE_DAUER
+    icon: "mdi:timer"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "TEMPORALE_LUEFTUNGSSTUFE_DAUER");
+      return {};
+
+  - platform: template
+    name: "VERSTELLTE_RAUMSOLLTEMP"
+    id: VERSTELLTE_RAUMSOLLTEMP
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "VERSTELLTE_RAUMSOLLTEMP");
+      return {};
+
+  - platform: template
+    name: "JAHR"
+    id: JAHR
+    icon: "mdi:calendar_month"
+    accuracy_decimals: 0
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "JAHR");
+      return {};
+
+  - platform: template
+    name: "MINUTE"
+    id: MINUTE
+    icon: "mdi:schedule"
+    accuracy_decimals: 0
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "MINUTE");
+      return {};
+
+  - platform: template
+    name: "MONAT"
+    id: MONAT
+    icon: "mdi:calendar_month"
+    accuracy_decimals: 0
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "MONAT");
+      return {};
+
+  - platform: template
+    name: "SEKUNDE"
+    id: SEKUNDE
+    icon: "mdi:schedule"
+    accuracy_decimals: 0
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "SEKUNDE");
+      return {};
+
+  - platform: template
+    name: "STUNDE"
+    id: STUNDE
+    icon: "mdi:schedule"
+    accuracy_decimals: 0
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "STUNDE");
+      return {};
+
+  - platform: template
+    name: "TAG"
+    id: TAG
+    icon: "mdi:calendar_month"
+    accuracy_decimals: 0
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "TAG");
+      return {};
+
+  - platform: template
+    name: "WP_STATUS"
+    id: WP_STATUS
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "WP_STATUS");
+      return {};
+
+  - platform: template
+    name: "EVU_SPERRE_AKTIV_MANAGER"
+    id: EVU_SPERRE_AKTIV_MANAGER
+    icon: "mdi:dip-switch"
+    accuracy_decimals: 0
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "EVU_SPERRE_AKTIV");
+      return {};
+
+  #########################################
+  #                                       #
+  #   HEIZMODUL SENSORS                   #
+  #                                       #
+  #########################################
+  - platform: template
+    name: "VERDAMPFERTEMP"
+    id: VERDAMPFERTEMP
+    unit_of_measurement: "°C"
+    icon: "mdi:kettle-steam-outline"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "VERDAMPFERTEMP");
+      return {};
+
+  - platform: template
+    name: "RUECKLAUFISTTEMP_HEIZMODUL"
+    id: RUECKLAUFISTTEMP_HEIZMODUL
+    unit_of_measurement: "°C"
+    icon: "mdi:waves-arrow-left"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "RUECKLAUFISTTEMP");
+      return {};
+
+  - platform: template
+    name: "RUECKLAUFISTTEMP_MANAGER"
+    id: RUECKLAUFISTTEMP_MANAGER
+    unit_of_measurement: "°C"
+    icon: "mdi:waves-arrow-left"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "RUECKLAUFISTTEMP");
+      return {};
+
+  - platform: template
+    name: "VERDICHTER"
+    id: VERDICHTER
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "VERDICHTER");
+      return {};
+
+  - platform: template
+    name: "WPVORLAUFIST_HEIZMODUL"
+    id: WPVORLAUFIST_HEIZMODUL
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "WPVORLAUFIST");
+      return {};
+
+  - platform: template
+    name: "WPVORLAUFIST_MANAGER"
+    id: WPVORLAUFIST_MANAGER
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    update_interval: 1min
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "WPVORLAUFIST");
+      return {};
+
+  - platform: template
+    name: "ABTAUUNGAKTIV"
+    id: ABTAUUNGAKTIV
+    icon: "mdi:description"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "AUSSENTEMP");
+      return {};
+
+  - platform: template
+    name: "BETRIEBSART_WP"
+    id: BETRIEBSART_WP
+    icon: "mdi:dip-switch"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "BETRIEBSART_WP");
+      return {};
+
+  - platform: template
+    name: "EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH"
+    id: EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH
+    unit_of_measurement: kWh
+    device_class: energy
+    icon: "mdi:transmission-tower"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH");
+      return {};
+
+  - platform: template
+    name: "EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH"
+    id: EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH
+    unit_of_measurement: Wh
+    device_class: energy
+    icon: "mdi:transmission-tower"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH");
+      return {};
+
+  - platform: template
+    name: "EL_AUFNAHMELEISTUNG_WW_SUM_KWH"
+    id: EL_AUFNAHMELEISTUNG_WW_SUM_KWH
+    unit_of_measurement: kWh
+    device_class: energy
+    icon: "mdi:transmission-tower"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "EL_AUFNAHMELEISTUNG_WW_SUM_KWH");
+      return {};
+
+  - platform: template
+    name: "EL_AUFNAHMELEISTUNG_WW_TAG_WH"
+    id: EL_AUFNAHMELEISTUNG_WW_TAG_WH
+    unit_of_measurement: Wh
+    device_class: energy
+    icon: "mdi:transmission-tower"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "EL_AUFNAHMELEISTUNG_WW_TAG_WH");
+      return {};
+
+  - platform: template
+    name: "LZ_VERD_1_2_WW_BETRIEB_HEIZMODUL"
+    id: LZ_VERD_1_2_WW_BETRIEB_HEIZMODUL
+    icon: "mdi:timer"
+    device_class: "duration"
+    unit_of_measurement: "h"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "LZ_VERD_1_2_WW_BETRIEB");
+      return {};
+
+  - platform: template
+    name: "LZ_VERD_1_WW_BETRIEB_HEIZMODUL"
+    id: LZ_VERD_1_WW_BETRIEB_HEIZMODUL
+    icon: "mdi:timer"
+    device_class: "duration"
+    unit_of_measurement: "h"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "LZ_VERD_1_WW_BETRIEB");
+      return {};
+
+  - platform: template
+    name: "LZ_VERD_2_WW_BETRIEB_HEIZMODUL"
+    id: LZ_VERD_2_WW_BETRIEB_HEIZMODUL
+    icon: "mdi:timer"
+    device_class: "duration"
+    unit_of_measurement: "h"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "LZ_VERD_2_WW_BETRIEB");
+      return {};
+
+  - platform: template
+    name: "SOFTWARE_NUMMER_HEIZMODUL"
+    id: SOFTWARE_NUMMER_HEIZMODUL
+    icon: "mdi:description"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "WAERMEERTRAG_2WE_HEIZ_SUM_KWH"
+    id: WAERMEERTRAG_2WE_HEIZ_SUM_KWH
+    unit_of_measurement: kWh
+    device_class: energy
+    icon: "mdi:heating-coil"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "WAERMEERTRAG_2WE_HEIZ_SUM_KWH");
+      return {};
+
+  - platform: template
+    name: "WAERMEERTRAG_2WE_WW_SUM_KWH"
+    id: WAERMEERTRAG_2WE_WW_SUM_KWH
+    unit_of_measurement: kWh
+    device_class: energy
+    icon: "mdi:water-boiler"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "WAERMEERTRAG_2WE_WW_SUM_KWH");
+      return {};
+
+  - platform: template
+    name: "WAERMEERTRAG_HEIZ_SUM_KWH"
+    id: WAERMEERTRAG_HEIZ_SUM_KWH
+    unit_of_measurement: kWh
+    device_class: energy
+    icon: "mdi:heating-coil"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "WAERMEERTRAG_HEIZ_SUM_KWH");
+      return {};
+
+  - platform: template
+    name: "WAERMEERTRAG_HEIZ_TAG_WH"
+    id: WAERMEERTRAG_HEIZ_TAG_WH
+    unit_of_measurement: Wh
+    device_class: energy
+    icon: "mdi:heating-coil"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "WAERMEERTRAG_HEIZ_TAG_WH");
+      return {};
+
+  - platform: template
+    name: "WAERMEERTRAG_WW_SUM_KWH"
+    id: WAERMEERTRAG_WW_SUM_KWH
+    unit_of_measurement: kWh
+    device_class: energy
+    icon: "mdi:water-boiler"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "WAERMEERTRAG_WW_SUM_KWH");
+      return {};
+
+  - platform: template
+    name: "WAERMEERTRAG_WW_TAG_WH"
+    id: WAERMEERTRAG_WW_TAG_WH
+    unit_of_measurement: Wh
+    device_class: energy
+    icon: "mdi:water-boiler"
+    accuracy_decimals: 0
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "WAERMEERTRAG_WW_TAG_WH");
+      return {};
+
+  - platform: template
+    name: "EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH"
+    id: EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH
+    unit_of_measurement: MWh
+    device_class: energy
+    icon: "mdi:transmission-tower"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH");
+      return {};
+
+  - platform: template
+    name: "EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH"
+    id: EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH
+    unit_of_measurement: kWh
+    device_class: energy
+    icon: "mdi:transmission-tower"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH");
+      return {};
+
+  - platform: template
+    name: "EL_AUFNAHMELEISTUNG_WW_SUM_MWH"
+    id: EL_AUFNAHMELEISTUNG_WW_SUM_MWH
+    unit_of_measurement: MWh
+    device_class: energy
+    icon: "mdi:transmission-tower"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "EL_AUFNAHMELEISTUNG_WW_SUM_MWH");
+      return {};
+
+  - platform: template
+    name: "EL_AUFNAHMELEISTUNG_WW_TAG_KWH"
+    id: EL_AUFNAHMELEISTUNG_WW_TAG_KWH
+    unit_of_measurement: kWh
+    device_class: energy
+    icon: "mdi:transmission-tower"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "EL_AUFNAHMELEISTUNG_WW_TAG_KWH");
+      return {};
+
+  - platform: template
+    name: "WAERMEERTRAG_2WE_HEIZ_SUM_MWH"
+    id: WAERMEERTRAG_2WE_HEIZ_SUM_MWH
+    unit_of_measurement: MWh
+    device_class: energy
+    icon: "mdi:heating-coil"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "WAERMEERTRAG_2WE_HEIZ_SUM_MWH");
+      return {};
+
+  - platform: template
+    name: "WAERMEERTRAG_2WE_WW_SUM_MWH"
+    id: WAERMEERTRAG_2WE_WW_SUM_MWH
+    unit_of_measurement: MWh
+    device_class: energy
+    icon: "mdi:water-boiler"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "WAERMEERTRAG_2WE_WW_SUM_MWH");
+      return {};
+
+  - platform: template
+    name: "WAERMEERTRAG_HEIZ_SUM_MWH"
+    id: WAERMEERTRAG_HEIZ_SUM_MWH
+    unit_of_measurement: MWh
+    device_class: energy
+    icon: "mdi:heating-coil"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "WAERMEERTRAG_HEIZ_SUM_MWH");
+      return {};
+
+  - platform: template
+    name: "WAERMEERTRAG_HEIZ_TAG_KWH"
+    id: WAERMEERTRAG_HEIZ_TAG_KWH
+    unit_of_measurement: kWh
+    device_class: energy
+    icon: "mdi:heating-coil"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "WAERMEERTRAG_HEIZ_TAG_KWH");
+      return {};
+
+  - platform: template
+    name: "WAERMEERTRAG_WW_SUM_MWH"
+    id: WAERMEERTRAG_WW_SUM_MWH
+    unit_of_measurement: MWh
+    device_class: energy
+    icon: "mdi:water-boiler"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "WAERMEERTRAG_WW_SUM_MWH");
+      return {};
+
+  - platform: template
+    name: "WAERMEERTRAG_WW_TAG_KWH"
+    id: WAERMEERTRAG_WW_TAG_KWH
+    unit_of_measurement: kWh
+    device_class: energy
+    icon: "mdi:water-boiler"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "WAERMEERTRAG_WW_TAG_KWH");
+      return {};
+
+  - platform: template
+    name: "LZ_VERD_1_2_HEIZBETRIEB_HEIZMODUL"
+    id: LZ_VERD_1_2_HEIZBETRIEB_HEIZMODUL
+    icon: "mdi:timer"
+    device_class: "duration"
+    unit_of_measurement: "h"
+    state_class: "measurement"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "LZ_VERD_1_2_HEIZBETRIEB");
+      return {};
+
+  - platform: template
+    name: "LZ_VERD_1_2_KUEHLBETRIEB_HEIZMODUL"
+    id: LZ_VERD_1_2_KUEHLBETRIEB_HEIZMODUL
+    icon: "mdi:timer"
+    device_class: "duration"
+    unit_of_measurement: "h"
+    state_class: "measurement"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "LZ_VERD_1_2_KUEHLBETRIEB");
+      return {};
+
+  - platform: template
+    name: "LZ_VERD_1_HEIZBETRIEB_HEIZMODUL"
+    id: LZ_VERD_1_HEIZBETRIEB_HEIZMODUL
+    icon: "mdi:timer"
+    device_class: "duration"
+    unit_of_measurement: "h"
+    state_class: "measurement"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "LZ_VERD_1_HEIZBETRIEB");
+      return {};
+
+  - platform: template
+    name: "LZ_VERD_1_KUEHLBETRIEB_HEIZMODUL"
+    id: LZ_VERD_1_KUEHLBETRIEB_HEIZMODUL
+    icon: "mdi:timer"
+    device_class: "duration"
+    unit_of_measurement: "h"
+    state_class: "measurement"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "LZ_VERD_1_KUEHLBETRIEB");
+      return {};
+
+  - platform: template
+    name: "LZ_VERD_2_HEIZBETRIEB_HEIZMODUL"
+    id: LZ_VERD_2_HEIZBETRIEB_HEIZMODUL
+    icon: "mdi:timer"
+    device_class: "duration"
+    unit_of_measurement: "h"
+    state_class: "measurement"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "LZ_VERD_2_HEIZBETRIEB");
+      return {};
+
+  - platform: template
+    name: "LZ_VERD_2_KUEHLBETRIEB_HEIZMODUL"
+    id: LZ_VERD_2_KUEHLBETRIEB_HEIZMODUL
+    icon: "mdi:timer"
+    device_class: "duration"
+    unit_of_measurement: "h"
+    state_class: "measurement"
+    accuracy_decimals: 3
+    update_interval: 10min
+    lambda: |-
+      readSignal(&CanMembers[cm_heizmodul], "LZ_VERD_2_KUEHLBETRIEB");
+      return {};
+
+  #########################################
+  #                                       #
+  #   BERECHNETE SENSOREN                 #
+  #                                       #
+  #########################################
+  - platform: template
+    name: "EL_AUFNAHMELEISTUNG_HEIZ_SUM"
+    id: EL_AUFNAHMELEISTUNG_HEIZ_SUM
+    unit_of_measurement: MWh
+    device_class: energy
+    icon: "mdi:transmission-tower"
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  - platform: template
+    name: "EL_AUFNAHMELEISTUNG_WW_SUM"
+    id: EL_AUFNAHMELEISTUNG_WW_SUM
+    unit_of_measurement: MWh
+    device_class: energy
+    icon: "mdi:transmission-tower"
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  - platform: template
+    name: "EL_AUFNAHMELEISTUNG_HEIZ_INCREASING"
+    id: EL_AUFNAHMELEISTUNG_HEIZ_INCREASING
+    unit_of_measurement: kWh
+    device_class: energy
+    icon: "mdi:transmission-tower"
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  - platform: template
+    name: "EL_AUFNAHMELEISTUNG_WW_INCREASING"
+    id: EL_AUFNAHMELEISTUNG_WW_INCREASING
+    unit_of_measurement: kWh
+    device_class: energy
+    icon: "mdi:transmission-tower"
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  - platform: template
+    name: "EL_AUFNAHMELEISTUNG_HEIZ_TAG"
+    id: EL_AUFNAHMELEISTUNG_HEIZ_TAG
+    unit_of_measurement: kWh
+    device_class: energy
+    icon: "mdi:transmission-tower"
+    accuracy_decimals: 3
+
+  - platform: template
+    name: "EL_AUFNAHMELEISTUNG_WW_TAG"
+    id: EL_AUFNAHMELEISTUNG_WW_TAG
+    unit_of_measurement: kWh
+    device_class: energy
+    icon: "mdi:transmission-tower"
+    accuracy_decimals: 3
+
+  - platform: template
+    name: "WAERMEERTRAG_2WE_HEIZ_SUM"
+    id: WAERMEERTRAG_2WE_HEIZ_SUM
+    unit_of_measurement: MWh
+    device_class: energy
+    icon: "mdi:heating-coil"
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  - platform: template
+    name: "WAERMEERTRAG_2WE_WW_SUM"
+    id: WAERMEERTRAG_2WE_WW_SUM
+    unit_of_measurement: MWh
+    device_class: energy
+    icon: "mdi:water-boiler"
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  - platform: template
+    name: "WAERMEERTRAG_HEIZ_SUM"
+    id: WAERMEERTRAG_HEIZ_SUM
+    unit_of_measurement: MWh
+    device_class: energy
+    icon: "mdi:heating-coil"
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  - platform: template
+    name: "WAERMEERTRAG_HEIZ_INCREASING"
+    id: WAERMEERTRAG_HEIZ_INCREASING
+    unit_of_measurement: kWh
+    device_class: energy
+    icon: "mdi:heating-coil"
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  - platform: template
+    name: "WAERMEERTRAG_HEIZ_TAG"
+    id: WAERMEERTRAG_HEIZ_TAG
+    unit_of_measurement: kWh
+    device_class: energy
+    icon: "mdi:heating-coil"
+    accuracy_decimals: 3
+
+  - platform: template
+    name: "WAERMEERTRAG_WW_SUM"
+    id: WAERMEERTRAG_WW_SUM
+    unit_of_measurement: MWh
+    device_class: energy
+    icon: "mdi:water-boiler"
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  - platform: template
+    name: "WAERMEERTRAG_WW_INCREASING"
+    id: WAERMEERTRAG_WW_INCREASING
+    unit_of_measurement: kWh
+    device_class: energy
+    icon: "mdi:heating-coil"
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  - platform: template
+    name: "WAERMEERTRAG_WW_TAG"
+    id: WAERMEERTRAG_WW_TAG
+    unit_of_measurement: KWh
+    device_class: energy
+    icon: "mdi:water-boiler"
+    accuracy_decimals: 3
+
+  - platform: template
+    name: "COP_WW"
+    id: COP_WW
+    icon: "mdi:chart-bell-curve-cumulative"
+    device_class: "power_factor"
+    state_class: "measurement"
+    accuracy_decimals: 2
+
+  - platform: template
+    name: "COP_HEIZ"
+    id: COP_HEIZ
+    icon: "mdi:chart-bell-curve-cumulative"
+    device_class: "power_factor"
+    state_class: "measurement"
+    accuracy_decimals: 2
+
+  - platform: template
+    name: "COP_GESAMT"
+    id: COP_GESAMT
+    icon: "mdi:chart-bell-curve-cumulative"
+    device_class: "power_factor"
+    state_class: "measurement"
+    accuracy_decimals: 2
+
+#########################################
+#                                       #
+#   TEXT SENSOREN                       #
+#                                       #
+#########################################
+text_sensor:
+  #########################################
+  #                                       #
+  #   HOME ASSISTANT TEXT SENSOREN        #
+  #                                       #
+  #########################################
+  - platform: homeassistant
+    name: "EINSTELL_SPEICHERSOLLTEMP_SET"
+    id: EINSTELL_SPEICHERSOLLTEMP_SET
+    entity_id: input_number.speichersolltemp_set
+    on_value:
+      then:
+        lambda: |-
+          if(atoi(x.c_str()) != 20) {
+            char temp[3];
+            strncpy(temp, x.c_str(), sizeof(temp)-1);
+            temp[2] ='\0';
+            const char* ctemp = temp;
+            writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP", ctemp);
+            id(EINSTELL_SPEICHERSOLLTEMP).update();
+            id(SPEICHERISTTEMP).update();
+            id(SPEICHERSOLLTEMP).update();
+          }
+          return;
+
+  - platform: homeassistant
+    name: "EINSTELL_SPEICHERSOLLTEMP2_SET"
+    id: EINSTELL_SPEICHERSOLLTEMP2_SET
+    entity_id: input_number.speichersolltemp2_set
+    on_value:
+      then:
+        lambda: |-
+          if(atoi(x.c_str()) != 20) {
+            char temp[3];
+            strncpy(temp, x.c_str(), sizeof(temp)-1);
+            temp[2] ='\0';
+            const char* ctemp = temp;
+            writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP2", ctemp);
+            id(EINSTELL_SPEICHERSOLLTEMP2).update();
+            id(SPEICHERISTTEMP).update();
+            id(SPEICHERSOLLTEMP).update();
+          }
+          return;
+
+  #########################################
+  #                                       #
+  #   MANAGER TEXT SENSORS                #
+  #                                       #
+  #########################################
+  - platform: template
+    name: "GERAETE_ID_MANAGER"
+    id: GERAETE_ID_MANAGER
+    icon: "mdi:description"
+
+  - platform: template
+    name: "PROGRAMMSCHALTER"
+    id: PROGRAMMSCHALTER
+    icon: "mdi:switch"
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
+      return {};
+
+  - platform: template
+    name: "SOMMERBETRIEB"
+    id: SOMMERBETRIEB
+    icon: "mdi:weather-sunny"
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "SOMMERBETRIEB");
+      return {};
+
+  - platform: template
+    name: "WW_ECO"
+    id: WW_ECO
+    icon: "mdi:leaf-circle-outline"
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "WW_ECO");
+      return {};
+
+  #########################################
+  #                                       #
+  #   HEIZMODUL TEXT SENSORS              #
+  #                                       #
+  #########################################
+  - platform: template
+    name: "GERAETE_ID_HEIZMODUL"
+    id: GERAETE_ID_HEIZMODUL
+    icon: "mdi:description"
+
+  #########################################
+  #                                       #
+  #   KESSEL TEXT SENSORS                 #
+  #                                       #
+  #########################################
+  - platform: template
+    name: "GERAETE_ID_KESSEL"
+    id: GERAETE_ID_KESSEL
+    icon: "mdi:description"
