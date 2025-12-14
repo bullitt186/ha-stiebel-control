@@ -1,0 +1,198 @@
+title: Wärmepumpe
+views:
+  - path: default_view
+    title: Home
+    cards:
+      - type: vertical-stack
+        cards:
+          - type: horizontal-stack
+            cards:
+              - type: tile
+                entity: sensor.datum
+                show_entity_picture: false
+                vertical: false
+                name: Datum
+              - type: tile
+                entity: sensor.zeit
+                name: Uhrzeit
+                vertical: false
+          - type: horizontal-stack
+            cards:
+              - type: gauge
+                entity: sensor.cop_gesamt
+                min: 3
+                max: 4
+                needle: false
+                name: COP Gesamt
+              - type: gauge
+                entity: sensor.cop_heiz
+                min: 3
+                max: 4
+                name: COP Heizen
+              - type: gauge
+                entity: sensor.cop_ww
+                min: 3
+                max: 4
+                name: COP Wasser
+          - square: false
+            type: grid
+            cards:
+              - type: tile
+                entity: sensor.programmschalter_with_icon
+                name: Programm
+                vertical: false
+              - type: tile
+                entity: sensor.sommerbetrieb_text
+                'name:': Betriebsart
+                vertical: false
+            columns: 2
+      - type: vertical-stack
+        cards:
+          - type: custom:mushroom-title-card
+            title: Warmwasser
+          - type: custom:apexcharts-card
+            apex_config:
+              chart:
+                stacked: true
+              xaxis:
+                labels:
+                  format: dd
+              legend:
+                show: false
+            graph_span: 7d1s
+            span:
+              end: day
+            show:
+              last_updated: false
+            header:
+              show: true
+              show_states: true
+              colorize_states: true
+            series:
+              - entity: sensor.el_aufnahmeleistung_ww_tag
+                name: Aufnahmeleistung
+                type: column
+                group_by:
+                  func: max
+                  duration: 1d
+                show:
+                  datalabels: true
+              - entity: sensor.waermeertrag_ww_tag
+                name: Wärmeertrag
+                type: column
+                group_by:
+                  func: max
+                  duration: 1d
+                show:
+                  datalabels: true
+          - type: custom:apexcharts-card
+            header:
+              show: true
+              show_states: true
+              colorize_states: true
+            all_series_config:
+              stroke_width: 1
+              curve: smooth
+            series:
+              - entity: sensor.speicheristtemp
+                name: Ist
+              - entity: sensor.speichersolltemp
+                name: Soll
+              - entity: sensor.einstell_speichersolltemp2
+                name: Set Eco
+              - entity: sensor.einstell_speichersolltemp
+                name: Set Komfort
+          - type: horizontal-stack
+            cards:
+              - type: entities
+                entities:
+                  - entity: input_number.speichersolltemp_set
+                    name: Komforttemperatur
+                    secondary_info: none
+                  - entity: input_number.speichersolltemp2_set
+                    name: Eco-Temperatur
+                    secondary_info: none
+                state_color: true
+      - type: vertical-stack
+        cards:
+          - type: custom:mushroom-title-card
+            title: Heizung
+          - type: custom:apexcharts-card
+            apex_config:
+              chart:
+                stacked: true
+              xaxis:
+                labels:
+                  format: dd
+              legend:
+                show: false
+            graph_span: 7d1s
+            span:
+              end: day
+            show:
+              last_updated: false
+            header:
+              show: true
+              show_states: true
+              colorize_states: true
+            series:
+              - entity: sensor.el_aufnahmeleistung_heiz_tag
+                name: Aufnahmeleistung
+                type: column
+                group_by:
+                  func: max
+                  duration: 1d
+                show:
+                  datalabels: true
+              - entity: sensor.waermeertrag_heiz_tag
+                name: Wärmeertrag
+                type: column
+                group_by:
+                  func: max
+                  duration: 1d
+                show:
+                  datalabels: true
+          - type: custom:apexcharts-card
+            header:
+              show: true
+              show_states: true
+              colorize_states: true
+            all_series_config:
+              stroke_width: 1
+              curve: smooth
+            series:
+              - entity: sensor.wpvorlaufist
+                name: Vorlauf Ist
+              - entity: sensor.vorlaufsolltemp
+                name: Vorlauf Soll
+              - entity: sensor.ruecklaufisttemp
+                name: Rücklauf Ist
+      - type: vertical-stack
+        cards:
+          - type: custom:mushroom-title-card
+            title: Einstellungen
+          - type: entities
+            entities:
+              - entity: sensor.programmschalter
+                name: Programmschalter
+              - entity: select.programmschalter_set
+            title: Programmschalter
+          - type: entities
+            entities:
+              - entity: sensor.zeit
+                name: Uhrzeit Ist
+                secondary_info: none
+              - entity: input_datetime.warmepumpe_uhrzeit
+                name: Uhrzeit Soll
+                secondary_info: none
+              - entity: button.update_uhrzeit
+                name: Uhrzeit setzen
+                secondary_info: none
+              - entity: sensor.datum
+                name: Datum Ist
+              - entity: input_datetime.warmepumpe_datum
+                name: Datum Soll
+                secondary_info: none
+              - entity: button.update_datum
+                name: Datum setzen
+            title: Zeit/Datum
