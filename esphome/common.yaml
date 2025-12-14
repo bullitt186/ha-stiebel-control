@@ -35,6 +35,21 @@ esp32:
 
 #########################################
 #                                       #
+#   MQTT                                #
+#                                       #
+#########################################
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  id: mqtt_client
+  discovery: true
+  discovery_prefix: homeassistant
+  on_connect:
+    - logger.log: "Connected to MQTT broker"
+
+#########################################
+#                                       #
 #   TEXT SENSOREN                       #
 #                                       #
 #########################################

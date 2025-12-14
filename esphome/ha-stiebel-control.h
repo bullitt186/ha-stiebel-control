@@ -21,6 +21,7 @@
 #include "KElsterTable.h"
 #include <sstream>
 #include <iomanip>
+#include <set>
 
 typedef struct
 {
@@ -72,6 +73,96 @@ typedef enum
     cm_dcf_modul,
     cm_other
 } CanMemberType;
+
+// Signal configuration structure for MQTT auto-discovery
+typedef struct {
+    const char* namePattern;     // Pattern to match signal name (use * for wildcard)
+    const char* deviceClass;     // HA device class (temperature, energy, power, etc.)
+    const char* unit;            // Unit of measurement
+    const char* icon;            // MDI icon
+    const char* stateClass;      // measurement, total, total_increasing
+} SignalConfig;
+
+// Configurable signal mapping table - EDIT THIS to customize sensors
+static const SignalConfig signalMappings[] = {
+    // Temperature sensors
+    {"*TEMP*", "temperature", "°C", "mdi:thermometer", "measurement"},
+    {"VERDAMPFERTEMP", "temperature", "°C", "mdi:snowflake", "measurement"},
+    {"HEISSGAS_TEMP", "temperature", "°C", "mdi:fire", "measurement"},
+    {"ABGASTEMP", "temperature", "°C", "mdi:smoke", "measurement"},
+    {"TAUPUNKT_TEMP", "temperature", "°C", "mdi:water-percent", "measurement"},
+    
+    // Energy sensors
+    {"*ENERGIE*", "energy", "kWh", "mdi:lightning-bolt", "total_increasing"},
+    {"*_KWH", "energy", "kWh", "mdi:lightning-bolt", "total_increasing"},
+    {"*_MWH", "energy", "MWh", "mdi:lightning-bolt", "total_increasing"},
+    {"*_WH", "energy", "Wh", "mdi:lightning-bolt", "total_increasing"},
+    {"WAERMEERTRAG*", "energy", "kWh", "mdi:fire", "total_increasing"},
+    {"EL_AUFNAHMELEISTUNG*", "energy", "kWh", "mdi:transmission-tower", "total_increasing"},
+    {"*ERTRAG*", "energy", "kWh", "mdi:solar-power", "total_increasing"},
+    
+    // Power sensors
+    {"*LEISTUNG*", "power", "W", "mdi:flash", "measurement"},
+    
+    // Pressure sensors
+    {"*DRUCK*", "pressure", "bar", "mdi:gauge", "measurement"},
+    {"WASSERDRUCK", "pressure", "bar", "mdi:water-pump", "measurement"},
+    {"MASCHINENDRUCK", "pressure", "bar", "mdi:hydraulic-oil-level", "measurement"},
+    
+    // Flow/Volume sensors
+    {"*VOLUMENSTROM*", "volume_flow_rate", "l/min", "mdi:pump", "measurement"},
+    {"*DURCHFLUSS*", "volume_flow_rate", "l/min", "mdi:water-pump", "measurement"},
+    {"DURCHFLUSSMENGE*", "volume", "l", "mdi:gauge", "total_increasing"},
+    
+    // Electrical sensors
+    {"*SPANNUNG*", "voltage", "V", "mdi:sine-wave", "measurement"},
+    {"*STROM*", "current", "A", "mdi:current-ac", "measurement"},
+    {"*FREQUENZ*", "frequency", "Hz", "mdi:sine-wave", "measurement"},
+    
+    // Speed/RPM sensors
+    {"*DREHZAHL*", "frequency", "rpm", "mdi:fan", "measurement"},
+    {"GEBLAESEDREHZAHL", "frequency", "rpm", "mdi:fan", "measurement"},
+    
+    // Humidity sensor
+    {"FEUCHTE*", "humidity", "%", "mdi:water-percent", "measurement"},
+    
+    // Duration/Time sensors
+    {"LAUFZEIT*", "duration", "h", "mdi:timer", "total_increasing"},
+    {"LZ_*", "duration", "h", "mdi:timer", "total_increasing"},
+    {"STILLSTANDZEIT*", "duration", "h", "mdi:timer-off", "total_increasing"},
+    {"*ZEIT*", "duration", "min", "mdi:clock", "measurement"},
+    {"*DAUER*", "duration", "min", "mdi:timer", "measurement"},
+    
+    // Percentage sensors
+    {"MODGRAD*", "power_factor", "%", "mdi:percent", "measurement"},
+    
+    // Version/Config (no unit)
+    {"SOFTWARE_VERSION", "", "", "mdi:application-cog", ""},
+    {"SOFTWARE_NUMMER", "", "", "mdi:application-cog", ""},
+    {"GERAETE_ID", "", "", "mdi:identifier", ""},
+    {"FIRMWARE*", "", "", "mdi:chip", ""},
+    
+    // Status indicators
+    {"*STATUS*", "", "", "mdi:information", "measurement"},
+    {"*SPERRE*", "", "", "mdi:lock", ""},
+    {"*PUMPE*", "", "", "mdi:pump", ""},
+    {"*BRENNER*", "", "", "mdi:fire", ""},
+    {"*MISCHER*", "", "", "mdi:valve", ""},
+    {"*VENTIL*", "", "", "mdi:valve", ""},
+    {"*RELAIS*", "", "", "mdi:electric-switch", ""},
+    {"VERDICHTER*", "", "", "mdi:air-conditioner", ""},
+    
+    // Cooling/Heating mode indicators
+    {"*KUEHLUNG*", "", "", "mdi:snowflake", ""},
+    {"*HEIZ*", "", "", "mdi:radiator", ""},
+    {"*BETRIEB*", "", "", "mdi:cog", ""},
+    
+    // Default fallback (must be last)
+    {"*", "", "", "mdi:flash", "measurement"}
+};
+
+// Track which signals have been discovered
+static std::set<std::string> discoveredSignals;
 
 std::vector<uint8_t> generate_read_id(unsigned short can_id)
 {
@@ -318,6 +409,229 @@ void publishTime()
     id(ZEIT).publish_state(stunde + ":" + minute + ":" + sekunde);
 }
 
+// Helper: Check if string matches pattern (supports * wildcard)
+bool matchesPattern(const char* text, const char* pattern) {
+    std::string t(text);
+    std::string p(pattern);
+    
+    // Convert to uppercase for case-insensitive matching
+    std::transform(t.begin(), t.end(), t.begin(), ::toupper);
+    std::transform(p.begin(), p.end(), p.begin(), ::toupper);
+    
+    size_t pos = p.find('*');
+    if (pos == std::string::npos) {
+        return t == p; // No wildcard, exact match
+    }
+    
+    // Check prefix and suffix
+    std::string prefix = p.substr(0, pos);
+    std::string suffix = p.substr(pos + 1);
+    
+    if (prefix.length() > 0 && t.find(prefix) != 0) return false;
+    if (suffix.length() > 0 && t.rfind(suffix) != t.length() - suffix.length()) return false;
+    
+    return true;
+}
+
+// Get signal configuration based on name and type
+const SignalConfig* getSignalConfig(const char* signalName, ElsterType type) {
+    // Try to find matching pattern
+    for (const auto& config : signalMappings) {
+        if (matchesPattern(signalName, config.namePattern)) {
+            return &config;
+        }
+    }
+    // Return default (last entry)
+    return &signalMappings[sizeof(signalMappings)/sizeof(SignalConfig) - 1];
+}
+
+// Abbreviation expansion lookup table
+static const struct {
+    const char* abbrev;
+    const char* full;
+} abbreviations[] = {
+    {"TEMP", "Temperatur"},
+    {"WW", "Warmwasser"},
+    {"IST", "Ist"},
+    {"SOLL", "Soll"},
+    {"MAX", "Maximum"},
+    {"MIN", "Minimum"},
+    {"SUM", "Summe"},
+    {"TAG", "Tag"},
+    {"HEIZ", "Heizung"},
+    {"KUEHLUNG", "Kühlung"},
+    {"VERD", "Verdichter"},
+    {"EL", "Elektrisch"},
+    {"LEISTUNG", "Leistung"},
+    {"DRUCK", "Druck"},
+    {"VORLAUF", "Vorlauf"},
+    {"RUECKLAUF", "Rücklauf"},
+    {"AUSSEN", "Außen"},
+    {"RAUM", "Raum"},
+    {"SPEICHER", "Speicher"},
+    {"KESSEL", "Kessel"},
+    {"SAMMLER", "Sammler"},
+    {"LAUFZEIT", "Laufzeit"},
+    {"ERTRAG", "Ertrag"},
+    {"BETRIEB", "Betrieb"},
+    {"PUMPE", "Pumpe"},
+    {"DURCHFLUSS", "Durchfluss"},
+    {"VOLUMENSTROM", "Volumenstrom"},
+    {"SPANNUNG", "Spannung"},
+    {"STROM", "Strom"},
+    {"FREQUENZ", "Frequenz"},
+    {"DREHZAHL", "Drehzahl"}
+};
+
+// Generate friendly name from signal name (kept in German as requested)
+std::string getFriendlyName(const char* signalName, const char* canMemberName) {
+    std::string name(signalName);
+    
+    // Keep German signal names, replace underscores with spaces
+    std::replace(name.begin(), name.end(), '_', ' ');
+    
+    // Apply abbreviation expansions (word boundaries respected)
+    for (size_t i = 0; i < sizeof(abbreviations)/sizeof(abbreviations[0]); i++) {
+        const char* abbrev = abbreviations[i].abbrev;
+        const char* full = abbreviations[i].full;
+        size_t abbrevLen = strlen(abbrev);
+        size_t fullLen = strlen(full);
+        size_t pos = 0;
+        
+        // Check at beginning
+        if (name.find(std::string(abbrev) + " ") == 0) {
+            name.replace(0, abbrevLen, full);
+        }
+        
+        // Check in middle
+        std::string search = std::string(" ") + abbrev + " ";
+        std::string replace = std::string(" ") + full + " ";
+        while ((pos = name.find(search, pos)) != std::string::npos) {
+            name.replace(pos, search.length(), replace);
+            pos += replace.length();
+        }
+        
+        // Check at end
+        if (name.length() >= abbrevLen) {
+            if (name.substr(name.length() - abbrevLen) == abbrev) {
+                name.replace(name.length() - abbrevLen, abbrevLen, full);
+            }
+        }
+    }
+    
+    // Add CAN member prefix for context
+    std::string prefix(canMemberName);
+    if (prefix != "PC" && prefix != "OTHER") {
+        // Convert prefix to title case
+        std::transform(prefix.begin(), prefix.end(), prefix.begin(), ::tolower);
+        if (!prefix.empty()) {
+            prefix[0] = ::toupper(prefix[0]);
+        }
+        name = prefix + " " + name;
+    }
+    
+    // Convert to title case: lowercase all, then capitalize first letter of each word
+    std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+    bool capitalizeNext = true;
+    for (size_t i = 0; i < name.length(); i++) {
+        if (capitalizeNext && std::isalpha(name[i])) {
+            name[i] = ::toupper(name[i]);
+            capitalizeNext = false;
+        } else if (name[i] == ' ') {
+            capitalizeNext = true;
+        }
+    }
+    
+    return name;
+}
+
+// Publish MQTT Discovery config for a signal
+void publishMqttDiscovery(uint32_t can_id, const ElsterIndex *ei) {
+    const CanMember &cm = lookupCanMember(can_id);
+    const SignalConfig* config = getSignalConfig(ei->Name, (ElsterType)ei->Type);
+    
+    // Generate unique ID
+    char uniqueId[128];
+    snprintf(uniqueId, sizeof(uniqueId), "stiebel_%s_%s", cm.Name, ei->Name);
+    std::string uid(uniqueId);
+    std::transform(uid.begin(), uid.end(), uid.begin(), ::tolower);
+    
+    // Check if already discovered
+    if (discoveredSignals.find(uid) != discoveredSignals.end()) {
+        return; // Already published discovery
+    }
+    discoveredSignals.insert(uid);
+    
+    // Determine component type based on ElsterType
+    const char* component = "sensor";
+    if (ei->Type == et_bool || ei->Type == et_little_bool) {
+        component = "binary_sensor";
+    }
+    
+    // Build discovery topic
+    char discoveryTopic[256];
+    snprintf(discoveryTopic, sizeof(discoveryTopic), 
+             "homeassistant/%s/heatingpump/%s/config", component, uniqueId);
+    
+    // Build state topic
+    char stateTopic[128];
+    snprintf(stateTopic, sizeof(stateTopic), "heatingpump/%s/%s/state", cm.Name, ei->Name);
+    
+    // Generate friendly name
+    std::string friendlyName = getFriendlyName(ei->Name, cm.Name);
+    
+    // Build JSON payload
+    std::string payload = "{";
+    payload += "\"name\":\"" + friendlyName + "\",";
+    payload += "\"unique_id\":\"" + uid + "\",";
+    payload += "\"state_topic\":\"" + std::string(stateTopic) + "\",";
+    
+    // Device info
+    payload += "\"device\":{";
+    payload += "\"identifiers\":[\"stiebel_eltron_wpl13e\"],";
+    payload += "\"name\":\"Stiebel Eltron Heat Pump\",";
+    payload += "\"model\":\"WPL 13 E\",";
+    payload += "\"manufacturer\":\"Stiebel Eltron\"";
+    payload += "},";
+    
+    // Add device class if specified
+    if (strlen(config->deviceClass) > 0) {
+        payload += "\"device_class\":\"" + std::string(config->deviceClass) + "\",";
+    }
+    
+    // Add unit if specified
+    if (strlen(config->unit) > 0) {
+        payload += "\"unit_of_measurement\":\"" + std::string(config->unit) + "\",";
+    }
+    
+    // Add state class if specified
+    if (strlen(config->stateClass) > 0) {
+        payload += "\"state_class\":\"" + std::string(config->stateClass) + "\",";
+    }
+    
+    // Add icon
+    payload += "\"icon\":\"" + std::string(config->icon) + "\"";
+    
+    payload += "}";
+    
+    // Publish discovery message
+    id(mqtt_client).publish(discoveryTopic, payload, 0, true); // QoS 0, retain true
+    
+    ESP_LOGI("MQTT Discovery", "Published: %s -> %s", uniqueId, friendlyName.c_str());
+}
+
+// Publish signal state to MQTT
+void publishMqttState(uint32_t can_id, const ElsterIndex *ei, const std::string &value) {
+    const CanMember &cm = lookupCanMember(can_id);
+    
+    // Build state topic
+    char stateTopic[128];
+    snprintf(stateTopic, sizeof(stateTopic), "heatingpump/%s/%s/state", cm.Name, ei->Name);
+    
+    // Publish state
+    id(mqtt_client).publish(stateTopic, value);
+}
+
 void update_COP_WW()
 {
     float cop_ww = (id(WAERMEERTRAG_WW_SUM).state + id(WAERMEERTRAG_2WE_WW_SUM).state) / id(EL_AUFNAHMELEISTUNG_WW_SUM).state;
@@ -339,6 +653,10 @@ void update_COP_GESAMT()
 void updateSensor(uint32_t can_id, const ElsterIndex *ei, std::string value)
 {
     CanMemberType cmt = lookupCanMemberType(can_id);
+    
+    // Publish to MQTT (discovery + state) for ALL signals
+    publishMqttDiscovery(can_id, ei);
+    publishMqttState(can_id, ei, value);
 
     if (ei->Name == "AUSSENTEMP")
     {
@@ -897,6 +1215,11 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, std::string value)
         }
         return;
     }
+    
+    // Log unmatched signal for identification
+    const CanMember &cm = lookupCanMember(can_id);
+    ESP_LOGW("updateSensor()", "UNMATCHED SIGNAL: %s (0x%04x) from %s (0x%02x) = %s (%s)", 
+             ei->Name, ei->Index, cm.Name, cm.CanId, value.c_str(), ElsterTypeStr[ei->Type]);
 }
 
 void identifyCanMembers()
