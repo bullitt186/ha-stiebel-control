@@ -729,31 +729,56 @@ void update_COP_GESAMT()
 bool isInvalidValue(const ElsterIndex *ei, const std::string &value) {
     if (value.empty()) return true;
     
-    // Check for common invalid string values
+    // Check for common invalid string values (but allow valid state strings)
     if (value == "SNA" || value == "---" || value == "N/A") return true;
     
+    // Allow common valid state strings (case-insensitive check)
+    std::string lowerValue = value;
+    std::transform(lowerValue.begin(), lowerValue.end(), lowerValue.begin(), ::tolower);
+    if (lowerValue == "on" || lowerValue == "off" || 
+        lowerValue == "ein" || lowerValue == "aus" ||
+        lowerValue == "true" || lowerValue == "false" ||
+        lowerValue == "yes" || lowerValue == "no" ||
+        lowerValue == "ja" || lowerValue == "nein") {
+        return false; // Valid state string
+    }
+    
     // Check numeric types for invalid values
-    if (ei->Type == et_byte || ei->Type == et_bool || ei->Type == et_little_bool ||
-        ei->Type == et_cent_val || ei->Type == et_dec_val || ei->Type == et_double_val ||
-        ei->Type == et_triple_val) {
+    if (ei->Type == et_byte || ei->Type == et_cent_val || ei->Type == et_dec_val || 
+        ei->Type == et_double_val || ei->Type == et_triple_val) {
         
         // Check if string contains valid numeric characters
         bool hasDigit = false;
+        bool hasDecimal = false;
         for (size_t i = 0; i < value.length(); i++) {
             char c = value[i];
             if (c >= '0' && c <= '9') {
                 hasDigit = true;
-            } else if (c != '-' && c != '.' && c != ' ' && c != '+') {
+            } else if (c == '.') {
+                hasDecimal = true;
+            } else if (c != '-' && c != ' ' && c != '+') {
                 return true; // Invalid character for number
             }
         }
         if (!hasDigit) return true; // No digits found
         
-        // Parse value and check for common invalid numeric values
+        // Check for exact invalid string values (more reliable than float comparison)
+        if (value == "-255" || value == "-32768" || value == "32767" ||
+            value == "-327.68" || value == "327.68" || value == "-327.67" || value == "327.67") {
+            return true;
+        }
+        
+        // Parse value and check for invalid ranges
         float fval = std::stof(value);
-        // Common invalid values: -255, -32768, 32767, -327.68, 327.67
-        if (fval == -255.0f || fval == -32768.0f || fval == 32767.0f ||
-            fval == -327.68f || fval == 327.67f || fval < -300.0f || fval > 1000.0f) {
+        if (fval < -300.0f || fval > 1000.0f) {
+            return true;
+        }
+        
+        // For values near common invalid markers, use tolerance check
+        const float epsilon = 0.01f;
+        if (std::abs(fval - (-255.0f)) < epsilon || 
+            std::abs(fval - (-32768.0f)) < epsilon ||
+            std::abs(fval - 32767.0f) < epsilon) {
             return true;
         }
     }
@@ -809,11 +834,27 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
         return; // Don't publish invalid values
     }
     
-    // Valid value received - reset invalid counter
+    // Valid value received - remove from blacklist if present
+    if (blacklistedSignals.find(key) != blacklistedSignals.end()) {
+        blacklistedSignals.erase(key);
+        ESP_LOGI("BLACKLIST", "Signal %s from %s recovered with valid value '%s' - removed from blacklist",
+                 ei->Name, cm.Name, value.c_str());
+        
+        // Clear discovery cache so it gets republished
+        char uniqueId[128];
+        snprintf(uniqueId, sizeof(uniqueId), "stiebel_%s_%s", cm.Name, ei->Name);
+        std::string uid(uniqueId);
+        std::transform(uid.begin(), uid.end(), uid.begin(), ::tolower);
+        std::replace(uid.begin(), uid.end(), ' ', '_');
+        discoveredSignals.erase(uid);
+    }
+    
+    // Reset invalid and no-response counters
     if (invalidSignalCounts.find(key) != invalidSignalCounts.end()) {
-        ESP_LOGD("BLACKLIST", "Signal %s from %s recovered (was %d invalid attempts)",
-                 ei->Name, cm.Name, invalidSignalCounts[key]);
         invalidSignalCounts.erase(key);
+    }
+    if (noResponseCounts.find(key) != noResponseCounts.end()) {
+        noResponseCounts.erase(key);
     }
     
     // Publish to MQTT (discovery + state) for valid signals only

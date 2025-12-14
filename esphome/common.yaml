@@ -127,11 +127,11 @@ interval:
   
   # Request temperature signals in small batches every 10 seconds
   # Rotates through all signals - full cycle completes in ~3 minutes
-  - interval: 10s
+  - interval: 5s
     then:
       - lambda: |-
           static int signalIndex = 0;
-          static const int SIGNALS_PER_BATCH = 5;  // Only 5 signals per batch to avoid blocking
+          static const int SIGNALS_PER_BATCH = 1;  // Only 5 signals per batch to avoid blocking
           
           static const char* tempSignals[] = {
             "KESSELSOLLTEMP", "SPEICHERSOLLTEMP", "VORLAUFSOLLTEMP",
