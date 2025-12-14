@@ -1,0 +1,20 @@
+#
+#  Minimal ESPHome Configuration for Stiebel Eltron Heat Pump
+#  Uses MQTT auto-discovery for all 3800+ signals from Elster protocol
+#  Only defines 22 essential sensors for COP calculations and HA integration
+#
+
+substitutions:
+  device_name: heatingpump
+  friendly_name: "Stiebel Eltron Wärmepumpe"
+  # CAN SPI pins for ESP32
+  can_clk_pin: GPIO18
+  can_mosi_pin: GPIO23
+  can_miso_pin: GPIO19
+  can_cs_pin: GPIO5
+  can_id_pc: "0x680"
+
+packages:
+  base: !include ha-stiebel-control/common.yaml
+  wifi: !include ha-stiebel-control/wifi.yaml
+  sensors: !include ha-stiebel-control/wpl13e.yaml

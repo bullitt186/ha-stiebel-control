@@ -22,6 +22,7 @@
 #include <sstream>
 #include <iomanip>
 #include <set>
+#include <map>
 
 typedef struct
 {
@@ -164,6 +165,18 @@ static const SignalConfig signalMappings[] = {
 // Track which signals have been discovered
 static std::set<std::string> discoveredSignals;
 
+// Track signals that returned invalid values (blacklisted until reboot)
+static std::set<std::string> blacklistedSignals;
+
+// Track consecutive invalid value counts per signal (reset on valid value)
+static std::map<std::string, int> invalidSignalCounts;
+
+// Track pending requests with timestamps (to detect no-response)
+static std::map<std::string, unsigned long> pendingRequests;
+
+// Track consecutive no-response counts per signal
+static std::map<std::string, int> noResponseCounts;
+
 std::vector<uint8_t> generate_read_id(unsigned short can_id)
 {
     std::vector<uint8_t> read_id;
@@ -294,6 +307,10 @@ void readSignal(const CanMember *cm, const ElsterIndex *ei)
     char logmsg[120];
     snprintf(logmsg, sizeof(logmsg), "READ \"%s\" (0x%04x) FROM %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x", ei->Name, ei->Index, cm->Name, cm->CanId, readId[0], readId[1], data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
     ESP_LOGI("readSignal()", "%s", logmsg);
+
+    // Mark request as pending with current timestamp
+    std::string key = std::string(cm->Name) + "_" + ei->Name;
+    pendingRequests[key] = millis();
 
     id(my_mcp2515).send_data(CanMembers[cm_pc].CanId, use_extended_id, data);
 }
@@ -490,59 +507,76 @@ std::string getFriendlyName(const char* signalName, const char* canMemberName) {
     // Keep German signal names, replace underscores with spaces
     std::replace(name.begin(), name.end(), '_', ' ');
     
-    // Apply abbreviation expansions (word boundaries respected)
+    // Apply abbreviation expansions efficiently
     for (size_t i = 0; i < sizeof(abbreviations)/sizeof(abbreviations[0]); i++) {
         const char* abbrev = abbreviations[i].abbrev;
         const char* full = abbreviations[i].full;
-        size_t abbrevLen = strlen(abbrev);
-        size_t fullLen = strlen(full);
+        const size_t abbrevLen = strlen(abbrev);
+        const size_t fullLen = strlen(full);
         size_t pos = 0;
         
-        // Check at beginning
-        if (name.find(std::string(abbrev) + " ") == 0) {
+        // Check at beginning (with space after)
+        if (name.length() > abbrevLen && name.compare(0, abbrevLen, abbrev) == 0 && name[abbrevLen] == ' ') {
             name.replace(0, abbrevLen, full);
+            pos = fullLen;
         }
         
-        // Check in middle
-        std::string search = std::string(" ") + abbrev + " ";
-        std::string replace = std::string(" ") + full + " ";
-        while ((pos = name.find(search, pos)) != std::string::npos) {
-            name.replace(pos, search.length(), replace);
-            pos += replace.length();
-        }
-        
-        // Check at end
-        if (name.length() >= abbrevLen) {
-            if (name.substr(name.length() - abbrevLen) == abbrev) {
-                name.replace(name.length() - abbrevLen, abbrevLen, full);
+        // Check in middle (space before and after)
+        while ((pos = name.find(abbrev, pos)) != std::string::npos) {
+            bool hasBefore = (pos > 0 && name[pos - 1] == ' ');
+            bool hasAfter = (pos + abbrevLen < name.length() && name[pos + abbrevLen] == ' ');
+            if (hasBefore && hasAfter) {
+                name.replace(pos, abbrevLen, full);
+                pos += fullLen;
+            } else {
+                pos += abbrevLen;
             }
         }
-    }
-    
-    // Add CAN member prefix for context
-    std::string prefix(canMemberName);
-    if (prefix != "PC" && prefix != "OTHER") {
-        // Convert prefix to title case
-        std::transform(prefix.begin(), prefix.end(), prefix.begin(), ::tolower);
-        if (!prefix.empty()) {
-            prefix[0] = ::toupper(prefix[0]);
+        
+        // Check at end (with space before)
+        if (name.length() > abbrevLen && name.compare(name.length() - abbrevLen, abbrevLen, abbrev) == 0 &&
+            name[name.length() - abbrevLen - 1] == ' ') {
+            name.replace(name.length() - abbrevLen, abbrevLen, full);
         }
-        name = prefix + " " + name;
     }
     
-    // Convert to title case: lowercase all, then capitalize first letter of each word
-    std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+    // Convert to title case efficiently: lowercase all, then capitalize first letter of each word
+    // Note: CAN member name is NOT added as prefix since the device hierarchy already shows it
     bool capitalizeNext = true;
     for (size_t i = 0; i < name.length(); i++) {
         if (capitalizeNext && std::isalpha(name[i])) {
-            name[i] = ::toupper(name[i]);
+            name[i] = ::toupper(::tolower(name[i]));
             capitalizeNext = false;
-        } else if (name[i] == ' ') {
-            capitalizeNext = true;
+        } else {
+            name[i] = ::tolower(name[i]);
+            if (name[i] == ' ') capitalizeNext = true;
         }
     }
     
     return name;
+}
+
+// Publish main device (parent for all CAN member sub-devices)
+void publishMainDevice() {
+    const char* mainDeviceId = "stiebel_eltron_wpl13e";
+    
+    // Publish a sensor to register the main device
+    const char* discoveryTopic = "homeassistant/sensor/heatingpump/main_device/config";
+    
+    std::ostringstream payload;
+    payload << "{\"name\":\"Wärmepumpe Status\","
+            << "\"unique_id\":\"" << mainDeviceId << "_status\","
+            << "\"state_topic\":\"heatingpump/status\","
+            << "\"icon\":\"mdi:heat-pump\","
+            << "\"device\":{\"identifiers\":[\"" << mainDeviceId << "\"],"
+            << "\"name\":\"Stiebel Eltron Wärmepumpe\","
+            << "\"model\":\"WPL 13 E\","
+            << "\"manufacturer\":\"Stiebel Eltron\"}}";
+    
+    std::string payloadStr = payload.str();
+    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    
+    ESP_LOGI("MQTT", "Main device published: Stiebel Eltron Wärmepumpe");
 }
 
 // Publish MQTT Discovery config for a signal
@@ -550,11 +584,12 @@ void publishMqttDiscovery(uint32_t can_id, const ElsterIndex *ei) {
     const CanMember &cm = lookupCanMember(can_id);
     const SignalConfig* config = getSignalConfig(ei->Name, (ElsterType)ei->Type);
     
-    // Generate unique ID
+    // Generate unique ID (lowercase, no spaces)
     char uniqueId[128];
     snprintf(uniqueId, sizeof(uniqueId), "stiebel_%s_%s", cm.Name, ei->Name);
     std::string uid(uniqueId);
     std::transform(uid.begin(), uid.end(), uid.begin(), ::tolower);
+    std::replace(uid.begin(), uid.end(), ' ', '_');
     
     // Check if already discovered
     if (discoveredSignals.find(uid) != discoveredSignals.end()) {
@@ -571,7 +606,7 @@ void publishMqttDiscovery(uint32_t can_id, const ElsterIndex *ei) {
     // Build discovery topic
     char discoveryTopic[256];
     snprintf(discoveryTopic, sizeof(discoveryTopic), 
-             "homeassistant/%s/heatingpump/%s/config", component, uniqueId);
+             "homeassistant/%s/heatingpump/%s/config", component, uid.c_str());
     
     // Build state topic
     char stateTopic[128];
@@ -580,53 +615,93 @@ void publishMqttDiscovery(uint32_t can_id, const ElsterIndex *ei) {
     // Generate friendly name
     std::string friendlyName = getFriendlyName(ei->Name, cm.Name);
     
-    // Build JSON payload
-    std::string payload = "{";
-    payload += "\"name\":\"" + friendlyName + "\",";
-    payload += "\"unique_id\":\"" + uid + "\",";
-    payload += "\"state_topic\":\"" + std::string(stateTopic) + "\",";
+    // Build JSON payload efficiently using ostringstream
+    std::ostringstream payload;
+    payload << "{\"name\":\"" << friendlyName << "\","
+            << "\"unique_id\":\"" << uid << "\","
+            << "\"state_topic\":\"" << stateTopic << "\","
+            << "\"availability_topic\":\"heatingpump/status\"";
     
-    // Device info
-    payload += "\"device\":{";
-    payload += "\"identifiers\":[\"stiebel_eltron_wpl13e\"],";
-    payload += "\"name\":\"Stiebel Eltron Heat Pump\",";
-    payload += "\"model\":\"WPL 13 E\",";
-    payload += "\"manufacturer\":\"Stiebel Eltron\"";
-    payload += "},";
-    
-    // Add device class if specified
-    if (strlen(config->deviceClass) > 0) {
-        payload += "\"device_class\":\"" + std::string(config->deviceClass) + "\",";
+    // Add optional fields only if specified
+    if (config->deviceClass[0] != '\0') {
+        payload << ",\"device_class\":\"" << config->deviceClass << "\"";
+    }
+    if (config->unit[0] != '\0') {
+        payload << ",\"unit_of_measurement\":\"" << config->unit << "\"";
+    }
+    if (config->stateClass[0] != '\0') {
+        payload << ",\"state_class\":\"" << config->stateClass << "\"";
+    }
+    if (config->icon[0] != '\0') {
+        payload << ",\"icon\":\"" << config->icon << "\"";
     }
     
-    // Add unit if specified
-    if (strlen(config->unit) > 0) {
-        payload += "\"unit_of_measurement\":\"" + std::string(config->unit) + "\",";
+    // Device info - create individual device per CAN member as sub-device
+    // Main device ID for the heat pump
+    const char* mainDeviceId = "stiebel_eltron_wpl13e";
+    
+    // Create unique device ID for this CAN member
+    char canMemberDeviceId[64];
+    snprintf(canMemberDeviceId, sizeof(canMemberDeviceId), "stiebel_%s", cm.Name);
+    
+    // Convert CAN member name to friendly German name
+    const char* canMemberFriendlyName = cm.Name;
+    if (strcmp(cm.Name, "KESSEL") == 0) canMemberFriendlyName = "Kessel";
+    else if (strcmp(cm.Name, "MANAGER") == 0) canMemberFriendlyName = "Manager";
+    else if (strcmp(cm.Name, "HEIZMODUL") == 0) canMemberFriendlyName = "Heizmodul";
+    else if (strcmp(cm.Name, "FEHLERSPEICHER") == 0) canMemberFriendlyName = "Fehlerspeicher";
+    else if (strcmp(cm.Name, "MIXER1") == 0) canMemberFriendlyName = "Mischer 1";
+    else if (strcmp(cm.Name, "MIXER2") == 0) canMemberFriendlyName = "Mischer 2";
+    else if (strcmp(cm.Name, "WMZ1") == 0) canMemberFriendlyName = "Wärmemengenzähler 1";
+    else if (strcmp(cm.Name, "WMZ2") == 0) canMemberFriendlyName = "Wärmemengenzähler 2";
+    
+    payload << ",\"device\":{\"identifiers\":[\"" << canMemberDeviceId << "\"],"
+            << "\"name\":\"" << canMemberFriendlyName << "\","
+            << "\"via_device\":\"" << mainDeviceId << "\","
+            << "\"manufacturer\":\"Stiebel Eltron\"}}";
+    
+    // Publish discovery message with retain flag
+    std::string payloadStr = payload.str();
+    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    
+    ESP_LOGI("MQTT", "Discovery published for %s", friendlyName.c_str());
+}
+
+// Republish all MQTT discoveries (for periodic refresh)
+void republishAllDiscoveries() {
+    ESP_LOGI("MQTT", "Republishing all MQTT discoveries (%d signals)", discoveredSignals.size());
+    
+    // Create a copy of discovered signals to iterate over
+    std::set<std::string> signalsToRepublish = discoveredSignals;
+    
+    // Clear the set so signals can be republished
+    discoveredSignals.clear();
+    
+    // Force republish by reading all known signals
+    // This will trigger processAndUpdate which calls publishMqttDiscovery
+    for (const auto& signal : signalsToRepublish) {
+        ESP_LOGD("MQTT", "Marked for republish: %s", signal.c_str());
     }
     
-    // Add state class if specified
-    if (strlen(config->stateClass) > 0) {
-        payload += "\"state_class\":\"" + std::string(config->stateClass) + "\",";
-    }
-    
-    // Add icon
-    payload += "\"icon\":\"" + std::string(config->icon) + "\"";
-    
-    payload += "}";
-    
-    // Publish discovery message
-    id(mqtt_client).publish(discoveryTopic, payload, 0, true); // QoS 0, retain true
-    
-    ESP_LOGI("MQTT Discovery", "Published: %s -> %s", uniqueId, friendlyName.c_str());
+    ESP_LOGI("MQTT", "Discovery refresh complete - will republish as signals are received");
 }
 
 // Publish signal state to MQTT
 void publishMqttState(uint32_t can_id, const ElsterIndex *ei, const std::string &value) {
+    // Input validation
+    if (!ei || !ei->Name || value.empty()) {
+        ESP_LOGW("MQTT", "Invalid signal data, skipping state publish");
+        return;
+    }
+    
     const CanMember &cm = lookupCanMember(can_id);
     
-    // Build state topic
+    // Build state topic with bounds checking
     char stateTopic[128];
-    snprintf(stateTopic, sizeof(stateTopic), "heatingpump/%s/%s/state", cm.Name, ei->Name);
+    int written = snprintf(stateTopic, sizeof(stateTopic), "heatingpump/%s/%s/state", cm.Name, ei->Name);
+    if (written >= sizeof(stateTopic)) {
+        ESP_LOGW("MQTT", "Topic too long for %s/%s, truncated", cm.Name, ei->Name);
+    }
     
     // Publish state
     id(mqtt_client).publish(stateTopic, value);
@@ -650,576 +725,166 @@ void update_COP_GESAMT()
     id(COP_GESAMT).publish_state(cop_gesamt);
 }
 
-void updateSensor(uint32_t can_id, const ElsterIndex *ei, std::string value)
-{
-    CanMemberType cmt = lookupCanMemberType(can_id);
+// Check if value is invalid/unsupported
+bool isInvalidValue(const ElsterIndex *ei, const std::string &value) {
+    if (value.empty()) return true;
     
-    // Publish to MQTT (discovery + state) for ALL signals
+    // Check for common invalid string values
+    if (value == "SNA" || value == "---" || value == "N/A") return true;
+    
+    // Check numeric types for invalid values
+    if (ei->Type == et_byte || ei->Type == et_bool || ei->Type == et_little_bool ||
+        ei->Type == et_cent_val || ei->Type == et_dec_val || ei->Type == et_double_val ||
+        ei->Type == et_triple_val) {
+        
+        // Check if string contains valid numeric characters
+        bool hasDigit = false;
+        for (size_t i = 0; i < value.length(); i++) {
+            char c = value[i];
+            if (c >= '0' && c <= '9') {
+                hasDigit = true;
+            } else if (c != '-' && c != '.' && c != ' ' && c != '+') {
+                return true; // Invalid character for number
+            }
+        }
+        if (!hasDigit) return true; // No digits found
+        
+        // Parse value and check for common invalid numeric values
+        float fval = std::stof(value);
+        // Common invalid values: -255, -32768, 32767, -327.68, 327.67
+        if (fval == -255.0f || fval == -32768.0f || fval == 32767.0f ||
+            fval == -327.68f || fval == 327.67f || fval < -300.0f || fval > 1000.0f) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &value)
+{
+    const CanMember &cm = lookupCanMember(can_id);
+    std::string key = std::string(cm.Name) + "_" + ei->Name;
+    
+    // Response received - remove from pending requests and reset no-response counter
+    if (pendingRequests.find(key) != pendingRequests.end()) {
+        pendingRequests.erase(key);
+    }
+    if (noResponseCounts.find(key) != noResponseCounts.end()) {
+        noResponseCounts.erase(key);
+    }
+    
+    // Check for invalid values and track consecutive failures
+    if (isInvalidValue(ei, value)) {
+        // Increment invalid count for this signal
+        invalidSignalCounts[key]++;
+        
+        // Only blacklist after 3 consecutive invalid values
+        if (invalidSignalCounts[key] >= 3) {
+            if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
+                blacklistedSignals.insert(key);
+                ESP_LOGW("BLACKLIST", "Signal %s from %s returned %d consecutive invalid values (last: '%s') - blacklisted",
+                         ei->Name, cm.Name, invalidSignalCounts[key], value.c_str());
+                
+                // Remove from Home Assistant by sending empty discovery message
+                char uniqueId[128];
+                snprintf(uniqueId, sizeof(uniqueId), "stiebel_%s_%s", cm.Name, ei->Name);
+                std::string uid(uniqueId);
+                std::transform(uid.begin(), uid.end(), uid.begin(), ::tolower);
+                std::replace(uid.begin(), uid.end(), ' ', '_');
+                
+                const char* component = (ei->Type == et_bool || ei->Type == et_little_bool) ? "binary_sensor" : "sensor";
+                char discoveryTopic[256];
+                snprintf(discoveryTopic, sizeof(discoveryTopic), 
+                         "homeassistant/%s/heatingpump/%s/config", component, uid.c_str());
+                
+                // Send empty payload to remove entity from HA
+                id(mqtt_client).publish(discoveryTopic, "", 0, 0, true);
+                ESP_LOGI("BLACKLIST", "Removed discovery for %s from Home Assistant", uid.c_str());
+            }
+        } else {
+            ESP_LOGD("BLACKLIST", "Signal %s from %s invalid (%d/3): '%s'",
+                     ei->Name, cm.Name, invalidSignalCounts[key], value.c_str());
+        }
+        return; // Don't publish invalid values
+    }
+    
+    // Valid value received - reset invalid counter
+    if (invalidSignalCounts.find(key) != invalidSignalCounts.end()) {
+        ESP_LOGD("BLACKLIST", "Signal %s from %s recovered (was %d invalid attempts)",
+                 ei->Name, cm.Name, invalidSignalCounts[key]);
+        invalidSignalCounts.erase(key);
+    }
+    
+    // Publish to MQTT (discovery + state) for valid signals only
     publishMqttDiscovery(can_id, ei);
     publishMqttState(can_id, ei, value);
+}
 
-    if (ei->Name == "AUSSENTEMP")
-    {
-        id(AUSSENTEMP).publish_state(std::stof(value));
-        return;
-    }
-    if (ei->Name == "EINSTELL_SPEICHERSOLLTEMP")
-    {
-        id(EINSTELL_SPEICHERSOLLTEMP).publish_state(std::stof(value));
-        return;
-    }
-    if (ei->Name == "EINSTELL_SPEICHERSOLLTEMP2")
-    {
-        id(EINSTELL_SPEICHERSOLLTEMP2).publish_state(std::stof(value));
-        return;
-    }
-    if (ei->Name == "HILFSKESSELSOLL")
-    {
-        id(HILFSKESSELSOLL).publish_state(std::stof(value));
-        return;
-    }
-    if (ei->Name == "KESSELSOLLTEMP")
-    {
-        id(KESSELSOLLTEMP).publish_state(std::stof(value));
-        return;
-    }
-    if (ei->Name == "SPEICHERISTTEMP")
-    {
-        id(SPEICHERISTTEMP).publish_state(std::stof(value));
-        return;
-    }
-    if (ei->Name == "SPEICHERSOLLTEMP")
-    {
-        id(SPEICHERSOLLTEMP).publish_state(std::stof(value));
-        return;
-    }
-    if (ei->Name == "SPEICHER_OBEN_TEMP")
-    {
-        id(SPEICHER_OBEN_TEMP).publish_state(std::stof(value));
-        return;
-    }
-    if (ei->Name == "SPEICHER_UNTEN_TEMP")
-    {
-        id(SPEICHER_UNTEN_TEMP).publish_state(std::stof(value));
-        return;
-    }
-    if (ei->Name == "VORLAUFISTTEMP")
-    {
-        switch (cmt)
-        {
-        case cm_kessel:
-            id(VORLAUFISTTEMP_KESSEL).publish_state(std::stof(value));
-            return;
-        case cm_manager:
-            id(VORLAUFISTTEMP_MANAGER).publish_state(std::stof(value));
-            return;
+// Check for timed-out requests (no response received)
+void checkPendingRequests() {
+    const unsigned long TIMEOUT_MS = 5000; // 5 second timeout
+    unsigned long now = millis();
+    
+    // Create list of timed-out requests
+    std::vector<std::string> timedOut;
+    for (auto it = pendingRequests.begin(); it != pendingRequests.end(); ++it) {
+        if (now - it->second > TIMEOUT_MS) {
+            timedOut.push_back(it->first);
         }
-        return;
-    }
-    if (ei->Name == "VORLAUFSOLLTEMP")
-    {
-        id(VORLAUFSOLLTEMP).publish_state(std::stof(value));
-        return;
-    }
-    if (ei->Name == "GERAETE_ID")
-    {
-        switch (cmt)
-        {
-        case cm_kessel:
-            id(GERAETE_ID_KESSEL).publish_state(value);
-            break;
-        case cm_manager:
-            id(GERAETE_ID_MANAGER).publish_state(value);
-            break;
-        case cm_heizmodul:
-            id(GERAETE_ID_HEIZMODUL).publish_state(value);
-            break;
-        }
-        return;
-    }
-    if (ei->Name == "JAHR")
-    {
-        id(JAHR).publish_state(std::stoi(value));
-        publishDate();
-        return;
-    }
-    if (ei->Name == "LAUFZEIT_VERD_BEI_SPEICHERBEDARF")
-    {
-        id(LAUFZEIT_VERD_BEI_SPEICHERBEDARF).publish_state(std::stoi(value));
-        return;
-    }
-    if (ei->Name == "LUEFT_PASSIVKUEHLUNG_UEBER_FORTLUEFTER")
-    {
-        id(LUEFT_PASSIVKUEHLUNG_UEBER_FORTLUEFTER).publish_state(std::stoi(value));
-        return;
-    }
-    if (ei->Name == "MINUTE")
-    {
-        id(MINUTE).publish_state(std::stoi(value));
-        publishTime();
-        return;
-    }
-    if (ei->Name == "MONAT")
-    {
-        id(MONAT).publish_state(std::stoi(value));
-        publishDate();
-        return;
-    }
-    if (ei->Name == "PROGRAMMSCHALTER")
-    {
-        id(PROGRAMMSCHALTER).publish_state(value);
-        return;
-    }
-    if (ei->Name == "RAUMISTTEMP")
-    {
-        id(RAUMISTTEMP).publish_state(std::stof(value));
-        return;
-    }
-    if (ei->Name == "RAUMSOLLTEMP_I")
-    {
-        id(RAUMSOLLTEMP_I).publish_state(std::stof(value));
-        return;
-    }
-    if (ei->Name == "RAUMSOLLTEMP_II")
-    {
-        id(RAUMSOLLTEMP_II).publish_state(std::stof(value));
-        return;
-    }
-    if (ei->Name == "RAUMSOLLTEMP_III")
-    {
-        id(RAUMSOLLTEMP_III).publish_state(std::stof(value));
-        return;
-    }
-    if (ei->Name == "RAUMSOLLTEMP_NACHT")
-    {
-        id(RAUMSOLLTEMP_NACHT).publish_state(std::stof(value));
-        return;
-    }
-    if (ei->Name == "SEKUNDE")
-    {
-        id(SEKUNDE).publish_state(std::stoi(value));
-        publishTime();
-        return;
-    }
-    if (ei->Name == "SAMMLERISTTEMP")
-    {
-        id(SAMMLERISTTEMP).publish_state(std::stof(value));
-        return;
-    }
-    if (ei->Name == "SAMMLERSOLLTEMP")
-    {
-        id(SAMMLERSOLLTEMP).publish_state(std::stof(value));
-        return;
-    }
-    if (ei->Name == "SOFTWARE_VERSION")
-    {
-        id(SOFTWARE_VERSION).publish_state(std::stoi(value));
-        return;
-    }
-    if (ei->Name == "SOMMERBETRIEB")
-    {
-        id(SOMMERBETRIEB).publish_state(value);
-        return;
-    }
-    if (ei->Name == "STUNDE")
-    {
-        id(STUNDE).publish_state(std::stoi(value));
-        publishTime();
-        return;
-    }
-    if (ei->Name == "TAG")
-    {
-        id(TAG).publish_state(std::stoi(value));
-        publishDate();
-        return;
-    }
-    if (ei->Name == "TEILVORRANG_WW")
-    {
-        id(TEILVORRANG_WW).publish_state(std::stoi(value));
-        return;
-    }
-    if (ei->Name == "TEMPORALE_LUEFTUNGSSTUFE_DAUER")
-    {
-        id(TEMPORALE_LUEFTUNGSSTUFE_DAUER).publish_state(std::stoi(value));
-        return;
-    }
-    if (ei->Name == "VERDICHTER")
-    {
-        switch (cmt)
-        {
-        case cm_heizmodul:
-            id(VERDICHTER).publish_state(std::stof(value));
-            break;
-        }
-        return;
-    }
-    if (ei->Name == "VERSTELLTE_RAUMSOLLTEMP")
-    {
-        id(VERSTELLTE_RAUMSOLLTEMP).publish_state(std::stof(value));
-        return;
-    }
-    if (ei->Name == "WP_STATUS")
-    {
-        id(WP_STATUS).publish_state(std::stoi(value));
-        return;
-    }
-    if (ei->Name == "WW_ECO")
-    {
-        id(WW_ECO).publish_state(value);
-        return;
-    }
-    if (ei->Name == "EVU_SPERRE_AKTIV")
-    {
-        id(EVU_SPERRE_AKTIV_MANAGER).publish_state(std::stoi(value));
-        return;
-    }
-    if (ei->Name == "VERDAMPFERTEMP")
-    {
-        id(VERDAMPFERTEMP).publish_state(std::stof(value));
-        return;
-    }
-    if (ei->Name == "RUECKLAUFISTTEMP")
-    {
-        switch (cmt)
-        {
-        case cm_heizmodul:
-            id(RUECKLAUFISTTEMP_HEIZMODUL).publish_state(std::stof(value));
-            break;
-        case cm_manager:
-            if (std::stof(value) > 0) {
-                id(RUECKLAUFISTTEMP_MANAGER).publish_state(std::stof(value));
-            }
-            break;
-        }
-        return;
-    }
-    if (ei->Name == "WPVORLAUFIST")
-    {
-        switch (cmt)
-        {
-        case cm_heizmodul:
-            id(WPVORLAUFIST_HEIZMODUL).publish_state(std::stof(value));
-            break;
-        case cm_manager:
-            id(WPVORLAUFIST_MANAGER).publish_state(std::stof(value));
-            break;
-        }
-        return;
-
-    }
-    if (ei->Name == "ABTAUUNGAKTIV")
-    {
-        id(ABTAUUNGAKTIV).publish_state(std::stoi(value));
-        return;
-    }
-    if (ei->Name == "BETRIEBSART_WP")
-    {
-        id(BETRIEBSART_WP).publish_state(std::stoi(value));
-        return;
-    }
-    if (ei->Name == "EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH")
-    {
-        id(EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH).publish_state(std::stoi(value));
-        id(EL_AUFNAHMELEISTUNG_HEIZ_SUM).publish_state(id(EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH).state + id(EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH).state / 1000);
-        update_COP_HEIZ();
-        update_COP_GESAMT();
-        return;
-    }
-    if (ei->Name == "EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH")
-    {
-        id(EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH).publish_state(std::stoi(value));
-        id(EL_AUFNAHMELEISTUNG_HEIZ_TAG).publish_state(id(EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH).state + id(EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH).state / 1000);
-        id(EL_AUFNAHMELEISTUNG_HEIZ_INCREASING).publish_state(id(EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH).state + id(EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH).state / 1000);
-        update_COP_HEIZ();
-        update_COP_GESAMT();
-        return;
-    }
-    if (ei->Name == "EL_AUFNAHMELEISTUNG_WW_SUM_KWH")
-    {
-        id(EL_AUFNAHMELEISTUNG_WW_SUM_KWH).publish_state(std::stoi(value));
-        id(EL_AUFNAHMELEISTUNG_WW_SUM).publish_state(id(EL_AUFNAHMELEISTUNG_WW_SUM_MWH).state + id(EL_AUFNAHMELEISTUNG_WW_SUM_KWH).state / 1000);
-        update_COP_WW();
-        update_COP_GESAMT();
-        return;
-    }
-    if (ei->Name == "EL_AUFNAHMELEISTUNG_WW_TAG_WH")
-    {
-        id(EL_AUFNAHMELEISTUNG_WW_TAG_WH).publish_state(std::stoi(value));
-        id(EL_AUFNAHMELEISTUNG_WW_TAG).publish_state(id(EL_AUFNAHMELEISTUNG_WW_TAG_KWH).state + id(EL_AUFNAHMELEISTUNG_WW_TAG_WH).state / 1000);
-        id(EL_AUFNAHMELEISTUNG_WW_INCREASING).publish_state(id(EL_AUFNAHMELEISTUNG_WW_TAG_KWH).state + id(EL_AUFNAHMELEISTUNG_WW_TAG_WH).state / 1000);
-        update_COP_WW();
-        update_COP_GESAMT();
-        return;
-    }
-    if (ei->Name == "LZ_VERD_1_2_WW_BETRIEB")
-    {
-        switch (cmt)
-        {
-        case cm_manager:
-            id(LZ_VERD_1_2_WW_BETRIEB_MANAGER).publish_state(std::stoi(value));
-            break;
-        case cm_heizmodul:
-            id(LZ_VERD_1_2_WW_BETRIEB_HEIZMODUL).publish_state(std::stoi(value));
-            break;
-        }
-        return;
-    }
-    if (ei->Name == "LZ_VERD_1_WW_BETRIEB")
-    {
-        switch (cmt)
-        {
-        case cm_manager:
-            id(LZ_VERD_1_WW_BETRIEB_MANAGER).publish_state(std::stoi(value));
-            break;
-        case cm_heizmodul:
-            id(LZ_VERD_1_WW_BETRIEB_HEIZMODUL).publish_state(std::stoi(value));
-            break;
-        }
-        return;
-    }
-    if (ei->Name == "LZ_VERD_2_WW_BETRIEB")
-    {
-        switch (cmt)
-        {
-        case cm_manager:
-            id(LZ_VERD_2_WW_BETRIEB_MANAGER).publish_state(std::stoi(value));
-            break;
-        case cm_heizmodul:
-            id(LZ_VERD_2_WW_BETRIEB_HEIZMODUL).publish_state(std::stoi(value));
-            break;
-        }
-        return;
-    }
-    if (ei->Name == "SOFTWARE_NUMMER")
-    {
-        switch (cmt)
-        {
-        case cm_manager:
-            id(SOFTWARE_NUMMER_MANAGER).publish_state(std::stoi(value));
-            break;
-        case cm_heizmodul:
-            id(SOFTWARE_NUMMER_HEIZMODUL).publish_state(std::stoi(value));
-            break;
-        }
-        return;
-    }
-    if (ei->Name == "WAERMEERTRAG_2WE_HEIZ_SUM_KWH")
-    {
-        id(WAERMEERTRAG_2WE_HEIZ_SUM_KWH).publish_state(std::stoi(value));
-        id(WAERMEERTRAG_2WE_HEIZ_SUM).publish_state(id(WAERMEERTRAG_2WE_HEIZ_SUM_MWH).state + id(WAERMEERTRAG_2WE_HEIZ_SUM_KWH).state / 1000);
-        update_COP_HEIZ();
-        update_COP_GESAMT();
-        return;
-    }
-    if (ei->Name == "WAERMEERTRAG_2WE_WW_SUM_KWH")
-    {
-        id(WAERMEERTRAG_2WE_WW_SUM_KWH).publish_state(std::stoi(value));
-        id(WAERMEERTRAG_2WE_WW_SUM).publish_state(id(WAERMEERTRAG_2WE_WW_SUM_MWH).state + id(WAERMEERTRAG_2WE_WW_SUM_KWH).state / 1000);
-        update_COP_HEIZ();
-        update_COP_GESAMT();
-        return;
-    }
-    if (ei->Name == "WAERMEERTRAG_HEIZ_SUM_KWH")
-    {
-        id(WAERMEERTRAG_HEIZ_SUM_KWH).publish_state(std::stoi(value));
-        id(WAERMEERTRAG_HEIZ_SUM).publish_state(id(WAERMEERTRAG_HEIZ_SUM_MWH).state + id(WAERMEERTRAG_HEIZ_SUM_KWH).state / 1000);
-        update_COP_HEIZ();
-        update_COP_GESAMT();
-        return;
-    }
-    if (ei->Name == "WAERMEERTRAG_HEIZ_TAG_WH")
-    {
-        id(WAERMEERTRAG_HEIZ_TAG_WH).publish_state(std::stoi(value));
-        id(WAERMEERTRAG_HEIZ_TAG).publish_state(id(WAERMEERTRAG_HEIZ_TAG_KWH).state + id(WAERMEERTRAG_HEIZ_TAG_WH).state / 1000);
-        id(WAERMEERTRAG_HEIZ_INCREASING).publish_state(id(WAERMEERTRAG_HEIZ_TAG_KWH).state + id(WAERMEERTRAG_HEIZ_TAG_WH).state / 1000);
-        update_COP_HEIZ();
-        update_COP_GESAMT();
-        return;
-    }
-    if (ei->Name == "WAERMEERTRAG_WW_SUM_KWH")
-    {
-        id(WAERMEERTRAG_WW_SUM_KWH).publish_state(std::stoi(value));
-        id(WAERMEERTRAG_WW_SUM).publish_state(id(WAERMEERTRAG_WW_SUM_MWH).state + id(WAERMEERTRAG_WW_SUM_KWH).state / 1000);
-        update_COP_WW();
-        update_COP_GESAMT();
-        return;
-    }
-    if (ei->Name == "WAERMEERTRAG_WW_TAG_WH")
-    {
-        id(WAERMEERTRAG_WW_TAG_WH).publish_state(std::stoi(value));
-        id(WAERMEERTRAG_WW_TAG).publish_state(id(WAERMEERTRAG_WW_TAG_KWH).state + id(WAERMEERTRAG_WW_TAG_WH).state / 1000);
-        id(WAERMEERTRAG_WW_INCREASING).publish_state(id(WAERMEERTRAG_WW_TAG_KWH).state + id(WAERMEERTRAG_WW_TAG_WH).state / 1000);
-        update_COP_WW();
-        update_COP_GESAMT();
-        return;
-    }
-    if (ei->Name == "EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH")
-    {
-        id(EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH).publish_state(std::stod(value));
-        id(EL_AUFNAHMELEISTUNG_HEIZ_SUM).publish_state(id(EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH).state + id(EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH).state / 1000);
-        update_COP_HEIZ();
-        update_COP_GESAMT();
-        return;
-    }
-    if (ei->Name == "EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH")
-    {
-        id(EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH).publish_state(std::stod(value));
-        id(EL_AUFNAHMELEISTUNG_HEIZ_TAG).publish_state(id(EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH).state + id(EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH).state / 1000);
-        id(EL_AUFNAHMELEISTUNG_HEIZ_INCREASING).publish_state(id(EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH).state + id(EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH).state / 1000);
-        update_COP_HEIZ();
-        update_COP_GESAMT();
-        return;
-    }
-    if (ei->Name == "EL_AUFNAHMELEISTUNG_WW_SUM_MWH")
-    {
-        id(EL_AUFNAHMELEISTUNG_WW_SUM_MWH).publish_state(std::stod(value));
-        id(EL_AUFNAHMELEISTUNG_WW_SUM).publish_state(id(EL_AUFNAHMELEISTUNG_WW_SUM_MWH).state + id(EL_AUFNAHMELEISTUNG_WW_SUM_KWH).state / 1000);
-        update_COP_WW();
-        update_COP_GESAMT();
-        return;
-    }
-    if (ei->Name == "EL_AUFNAHMELEISTUNG_WW_TAG_KWH")
-    {
-        id(EL_AUFNAHMELEISTUNG_WW_TAG_KWH).publish_state(std::stod(value));
-        id(EL_AUFNAHMELEISTUNG_WW_TAG).publish_state(id(EL_AUFNAHMELEISTUNG_WW_TAG_KWH).state + id(EL_AUFNAHMELEISTUNG_WW_TAG_WH).state / 1000);
-        id(EL_AUFNAHMELEISTUNG_WW_INCREASING).publish_state(id(EL_AUFNAHMELEISTUNG_WW_TAG_KWH).state + id(EL_AUFNAHMELEISTUNG_WW_TAG_WH).state / 1000);
-        update_COP_WW();
-        update_COP_GESAMT();
-        return;
-    }
-    if (ei->Name == "WAERMEERTRAG_2WE_HEIZ_SUM_MWH")
-    {
-        id(WAERMEERTRAG_2WE_HEIZ_SUM_MWH).publish_state(std::stod(value));
-        id(WAERMEERTRAG_2WE_HEIZ_SUM).publish_state(id(WAERMEERTRAG_2WE_HEIZ_SUM_MWH).state + id(WAERMEERTRAG_2WE_HEIZ_SUM_KWH).state / 1000);
-        update_COP_HEIZ();
-        update_COP_GESAMT();
-        return;
-    }
-    if (ei->Name == "WAERMEERTRAG_2WE_WW_SUM_MWH")
-    {
-        id(WAERMEERTRAG_2WE_WW_SUM_MWH).publish_state(std::stod(value));
-        id(WAERMEERTRAG_2WE_WW_SUM).publish_state(id(WAERMEERTRAG_2WE_WW_SUM_MWH).state + id(WAERMEERTRAG_2WE_WW_SUM_KWH).state / 1000);
-        update_COP_WW();
-        update_COP_GESAMT();
-        return;
-    }
-    if (ei->Name == "WAERMEERTRAG_HEIZ_SUM_MWH")
-    {
-        id(WAERMEERTRAG_HEIZ_SUM_MWH).publish_state(std::stod(value));
-        id(WAERMEERTRAG_HEIZ_SUM).publish_state(id(WAERMEERTRAG_HEIZ_SUM_MWH).state + id(WAERMEERTRAG_HEIZ_SUM_KWH).state / 1000);
-        update_COP_HEIZ();
-        update_COP_GESAMT();
-        return;
-    }
-    if (ei->Name == "WAERMEERTRAG_HEIZ_TAG_KWH")
-    {
-        id(WAERMEERTRAG_HEIZ_TAG_KWH).publish_state(std::stod(value));
-        id(WAERMEERTRAG_HEIZ_TAG).publish_state(id(WAERMEERTRAG_HEIZ_TAG_KWH).state + id(WAERMEERTRAG_HEIZ_TAG_WH).state / 1000);
-        id(WAERMEERTRAG_HEIZ_INCREASING).publish_state(id(WAERMEERTRAG_HEIZ_TAG_KWH).state + id(WAERMEERTRAG_HEIZ_TAG_WH).state / 1000);
-        update_COP_HEIZ();
-        update_COP_GESAMT();
-        return;
-    }
-    if (ei->Name == "WAERMEERTRAG_WW_SUM_MWH")
-    {
-        id(WAERMEERTRAG_WW_SUM_MWH).publish_state(std::stod(value));
-        id(WAERMEERTRAG_WW_SUM).publish_state(id(WAERMEERTRAG_WW_SUM_MWH).state + id(WAERMEERTRAG_WW_SUM_KWH).state / 1000);
-        update_COP_WW();
-        update_COP_GESAMT();
-        return;
-    }
-    if (ei->Name == "WAERMEERTRAG_WW_TAG_KWH")
-    {
-        id(WAERMEERTRAG_WW_TAG_KWH).publish_state(std::stod(value));
-        id(WAERMEERTRAG_WW_TAG).publish_state(id(WAERMEERTRAG_WW_TAG_KWH).state + id(WAERMEERTRAG_WW_TAG_WH).state / 1000);
-        id(WAERMEERTRAG_WW_INCREASING).publish_state(id(WAERMEERTRAG_WW_TAG_KWH).state + id(WAERMEERTRAG_WW_TAG_WH).state / 1000);
-        update_COP_WW();
-        update_COP_GESAMT();
-        return;
-    }
-    if (ei->Name == "LZ_VERD_1_2_HEIZBETRIEB")
-    {
-        switch (cmt)
-        {
-        case cm_manager:
-            id(LZ_VERD_1_2_HEIZBETRIEB_MANAGER).publish_state(std::stod(value));
-            break;
-        case cm_heizmodul:
-            id(LZ_VERD_1_2_HEIZBETRIEB_HEIZMODUL).publish_state(std::stod(value));
-            break;
-        }
-        return;
-    }
-    if (ei->Name == "LZ_VERD_1_2_KUEHLBETRIEB")
-    {
-        switch (cmt)
-        {
-        case cm_manager:
-            id(LZ_VERD_1_2_KUEHLBETRIEB_MANAGER).publish_state(std::stod(value));
-            break;
-        case cm_heizmodul:
-            id(LZ_VERD_1_2_KUEHLBETRIEB_HEIZMODUL).publish_state(std::stod(value));
-            break;
-        }
-        return;
-    }
-    if (ei->Name == "LZ_VERD_1_HEIZBETRIEB")
-    {
-        switch (cmt)
-        {
-        case cm_manager:
-            id(LZ_VERD_1_HEIZBETRIEB_MANAGER).publish_state(std::stod(value));
-            break;
-        case cm_heizmodul:
-            id(LZ_VERD_1_HEIZBETRIEB_HEIZMODUL).publish_state(std::stod(value));
-            break;
-        }
-        return;
-    }
-    if (ei->Name == "LZ_VERD_1_KUEHLBETRIEB")
-    {
-        switch (cmt)
-        {
-        case cm_manager:
-            id(LZ_VERD_1_KUEHLBETRIEB_MANAGER).publish_state(std::stod(value));
-            break;
-        case cm_heizmodul:
-            id(LZ_VERD_1_KUEHLBETRIEB_HEIZMODUL).publish_state(std::stod(value));
-            break;
-        }
-        return;
-    }
-    if (ei->Name == "LZ_VERD_2_HEIZBETRIEB")
-    {
-        switch (cmt)
-        {
-        case cm_manager:
-            id(LZ_VERD_2_HEIZBETRIEB_MANAGER).publish_state(std::stod(value));
-            break;
-        case cm_heizmodul:
-            id(LZ_VERD_2_HEIZBETRIEB_HEIZMODUL).publish_state(std::stod(value));
-            break;
-        }
-        return;
-    }
-    if (ei->Name == "LZ_VERD_2_KUEHLBETRIEB")
-    {
-        switch (cmt)
-        {
-        case cm_manager:
-            id(LZ_VERD_2_KUEHLBETRIEB_MANAGER).publish_state(std::stod(value));
-            break;
-        case cm_heizmodul:
-            id(LZ_VERD_2_KUEHLBETRIEB_HEIZMODUL).publish_state(std::stod(value));
-            break;
-        }
-        return;
     }
     
-    // Log unmatched signal for identification
-    const CanMember &cm = lookupCanMember(can_id);
-    ESP_LOGW("updateSensor()", "UNMATCHED SIGNAL: %s (0x%04x) from %s (0x%02x) = %s (%s)", 
-             ei->Name, ei->Index, cm.Name, cm.CanId, value.c_str(), ElsterTypeStr[ei->Type]);
+    // Process timed-out requests
+    for (const auto& key : timedOut) {
+        pendingRequests.erase(key);
+        noResponseCounts[key]++;
+        
+        // Blacklist after 3 consecutive no-responses
+        if (noResponseCounts[key] >= 3) {
+            if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
+                blacklistedSignals.insert(key);
+                
+                // Parse key to get member and signal name
+                size_t underscorePos = key.find('_');
+                if (underscorePos != std::string::npos) {
+                    std::string memberName = key.substr(0, underscorePos);
+                    std::string signalName = key.substr(underscorePos + 1);
+                    
+                    ESP_LOGW("BLACKLIST", "Signal %s from %s: no response after %d attempts - blacklisted",
+                             signalName.c_str(), memberName.c_str(), noResponseCounts[key]);
+                    
+                    // Remove from Home Assistant
+                    char uniqueId[128];
+                    snprintf(uniqueId, sizeof(uniqueId), "stiebel_%s", key.c_str());
+                    std::string uid(uniqueId);
+                    std::transform(uid.begin(), uid.end(), uid.begin(), ::tolower);
+                    
+                    char discoveryTopic[256];
+                    snprintf(discoveryTopic, sizeof(discoveryTopic), 
+                             "homeassistant/sensor/heatingpump/%s/config", uid.c_str());
+                    id(mqtt_client).publish(discoveryTopic, "", 0, 0, true);
+                    
+                    // Also try binary_sensor
+                    snprintf(discoveryTopic, sizeof(discoveryTopic), 
+                             "homeassistant/binary_sensor/heatingpump/%s/config", uid.c_str());
+                    id(mqtt_client).publish(discoveryTopic, "", 0, 0, true);
+                }
+            }
+        } else {
+            // Parse key for logging
+            size_t underscorePos = key.find('_');
+            if (underscorePos != std::string::npos) {
+                std::string memberName = key.substr(0, underscorePos);
+                std::string signalName = key.substr(underscorePos + 1);
+                ESP_LOGD("NO_RESPONSE", "Signal %s from %s: no response (%d/3)",
+                         signalName.c_str(), memberName.c_str(), noResponseCounts[key]);
+            }
+        }
+    }
+    
+    if (!timedOut.empty()) {
+        ESP_LOGI("NO_RESPONSE", "Detected %d timed-out requests", timedOut.size());
+    }
 }
 
 void identifyCanMembers()

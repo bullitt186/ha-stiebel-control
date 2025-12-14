@@ -19,7 +19,13 @@
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-  use_address: waermepumpe.iot.stahmer.lan
+  #use_address: waermepumpe.iot.stahmer.lan
+  # Fast reconnection for better availability
+  fast_connect: true
+  # Power save mode off for stable CAN communication
+  power_save_mode: none
+  # Reconnection strategy
+  reboot_timeout: 5min
   #wifi:
   #  ssid: "Airport-IoT"
   #  password: "X0dkaU95tONC"

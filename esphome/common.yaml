@@ -35,6 +35,36 @@ esp32:
 
 #########################################
 #                                       #
+#   LOGGER                              #
+#                                       #
+#########################################
+logger:
+  level: INFO  # Change to DEBUG for troubleshooting
+  baud_rate: 115200
+  logs:
+    # Reduce verbose CAN logging in production
+    canbus: INFO
+    mqtt: INFO
+    # Keep critical logs visible
+    component: WARN
+
+#########################################
+#                                       #
+#   API & OTA                           #
+#                                       #
+#########################################
+api:
+  reboot_timeout: 15min
+
+ota:
+  platform: esphome
+  password: f0e6110663e3bef67846f076d7e4db81
+
+safe_mode:
+  reboot_timeout: 5min
+
+#########################################
+#                                       #
 #   MQTT                                #
 #                                       #
 #########################################
@@ -43,10 +73,198 @@ mqtt:
   username: !secret mqtt_username
   password: !secret mqtt_password
   id: mqtt_client
-  discovery: true
+  # Disable native ESPHome discovery - using custom auto-discovery instead
+  discovery: false
   discovery_prefix: homeassistant
+  # Birth message - sent when ESP32 connects
+  birth_message:
+    topic: heatingpump/status
+    payload: online
+    qos: 1
+    retain: true
+  # Last Will Testament - sent by broker if ESP32 disconnects unexpectedly
+  will_message:
+    topic: heatingpump/status
+    payload: offline
+    qos: 1
+    retain: true
+  # Keepalive for connection monitoring
+  keepalive: 15s
+  # Disable reboot on MQTT disconnect - will keep trying to reconnect indefinitely
+  reboot_timeout: 0s
   on_connect:
-    - logger.log: "Connected to MQTT broker"
+    - logger.log: 
+        level: INFO
+        format: "Connected to MQTT broker"
+    - lambda: |-
+        publishMainDevice();
+  on_disconnect:
+    - logger.log:
+        level: WARN
+        format: "Disconnected from MQTT broker - will automatically retry"
+  on_message:
+    - topic: heatingpump/reconnect
+      then:
+        - logger.log: "Manual reconnect triggered"
+
+#########################################
+#                                       #
+#   INTERVAL TIMER                      #
+#                                       #
+#########################################
+interval:
+  # Check for timed-out CAN requests every 10 seconds
+  - interval: 10s
+    then:
+      - lambda: |-
+          checkPendingRequests();
+  
+  # Republish MQTT discovery every 15 minutes for reliability
+  - interval: 15min
+    then:
+      - lambda: |-
+          republishAllDiscoveries();
+  
+  # Request temperature signals in small batches every 10 seconds
+  # Rotates through all signals - full cycle completes in ~3 minutes
+  - interval: 10s
+    then:
+      - lambda: |-
+          static int signalIndex = 0;
+          static const int SIGNALS_PER_BATCH = 5;  // Only 5 signals per batch to avoid blocking
+          
+          static const char* tempSignals[] = {
+            "KESSELSOLLTEMP", "SPEICHERSOLLTEMP", "VORLAUFSOLLTEMP",
+            "RAUMSOLLTEMP_I", "RAUMSOLLTEMP_II", "RAUMSOLLTEMP_III",
+            "RAUMSOLLTEMP_NACHT", "AUSSENTEMP", "SAMMLERISTTEMP",
+            "SPEICHERISTTEMP", "VORLAUFISTTEMP", "RAUMISTTEMP",
+            "VERSTELLTE_RAUMSOLLTEMP", "EINSTELL_SPEICHERSOLLTEMP",
+            "SAMMLERSOLLTEMP", "RUECKLAUFISTTEMP", "SPEICHER_UNTEN_TEMP",
+            "SOLARZONENTEMP", "SPEICHER_OBEN_TEMP", "KOLLEKTORTEMP",
+            "FESTSTOFFKESSELTEMP", "MIN_TEMP_KESSEL", "ANFAHRTEMP",
+            "MAX_TEMP_KESSEL", "MAX_TEMP_HZK", "KOLLEKTORTEMP_2",
+            "MULTIFUNKTION_ISTTEMP", "PUFFERTEMP_OBEN1", "PUFFERTEMP_MITTE1",
+            "PUFFERTEMP_UNTEN1", "PUFFERTEMP_OBEN2", "PUFFERTEMP_MITTE2",
+            "PUFFERTEMP_UNTEN2", "PUFFERTEMP_OBEN3", "PUFFERTEMP_MITTE3",
+            "PUFFERTEMP_UNTEN3", "AUSSENTEMPVERZOEGERUNG", "AUSWAHL_STANDARDTEMP",
+            "MIN_TEMP_HZK", "FERIEN_ABSENKTEMP", "WW_MAXTEMP",
+            "KESSELSOLLTEMP_2WE", "ABWESENHEITSTEMP", "EINSTELL_SPEICHERSOLLTEMP3",
+            "ABGASTEMP", "WW_SCHNELL_START_TEMPERATUR", "MAX_WW_TEMP",
+            "BIVALENTPARALLELTEMPERATUR_HZG", "BIVALENTPARALLELTEMPERATUR_WW",
+            "BIVALENZALTERNATIVTEMPERATUR_HZG", "BIVALENZALTERNATIVTEMPERATUR_WW",
+            "QUELLENSOLLTEMPERATUR", "AUSSENTEMPERATUR_WARMWASSER",
+            "ESTRICH_SOCKELTEMPERATUR", "ESTRICH_MAX_TEMPERATUR",
+            "EINSTELL_SPEICHERSOLLTEMP2", "WPVORLAUFIST", "WPRUECKLAUFIST",
+            "VERDAMPFERTEMP", "VERDICHTER", "HILFSKESSELSOLL"
+          };
+          static const int SIGNAL_COUNT = sizeof(tempSignals) / sizeof(tempSignals[0]);
+          
+          const CanMember* members[] = {
+            &CanMembers[cm_kessel],
+            &CanMembers[cm_manager],
+            &CanMembers[cm_heizmodul]
+          };
+          static const int MEMBER_COUNT = sizeof(members) / sizeof(members[0]);
+          
+          // Request next batch of signals
+          int requested = 0;
+          while (requested < SIGNALS_PER_BATCH && signalIndex < SIGNAL_COUNT * MEMBER_COUNT) {
+            int memberIdx = signalIndex / SIGNAL_COUNT;
+            int sigIdx = signalIndex % SIGNAL_COUNT;
+            
+            // Check if signal is blacklisted for this member
+            std::string key = std::string(members[memberIdx]->Name) + "_" + tempSignals[sigIdx];
+            if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
+              const ElsterIndex* ei = GetElsterIndex(tempSignals[sigIdx]);
+              if (ei && ei->Index != 0xFFFF) {
+                readSignal(members[memberIdx], ei);
+                requested++;
+              }
+            }
+            signalIndex++;
+          }
+          
+          // Reset index when we've gone through all signals
+          if (signalIndex >= SIGNAL_COUNT * MEMBER_COUNT) {
+            signalIndex = 0;
+            ESP_LOGI("INTERVAL", "Temperature signal cycle complete - restarting");
+          }
+  
+  # Request time/date and status signals every 1 minute
+  - interval: 1min
+    then:
+      - lambda: |-
+          ESP_LOGI("INTERVAL", "Requesting time/date and status signals");
+          
+          static const char* statusSignals[] = {
+            "JAHR", "MONAT", "TAG", "STUNDE", "MINUTE", "SEKUNDE",
+            "WP_STATUS", "EVU_SPERRE_AKTIV", "ABTAUUNGAKTIV",
+            "BETRIEBSART_WP", "PROGRAMMSCHALTER"
+          };
+          
+          const CanMember* members[] = {
+            &CanMembers[cm_manager],
+            &CanMembers[cm_heizmodul]
+          };
+          
+          for (const auto* member : members) {
+            for (const auto* signal : statusSignals) {
+              // Check if signal is blacklisted for this member
+              std::string key = std::string(member->Name) + "_" + signal;
+              if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
+                const ElsterIndex* ei = GetElsterIndex(signal);
+                if (ei && ei->Index != 0xFFFF) {
+                  readSignal(member, ei);
+                }
+              }
+            }
+          }
+  
+  # Request energy and duration counters every 10 minutes
+  - interval: 10min
+    then:
+      - lambda: |-
+          ESP_LOGI("INTERVAL", "Requesting energy and duration signals");
+          
+          static const char* energyDurationSignals[] = {
+            "EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", "EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH",
+            "EL_AUFNAHMELEISTUNG_WW_TAG_KWH", "EL_AUFNAHMELEISTUNG_WW_SUM_MWH",
+            "WAERMEERTRAG_2WE_WW_TAG_KWH", "WAERMEERTRAG_2WE_WW_SUM_MWH",
+            "WAERMEERTRAG_2WE_HEIZ_TAG_KWH", "WAERMEERTRAG_2WE_HEIZ_SUM_MWH",
+            "WAERMEERTRAG_WW_TAG_KWH", "WAERMEERTRAG_WW_SUM_MWH",
+            "WAERMEERTRAG_HEIZ_TAG_KWH", "WAERMEERTRAG_HEIZ_SUM_MWH",
+            "EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH", "EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH",
+            "EL_AUFNAHMELEISTUNG_WW_TAG_WH", "EL_AUFNAHMELEISTUNG_WW_SUM_KWH",
+            "WAERMEERTRAG_2WE_HEIZ_SUM_KWH", "WAERMEERTRAG_2WE_WW_SUM_KWH",
+            "WAERMEERTRAG_HEIZ_SUM_KWH", "WAERMEERTRAG_HEIZ_TAG_WH",
+            "WAERMEERTRAG_WW_SUM_KWH", "WAERMEERTRAG_WW_TAG_WH",
+            "LZ_VERD_1_2_HEIZBETRIEB", "LZ_VERD_1_2_KUEHLBETRIEB",
+            "LZ_VERD_1_2_WW_BETRIEB", "LZ_VERD_1_HEIZBETRIEB",
+            "LZ_VERD_1_KUEHLBETRIEB", "LZ_VERD_1_WW_BETRIEB",
+            "LZ_VERD_2_HEIZBETRIEB", "LZ_VERD_2_KUEHLBETRIEB",
+            "LZ_VERD_2_WW_BETRIEB", "LAUFZEIT_VERD_BEI_SPEICHERBEDARF",
+            "LUEFT_PASSIVKUEHLUNG_UEBER_FORTLUEFTER",
+            "TEMPORALE_LUEFTUNGSSTUFE_DAUER", "TEILVORRANG_WW",
+            "SOFTWARE_NUMMER", "SOFTWARE_VERSION", "GERAETE_ID"
+          };
+          
+          const CanMember* members[] = {
+            &CanMembers[cm_manager],
+            &CanMembers[cm_heizmodul]
+          };
+          
+          for (const auto* member : members) {
+            for (const auto* signal : energyDurationSignals) {
+              // Check if signal is blacklisted for this member
+              std::string key = std::string(member->Name) + "_" + signal;
+              if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
+                const ElsterIndex* ei = GetElsterIndex(signal);
+                if (ei && ei->Index != 0xFFFF) {
+                  readSignal(member, ei);
+                }
+              }
+            }
+          }
 
 #########################################
 #                                       #
@@ -77,11 +295,13 @@ text_sensor:
   - platform: template
     name: "DATUM"
     id: DATUM
+    internal: true
     icon: "mdi:calendar"
 
   - platform: template
     name: "ZEIT"
     id: ZEIT
+    internal: true
     icon: "mdi:clock"
 
 #########################################
@@ -93,6 +313,7 @@ button:
   - platform: template
     name: "Update Uhrzeit"
     id: update_uhrzeit
+    internal: true
     on_press:
       then:
         lambda: |-
@@ -101,6 +322,7 @@ button:
   - platform: template
     name: "Update Datum"
     id: update_datum
+    internal: true
     on_press:
       then:
         lambda: |-
@@ -109,6 +331,7 @@ button:
   - platform: template
     name: "Identify CAN Members"
     id: identify_can_members
+    internal: true
     on_press:
       then:
         lambda: |-
@@ -118,7 +341,7 @@ button:
 #########################################
 #                                       #
 #   SPI Konfiguration                   #
-#                                       #
+#   MCP2515 CAN Controller Interface    #
 #########################################
 spi:
   id: McpSpi
