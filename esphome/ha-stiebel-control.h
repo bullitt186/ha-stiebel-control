@@ -177,6 +177,140 @@ static std::map<std::string, unsigned long> pendingRequests;
 // Track consecutive no-response counts per signal
 static std::map<std::string, int> noResponseCounts;
 
+// Request frequency definitions
+enum RequestFrequency {
+    FREQ_5S = 5,
+    FREQ_10S = 10,
+    FREQ_30S = 30,
+    FREQ_1MIN = 60,
+    FREQ_5MIN = 300,
+    FREQ_10MIN = 600,
+    FREQ_30MIN = 1800,
+    FREQ_60MIN = 3600
+};
+
+// Signal request configuration
+typedef struct {
+    const char* signalName;
+    RequestFrequency frequency;
+    CanMemberType member;  // Use cm_other for "all members"
+} SignalRequest;
+
+// Configurable signal request table - EDIT THIS to customize what gets requested
+static const SignalRequest signalRequests[] = {
+    // Time and date signals (1 minute interval)
+    {"JAHR", FREQ_1MIN, cm_manager},
+    {"MONAT", FREQ_1MIN, cm_manager},
+    {"TAG", FREQ_1MIN, cm_manager},
+    {"STUNDE", FREQ_1MIN, cm_manager},
+    {"MINUTE", FREQ_1MIN, cm_manager},
+    {"SEKUNDE", FREQ_1MIN, cm_manager},
+    
+    // Status signals (1 minute interval)
+    {"WP_STATUS", FREQ_1MIN, cm_manager},
+    {"EVU_SPERRE_AKTIV", FREQ_1MIN, cm_manager},
+    {"ABTAUUNGAKTIV", FREQ_1MIN, cm_heizmodul},
+    {"BETRIEBSART_WP", FREQ_10MIN, cm_manager},
+    {"PROGRAMMSCHALTER", FREQ_10MIN, cm_manager},
+    
+    // Temperature signals (30 second interval) - request from all members
+    {"KESSELSOLLTEMP", FREQ_30S, cm_other},
+    {"SPEICHERSOLLTEMP", FREQ_30S, cm_other},
+    {"VORLAUFSOLLTEMP", FREQ_30S, cm_other},
+    {"RAUMSOLLTEMP_I", FREQ_30S, cm_other},
+    {"RAUMSOLLTEMP_II", FREQ_30S, cm_other},
+    {"RAUMSOLLTEMP_III", FREQ_30S, cm_other},
+    {"RAUMSOLLTEMP_NACHT", FREQ_30S, cm_other},
+    {"AUSSENTEMP", FREQ_30S, cm_other},
+    {"SAMMLERISTTEMP", FREQ_30S, cm_other},
+    {"SPEICHERISTTEMP", FREQ_30S, cm_other},
+    {"VORLAUFISTTEMP", FREQ_30S, cm_other},
+    {"RAUMISTTEMP", FREQ_30S, cm_other},
+    {"VERSTELLTE_RAUMSOLLTEMP", FREQ_30S, cm_other},
+    {"EINSTELL_SPEICHERSOLLTEMP", FREQ_30S, cm_other},
+    {"VERDAMPFERTEMP", FREQ_30S, cm_other},
+    {"SAMMLERSOLLTEMP", FREQ_30S, cm_other},
+    {"RUECKLAUFISTTEMP", FREQ_30S, cm_other},
+    {"SPEICHER_UNTEN_TEMP", FREQ_30S, cm_other},
+    {"SOLARZONENTEMP", FREQ_30S, cm_other},
+    {"SPEICHER_OBEN_TEMP", FREQ_30S, cm_other},
+    {"KOLLEKTORTEMP", FREQ_30S, cm_other},
+    {"FESTSTOFFKESSELTEMP", FREQ_30S, cm_other},
+    {"MIN_TEMP_KESSEL", FREQ_30S, cm_other},
+    {"ANFAHRTEMP", FREQ_30S, cm_other},
+    {"MAX_TEMP_KESSEL", FREQ_30S, cm_other},
+    {"MAX_TEMP_HZK", FREQ_30S, cm_other},
+    {"KOLLEKTORTEMP_2", FREQ_30S, cm_other},
+    {"MULTIFUNKTION_ISTTEMP", FREQ_30S, cm_other},
+    {"PUFFERTEMP_OBEN1", FREQ_30S, cm_other},
+    {"PUFFERTEMP_MITTE1", FREQ_30S, cm_other},
+    {"PUFFERTEMP_UNTEN1", FREQ_30S, cm_other},
+    {"PUFFERTEMP_OBEN2", FREQ_30S, cm_other},
+    {"PUFFERTEMP_MITTE2", FREQ_30S, cm_other},
+    {"PUFFERTEMP_UNTEN2", FREQ_30S, cm_other},
+    {"PUFFERTEMP_OBEN3", FREQ_30S, cm_other},
+    {"PUFFERTEMP_MITTE3", FREQ_30S, cm_other},
+    {"PUFFERTEMP_UNTEN3", FREQ_30S, cm_other},
+    {"AUSSENTEMPVERZOEGERUNG", FREQ_30S, cm_other},
+    {"AUSWAHL_STANDARDTEMP", FREQ_30S, cm_other},
+    {"MIN_TEMP_HZK", FREQ_30S, cm_other},
+    {"FERIEN_ABSENKTEMP", FREQ_30S, cm_other},
+    {"WW_MAXTEMP", FREQ_30S, cm_other},
+    {"KESSELSOLLTEMP_2WE", FREQ_30S, cm_other},
+    {"ABWESENHEITSTEMP", FREQ_30S, cm_other},
+    {"EINSTELL_SPEICHERSOLLTEMP3", FREQ_30S, cm_other},
+    {"ABGASTEMP", FREQ_30S, cm_other},
+    {"WW_SCHNELL_START_TEMPERATUR", FREQ_30S, cm_other},
+    {"MAX_WW_TEMP", FREQ_30S, cm_other},
+    {"BIVALENTPARALLELTEMPERATUR_HZG", FREQ_30S, cm_other},
+    {"BIVALENTPARALLELTEMPERATUR_WW", FREQ_30S, cm_other},
+    {"BIVALENZALTERNATIVTEMPERATUR_HZG", FREQ_30S, cm_other},
+    {"BIVALENZALTERNATIVTEMPERATUR_WW", FREQ_30S, cm_other},
+    {"QUELLENSOLLTEMPERATUR", FREQ_30S, cm_other},
+    {"AUSSENTEMPERATUR_WARMWASSER", FREQ_30S, cm_other},
+    {"SOLARTEMP_MAX", FREQ_30S, cm_other},
+    {"ESTRICH_SOCKELTEMPERATUR", FREQ_30S, cm_other},
+    {"ESTRICH_MAX_TEMPERATUR", FREQ_30S, cm_other},
+    {"SW_AUSSENTEMP", FREQ_30S, cm_other},
+    {"MAX_HEIZUNG_TEMP", FREQ_30S, cm_other},
+    {"TAUPUNKT_TEMP", FREQ_30S, cm_other},
+    {"HEISSGAS_TEMP", FREQ_30S, cm_other},
+    {"WPVORLAUFIST", FREQ_30S, cm_other},
+    {"WPRUECKLAUFIST", FREQ_30S, cm_other},
+    {"VERDICHTER", FREQ_30S, cm_other},
+    {"EINSTELL_SPEICHERSOLLTEMP2", FREQ_30S, cm_other},
+    
+    // Energy counters (10 minute interval)
+    // {"EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", FREQ_10MIN, cm_manager},
+    // {"EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", FREQ_10MIN, cm_manager},
+    // {"EL_AUFNAHMELEISTUNG_WW_TAG_KWH", FREQ_10MIN, cm_manager},
+    // {"EL_AUFNAHMELEISTUNG_WW_SUM_MWH", FREQ_10MIN, cm_manager},
+    // {"WAERMEERTRAG_2WE_WW_TAG_KWH", FREQ_10MIN, cm_manager},
+    // {"WAERMEERTRAG_2WE_WW_SUM_MWH", FREQ_10MIN, cm_manager},
+    // {"WAERMEERTRAG_2WE_HEIZ_TAG_KWH", FREQ_10MIN, cm_manager},
+    // {"WAERMEERTRAG_2WE_HEIZ_SUM_MWH", FREQ_10MIN, cm_manager},
+    // {"WAERMEERTRAG_WW_TAG_KWH", FREQ_10MIN, cm_manager},
+    // {"WAERMEERTRAG_WW_SUM_MWH", FREQ_10MIN, cm_manager},
+    // {"WAERMEERTRAG_HEIZ_TAG_KWH", FREQ_10MIN, cm_manager},
+    // {"WAERMEERTRAG_HEIZ_SUM_MWH", FREQ_10MIN, cm_manager},
+    
+    // Runtime counters (10 minute interval)
+    // {"LZ_VERD_1_2_HEIZBETRIEB", FREQ_10MIN, cm_manager},
+    // {"LZ_VERD_1_2_WW_BETRIEB", FREQ_10MIN, cm_manager},
+    // {"LZ_VERD_1_HEIZBETRIEB", FREQ_10MIN, cm_manager},
+    // {"LZ_VERD_1_WW_BETRIEB", FREQ_10MIN, cm_manager},
+    
+    // Device info (30 minute interval)
+    {"SOFTWARE_NUMMER", FREQ_60MIN, cm_other},
+    {"SOFTWARE_VERSION", FREQ_60MIN, cm_other},
+    {"GERAETE_ID", FREQ_60MIN, cm_other}
+};
+
+// Runtime state for signal request manager
+static unsigned long lastRequestTime[sizeof(signalRequests) / sizeof(SignalRequest)] = {0};
+static bool requestManagerStarted = false;
+static unsigned long requestManagerStartTime = 0;
+
 std::vector<uint8_t> generate_read_id(unsigned short can_id)
 {
     std::vector<uint8_t> read_id;
@@ -703,8 +837,170 @@ void publishMqttState(uint32_t can_id, const ElsterIndex *ei, const std::string 
         ESP_LOGW("MQTT", "Topic too long for %s/%s, truncated", cm.Name, ei->Name);
     }
     
-    // Publish state
-    id(mqtt_client).publish(stateTopic, value);
+    // Publish state with retain flag
+    id(mqtt_client).publish(stateTopic, value.c_str(), value.length(), 0, true);
+}
+
+// Publish blacklist diagnostics sensors to Home Assistant
+void publishBlacklistDiagnostics() {
+    // 1. Blacklisted signals sensor (permanent blocks)
+    {
+        const char* discoveryTopic = "homeassistant/sensor/heatingpump/blacklisted_signals/config";
+        const char* stateTopic = "heatingpump/diagnostics/blacklisted_signals/state";
+        const char* attributesTopic = "heatingpump/diagnostics/blacklisted_signals/attributes";
+        
+        // Discovery message
+        std::ostringstream discovery;
+        discovery << "{\"name\":\"Blacklisted Signals\","
+                  << "\"unique_id\":\"stiebel_blacklisted_signals\","
+                  << "\"state_topic\":\"" << stateTopic << "\","
+                  << "\"json_attributes_topic\":\"" << attributesTopic << "\","
+                  << "\"icon\":\"mdi:block-helper\","
+                  << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
+                  << "\"name\":\"Stiebel Eltron Wärmepumpe\","
+                  << "\"manufacturer\":\"Stiebel Eltron\"}}";
+        
+        std::string discoveryStr = discovery.str();
+        id(mqtt_client).publish(discoveryTopic, discoveryStr.c_str(), discoveryStr.length(), 0, true);
+        
+        // State: count of blacklisted signals
+        std::string stateStr = std::to_string(blacklistedSignals.size());
+        id(mqtt_client).publish(stateTopic, stateStr.c_str(), stateStr.length(), 0, true);
+        
+        // Attributes: list of blacklisted signals with reason
+        std::ostringstream attributes;
+        attributes << "{\"signals\":[";
+        bool first = true;
+        for (const auto& signal : blacklistedSignals) {
+            if (!first) attributes << ",";
+            first = false;
+            
+            // Extract member and signal name
+            size_t pos = signal.find('_');
+            std::string member = (pos != std::string::npos) ? signal.substr(0, pos) : "unknown";
+            std::string signalName = (pos != std::string::npos) ? signal.substr(pos + 1) : signal;
+            
+            // Determine reason (check both maps)
+            std::string reason = "unknown";
+            if (invalidSignalCounts.find(signal) != invalidSignalCounts.end() && 
+                invalidSignalCounts.at(signal) >= 3) {
+                reason = "invalid_values";
+            } else if (noResponseCounts.find(signal) != noResponseCounts.end() && 
+                       noResponseCounts.at(signal) >= 3) {
+                reason = "no_response";
+            }
+            
+            attributes << "{\"key\":\"" << signal << "\","
+                      << "\"member\":\"" << member << "\","
+                      << "\"signal\":\"" << signalName << "\","
+                      << "\"reason\":\"" << reason << "\"}";
+        }
+        attributes << "],\"count\":" << blacklistedSignals.size() << "}";
+        
+        std::string attributesStr = attributes.str();
+        id(mqtt_client).publish(attributesTopic, attributesStr.c_str(), attributesStr.length(), 0, true);
+    }
+    
+    // 2. Invalid value counts sensor
+    {
+        const char* discoveryTopic = "homeassistant/sensor/heatingpump/invalid_value_signals/config";
+        const char* stateTopic = "heatingpump/diagnostics/invalid_value_signals/state";
+        const char* attributesTopic = "heatingpump/diagnostics/invalid_value_signals/attributes";
+        
+        // Discovery message
+        std::ostringstream discovery;
+        discovery << "{\"name\":\"Invalid Value Signals\","
+                  << "\"unique_id\":\"stiebel_invalid_value_signals\","
+                  << "\"state_topic\":\"" << stateTopic << "\","
+                  << "\"json_attributes_topic\":\"" << attributesTopic << "\","
+                  << "\"icon\":\"mdi:alert-circle\","
+                  << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
+                  << "\"name\":\"Stiebel Eltron Wärmepumpe\","
+                  << "\"manufacturer\":\"Stiebel Eltron\"}}";
+        
+        std::string discoveryStr = discovery.str();
+        id(mqtt_client).publish(discoveryTopic, discoveryStr.c_str(), discoveryStr.length(), 0, true);
+        
+        // State: count of signals with invalid values
+        std::string stateStr = std::to_string(invalidSignalCounts.size());
+        id(mqtt_client).publish(stateTopic, stateStr.c_str(), stateStr.length(), 0, true);
+        
+        // Attributes: signals with invalid value counts
+        std::ostringstream attributes;
+        attributes << "{\"signals\":[";
+        bool first = true;
+        for (const auto& entry : invalidSignalCounts) {
+            if (!first) attributes << ",";
+            first = false;
+            
+            // Extract member and signal name
+            size_t pos = entry.first.find('_');
+            std::string member = (pos != std::string::npos) ? entry.first.substr(0, pos) : "unknown";
+            std::string signalName = (pos != std::string::npos) ? entry.first.substr(pos + 1) : entry.first;
+            
+            attributes << "{\"key\":\"" << entry.first << "\","
+                      << "\"member\":\"" << member << "\","
+                      << "\"signal\":\"" << signalName << "\","
+                      << "\"count\":" << entry.second << ","
+                      << "\"status\":\"" << (entry.second >= 3 ? "blacklisted" : "warning") << "\"}";
+        }
+        attributes << "],\"count\":" << invalidSignalCounts.size() << "}";
+        
+        std::string attributesStr = attributes.str();
+        id(mqtt_client).publish(attributesTopic, attributesStr.c_str(), attributesStr.length(), 0, true);
+    }
+    
+    // 3. No-response counts sensor
+    {
+        const char* discoveryTopic = "homeassistant/sensor/heatingpump/no_response_signals/config";
+        const char* stateTopic = "heatingpump/diagnostics/no_response_signals/state";
+        const char* attributesTopic = "heatingpump/diagnostics/no_response_signals/attributes";
+        
+        // Discovery message
+        std::ostringstream discovery;
+        discovery << "{\"name\":\"No Response Signals\","
+                  << "\"unique_id\":\"stiebel_no_response_signals\","
+                  << "\"state_topic\":\"" << stateTopic << "\","
+                  << "\"json_attributes_topic\":\"" << attributesTopic << "\","
+                  << "\"icon\":\"mdi:connection\","
+                  << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
+                  << "\"name\":\"Stiebel Eltron Wärmepumpe\","
+                  << "\"manufacturer\":\"Stiebel Eltron\"}}";
+        
+        std::string discoveryStr = discovery.str();
+        id(mqtt_client).publish(discoveryTopic, discoveryStr.c_str(), discoveryStr.length(), 0, true);
+        
+        // State: count of signals with no responses
+        std::string stateStr = std::to_string(noResponseCounts.size());
+        id(mqtt_client).publish(stateTopic, stateStr.c_str(), stateStr.length(), 0, true);
+        
+        // Attributes: signals with no-response counts
+        std::ostringstream attributes;
+        attributes << "{\"signals\":[";
+        bool first = true;
+        for (const auto& entry : noResponseCounts) {
+            if (!first) attributes << ",";
+            first = false;
+            
+            // Extract member and signal name
+            size_t pos = entry.first.find('_');
+            std::string member = (pos != std::string::npos) ? entry.first.substr(0, pos) : "unknown";
+            std::string signalName = (pos != std::string::npos) ? entry.first.substr(pos + 1) : entry.first;
+            
+            attributes << "{\"key\":\"" << entry.first << "\","
+                      << "\"member\":\"" << member << "\","
+                      << "\"signal\":\"" << signalName << "\","
+                      << "\"count\":" << entry.second << ","
+                      << "\"status\":\"" << (entry.second >= 3 ? "blacklisted" : "warning") << "\"}";
+        }
+        attributes << "],\"count\":" << noResponseCounts.size() << "}";
+        
+        std::string attributesStr = attributes.str();
+        id(mqtt_client).publish(attributesTopic, attributesStr.c_str(), attributesStr.length(), 0, true);
+    }
+    
+    ESP_LOGI("DIAGNOSTICS", "Published blacklist diagnostics: %d blacklisted, %d invalid, %d no-response",
+             blacklistedSignals.size(), invalidSignalCounts.size(), noResponseCounts.size());
 }
 
 void update_COP_WW()
@@ -825,7 +1121,16 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
                 
                 // Send empty payload to remove entity from HA
                 id(mqtt_client).publish(discoveryTopic, "", 0, 0, true);
-                ESP_LOGI("BLACKLIST", "Removed discovery for %s from Home Assistant", uid.c_str());
+                
+                // Clear retained state value
+                char stateTopic[128];
+                snprintf(stateTopic, sizeof(stateTopic), "heatingpump/%s/%s/state", cm.Name, ei->Name);
+                id(mqtt_client).publish(stateTopic, "", 0, 0, true);
+                
+                ESP_LOGI("BLACKLIST", "Removed discovery and state for %s from Home Assistant", uid.c_str());
+                
+                // Update diagnostics sensors
+                publishBlacklistDiagnostics();
             }
         } else {
             ESP_LOGD("BLACKLIST", "Signal %s from %s invalid (%d/3): '%s'",
@@ -847,6 +1152,9 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
         std::transform(uid.begin(), uid.end(), uid.begin(), ::tolower);
         std::replace(uid.begin(), uid.end(), ' ', '_');
         discoveredSignals.erase(uid);
+        
+        // Update diagnostics sensors
+        publishBlacklistDiagnostics();
     }
     
     // Reset invalid and no-response counters
@@ -909,6 +1217,14 @@ void checkPendingRequests() {
                     snprintf(discoveryTopic, sizeof(discoveryTopic), 
                              "homeassistant/binary_sensor/heatingpump/%s/config", uid.c_str());
                     id(mqtt_client).publish(discoveryTopic, "", 0, 0, true);
+                    
+                    // Clear retained state value
+                    char stateTopic[128];
+                    snprintf(stateTopic, sizeof(stateTopic), "heatingpump/%s/%s/state", memberName.c_str(), signalName.c_str());
+                    id(mqtt_client).publish(stateTopic, "", 0, 0, true);
+                    
+                    // Update diagnostics sensors
+                    publishBlacklistDiagnostics();
                 }
             }
         } else {
@@ -925,6 +1241,72 @@ void checkPendingRequests() {
     
     if (!timedOut.empty()) {
         ESP_LOGI("NO_RESPONSE", "Detected %d timed-out requests", timedOut.size());
+    }
+}
+
+// Process signal request table with frequency-based scheduling
+void processSignalRequests() {
+    // Startup delay: wait 30 seconds after boot before starting requests
+    if (!requestManagerStarted) {
+        if (requestManagerStartTime == 0) {
+            requestManagerStartTime = millis();
+            ESP_LOGI("REQUEST_MGR", "Starting signal request manager (30s startup delay)");
+            return;
+        }
+        
+        const unsigned long STARTUP_DELAY_MS = 30000; // 30 seconds
+        if (millis() - requestManagerStartTime < STARTUP_DELAY_MS) {
+            return; // Still in startup delay
+        }
+        
+        requestManagerStarted = true;
+        ESP_LOGI("REQUEST_MGR", "Signal request manager active - processing %d signal definitions", 
+                 sizeof(signalRequests) / sizeof(SignalRequest));
+    }
+    
+    unsigned long now = millis();
+    const int REQUEST_COUNT = sizeof(signalRequests) / sizeof(SignalRequest);
+    
+    // Process each signal in the request table
+    for (int i = 0; i < REQUEST_COUNT; i++) {
+        const SignalRequest& req = signalRequests[i];
+        
+        // Check if it's time to request this signal
+        unsigned long timeSinceLastRequest = now - lastRequestTime[i];
+        unsigned long intervalMs = req.frequency * 1000UL;
+        
+        if (timeSinceLastRequest >= intervalMs) {
+            const ElsterIndex* ei = GetElsterIndex(req.signalName);
+            if (!ei || ei->Index == 0xFFFF) {
+                continue; // Signal not found in table
+            }
+            
+            // Determine which members to request from
+            if (req.member == cm_other) {
+                // Request from all members
+                const CanMember* allMembers[] = {
+                    &CanMembers[cm_kessel],
+                    &CanMembers[cm_manager],
+                    &CanMembers[cm_heizmodul]
+                };
+                
+                for (const auto* member : allMembers) {
+                    std::string key = std::string(member->Name) + "_" + req.signalName;
+                    if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
+                        readSignal(member, ei);
+                    }
+                }
+            } else {
+                // Request from specific member
+                const CanMember* member = &CanMembers[req.member];
+                std::string key = std::string(member->Name) + "_" + req.signalName;
+                if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
+                    readSignal(member, ei);
+                }
+            }
+            
+            lastRequestTime[i] = now;
+        }
     }
 }
 
