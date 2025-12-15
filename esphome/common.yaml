@@ -39,12 +39,13 @@ esp32:
 #                                       #
 #########################################
 logger:
-  level: INFO  # Change to DEBUG for troubleshooting
+  level: DEBUG  # Change to DEBUG for troubleshooting
   baud_rate: 115200
   logs:
     # Reduce verbose CAN logging in production
     canbus: INFO
     mqtt: INFO
+    PATTERN: DEBUG
     # Keep critical logs visible
     component: WARN
 

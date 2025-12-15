@@ -177,6 +177,9 @@ static std::map<std::string, unsigned long> pendingRequests;
 // Track consecutive no-response counts per signal
 static std::map<std::string, int> noResponseCounts;
 
+// Track last request time per unique signal key (MEMBER_SIGNAL)
+static std::map<std::string, unsigned long> lastRequestTime;
+
 // Request frequency definitions
 enum RequestFrequency {
     FREQ_5S = 5,
@@ -307,7 +310,6 @@ static const SignalRequest signalRequests[] = {
 };
 
 // Runtime state for signal request manager
-static unsigned long lastRequestTime[sizeof(signalRequests) / sizeof(SignalRequest)] = {0};
 static bool requestManagerStarted = false;
 static unsigned long requestManagerStartTime = 0;
 
@@ -569,12 +571,18 @@ bool matchesPattern(const char* text, const char* pattern) {
     std::transform(t.begin(), t.end(), t.begin(), ::toupper);
     std::transform(p.begin(), p.end(), p.begin(), ::toupper);
     
+    // Handle special case: *TEXT* means "contains TEXT"
+    if (p.length() >= 2 && p[0] == '*' && p[p.length()-1] == '*') {
+        std::string search = p.substr(1, p.length() - 2);
+        return t.find(search) != std::string::npos;
+    }
+    
     size_t pos = p.find('*');
     if (pos == std::string::npos) {
         return t == p; // No wildcard, exact match
     }
     
-    // Check prefix and suffix
+    // Handle single wildcard: PREFIX* or *SUFFIX
     std::string prefix = p.substr(0, pos);
     std::string suffix = p.substr(pos + 1);
     
@@ -589,10 +597,12 @@ const SignalConfig* getSignalConfig(const char* signalName, ElsterType type) {
     // Try to find matching pattern
     for (const auto& config : signalMappings) {
         if (matchesPattern(signalName, config.namePattern)) {
+            ESP_LOGD("PATTERN", "Signal '%s' matched pattern '%s'", signalName, config.namePattern);
             return &config;
         }
     }
     // Return default (last entry)
+    ESP_LOGW("PATTERN", "Signal '%s' using default pattern (no match found)", signalName);
     return &signalMappings[sizeof(signalMappings)/sizeof(SignalConfig) - 1];
 }
 
@@ -731,6 +741,10 @@ void publishMqttDiscovery(uint32_t can_id, const ElsterIndex *ei) {
     }
     discoveredSignals.insert(uid);
     
+    // Debug: log signal config
+    ESP_LOGD("MQTT", "Signal %s: device_class=%s, unit=%s, state_class=%s", 
+             ei->Name, config->deviceClass, config->unit, config->stateClass);
+    
     // Determine component type based on ElsterType
     const char* component = "sensor";
     if (ei->Type == et_bool || ei->Type == et_little_bool) {
@@ -756,6 +770,12 @@ void publishMqttDiscovery(uint32_t can_id, const ElsterIndex *ei) {
             << "\"state_topic\":\"" << stateTopic << "\","
             << "\"availability_topic\":\"heatingpump/status\"";
     
+    // For binary sensors, specify payload values
+    if (ei->Type == et_bool || ei->Type == et_little_bool) {
+        payload << ",\"payload_on\":\"on\","
+                << "\"payload_off\":\"off\"";
+    }
+    
     // Add optional fields only if specified
     if (config->deviceClass[0] != '\0') {
         payload << ",\"device_class\":\"" << config->deviceClass << "\"";
@@ -763,8 +783,18 @@ void publishMqttDiscovery(uint32_t can_id, const ElsterIndex *ei) {
     if (config->unit[0] != '\0') {
         payload << ",\"unit_of_measurement\":\"" << config->unit << "\"";
     }
+    // State class only for numeric sensors (not binary, text, enum, time, date, or ID types)
     if (config->stateClass[0] != '\0') {
-        payload << ",\"state_class\":\"" << config->stateClass << "\"";
+        bool isNumericType = (ei->Type == et_dec_val || 
+                              ei->Type == et_cent_val || 
+                              ei->Type == et_mil_val || 
+                              ei->Type == et_byte ||
+                              ei->Type == et_double_val ||
+                              ei->Type == et_triple_val ||
+                              ei->Type == et_little_endian);
+        if (isNumericType) {
+            payload << ",\"state_class\":\"" << config->stateClass << "\"";
+        }
     }
     if (config->icon[0] != '\0') {
         payload << ",\"icon\":\"" << config->icon << "\"";
@@ -1267,46 +1297,81 @@ void processSignalRequests() {
     unsigned long now = millis();
     const int REQUEST_COUNT = sizeof(signalRequests) / sizeof(SignalRequest);
     
+    // Rate limiting: max requests per iteration to prevent blocking
+    const int MAX_REQUESTS_PER_ITERATION = 5;
+    int requestsSentThisIteration = 0;
+    
     // Process each signal in the request table
-    for (int i = 0; i < REQUEST_COUNT; i++) {
+    for (int i = 0; i < REQUEST_COUNT && requestsSentThisIteration < MAX_REQUESTS_PER_ITERATION; i++) {
         const SignalRequest& req = signalRequests[i];
         
-        // Check if it's time to request this signal
-        unsigned long timeSinceLastRequest = now - lastRequestTime[i];
+        const ElsterIndex* ei = GetElsterIndex(req.signalName);
+        if (!ei || ei->Index == 0xFFFF) {
+            continue; // Signal not found in table
+        }
+        
         unsigned long intervalMs = req.frequency * 1000UL;
         
-        if (timeSinceLastRequest >= intervalMs) {
-            const ElsterIndex* ei = GetElsterIndex(req.signalName);
-            if (!ei || ei->Index == 0xFFFF) {
-                continue; // Signal not found in table
-            }
+        // Determine which members to request from
+        if (req.member == cm_other) {
+            // Request from all members (each tracked independently)
+            const CanMember* allMembers[] = {
+                &CanMembers[cm_kessel],
+                &CanMembers[cm_manager],
+                &CanMembers[cm_heizmodul]
+            };
             
-            // Determine which members to request from
-            if (req.member == cm_other) {
-                // Request from all members
-                const CanMember* allMembers[] = {
-                    &CanMembers[cm_kessel],
-                    &CanMembers[cm_manager],
-                    &CanMembers[cm_heizmodul]
-                };
+            for (const auto* member : allMembers) {
+                if (requestsSentThisIteration >= MAX_REQUESTS_PER_ITERATION) {
+                    break; // Hit rate limit
+                }
                 
-                for (const auto* member : allMembers) {
-                    std::string key = std::string(member->Name) + "_" + req.signalName;
+                // Use ei->Name (from ElsterTable) to match blacklist key format
+                std::string key = std::string(member->Name) + "_" + ei->Name;
+                
+                // Check if this specific member-signal combo is due
+                unsigned long lastReq = lastRequestTime[key];
+                unsigned long timeSinceLastRequest = now - lastReq;
+                
+                if (timeSinceLastRequest >= intervalMs) {
                     if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
                         readSignal(member, ei);
+                        requestsSentThisIteration++;
+                        // Set next request with random delay (200-1000ms) to spread load
+                        lastRequestTime[key] = now + random(200, 1001);
+                    } else {
+                        ESP_LOGD("REQUEST_MGR", "Skipping blacklisted signal: %s", key.c_str());
+                        // Still update timing to retry later (for recovery)
+                        lastRequestTime[key] = now + random(200, 1001);
                     }
                 }
-            } else {
-                // Request from specific member
-                const CanMember* member = &CanMembers[req.member];
-                std::string key = std::string(member->Name) + "_" + req.signalName;
+            }
+        } else {
+            // Request from specific member
+            const CanMember* member = &CanMembers[req.member];
+            std::string key = std::string(member->Name) + "_" + ei->Name;
+            
+            // Check if this specific member-signal combo is due
+            unsigned long lastReq = lastRequestTime[key];
+            unsigned long timeSinceLastRequest = now - lastReq;
+            
+            if (timeSinceLastRequest >= intervalMs) {
                 if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
                     readSignal(member, ei);
+                    requestsSentThisIteration++;
+                    // Set next request with random delay (200-1000ms) to spread load
+                    lastRequestTime[key] = now + random(200, 1001);
+                } else {
+                    ESP_LOGD("REQUEST_MGR", "Skipping blacklisted signal: %s", key.c_str());
+                    // Still update timing to retry later (for recovery)
+                    lastRequestTime[key] = now + random(200, 1001);
                 }
             }
-            
-            lastRequestTime[i] = now;
         }
+    }
+    
+    if (requestsSentThisIteration > 0) {
+        ESP_LOGV("REQUEST_MGR", "Sent %d requests this iteration", requestsSentThisIteration);
     }
 }
 
