@@ -88,26 +88,53 @@ template:
         availability: >
           {{ states('sensor.heatingpump_verdichter') not in ['unknown','unavailable','none'] }}
 
-input_number:
-  speichersolltemp2_set:
-    name: "SPEICHERSOLLTEMP2_SET"
-    initial: 20
-    min: 20
-    max: 60
-    mode: box
-    step: 1
-    unit_of_measurement: "°C"
-    icon: mdi:thermometer-low
-
-  speichersolltemp_set:
-    name: "SPEICHERSOLLTEMP_SET"
-    initial: 20
-    min: 20
-    max: 60
-    mode: box
-    step: 1
-    unit_of_measurement: "°C"
-    icon: mdi:thermometer-high
+mqtt:
+  number:
+    - name: "Speichersolltemp"
+      unique_id: heatingpump_speichersolltemp_set
+      command_topic: "heatingpump/command/speichersolltemp/set"
+      state_topic: "heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP/state"
+      min: 20
+      max: 60
+      step: 1
+      unit_of_measurement: "°C"
+      icon: "mdi:thermometer-high"
+      device:
+        identifiers: ["stiebel_eltron_wpl13e"]
+        name: "Stiebel Eltron Wärmepumpe"
+        manufacturer: "Stiebel Eltron"
+        
+    - name: "Speichersolltemp 2"
+      unique_id: heatingpump_speichersolltemp2_set
+      command_topic: "heatingpump/command/speichersolltemp2/set"
+      state_topic: "heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP2/state"
+      min: 20
+      max: 60
+      step: 1
+      unit_of_measurement: "°C"
+      icon: "mdi:thermometer-low"
+      device:
+        identifiers: ["stiebel_eltron_wpl13e"]
+        name: "Stiebel Eltron Wärmepumpe"
+        manufacturer: "Stiebel Eltron"
+  
+  select:
+    - name: "Programmschalter"
+      unique_id: heatingpump_programmschalter_set
+      command_topic: "heatingpump/command/programmschalter/set"
+      state_topic: "heatingpump/MANAGER/PROGRAMMSCHALTER/state"
+      options:
+        - "Notbetrieb"
+        - "Bereitschaft"
+        - "Automatik"
+        - "Tagbetrieb"
+        - "Absenkbetrieb"
+        - "Warmwasser"
+      icon: "mdi:tune"
+      device:
+        identifiers: ["stiebel_eltron_wpl13e"]
+        name: "Stiebel Eltron Wärmepumpe"
+        manufacturer: "Stiebel Eltron"
 
 sensor:
   - platform: statistics

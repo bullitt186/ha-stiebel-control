@@ -16,6 +16,10 @@
 #  along with this program. If not, see http://www.gnu.org/licenses/ .
 #
 
+substitutions:
+  # Blacklist configuration: set to "1" to enable, "0" to disable
+  blacklist_enabled: "1"
+
 esphome:
   name: heatingpump
   friendly_name: "Heating Pump CAN Interface"
@@ -27,6 +31,9 @@ esphome:
     - ha-stiebel-control/elster/NUtils.cpp
     - ha-stiebel-control/elster/NTypes.h
     - ha-stiebel-control/ha-stiebel-control.h
+  platformio_options:
+    build_flags:
+      - -DBLACKLIST_ENABLED=${blacklist_enabled}
 
 esp32:
   board: esp32dev
@@ -108,6 +115,32 @@ mqtt:
     - topic: heatingpump/reconnect
       then:
         - logger.log: "Manual reconnect triggered"
+    
+    # Temperature setpoint controls
+    - topic: heatingpump/command/speichersolltemp/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received speichersolltemp command: %s", x.c_str());
+            const char* value = x.c_str();
+            writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP", value);
+            readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP");
+    
+    - topic: heatingpump/command/speichersolltemp2/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received speichersolltemp2 command: %s", x.c_str());
+            const char* value = x.c_str();
+            writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP2", value);
+            readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP2");
+    
+    # Mode control
+    - topic: heatingpump/command/programmschalter/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received programmschalter command: %s", x.c_str());
+            const char* value = x.c_str();
+            writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", value);
+            readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
 
 #########################################
 #                                       #

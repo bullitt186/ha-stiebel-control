@@ -1,35 +1,8 @@
 #
 #  Minimal Sensor Definitions
 #  Only sensors actually used for calculations and inputs
+#  Controls (temperature setpoints, mode selection) are now MQTT-based
 #
-
-#########################################
-#   SELECT                              
-#########################################
-select:
-  - platform: template
-    name: "PROGRAMMSCHALTER_SET"
-    id: PROGRAMMSCHALTER_SET
-    internal: true
-    options:
-      - "Notbetrieb"
-      - "Bereitschaft"
-      - "Automatik"
-      - "Tagbetrieb"
-      - "Absenkbetrieb"
-      - "Warmwasser"
-      - "Unbekannt"
-    initial_option: "Unbekannt"
-    optimistic: true
-    on_value:
-      then:
-        - lambda: |-
-            const std::string& option = id(PROGRAMMSCHALTER_SET).current_option();
-            if (option != "Unbekannt") {
-              const char* auswahl = option.c_str();
-              writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", auswahl);
-              readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
-            }
 
 #########################################
 #   SENSORS                             
@@ -184,46 +157,7 @@ sensor:
 #   TEXT SENSOREN                       
 #########################################
 text_sensor:
-  # Home Assistant input helpers
-  - platform: homeassistant
-    name: "EINSTELL_SPEICHERSOLLTEMP_SET"
-    id: EINSTELL_SPEICHERSOLLTEMP_SET
-    entity_id: input_number.speichersolltemp_set
-    on_value:
-      then:
-        lambda: |-
-          if(atoi(x.c_str()) != 20) {
-            char temp[3];
-            strncpy(temp, x.c_str(), sizeof(temp)-1);
-            temp[2] ='\0';
-            const char* ctemp = temp;
-            writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP", ctemp);
-            id(EINSTELL_SPEICHERSOLLTEMP).update();
-            id(SPEICHERISTTEMP).update();
-            id(SPEICHERSOLLTEMP).update();
-          }
-          return;
-
-  - platform: homeassistant
-    name: "EINSTELL_SPEICHERSOLLTEMP2_SET"
-    id: EINSTELL_SPEICHERSOLLTEMP2_SET
-    entity_id: input_number.speichersolltemp2_set
-    on_value:
-      then:
-        lambda: |-
-          if(atoi(x.c_str()) != 20) {
-            char temp[3];
-            strncpy(temp, x.c_str(), sizeof(temp)-1);
-            temp[2] ='\0';
-            const char* ctemp = temp;
-            writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP2", ctemp);
-            id(EINSTELL_SPEICHERSOLLTEMP2).update();
-            id(SPEICHERISTTEMP).update();
-            id(SPEICHERSOLLTEMP).update();
-          }
-          return;
-
-  # Text sensors with lambdas
+  # Text sensors with lambdas (used to trigger CAN reads)
   - platform: template
     name: "PROGRAMMSCHALTER"
     id: PROGRAMMSCHALTER

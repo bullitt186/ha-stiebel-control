@@ -283,21 +283,21 @@ static const SignalRequest signalRequests[] = {
     {"VERDICHTER", FREQ_30S, cm_other},
     {"EINSTELL_SPEICHERSOLLTEMP2", FREQ_30S, cm_other},
     
-    // Energy counters (10 minute interval)
-    // {"EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", FREQ_10MIN, cm_manager},
-    // {"EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", FREQ_10MIN, cm_manager},
-    // {"EL_AUFNAHMELEISTUNG_WW_TAG_KWH", FREQ_10MIN, cm_manager},
-    // {"EL_AUFNAHMELEISTUNG_WW_SUM_MWH", FREQ_10MIN, cm_manager},
-    // {"WAERMEERTRAG_2WE_WW_TAG_KWH", FREQ_10MIN, cm_manager},
-    // {"WAERMEERTRAG_2WE_WW_SUM_MWH", FREQ_10MIN, cm_manager},
-    // {"WAERMEERTRAG_2WE_HEIZ_TAG_KWH", FREQ_10MIN, cm_manager},
-    // {"WAERMEERTRAG_2WE_HEIZ_SUM_MWH", FREQ_10MIN, cm_manager},
-    // {"WAERMEERTRAG_WW_TAG_KWH", FREQ_10MIN, cm_manager},
-    // {"WAERMEERTRAG_WW_SUM_MWH", FREQ_10MIN, cm_manager},
-    // {"WAERMEERTRAG_HEIZ_TAG_KWH", FREQ_10MIN, cm_manager},
-    // {"WAERMEERTRAG_HEIZ_SUM_MWH", FREQ_10MIN, cm_manager},
+    // Energy counters (10 minute interval) - needed for COP calculations
+    {"EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", FREQ_10MIN, cm_manager},
+    {"EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", FREQ_10MIN, cm_manager},
+    {"EL_AUFNAHMELEISTUNG_WW_TAG_KWH", FREQ_10MIN, cm_manager},
+    {"EL_AUFNAHMELEISTUNG_WW_SUM_MWH", FREQ_10MIN, cm_manager},
+    {"WAERMEERTRAG_2WE_WW_TAG_KWH", FREQ_10MIN, cm_manager},
+    {"WAERMEERTRAG_2WE_WW_SUM_MWH", FREQ_10MIN, cm_manager},
+    {"WAERMEERTRAG_2WE_HEIZ_TAG_KWH", FREQ_10MIN, cm_manager},
+    {"WAERMEERTRAG_2WE_HEIZ_SUM_MWH", FREQ_10MIN, cm_manager},
+    {"WAERMEERTRAG_WW_TAG_KWH", FREQ_10MIN, cm_manager},
+    {"WAERMEERTRAG_WW_SUM_MWH", FREQ_10MIN, cm_manager},
+    {"WAERMEERTRAG_HEIZ_TAG_KWH", FREQ_10MIN, cm_manager},
+    {"WAERMEERTRAG_HEIZ_SUM_MWH", FREQ_10MIN, cm_manager},
     
-    // Runtime counters (10 minute interval)
+    // Runtime counters (10 minute interval) - commented out, enable if needed
     // {"LZ_VERD_1_2_HEIZBETRIEB", FREQ_10MIN, cm_manager},
     // {"LZ_VERD_1_2_WW_BETRIEB", FREQ_10MIN, cm_manager},
     // {"LZ_VERD_1_HEIZBETRIEB", FREQ_10MIN, cm_manager},
@@ -502,6 +502,28 @@ void writeSignal(const CanMember *cm, const char *elsterName, const char *&str)
     return;
 }
 
+// Publish MQTT discovery for calculated date sensor
+void publishDateDiscovery() {
+    static bool discoveryPublished = false;
+    if (discoveryPublished) return;
+    
+    const char* discoveryTopic = "homeassistant/sensor/heatingpump/calculated_date/config";
+    
+    std::ostringstream payload;
+    payload << "{\"name\":\"Datum (Berechnet)\","
+            << "\"unique_id\":\"stiebel_calculated_date\","
+            << "\"state_topic\":\"heatingpump/calculated/date/state\","
+            << "\"icon\":\"mdi:calendar\","
+            << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
+            << "\"name\":\"Stiebel Eltron Wärmepumpe\","
+            << "\"manufacturer\":\"Stiebel Eltron\"}}";
+    
+    std::string payloadStr = payload.str();
+    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    discoveryPublished = true;
+    ESP_LOGI("MQTT", "Discovery published for calculated date sensor");
+}
+
 void publishDate()
 {
     int ijahr = static_cast<int>(id(JAHR).state);
@@ -538,7 +560,14 @@ void publishDate()
     }
 
     std::string datum = "20" + jahr + "-" + monat + "-" + tag;
-    id(DATUM).publish_state(datum);
+    
+    // Publish discovery first
+    publishDateDiscovery();
+    
+    // Publish state to MQTT
+    const char* stateTopic = "heatingpump/calculated/date/state";
+    id(mqtt_client).publish(stateTopic, datum.c_str(), datum.length(), 0, true);
+    ESP_LOGD("CALC", "Published date: %s", datum.c_str());
 }
 
 std::string formatNumber(int number, int width)
@@ -546,6 +575,28 @@ std::string formatNumber(int number, int width)
     std::ostringstream oss;
     oss << std::setw(width) << std::setfill('0') << number;
     return oss.str();
+}
+
+// Publish MQTT discovery for calculated time sensor
+void publishTimeDiscovery() {
+    static bool discoveryPublished = false;
+    if (discoveryPublished) return;
+    
+    const char* discoveryTopic = "homeassistant/sensor/heatingpump/calculated_time/config";
+    
+    std::ostringstream payload;
+    payload << "{\"name\":\"Zeit (Berechnet)\","
+            << "\"unique_id\":\"stiebel_calculated_time\","
+            << "\"state_topic\":\"heatingpump/calculated/time/state\","
+            << "\"icon\":\"mdi:clock-outline\","
+            << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
+            << "\"name\":\"Stiebel Eltron Wärmepumpe\","
+            << "\"manufacturer\":\"Stiebel Eltron\"}}";
+    
+    std::string payloadStr = payload.str();
+    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    discoveryPublished = true;
+    ESP_LOGI("MQTT", "Discovery published for calculated time sensor");
 }
 
 void publishTime()
@@ -559,7 +610,15 @@ void publishTime()
     int isekunde = (int)id(SEKUNDE).state;
     std::string sekunde = formatNumber(isekunde, 2);
 
-    id(ZEIT).publish_state(stunde + ":" + minute + ":" + sekunde);
+    std::string zeit = stunde + ":" + minute + ":" + sekunde;
+    
+    // Publish discovery first
+    publishTimeDiscovery();
+    
+    // Publish state to MQTT
+    const char* stateTopic = "heatingpump/calculated/time/state";
+    id(mqtt_client).publish(stateTopic, zeit.c_str(), zeit.length(), 0, true);
+    ESP_LOGD("CALC", "Published time: %s", zeit.c_str());
 }
 
 // Helper: Check if string matches pattern (supports * wildcard)
@@ -972,7 +1031,7 @@ void publishBlacklistDiagnostics() {
                       << "\"member\":\"" << member << "\","
                       << "\"signal\":\"" << signalName << "\","
                       << "\"count\":" << entry.second << ","
-                      << "\"status\":\"" << (entry.second >= 3 ? "blacklisted" : "warning") << "\"}";
+                      << "\"status\":\"" << (entry.second >= 10 ? "blacklisted" : "warning") << "\"}";
         }
         attributes << "],\"count\":" << invalidSignalCounts.size() << "}";
         
@@ -1021,7 +1080,7 @@ void publishBlacklistDiagnostics() {
                       << "\"member\":\"" << member << "\","
                       << "\"signal\":\"" << signalName << "\","
                       << "\"count\":" << entry.second << ","
-                      << "\"status\":\"" << (entry.second >= 3 ? "blacklisted" : "warning") << "\"}";
+                      << "\"status\":\"" << (entry.second >= 10 ? "blacklisted" : "warning") << "\"}";
         }
         attributes << "],\"count\":" << noResponseCounts.size() << "}";
         
@@ -1033,22 +1092,159 @@ void publishBlacklistDiagnostics() {
              blacklistedSignals.size(), invalidSignalCounts.size(), noResponseCounts.size());
 }
 
-void update_COP_WW()
-{
-    float cop_ww = (id(WAERMEERTRAG_WW_SUM).state + id(WAERMEERTRAG_2WE_WW_SUM).state) / id(EL_AUFNAHMELEISTUNG_WW_SUM).state;
-    id(COP_WW).publish_state(cop_ww);
+// Track which COP values we have valid data for
+static std::map<std::string, float> copEnergyValues;
+
+// Publish MQTT discovery for COP sensors
+void publishCOPDiscovery() {
+    static bool discoveryPublished = false;
+    if (discoveryPublished) return;
+    
+    // COP WW
+    {
+        const char* discoveryTopic = "homeassistant/sensor/heatingpump/cop_ww/config";
+        std::ostringstream payload;
+        payload << "{\"name\":\"COP Warmwasser\","
+                << "\"unique_id\":\"stiebel_cop_ww\","
+                << "\"state_topic\":\"heatingpump/calculated/cop_ww/state\","
+                << "\"icon\":\"mdi:water-boiler\","
+                << "\"state_class\":\"measurement\","
+                << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
+                << "\"name\":\"Stiebel Eltron Wärmepumpe\","
+                << "\"manufacturer\":\"Stiebel Eltron\"}}";
+        std::string payloadStr = payload.str();
+        id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    }
+    
+    // COP Heizung
+    {
+        const char* discoveryTopic = "homeassistant/sensor/heatingpump/cop_heiz/config";
+        std::ostringstream payload;
+        payload << "{\"name\":\"COP Heizung\","
+                << "\"unique_id\":\"stiebel_cop_heiz\","
+                << "\"state_topic\":\"heatingpump/calculated/cop_heiz/state\","
+                << "\"icon\":\"mdi:radiator\","
+                << "\"state_class\":\"measurement\","
+                << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
+                << "\"name\":\"Stiebel Eltron Wärmepumpe\","
+                << "\"manufacturer\":\"Stiebel Eltron\"}}";
+        std::string payloadStr = payload.str();
+        id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    }
+    
+    // COP Gesamt
+    {
+        const char* discoveryTopic = "homeassistant/sensor/heatingpump/cop_gesamt/config";
+        std::ostringstream payload;
+        payload << "{\"name\":\"COP Gesamt\","
+                << "\"unique_id\":\"stiebel_cop_gesamt\","
+                << "\"state_topic\":\"heatingpump/calculated/cop_gesamt/state\","
+                << "\"icon\":\"mdi:chart-line\","
+                << "\"state_class\":\"measurement\","
+                << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
+                << "\"name\":\"Stiebel Eltron Wärmepumpe\","
+                << "\"manufacturer\":\"Stiebel Eltron\"}}";
+        std::string payloadStr = payload.str();
+        id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    }
+    
+    discoveryPublished = true;
+    ESP_LOGI("MQTT", "Discovery published for COP sensors");
 }
 
-void update_COP_HEIZ()
-{
-    float cop_heiz = (id(WAERMEERTRAG_HEIZ_SUM).state + id(WAERMEERTRAG_2WE_HEIZ_SUM).state) / id(EL_AUFNAHMELEISTUNG_HEIZ_SUM).state;
-    id(COP_HEIZ).publish_state(cop_heiz);
+// Store energy value when received for COP calculation
+void storeCOPEnergyValue(const char* signalName, const std::string &value) {
+    // Validate the string contains a valid number (no exceptions available)
+    if (value.empty()) {
+        ESP_LOGW("COP", "Empty value for %s", signalName);
+        return;
+    }
+    
+    // Check for valid numeric characters
+    bool hasDigit = false;
+    bool isValid = true;
+    for (size_t i = 0; i < value.length(); i++) {
+        char c = value[i];
+        if (c >= '0' && c <= '9') {
+            hasDigit = true;
+        } else if (c != '.' && c != '-' && c != '+' && c != ' ') {
+            isValid = false;
+            break;
+        }
+    }
+    
+    if (!hasDigit || !isValid) {
+        ESP_LOGW("COP", "Invalid numeric value for %s: %s", signalName, value.c_str());
+        return;
+    }
+    
+    // Parse the value (std::stof may still fail but won't throw in this context)
+    float fval = std::atof(value.c_str());
+    copEnergyValues[signalName] = fval;
+    ESP_LOGD("COP", "Stored %s = %.3f", signalName, fval);
 }
 
-void update_COP_GESAMT()
-{
-    float cop_gesamt = (id(WAERMEERTRAG_HEIZ_SUM).state + id(WAERMEERTRAG_2WE_HEIZ_SUM).state + id(WAERMEERTRAG_WW_SUM).state + id(WAERMEERTRAG_2WE_WW_SUM).state) / (id(EL_AUFNAHMELEISTUNG_HEIZ_SUM).state + id(EL_AUFNAHMELEISTUNG_WW_SUM).state);
-    id(COP_GESAMT).publish_state(cop_gesamt);
+// Calculate and publish COP values if all required data is available
+void updateCOPCalculations() {
+    publishCOPDiscovery();
+    
+    // COP WW: (WAERMEERTRAG_WW_SUM + WAERMEERTRAG_2WE_WW_SUM) / EL_AUFNAHMELEISTUNG_WW_SUM
+    if (copEnergyValues.find("WAERMEERTRAG_WW_SUM_MWH") != copEnergyValues.end() &&
+        copEnergyValues.find("WAERMEERTRAG_2WE_WW_SUM_MWH") != copEnergyValues.end() &&
+        copEnergyValues.find("EL_AUFNAHMELEISTUNG_WW_SUM_MWH") != copEnergyValues.end()) {
+        
+        float el_ww = copEnergyValues["EL_AUFNAHMELEISTUNG_WW_SUM_MWH"];
+        if (el_ww > 0.001f) { // Avoid division by zero
+            float waerme_ww = copEnergyValues["WAERMEERTRAG_WW_SUM_MWH"] + copEnergyValues["WAERMEERTRAG_2WE_WW_SUM_MWH"];
+            float cop_ww = waerme_ww / el_ww;
+            
+            char valueStr[16];
+            snprintf(valueStr, sizeof(valueStr), "%.2f", cop_ww);
+            const char* stateTopic = "heatingpump/calculated/cop_ww/state";
+            id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
+            ESP_LOGI("COP", "COP WW: %.2f (Wärme: %.3f MWh, El: %.3f MWh)", cop_ww, waerme_ww, el_ww);
+        }
+    }
+    
+    // COP Heizung: (WAERMEERTRAG_HEIZ_SUM + WAERMEERTRAG_2WE_HEIZ_SUM) / EL_AUFNAHMELEISTUNG_HEIZ_SUM
+    if (copEnergyValues.find("WAERMEERTRAG_HEIZ_SUM_MWH") != copEnergyValues.end() &&
+        copEnergyValues.find("WAERMEERTRAG_2WE_HEIZ_SUM_MWH") != copEnergyValues.end() &&
+        copEnergyValues.find("EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH") != copEnergyValues.end()) {
+        
+        float el_heiz = copEnergyValues["EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH"];
+        if (el_heiz > 0.001f) { // Avoid division by zero
+            float waerme_heiz = copEnergyValues["WAERMEERTRAG_HEIZ_SUM_MWH"] + copEnergyValues["WAERMEERTRAG_2WE_HEIZ_SUM_MWH"];
+            float cop_heiz = waerme_heiz / el_heiz;
+            
+            char valueStr[16];
+            snprintf(valueStr, sizeof(valueStr), "%.2f", cop_heiz);
+            const char* stateTopic = "heatingpump/calculated/cop_heiz/state";
+            id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
+            ESP_LOGI("COP", "COP Heizung: %.2f (Wärme: %.3f MWh, El: %.3f MWh)", cop_heiz, waerme_heiz, el_heiz);
+        }
+    }
+    
+    // COP Gesamt: (all WAERMEERTRAG) / (all EL_AUFNAHMELEISTUNG)
+    if (copEnergyValues.find("WAERMEERTRAG_HEIZ_SUM_MWH") != copEnergyValues.end() &&
+        copEnergyValues.find("WAERMEERTRAG_2WE_HEIZ_SUM_MWH") != copEnergyValues.end() &&
+        copEnergyValues.find("WAERMEERTRAG_WW_SUM_MWH") != copEnergyValues.end() &&
+        copEnergyValues.find("WAERMEERTRAG_2WE_WW_SUM_MWH") != copEnergyValues.end() &&
+        copEnergyValues.find("EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH") != copEnergyValues.end() &&
+        copEnergyValues.find("EL_AUFNAHMELEISTUNG_WW_SUM_MWH") != copEnergyValues.end()) {
+        
+        float el_total = copEnergyValues["EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH"] + copEnergyValues["EL_AUFNAHMELEISTUNG_WW_SUM_MWH"];
+        if (el_total > 0.001f) { // Avoid division by zero
+            float waerme_total = copEnergyValues["WAERMEERTRAG_HEIZ_SUM_MWH"] + copEnergyValues["WAERMEERTRAG_2WE_HEIZ_SUM_MWH"] +
+                               copEnergyValues["WAERMEERTRAG_WW_SUM_MWH"] + copEnergyValues["WAERMEERTRAG_2WE_WW_SUM_MWH"];
+            float cop_gesamt = waerme_total / el_total;
+            
+            char valueStr[16];
+            snprintf(valueStr, sizeof(valueStr), "%.2f", cop_gesamt);
+            const char* stateTopic = "heatingpump/calculated/cop_gesamt/state";
+            id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
+            ESP_LOGI("COP", "COP Gesamt: %.2f (Wärme: %.3f MWh, El: %.3f MWh)", cop_gesamt, waerme_total, el_total);
+        }
+    }
 }
 
 // Check if value is invalid/unsupported
@@ -1130,8 +1326,9 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
         // Increment invalid count for this signal
         invalidSignalCounts[key]++;
         
-        // Only blacklist after 3 consecutive invalid values
-        if (invalidSignalCounts[key] >= 3) {
+        // Only blacklist after 10 consecutive invalid values
+        if (invalidSignalCounts[key] >= 10) {
+#if BLACKLIST_ENABLED
             if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
                 blacklistedSignals.insert(key);
                 ESP_LOGW("BLACKLIST", "Signal %s from %s returned %d consecutive invalid values (last: '%s') - blacklisted",
@@ -1162,8 +1359,12 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
                 // Update diagnostics sensors
                 publishBlacklistDiagnostics();
             }
+#else
+            ESP_LOGW("BLACKLIST", "Signal %s from %s returned %d consecutive invalid values (last: '%s') - blacklisting disabled",
+                     ei->Name, cm.Name, invalidSignalCounts[key], value.c_str());
+#endif
         } else {
-            ESP_LOGD("BLACKLIST", "Signal %s from %s invalid (%d/3): '%s'",
+            ESP_LOGD("BLACKLIST", "Signal %s from %s invalid (%d/10): '%s'",
                      ei->Name, cm.Name, invalidSignalCounts[key], value.c_str());
         }
         return; // Don't publish invalid values
@@ -1198,6 +1399,30 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
     // Publish to MQTT (discovery + state) for valid signals only
     publishMqttDiscovery(can_id, ei);
     publishMqttState(can_id, ei, value);
+    
+    // Trigger calculated sensors when their source values update
+    const char* signalName = ei->Name;
+    
+    // Update date when TAG changes (implies day changed, includes month/year if needed)
+    if (strcmp(signalName, "TAG") == 0) {
+        publishDate();
+    }
+    
+    // Update time when MINUTE changes (implies second changed, more efficient than every second)
+    if (strcmp(signalName, "MINUTE") == 0) {
+        publishTime();
+    }
+    
+    // Store energy values and recalculate COP
+    if (strcmp(signalName, "EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH") == 0 ||
+        strcmp(signalName, "EL_AUFNAHMELEISTUNG_WW_SUM_MWH") == 0 ||
+        strcmp(signalName, "WAERMEERTRAG_2WE_WW_SUM_MWH") == 0 ||
+        strcmp(signalName, "WAERMEERTRAG_2WE_HEIZ_SUM_MWH") == 0 ||
+        strcmp(signalName, "WAERMEERTRAG_WW_SUM_MWH") == 0 ||
+        strcmp(signalName, "WAERMEERTRAG_HEIZ_SUM_MWH") == 0) {
+        storeCOPEnergyValue(signalName, value);
+        updateCOPCalculations();
+    }
 }
 
 // Check for timed-out requests (no response received)
@@ -1218,8 +1443,9 @@ void checkPendingRequests() {
         pendingRequests.erase(key);
         noResponseCounts[key]++;
         
-        // Blacklist after 3 consecutive no-responses
-        if (noResponseCounts[key] >= 3) {
+        // Blacklist after 10 consecutive no-responses
+        if (noResponseCounts[key] >= 10) {
+#if BLACKLIST_ENABLED
             if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
                 blacklistedSignals.insert(key);
                 
@@ -1257,6 +1483,16 @@ void checkPendingRequests() {
                     publishBlacklistDiagnostics();
                 }
             }
+#else
+            // Parse key for logging
+            size_t underscorePos = key.find('_');
+            if (underscorePos != std::string::npos) {
+                std::string memberName = key.substr(0, underscorePos);
+                std::string signalName = key.substr(underscorePos + 1);
+                ESP_LOGW("BLACKLIST", "Signal %s from %s: no response after %d attempts - blacklisting disabled",
+                         signalName.c_str(), memberName.c_str(), noResponseCounts[key]);
+            }
+#endif
         } else {
             // Parse key for logging
             size_t underscorePos = key.find('_');
