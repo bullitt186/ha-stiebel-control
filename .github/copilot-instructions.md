@@ -7,9 +7,8 @@ ESPHome/Home Assistant integration for monitoring and controlling Stiebel Eltron
 
 ### Core Components
 - **ESPHome Firmware** (`esphome/`): ESP32 code interfacing with Stiebel Eltron heat pump via CAN bus
-  - `common.yaml`: Base configuration with CAN bus setup, SPI config, buttons, and core text sensors
+  - `common.yaml`: Base configuration with CAN bus setup, SPI config, WiFi/network, buttons, and core text sensors
   - `wpl13e.yaml`: Device-specific sensors, selects, and text sensors for WPL13E heat pump model (template for other models)
-  - `wifi.yaml`: WiFi and network configuration template
   - `ha-stiebel-control.h`: Main C++ logic for CAN communication and Elster protocol handling
   
 - **Elster Protocol Library** (`esphome/elster/`): C/C++ implementation of Stiebel Eltron's proprietary protocol

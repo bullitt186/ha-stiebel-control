@@ -17,12 +17,21 @@
 
 #if !defined(ha_stiebel_control_H)
 #define ha_stiebel_control_H
+
+// ============================================================================
+// INCLUDES
+// ============================================================================
 #include "ElsterTable.h"
 #include "KElsterTable.h"
+#include "config.h"
 #include <sstream>
 #include <iomanip>
 #include <set>
 #include <map>
+
+// ============================================================================
+// CAN BUS MEMBER DEFINITIONS
+// ============================================================================
 
 typedef struct
 {
@@ -74,6 +83,10 @@ typedef enum
     cm_dcf_modul,
     cm_other
 } CanMemberType;
+
+// ============================================================================
+// MQTT AUTO-DISCOVERY CONFIGURATION
+// ============================================================================
 
 // Signal configuration structure for MQTT auto-discovery
 typedef struct {
@@ -162,6 +175,10 @@ static const SignalConfig signalMappings[] = {
     {"*", "", "", "mdi:flash", "measurement"}
 };
 
+// ============================================================================
+// RUNTIME STATE TRACKING
+// ============================================================================
+
 // Track which signals have been discovered
 static std::set<std::string> discoveredSignals;
 
@@ -180,139 +197,32 @@ static std::map<std::string, int> noResponseCounts;
 // Track last request time per unique signal key (MEMBER_SIGNAL)
 static std::map<std::string, unsigned long> lastRequestTime;
 
-// Request frequency definitions
-enum RequestFrequency {
-    FREQ_5S = 5,
-    FREQ_10S = 10,
-    FREQ_30S = 30,
-    FREQ_1MIN = 60,
-    FREQ_5MIN = 300,
-    FREQ_10MIN = 600,
-    FREQ_30MIN = 1800,
-    FREQ_60MIN = 3600
-};
+// ============================================================================
+// SIGNAL REQUEST CONFIGURATION
+// ============================================================================
 
-// Signal request configuration
+// Signal request configuration structure
 typedef struct {
     const char* signalName;
-    RequestFrequency frequency;
-    CanMemberType member;  // Use cm_other for "all members"
+    unsigned long frequency;     // Request frequency in seconds
+    CanMemberType member;        // Use cm_other for "all members"
 } SignalRequest;
 
-// Configurable signal request table - EDIT THIS to customize what gets requested
-static const SignalRequest signalRequests[] = {
-    // Time and date signals (1 minute interval)
-    {"JAHR", FREQ_1MIN, cm_manager},
-    {"MONAT", FREQ_1MIN, cm_manager},
-    {"TAG", FREQ_1MIN, cm_manager},
-    {"STUNDE", FREQ_1MIN, cm_manager},
-    {"MINUTE", FREQ_1MIN, cm_manager},
-    {"SEKUNDE", FREQ_1MIN, cm_manager},
-    
-    // Status signals (1 minute interval)
-    {"WP_STATUS", FREQ_1MIN, cm_manager},
-    {"EVU_SPERRE_AKTIV", FREQ_1MIN, cm_manager},
-    {"ABTAUUNGAKTIV", FREQ_1MIN, cm_heizmodul},
-    {"BETRIEBSART_WP", FREQ_10MIN, cm_manager},
-    {"PROGRAMMSCHALTER", FREQ_10MIN, cm_manager},
-    
-    // Temperature signals (30 second interval) - request from all members
-    {"KESSELSOLLTEMP", FREQ_30S, cm_other},
-    {"SPEICHERSOLLTEMP", FREQ_30S, cm_other},
-    {"VORLAUFSOLLTEMP", FREQ_30S, cm_other},
-    {"RAUMSOLLTEMP_I", FREQ_30S, cm_other},
-    {"RAUMSOLLTEMP_II", FREQ_30S, cm_other},
-    {"RAUMSOLLTEMP_III", FREQ_30S, cm_other},
-    {"RAUMSOLLTEMP_NACHT", FREQ_30S, cm_other},
-    {"AUSSENTEMP", FREQ_30S, cm_other},
-    {"SAMMLERISTTEMP", FREQ_30S, cm_other},
-    {"SPEICHERISTTEMP", FREQ_30S, cm_other},
-    {"VORLAUFISTTEMP", FREQ_30S, cm_other},
-    {"RAUMISTTEMP", FREQ_30S, cm_other},
-    {"VERSTELLTE_RAUMSOLLTEMP", FREQ_30S, cm_other},
-    {"EINSTELL_SPEICHERSOLLTEMP", FREQ_30S, cm_other},
-    {"VERDAMPFERTEMP", FREQ_30S, cm_other},
-    {"SAMMLERSOLLTEMP", FREQ_30S, cm_other},
-    {"RUECKLAUFISTTEMP", FREQ_30S, cm_other},
-    {"SPEICHER_UNTEN_TEMP", FREQ_30S, cm_other},
-    {"SOLARZONENTEMP", FREQ_30S, cm_other},
-    {"SPEICHER_OBEN_TEMP", FREQ_30S, cm_other},
-    {"KOLLEKTORTEMP", FREQ_30S, cm_other},
-    {"FESTSTOFFKESSELTEMP", FREQ_30S, cm_other},
-    {"MIN_TEMP_KESSEL", FREQ_30S, cm_other},
-    {"ANFAHRTEMP", FREQ_30S, cm_other},
-    {"MAX_TEMP_KESSEL", FREQ_30S, cm_other},
-    {"MAX_TEMP_HZK", FREQ_30S, cm_other},
-    {"KOLLEKTORTEMP_2", FREQ_30S, cm_other},
-    {"MULTIFUNKTION_ISTTEMP", FREQ_30S, cm_other},
-    {"PUFFERTEMP_OBEN1", FREQ_30S, cm_other},
-    {"PUFFERTEMP_MITTE1", FREQ_30S, cm_other},
-    {"PUFFERTEMP_UNTEN1", FREQ_30S, cm_other},
-    {"PUFFERTEMP_OBEN2", FREQ_30S, cm_other},
-    {"PUFFERTEMP_MITTE2", FREQ_30S, cm_other},
-    {"PUFFERTEMP_UNTEN2", FREQ_30S, cm_other},
-    {"PUFFERTEMP_OBEN3", FREQ_30S, cm_other},
-    {"PUFFERTEMP_MITTE3", FREQ_30S, cm_other},
-    {"PUFFERTEMP_UNTEN3", FREQ_30S, cm_other},
-    {"AUSSENTEMPVERZOEGERUNG", FREQ_30S, cm_other},
-    {"AUSWAHL_STANDARDTEMP", FREQ_30S, cm_other},
-    {"MIN_TEMP_HZK", FREQ_30S, cm_other},
-    {"FERIEN_ABSENKTEMP", FREQ_30S, cm_other},
-    {"WW_MAXTEMP", FREQ_30S, cm_other},
-    {"KESSELSOLLTEMP_2WE", FREQ_30S, cm_other},
-    {"ABWESENHEITSTEMP", FREQ_30S, cm_other},
-    {"EINSTELL_SPEICHERSOLLTEMP3", FREQ_30S, cm_other},
-    {"ABGASTEMP", FREQ_30S, cm_other},
-    {"WW_SCHNELL_START_TEMPERATUR", FREQ_30S, cm_other},
-    {"MAX_WW_TEMP", FREQ_30S, cm_other},
-    {"BIVALENTPARALLELTEMPERATUR_HZG", FREQ_30S, cm_other},
-    {"BIVALENTPARALLELTEMPERATUR_WW", FREQ_30S, cm_other},
-    {"BIVALENZALTERNATIVTEMPERATUR_HZG", FREQ_30S, cm_other},
-    {"BIVALENZALTERNATIVTEMPERATUR_WW", FREQ_30S, cm_other},
-    {"QUELLENSOLLTEMPERATUR", FREQ_30S, cm_other},
-    {"AUSSENTEMPERATUR_WARMWASSER", FREQ_30S, cm_other},
-    {"SOLARTEMP_MAX", FREQ_30S, cm_other},
-    {"ESTRICH_SOCKELTEMPERATUR", FREQ_30S, cm_other},
-    {"ESTRICH_MAX_TEMPERATUR", FREQ_30S, cm_other},
-    {"SW_AUSSENTEMP", FREQ_30S, cm_other},
-    {"MAX_HEIZUNG_TEMP", FREQ_30S, cm_other},
-    {"TAUPUNKT_TEMP", FREQ_30S, cm_other},
-    {"HEISSGAS_TEMP", FREQ_30S, cm_other},
-    {"WPVORLAUFIST", FREQ_30S, cm_other},
-    {"WPRUECKLAUFIST", FREQ_30S, cm_other},
-    {"VERDICHTER", FREQ_30S, cm_other},
-    {"EINSTELL_SPEICHERSOLLTEMP2", FREQ_30S, cm_other},
-    
-    // Energy counters (10 minute interval) - needed for COP calculations
-    {"EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", FREQ_10MIN, cm_manager},
-    {"EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", FREQ_10MIN, cm_manager},
-    {"EL_AUFNAHMELEISTUNG_WW_TAG_KWH", FREQ_10MIN, cm_manager},
-    {"EL_AUFNAHMELEISTUNG_WW_SUM_MWH", FREQ_10MIN, cm_manager},
-    {"WAERMEERTRAG_2WE_WW_TAG_KWH", FREQ_10MIN, cm_manager},
-    {"WAERMEERTRAG_2WE_WW_SUM_MWH", FREQ_10MIN, cm_manager},
-    {"WAERMEERTRAG_2WE_HEIZ_TAG_KWH", FREQ_10MIN, cm_manager},
-    {"WAERMEERTRAG_2WE_HEIZ_SUM_MWH", FREQ_10MIN, cm_manager},
-    {"WAERMEERTRAG_WW_TAG_KWH", FREQ_10MIN, cm_manager},
-    {"WAERMEERTRAG_WW_SUM_MWH", FREQ_10MIN, cm_manager},
-    {"WAERMEERTRAG_HEIZ_TAG_KWH", FREQ_10MIN, cm_manager},
-    {"WAERMEERTRAG_HEIZ_SUM_MWH", FREQ_10MIN, cm_manager},
-    
-    // Runtime counters (10 minute interval) - commented out, enable if needed
-    // {"LZ_VERD_1_2_HEIZBETRIEB", FREQ_10MIN, cm_manager},
-    // {"LZ_VERD_1_2_WW_BETRIEB", FREQ_10MIN, cm_manager},
-    // {"LZ_VERD_1_HEIZBETRIEB", FREQ_10MIN, cm_manager},
-    // {"LZ_VERD_1_WW_BETRIEB", FREQ_10MIN, cm_manager},
-    
-    // Device info (30 minute interval)
-    {"SOFTWARE_NUMMER", FREQ_60MIN, cm_other},
-    {"SOFTWARE_VERSION", FREQ_60MIN, cm_other},
-    {"GERAETE_ID", FREQ_60MIN, cm_other}
-};
+// Include device-specific signal request table
+// To support a different model, create a new signal_requests_XXXX.h file
+#include "signal_requests_wpl13e.h"
 
 // Runtime state for signal request manager
 static bool requestManagerStarted = false;
 static unsigned long requestManagerStartTime = 0;
 
+// ============================================================================
+// CAN BUS HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Generate CAN read ID from member CAN ID
+ */
 std::vector<uint8_t> generate_read_id(unsigned short can_id)
 {
     std::vector<uint8_t> read_id;
@@ -1031,7 +941,7 @@ void publishBlacklistDiagnostics() {
                       << "\"member\":\"" << member << "\","
                       << "\"signal\":\"" << signalName << "\","
                       << "\"count\":" << entry.second << ","
-                      << "\"status\":\"" << (entry.second >= 10 ? "blacklisted" : "warning") << "\"}";
+                      << "\"status\":\"" << (entry.second >= BLACKLIST_INVALID_THRESHOLD ? "blacklisted" : "warning") << "\"}";
         }
         attributes << "],\"count\":" << invalidSignalCounts.size() << "}";
         
@@ -1052,8 +962,8 @@ void publishBlacklistDiagnostics() {
                   << "\"state_topic\":\"" << stateTopic << "\","
                   << "\"json_attributes_topic\":\"" << attributesTopic << "\","
                   << "\"icon\":\"mdi:connection\","
-                  << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
-                  << "\"name\":\"Stiebel Eltron Wärmepumpe\","
+                  << "\"device\":{\"identifiers\":[\"" << MAIN_DEVICE_ID << "\"],"
+                  << "\"name\":\"" << MAIN_DEVICE_NAME << "\","
                   << "\"manufacturer\":\"Stiebel Eltron\"}}";
         
         std::string discoveryStr = discovery.str();
@@ -1080,7 +990,7 @@ void publishBlacklistDiagnostics() {
                       << "\"member\":\"" << member << "\","
                       << "\"signal\":\"" << signalName << "\","
                       << "\"count\":" << entry.second << ","
-                      << "\"status\":\"" << (entry.second >= 10 ? "blacklisted" : "warning") << "\"}";
+                      << "\"status\":\"" << (entry.second >= BLACKLIST_TIMEOUT_THRESHOLD ? "blacklisted" : "warning") << "\"}";
         }
         attributes << "],\"count\":" << noResponseCounts.size() << "}";
         
@@ -1326,8 +1236,8 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
         // Increment invalid count for this signal
         invalidSignalCounts[key]++;
         
-        // Only blacklist after 10 consecutive invalid values
-        if (invalidSignalCounts[key] >= 10) {
+        // Only blacklist after BLACKLIST_INVALID_THRESHOLD consecutive invalid values
+        if (invalidSignalCounts[key] >= BLACKLIST_INVALID_THRESHOLD) {
 #if BLACKLIST_ENABLED
             if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
                 blacklistedSignals.insert(key);
@@ -1364,8 +1274,8 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
                      ei->Name, cm.Name, invalidSignalCounts[key], value.c_str());
 #endif
         } else {
-            ESP_LOGD("BLACKLIST", "Signal %s from %s invalid (%d/10): '%s'",
-                     ei->Name, cm.Name, invalidSignalCounts[key], value.c_str());
+            ESP_LOGD("BLACKLIST", "Signal %s from %s invalid (%d/%d): '%s'",
+                     ei->Name, cm.Name, invalidSignalCounts[key], BLACKLIST_INVALID_THRESHOLD, value.c_str());
         }
         return; // Don't publish invalid values
     }
@@ -1427,13 +1337,12 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
 
 // Check for timed-out requests (no response received)
 void checkPendingRequests() {
-    const unsigned long TIMEOUT_MS = 5000; // 5 second timeout
     unsigned long now = millis();
     
     // Create list of timed-out requests
     std::vector<std::string> timedOut;
     for (auto it = pendingRequests.begin(); it != pendingRequests.end(); ++it) {
-        if (now - it->second > TIMEOUT_MS) {
+        if (now - it->second > CAN_REQUEST_TIMEOUT_MS) {
             timedOut.push_back(it->first);
         }
     }
@@ -1443,56 +1352,38 @@ void checkPendingRequests() {
         pendingRequests.erase(key);
         noResponseCounts[key]++;
         
-        // Blacklist after 10 consecutive no-responses
-        if (noResponseCounts[key] >= 10) {
-#if BLACKLIST_ENABLED
+        // Blacklist after N consecutive no-responses
+        if (noResponseCounts[key] >= BLACKLIST_TIMEOUT_THRESHOLD) {
             if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
                 blacklistedSignals.insert(key);
-                
                 // Parse key to get member and signal name
                 size_t underscorePos = key.find('_');
                 if (underscorePos != std::string::npos) {
                     std::string memberName = key.substr(0, underscorePos);
                     std::string signalName = key.substr(underscorePos + 1);
-                    
                     ESP_LOGW("BLACKLIST", "Signal %s from %s: no response after %d attempts - blacklisted",
                              signalName.c_str(), memberName.c_str(), noResponseCounts[key]);
-                    
                     // Remove from Home Assistant
                     char uniqueId[128];
                     snprintf(uniqueId, sizeof(uniqueId), "stiebel_%s", key.c_str());
                     std::string uid(uniqueId);
                     std::transform(uid.begin(), uid.end(), uid.begin(), ::tolower);
-                    
                     char discoveryTopic[256];
                     snprintf(discoveryTopic, sizeof(discoveryTopic), 
                              "homeassistant/sensor/heatingpump/%s/config", uid.c_str());
                     id(mqtt_client).publish(discoveryTopic, "", 0, 0, true);
-                    
                     // Also try binary_sensor
                     snprintf(discoveryTopic, sizeof(discoveryTopic), 
                              "homeassistant/binary_sensor/heatingpump/%s/config", uid.c_str());
                     id(mqtt_client).publish(discoveryTopic, "", 0, 0, true);
-                    
                     // Clear retained state value
                     char stateTopic[128];
                     snprintf(stateTopic, sizeof(stateTopic), "heatingpump/%s/%s/state", memberName.c_str(), signalName.c_str());
                     id(mqtt_client).publish(stateTopic, "", 0, 0, true);
-                    
                     // Update diagnostics sensors
                     publishBlacklistDiagnostics();
                 }
             }
-#else
-            // Parse key for logging
-            size_t underscorePos = key.find('_');
-            if (underscorePos != std::string::npos) {
-                std::string memberName = key.substr(0, underscorePos);
-                std::string signalName = key.substr(underscorePos + 1);
-                ESP_LOGW("BLACKLIST", "Signal %s from %s: no response after %d attempts - blacklisting disabled",
-                         signalName.c_str(), memberName.c_str(), noResponseCounts[key]);
-            }
-#endif
         } else {
             // Parse key for logging
             size_t underscorePos = key.find('_');
@@ -1512,33 +1403,30 @@ void checkPendingRequests() {
 
 // Process signal request table with frequency-based scheduling
 void processSignalRequests() {
-    // Startup delay: wait 30 seconds after boot before starting requests
+    // Startup delay: wait before starting signal requests
     if (!requestManagerStarted) {
         if (requestManagerStartTime == 0) {
             requestManagerStartTime = millis();
-            ESP_LOGI("REQUEST_MGR", "Starting signal request manager (30s startup delay)");
+            ESP_LOGI("REQUEST_MGR", "Starting signal request manager (%ds startup delay)", STARTUP_DELAY_MS / 1000);
             return;
         }
         
-        const unsigned long STARTUP_DELAY_MS = 30000; // 30 seconds
         if (millis() - requestManagerStartTime < STARTUP_DELAY_MS) {
             return; // Still in startup delay
         }
         
         requestManagerStarted = true;
         ESP_LOGI("REQUEST_MGR", "Signal request manager active - processing %d signal definitions", 
-                 sizeof(signalRequests) / sizeof(SignalRequest));
+                 SIGNAL_REQUEST_COUNT);
     }
     
     unsigned long now = millis();
-    const int REQUEST_COUNT = sizeof(signalRequests) / sizeof(SignalRequest);
     
     // Rate limiting: max requests per iteration to prevent blocking
-    const int MAX_REQUESTS_PER_ITERATION = 5;
     int requestsSentThisIteration = 0;
     
     // Process each signal in the request table
-    for (int i = 0; i < REQUEST_COUNT && requestsSentThisIteration < MAX_REQUESTS_PER_ITERATION; i++) {
+    for (int i = 0; i < SIGNAL_REQUEST_COUNT && requestsSentThisIteration < MAX_REQUESTS_PER_ITERATION; i++) {
         const SignalRequest& req = signalRequests[i];
         
         const ElsterIndex* ei = GetElsterIndex(req.signalName);

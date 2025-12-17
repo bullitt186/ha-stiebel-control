@@ -24,6 +24,7 @@ esphome:
   name: heatingpump
   friendly_name: "Heating Pump CAN Interface"
   includes:
+    - ha-stiebel-control/config.h
     - ha-stiebel-control/elster/ElsterTable.h
     - ha-stiebel-control/elster/KElsterTable.h
     - ha-stiebel-control/elster/KElsterTable.cpp
@@ -274,3 +275,41 @@ canbus:
         then:
           - lambda: |-
               processAndUpdate(can_id, x);
+#########################################
+#                                       #
+#   WiFi & Captive Portal               #
+#                                       #
+#########################################
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  #use_address: waermepumpe.iot.stahmer.lan
+  fast_connect: true
+  power_save_mode: none
+  reboot_timeout: 5min
+  ap:
+    ssid: "Heatingpump Fallback Hotspot"
+    password: "AsBl9n46jlOx"
+
+captive_portal:
+
+sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal dBm"
+    icon: "mdi:wifi"
+    update_interval: 60s
+    id: wifi_dbm
+
+  - platform: template
+    name: "WiFi Signal"
+    icon: "mdi:signal"
+    unit_of_measurement: "%"
+    update_interval: 60s
+    id: wifi_percentage
+    lambda: |-
+      float dBm = id(wifi_dbm).state;
+      float MIN_DBM = -100.0; // Minimum RSSI in dBm
+      float MAX_DBM = -30.0; // Maximum RSSI in dBm
+      if (dBm < MIN_DBM) dBm = MIN_DBM;
+      if (dBm > MAX_DBM) dBm = MAX_DBM;
+      return ((dBm - MIN_DBM) / (MAX_DBM - MIN_DBM)) * 100;

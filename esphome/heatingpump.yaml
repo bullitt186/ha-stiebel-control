@@ -16,5 +16,4 @@ substitutions:
 
 packages:
   base: !include ha-stiebel-control/common.yaml
-  wifi: !include ha-stiebel-control/wifi.yaml
   sensors: !include ha-stiebel-control/wpl13e.yaml
