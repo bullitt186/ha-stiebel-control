@@ -193,8 +193,8 @@ static std::map<std::string, unsigned long> pendingRequests;
 // Track consecutive no-response counts per signal
 static std::map<std::string, int> noResponseCounts;
 
-// Track last request time per unique signal key (MEMBER_SIGNAL)
-static std::map<std::string, unsigned long> lastRequestTime;
+// Track next scheduled request time per unique signal key (MEMBER_SIGNAL)
+static std::map<std::string, unsigned long> nextRequestTime;
 
 // ============================================================================
 // SIGNAL REQUEST CONFIGURATION
@@ -1555,10 +1555,11 @@ void processSignalRequests() {
     
     unsigned long now = millis();
     
-    // Rate limiting: max requests per iteration to prevent blocking
+    // Rate limiting: send up to MAX_REQUESTS_PER_ITERATION requests per iteration
+    // Randomization in scheduling prevents bursts
     int requestsSentThisIteration = 0;
     
-    // Process each signal in the request table
+    // Process each signal in the request table up to rate limit
     for (int i = 0; i < SIGNAL_REQUEST_COUNT && requestsSentThisIteration < MAX_REQUESTS_PER_ITERATION; i++) {
         const SignalRequest& req = signalRequests[i];
         
@@ -1586,20 +1587,25 @@ void processSignalRequests() {
                 // Use ei->Name (from ElsterTable) to match blacklist key format
                 std::string key = std::string(member->Name) + "_" + ei->Name;
                 
-                // Check if this specific member-signal combo is due
-                unsigned long lastReq = lastRequestTime[key];
-                unsigned long timeSinceLastRequest = now - lastReq;
+                // Get the next scheduled time for this signal
+                unsigned long nextScheduled = nextRequestTime[key];
                 
-                if (timeSinceLastRequest >= intervalMs) {
+                // Check if this signal is overdue (current time >= scheduled time)
+                if (nextScheduled == 0 || now >= nextScheduled) {
                     if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
                         readSignal(member, ei);
                         requestsSentThisIteration++;
-                        // Set next request with random delay (200-1000ms) to spread load
-                        lastRequestTime[key] = now + random(200, 1001);
+                        
+                        // Calculate next scheduled time: now + frequency + random delay
+                        unsigned long randomDelay = random(MIN_RANDOM_DELAY_MS, MAX_RANDOM_DELAY_MS + 1);
+                        nextRequestTime[key] = now + intervalMs + randomDelay;
+                        
+                        ESP_LOGD("REQUEST_MGR", "Sent %s, next in %lums", key.c_str(), intervalMs + randomDelay);
                     } else {
                         ESP_LOGD("REQUEST_MGR", "Skipping blacklisted signal: %s", key.c_str());
-                        // Still update timing to retry later (for recovery)
-                        lastRequestTime[key] = now + random(200, 1001);
+                        // Reschedule for retry later (for recovery)
+                        unsigned long randomDelay = random(MIN_RANDOM_DELAY_MS, MAX_RANDOM_DELAY_MS + 1);
+                        nextRequestTime[key] = now + intervalMs + randomDelay;
                     }
                 }
             }
@@ -1608,20 +1614,25 @@ void processSignalRequests() {
             const CanMember* member = &CanMembers[req.member];
             std::string key = std::string(member->Name) + "_" + ei->Name;
             
-            // Check if this specific member-signal combo is due
-            unsigned long lastReq = lastRequestTime[key];
-            unsigned long timeSinceLastRequest = now - lastReq;
+            // Get the next scheduled time for this signal
+            unsigned long nextScheduled = nextRequestTime[key];
             
-            if (timeSinceLastRequest >= intervalMs) {
+            // Check if this signal is overdue (current time >= scheduled time)
+            if (nextScheduled == 0 || now >= nextScheduled) {
                 if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
                     readSignal(member, ei);
                     requestsSentThisIteration++;
-                    // Set next request with random delay (200-1000ms) to spread load
-                    lastRequestTime[key] = now + random(200, 1001);
+                    
+                    // Calculate next scheduled time: now + frequency + random delay
+                    unsigned long randomDelay = random(MIN_RANDOM_DELAY_MS, MAX_RANDOM_DELAY_MS + 1);
+                    nextRequestTime[key] = now + intervalMs + randomDelay;
+                    
+                    ESP_LOGD("REQUEST_MGR", "Sent %s, next in %lums", key.c_str(), intervalMs + randomDelay);
                 } else {
                     ESP_LOGD("REQUEST_MGR", "Skipping blacklisted signal: %s", key.c_str());
-                    // Still update timing to retry later (for recovery)
-                    lastRequestTime[key] = now + random(200, 1001);
+                    // Reschedule for retry later (for recovery)
+                    unsigned long randomDelay = random(MIN_RANDOM_DELAY_MS, MAX_RANDOM_DELAY_MS + 1);
+                    nextRequestTime[key] = now + intervalMs + randomDelay;
                 }
             }
         }

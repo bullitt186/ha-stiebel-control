@@ -31,6 +31,12 @@
 // Maximum number of requests to send per iteration (rate limiting)
 #define MAX_REQUESTS_PER_ITERATION 5
 
+// Minimum random delay between requests (milliseconds)
+#define MIN_RANDOM_DELAY_MS 200
+
+// Maximum random delay between requests (milliseconds)
+#define MAX_RANDOM_DELAY_MS 1000
+
 // ============================================================================
 // MQTT SETTINGS
 // ============================================================================
