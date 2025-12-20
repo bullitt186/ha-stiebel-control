@@ -24,7 +24,6 @@
 #include "ElsterTable.h"
 #include "KElsterTable.h"
 #include "config.h"
-#include "signal_requests_wpl13e.h"
 #include <sstream>
 #include <iomanip>
 #include <set>
@@ -207,6 +206,9 @@ typedef struct {
     unsigned long frequency;     // Request frequency in seconds
     CanMemberType member;        // Use cm_other for "all members"
 } SignalRequest;
+
+// Include device-specific signal request table (must come AFTER SignalRequest is defined)
+#include "signal_requests_wpl13e.h"
 
 // Runtime state for signal request manager
 static bool requestManagerStarted = false;
@@ -557,17 +559,165 @@ bool matchesPattern(const char* text, const char* pattern) {
     return true;
 }
 
-// Get signal configuration based on name and type
-const SignalConfig* getSignalConfig(const char* signalName, ElsterType type) {
-    // Try to find matching pattern
+// Abbreviation list sorted by length (longest first)
+static const struct { const char* abbrev; const char* full; } abbrevList[] = {
+    {"VOLUMENSTROM", "Volumenstrom"},  // 12 chars
+    {"HILFSKESSEL", "Hilfskessel"},  // 11 chars
+    {"DURCHFLUSS", "Durchfluss"},      // 10 chars
+    {"RUECKLAUF", "Rücklauf"},         // 9 chars
+    {"LAUFZEIT", "Laufzeit"},          // 8 chars
+    {"LEISTUNG", "Leistung"},          // 8 chars
+    {"KUEHLUNG", "Kühlung"},           // 8 chars
+    {"FREQUENZ", "Frequenz"},          // 8 chars
+    {"DREHZAHL", "Drehzahl"},          // 8 chars
+    {"SPEICHER", "Speicher"},          // 8 chars
+    {"SPANNUNG", "Spannung"},          // 8 chars
+    {"VORLAUF", "Vorlauf"},            // 7 chars
+    {"SAMMLER", "Sammler"},            // 7 chars
+    {"BETRIEB", "Betrieb"},            // 7 chars
+    {"ERTRAG", "Ertrag"},              // 6 chars
+    {"AUSSEN", "Außen"},               // 6 chars
+    {"KESSEL", "Kessel"},              // 6 chars
+    {"DRUCK", "Druck"},                // 5 chars
+    {"STROM", "Strom"},                // 5 chars
+    {"PUMPE", "Pumpe"},                // 5 chars
+    {"VERD", "Verdichter"},            // 4 chars
+    {"TEMP", "Temperatur"},            // 4 chars
+    {"HEIZ", "Heizung"},               // 4 chars
+    {"RAUM", "Raum"},                  // 4 chars
+    {"SOLL", "Soll"},                  // 4 chars
+    {"MAX", "Maximum"},                // 3 chars
+    {"MIN", "Minimum"},                // 3 chars
+    {"SUM", "Summe"},                  // 3 chars
+    {"TAG", "Tag"},                    // 3 chars
+    {"IST", "Ist"},                    // 3 chars
+    {"WW", "Warmwasser"},              // 2 chars
+    {"WP", "Wärmepumpe"},              // 2 chars
+    {"EL", "Elektrisch"}               // 2 chars
+};
+
+// Recursive helper to split a signal name fragment
+inline std::string splitFragment(const std::string& fragment) {
+    // Stop if fragment is too short
+    if (fragment.length() <= 1) {
+        return fragment;
+    }
+    
+    // Convert to uppercase for case-insensitive search
+    std::string upperFragment = fragment;
+    std::transform(upperFragment.begin(), upperFragment.end(), upperFragment.begin(), ::toupper);
+    
+    // Try each abbreviation (longest first)
+    for (size_t i = 0; i < sizeof(abbrevList)/sizeof(abbrevList[0]); i++) {
+        const char* abbrev = abbrevList[i].abbrev;
+        size_t abbrevLen = strlen(abbrev);
+        
+        // Search for this abbreviation in the uppercase fragment
+        size_t pos = upperFragment.find(abbrev);
+        if (pos != std::string::npos) {
+            // Found! Split into left, match, right (use original fragment for extraction)
+            std::string left = fragment.substr(0, pos);
+            std::string match = fragment.substr(pos, abbrevLen);  // Preserve original case
+            std::string right = fragment.substr(pos + abbrevLen);
+            
+            // Recursively process left and right parts
+            std::string processedLeft = splitFragment(left);
+            std::string processedRight = splitFragment(right);
+            
+            // Combine with spaces
+            std::string result;
+            if (!processedLeft.empty()) {
+                result = processedLeft + " ";
+            }
+            result += match;
+            if (!processedRight.empty()) {
+                result += " " + processedRight;
+            }
+            
+            return result;
+        }
+    }
+    
+    // No match found, return fragment as-is
+    return fragment;
+}
+
+// Expand signal name by splitting concatenated abbreviations and adding TEMP suffix
+// E.g., "WPVORLAUFIST" -> "WP VORLAUF IST TEMP"
+inline std::string expandSignalName(const char* signalName) {
+    std::string name(signalName);
+    
+    // Step 1: Replace underscores with spaces
+    std::replace(name.begin(), name.end(), '_', ' ');
+    
+    // Step 2-4: Process each space-separated token
+    std::istringstream tokenStream(name);
+    std::string token;
+    std::ostringstream result;
+    bool first = true;
+    
+    while (tokenStream >> token) {
+        if (!first) result << " ";
+        first = false;
+        
+        // Recursively split this token
+        result << splitFragment(token);
+    }
+    
+    name = result.str();
+    
+    // Step 5: Trim and clean up excess whitespace
+    size_t start = name.find_first_not_of(" ");
+    size_t end = name.find_last_not_of(" ");
+    if (start != std::string::npos) {
+        name = name.substr(start, end - start + 1);
+    } else {
+        name = "";
+    }
+    
+    // Reduce multiple spaces to single space
+    size_t spacePos = 0;
+    while ((spacePos = name.find("  ", spacePos)) != std::string::npos) {
+        name.replace(spacePos, 2, " ");
+    }
+    
+    // Add "TEMP" suffix if name ends with "SOLL" or "IST" (temperature indicators)
+    if (name.length() >= 4) {
+        std::string upperName = name;
+        std::transform(upperName.begin(), upperName.end(), upperName.begin(), ::toupper);
+        
+        if (upperName.substr(upperName.length() - 4) == "SOLL" || 
+            upperName.substr(upperName.length() - 3) == "IST") {
+            // Check if TEMP is not already present
+            if (upperName.find("TEMP") == std::string::npos) {
+                name += " TEMP";
+            }
+        }
+    }
+    
+    return name;
+}
+
+// Get signal configuration based on expanded name and type
+inline const SignalConfig* getSignalConfig(const char* signalName, ElsterType type) {
+    // First expand the signal name
+    std::string expandedName = expandSignalName(signalName);
+    
+    // Convert to uppercase for pattern matching
+    std::string upperExpanded = expandedName;
+    std::transform(upperExpanded.begin(), upperExpanded.end(), upperExpanded.begin(), ::toupper);
+    
+    // Try to find matching pattern against expanded name
     for (const auto& config : signalMappings) {
-        if (matchesPattern(signalName, config.namePattern)) {
-            ESP_LOGD("PATTERN", "Signal '%s' matched pattern '%s'", signalName, config.namePattern);
+        if (matchesPattern(upperExpanded.c_str(), config.namePattern)) {
+            ESP_LOGD("PATTERN", "Signal '%s' (expanded: '%s') matched pattern '%s'", 
+                     signalName, expandedName.c_str(), config.namePattern);
             return &config;
         }
     }
     // Return default (last entry)
-    ESP_LOGW("PATTERN", "Signal '%s' using default pattern (no match found)", signalName);
+    ESP_LOGW("PATTERN", "Signal '%s' (expanded: '%s') using default pattern (no match found)", 
+             signalName, expandedName.c_str());
     return &signalMappings[sizeof(signalMappings)/sizeof(SignalConfig) - 1];
 }
 
@@ -606,17 +756,16 @@ static const struct {
     {"SPANNUNG", "Spannung"},
     {"STROM", "Strom"},
     {"FREQUENZ", "Frequenz"},
-    {"DREHZAHL", "Drehzahl"}
+    {"DREHZAHL", "Drehzahl"},
+    {"WP", "Wärmepumpe"}
 };
 
 // Generate friendly name from signal name (kept in German as requested)
-std::string getFriendlyName(const char* signalName, const char* canMemberName) {
-    std::string name(signalName);
+inline std::string getFriendlyName(const char* signalName, const char* canMemberName) {
+    // Step 1: Expand signal name (split concatenated words, add TEMP suffix)
+    std::string name = expandSignalName(signalName);
     
-    // Keep German signal names, replace underscores with spaces
-    std::replace(name.begin(), name.end(), '_', ' ');
-    
-    // Apply abbreviation expansions efficiently
+    // Step 2: Apply abbreviation expansions to the separated words
     for (size_t i = 0; i < sizeof(abbreviations)/sizeof(abbreviations[0]); i++) {
         const char* abbrev = abbreviations[i].abbrev;
         const char* full = abbreviations[i].full;
@@ -624,16 +773,11 @@ std::string getFriendlyName(const char* signalName, const char* canMemberName) {
         const size_t fullLen = strlen(full);
         size_t pos = 0;
         
-        // Check at beginning (with space after)
-        if (name.length() > abbrevLen && name.compare(0, abbrevLen, abbrev) == 0 && name[abbrevLen] == ' ') {
-            name.replace(0, abbrevLen, full);
-            pos = fullLen;
-        }
-        
-        // Check in middle (space before and after)
+        // Replace whole-word matches only (surrounded by spaces or start/end)
         while ((pos = name.find(abbrev, pos)) != std::string::npos) {
-            bool hasBefore = (pos > 0 && name[pos - 1] == ' ');
-            bool hasAfter = (pos + abbrevLen < name.length() && name[pos + abbrevLen] == ' ');
+            bool hasBefore = (pos == 0 || name[pos - 1] == ' ');
+            bool hasAfter = (pos + abbrevLen >= name.length() || name[pos + abbrevLen] == ' ');
+            
             if (hasBefore && hasAfter) {
                 name.replace(pos, abbrevLen, full);
                 pos += fullLen;
@@ -641,20 +785,13 @@ std::string getFriendlyName(const char* signalName, const char* canMemberName) {
                 pos += abbrevLen;
             }
         }
-        
-        // Check at end (with space before)
-        if (name.length() > abbrevLen && name.compare(name.length() - abbrevLen, abbrevLen, abbrev) == 0 &&
-            name[name.length() - abbrevLen - 1] == ' ') {
-            name.replace(name.length() - abbrevLen, abbrevLen, full);
-        }
     }
     
-    // Convert to title case efficiently: lowercase all, then capitalize first letter of each word
-    // Note: CAN member name is NOT added as prefix since the device hierarchy already shows it
+    // Step 3: Convert to title case
     bool capitalizeNext = true;
     for (size_t i = 0; i < name.length(); i++) {
         if (capitalizeNext && std::isalpha(name[i])) {
-            name[i] = ::toupper(::tolower(name[i]));
+            name[i] = ::toupper(name[i]);
             capitalizeNext = false;
         } else {
             name[i] = ::tolower(name[i]);
@@ -666,7 +803,7 @@ std::string getFriendlyName(const char* signalName, const char* canMemberName) {
 }
 
 // Publish main device (parent for all CAN member sub-devices)
-void publishMainDevice() {
+inline void publishMainDevice() {
     const char* mainDeviceId = "stiebel_eltron_wpl13e";
     
     // Publish a sensor to register the main device
