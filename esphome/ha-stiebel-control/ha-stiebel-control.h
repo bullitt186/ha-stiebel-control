@@ -101,38 +101,28 @@ typedef struct {
 
 // Configurable signal mapping table - EDIT THIS to customize sensors
 static const SignalConfig signalMappings[] = {
-    // Date/Time components (must be before wildcard patterns that could match)
+    
+    // Temperature sensors
+    {"TEMP", "temperature", "°C", "mdi:thermometer", "measurement"},
+    
+    // Energy sensors
+    {"KWH", "energy", "kWh", "mdi:lightning-bolt", "total_increasing"},
+    {"MWH", "energy", "MWh", "mdi:lightning-bolt", "total_increasing"},
+    {"WH", "energy", "Wh", "mdi:lightning-bolt", "total_increasing"},
+
+        // Date/Time components (must be before wildcard patterns that could match)
     {"JAHR", "", "", "mdi:calendar", "measurement"},
     {"MONAT", "", "", "mdi:calendar", "measurement"},
     {"TAG", "", "", "mdi:calendar", "measurement"},
     {"STUNDE", "", "", "mdi:clock", "measurement"},
     {"MINUTE", "", "", "mdi:clock", "measurement"},
     {"SEKUNDE", "", "", "mdi:clock", "measurement"},
-    
-    // Temperature sensors
-    {"*TEMP*", "temperature", "°C", "mdi:thermometer", "measurement"},
-    {"VERDAMPFERTEMP", "temperature", "°C", "mdi:snowflake", "measurement"},
-    {"HEISSGAS_TEMP", "temperature", "°C", "mdi:fire", "measurement"},
-    {"ABGASTEMP", "temperature", "°C", "mdi:smoke", "measurement"},
-    {"TAUPUNKT_TEMP", "temperature", "°C", "mdi:water-percent", "measurement"},
-    
-    // Energy sensors
-    {"*_KWH", "energy", "kWh", "mdi:lightning-bolt", "total_increasing"},
-    {"*_MWH", "energy", "MWh", "mdi:lightning-bolt", "total_increasing"},
-    {"*_WH", "energy", "Wh", "mdi:lightning-bolt", "total_increasing"},
-    {"WAERMEERTRAG*", "energy", "kWh", "mdi:fire", "total_increasing"},
-    {"EL_AUFNAHMELEISTUNG*", "energy", "kWh", "mdi:transmission-tower", "total_increasing"},
-    {"*ERTRAG*", "energy", "kWh", "mdi:solar-power", "total_increasing"},
-    {"*ENERGIE*", "energy", "kWh", "mdi:lightning-bolt", "total_increasing"},
 
-    
     // Power sensors
     {"*LEISTUNG*", "power", "W", "mdi:flash", "measurement"},
     
     // Pressure sensors
-    {"*DRUCK*", "pressure", "bar", "mdi:gauge", "measurement"},
-    {"WASSERDRUCK", "pressure", "bar", "mdi:water-pump", "measurement"},
-    {"MASCHINENDRUCK", "pressure", "bar", "mdi:hydraulic-oil-level", "measurement"},
+    {"DRUCK", "pressure", "bar", "mdi:gauge", "measurement"},
     
     // Flow/Volume sensors
     {"*VOLUMENSTROM*", "volume_flow_rate", "l/min", "mdi:pump", "measurement"},
@@ -145,15 +135,15 @@ static const SignalConfig signalMappings[] = {
     {"*FREQUENZ*", "frequency", "Hz", "mdi:sine-wave", "measurement"},
     
     // Speed/RPM sensors
-    {"*DREHZAHL*", "frequency", "rpm", "mdi:fan", "measurement"},
-    {"GEBLAESEDREHZAHL", "frequency", "rpm", "mdi:fan", "measurement"},
+    {"DREHZAHL", "frequency", "rpm", "mdi:fan", "measurement"},
     
     // Humidity sensor
     {"FEUCHTE*", "humidity", "%", "mdi:water-percent", "measurement"},
     
     // Duration/Time sensors
-    {"LAUFZEIT*", "duration", "h", "mdi:timer", "total_increasing"},
-    {"LZ_*", "duration", "h", "mdi:timer", "total_increasing"},
+    {"ZEIT", "duration", "min", "mdi:clock", "measurement"},
+    {"DAUER", "duration", "min", "mdi:timer", "measurement"},
+    {"LZ", "duration", "h", "mdi:timer", "total_increasing"},
     {"STILLSTANDZEIT*", "duration", "h", "mdi:timer-off", "total_increasing"},
     {"*ZEIT*", "duration", "min", "mdi:clock", "measurement"},
     {"*DAUER*", "duration", "min", "mdi:timer", "measurement"},
@@ -784,7 +774,7 @@ void publishCompressorActive()
     }
 }
 
-// Helper: Check if string matches pattern (supports * wildcard)
+// Helper: Check if pattern appears anywhere in text (case-insensitive substring match)
 bool matchesPattern(const char* text, const char* pattern) {
     std::string t(text);
     std::string p(pattern);
@@ -793,25 +783,8 @@ bool matchesPattern(const char* text, const char* pattern) {
     std::transform(t.begin(), t.end(), t.begin(), ::toupper);
     std::transform(p.begin(), p.end(), p.begin(), ::toupper);
     
-    // Handle special case: *TEXT* means "contains TEXT"
-    if (p.length() >= 2 && p[0] == '*' && p[p.length()-1] == '*') {
-        std::string search = p.substr(1, p.length() - 2);
-        return t.find(search) != std::string::npos;
-    }
-    
-    size_t pos = p.find('*');
-    if (pos == std::string::npos) {
-        return t == p; // No wildcard, exact match
-    }
-    
-    // Handle single wildcard: PREFIX* or *SUFFIX
-    std::string prefix = p.substr(0, pos);
-    std::string suffix = p.substr(pos + 1);
-    
-    if (prefix.length() > 0 && t.find(prefix) != 0) return false;
-    if (suffix.length() > 0 && t.rfind(suffix) != t.length() - suffix.length()) return false;
-    
-    return true;
+    // Check if pattern appears anywhere in text
+    return t.find(p) != std::string::npos;
 }
 
 // Abbreviation list sorted by length (longest first)
