@@ -63,42 +63,8 @@ sensor:
     accuracy_decimals: 3
     state_class: "total_increasing"
 
-  # Required for date/time formatting
-  - platform: template
-    name: "JAHR"
-    id: JAHR
-    internal: true
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "MONAT"
-    id: MONAT
-    internal: true
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "TAG"
-    id: TAG
-    internal: true
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "STUNDE"
-    id: STUNDE
-    internal: true
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "MINUTE"
-    id: MINUTE
-    internal: true
-    accuracy_decimals: 0
-
-  - platform: template
-    name: "SEKUNDE"
-    id: SEKUNDE
-    internal: true
-    accuracy_decimals: 0
+  # Date/time sensors - values tracked internally in C++ code
+  # No template sensors needed - values stored in static variables
 
   # Required for Home Assistant input helpers
   - platform: template

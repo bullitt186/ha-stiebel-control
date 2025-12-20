@@ -28,6 +28,9 @@
 #include <iomanip>
 #include <set>
 #include <map>
+#include <vector>
+#include <algorithm>
+#include <cmath>
 // ============================================================================
 // CAN BUS MEMBER DEFINITIONS
 // ============================================================================
@@ -98,6 +101,14 @@ typedef struct {
 
 // Configurable signal mapping table - EDIT THIS to customize sensors
 static const SignalConfig signalMappings[] = {
+    // Date/Time components (must be before wildcard patterns that could match)
+    {"JAHR", "", "", "mdi:calendar", "measurement"},
+    {"MONAT", "", "", "mdi:calendar", "measurement"},
+    {"TAG", "", "", "mdi:calendar", "measurement"},
+    {"STUNDE", "", "", "mdi:clock", "measurement"},
+    {"MINUTE", "", "", "mdi:clock", "measurement"},
+    {"SEKUNDE", "", "", "mdi:clock", "measurement"},
+    
     // Temperature sensors
     {"*TEMP*", "temperature", "°C", "mdi:thermometer", "measurement"},
     {"VERDAMPFERTEMP", "temperature", "°C", "mdi:snowflake", "measurement"},
@@ -106,13 +117,14 @@ static const SignalConfig signalMappings[] = {
     {"TAUPUNKT_TEMP", "temperature", "°C", "mdi:water-percent", "measurement"},
     
     // Energy sensors
-    {"*ENERGIE*", "energy", "kWh", "mdi:lightning-bolt", "total_increasing"},
     {"*_KWH", "energy", "kWh", "mdi:lightning-bolt", "total_increasing"},
     {"*_MWH", "energy", "MWh", "mdi:lightning-bolt", "total_increasing"},
     {"*_WH", "energy", "Wh", "mdi:lightning-bolt", "total_increasing"},
     {"WAERMEERTRAG*", "energy", "kWh", "mdi:fire", "total_increasing"},
     {"EL_AUFNAHMELEISTUNG*", "energy", "kWh", "mdi:transmission-tower", "total_increasing"},
     {"*ERTRAG*", "energy", "kWh", "mdi:solar-power", "total_increasing"},
+    {"*ENERGIE*", "energy", "kWh", "mdi:lightning-bolt", "total_increasing"},
+
     
     // Power sensors
     {"*LEISTUNG*", "power", "W", "mdi:flash", "measurement"},
@@ -204,6 +216,14 @@ static float lastWpVorlaufIst = NAN;
 static float lastRuecklaufIstTemp = NAN;
 static float lastVerdichterValue = NAN;
 
+// Track date/time component values
+static int lastJahr = -1;
+static int lastMonat = -1;
+static int lastTag = -1;
+static int lastStunde = -1;
+static int lastMinute = -1;
+static int lastSekunde = -1;
+
 // ============================================================================
 // SIGNAL REQUEST CONFIGURATION
 // ============================================================================
@@ -225,6 +245,10 @@ static unsigned long requestManagerStartTime = 0;
 // ============================================================================
 // CAN BUS HELPER FUNCTIONS
 // ============================================================================
+
+// Only compile function implementations when building with ESPHome framework
+// Skip when compiling ha-dummy.cpp or other standalone contexts
+#if !defined(HA_DUMMY_BUILD)
 
 /**
  * Generate CAN read ID from member CAN ID
@@ -427,7 +451,7 @@ void publishDateDiscovery(bool forceRepublish = false) {
     const char* discoveryTopic = "homeassistant/sensor/heatingpump/calculated_date/config";
     
     std::ostringstream payload;
-    payload << "{\"name\":\"Datum (Berechnet)\","
+    payload << "{\"name\":\"Datum\","
             << "\"unique_id\":\"stiebel_calculated_date\","
             << "\"state_topic\":\"heatingpump/calculated/date/state\","
             << "\"icon\":\"mdi:calendar\","
@@ -443,39 +467,31 @@ void publishDateDiscovery(bool forceRepublish = false) {
 
 void publishDate()
 {
-    int ijahr = static_cast<int>(id(JAHR).state);
-    std::string jahr;
-    if (ijahr >= 0 && ijahr < 99)
-    {
-        jahr = (ijahr < 10) ? "0" + std::to_string(ijahr) : std::to_string(ijahr);
+    // Validate that all values have been received
+    if (lastJahr < 0 || lastMonat < 0 || lastTag < 0) {
+        ESP_LOGW("CALC", "Cannot publish date: sensors not initialized (Jahr=%d, Monat=%d, Tag=%d)", 
+                 lastJahr, lastMonat, lastTag);
+        return;
     }
-    else
-    {
-        jahr = "00";
+    
+    int ijahr = lastJahr;
+    int imonat = lastMonat;
+    int itag = lastTag;
+    
+    // Log raw values for debugging
+    ESP_LOGD("CALC", "Date values: Jahr=%d, Monat=%d, Tag=%d", ijahr, imonat, itag);
+    
+    // Validate ranges
+    if (ijahr < 0 || ijahr > 99 || imonat < 1 || imonat > 12 || itag < 1 || itag > 31) {
+        ESP_LOGW("CALC", "Date values out of range: Jahr=%d, Monat=%d, Tag=%d", ijahr, imonat, itag);
+        return;
     }
-
-    int imonat = static_cast<int>(id(MONAT).state);
-    std::string monat;
-    if (imonat > 0 && imonat <= 12)
-    {
-        monat = (imonat < 10) ? "0" + std::to_string(imonat) : std::to_string(imonat);
-    }
-    else
-    {
-        monat = "00";
-    }
-
-    int itag = static_cast<int>(id(TAG).state);
-    std::string tag;
-    if (itag > 0 && itag <= 31)
-    {
-        tag = (itag < 10) ? "0" + std::to_string(itag) : std::to_string(itag);
-    }
-    else
-    {
-        tag = "00";
-    }
-
+    
+    // Format date components
+    std::string jahr = (ijahr < 10) ? "0" + std::to_string(ijahr) : std::to_string(ijahr);
+    std::string monat = (imonat < 10) ? "0" + std::to_string(imonat) : std::to_string(imonat);
+    std::string tag = (itag < 10) ? "0" + std::to_string(itag) : std::to_string(itag);
+    
     std::string datum = "20" + jahr + "-" + monat + "-" + tag;
     
     // Publish discovery first
@@ -484,7 +500,7 @@ void publishDate()
     // Publish state to MQTT
     const char* stateTopic = "heatingpump/calculated/date/state";
     id(mqtt_client).publish(stateTopic, datum.c_str(), datum.length(), 0, true);
-    ESP_LOGD("CALC", "Published date: %s", datum.c_str());
+    ESP_LOGI("CALC", "Published date: %s (Jahr=%d, Monat=%d, Tag=%d)", datum.c_str(), ijahr, imonat, itag);
 }
 
 std::string formatNumber(int number, int width)
@@ -503,7 +519,7 @@ void publishTimeDiscovery(bool forceRepublish = false) {
     const char* discoveryTopic = "homeassistant/sensor/heatingpump/calculated_time/config";
     
     std::ostringstream payload;
-    payload << "{\"name\":\"Zeit (Berechnet)\","
+    payload << "{\"name\":\"Zeit\","
             << "\"unique_id\":\"stiebel_calculated_time\","
             << "\"state_topic\":\"heatingpump/calculated/time/state\","
             << "\"icon\":\"mdi:clock-outline\","
@@ -519,13 +535,29 @@ void publishTimeDiscovery(bool forceRepublish = false) {
 
 void publishTime()
 {
-    int istunde = (int)id(STUNDE).state;
+    // Validate that all values have been received
+    if (lastStunde < 0 || lastMinute < 0 || lastSekunde < 0) {
+        ESP_LOGW("CALC", "Cannot publish time: sensors not initialized (Stunde=%d, Minute=%d, Sekunde=%d)", 
+                 lastStunde, lastMinute, lastSekunde);
+        return;
+    }
+    
+    int istunde = lastStunde;
+    int iminute = lastMinute;
+    int isekunde = lastSekunde;
+    
+    // Log raw values for debugging
+    ESP_LOGD("CALC", "Time values: Stunde=%d, Minute=%d, Sekunde=%d", istunde, iminute, isekunde);
+    
+    // Validate ranges
+    if (istunde < 0 || istunde > 23 || iminute < 0 || iminute > 59 || isekunde < 0 || isekunde > 59) {
+        ESP_LOGW("CALC", "Time values out of range: Stunde=%d, Minute=%d, Sekunde=%d", istunde, iminute, isekunde);
+        return;
+    }
+    
+    // Format time components
     std::string stunde = formatNumber(istunde, 2);
-
-    int iminute = (int)id(MINUTE).state;
     std::string minute = formatNumber(iminute, 2);
-
-    int isekunde = (int)id(SEKUNDE).state;
     std::string sekunde = formatNumber(isekunde, 2);
 
     std::string zeit = stunde + ":" + minute + ":" + sekunde;
@@ -536,7 +568,7 @@ void publishTime()
     // Publish state to MQTT
     const char* stateTopic = "heatingpump/calculated/time/state";
     id(mqtt_client).publish(stateTopic, zeit.c_str(), zeit.length(), 0, true);
-    ESP_LOGD("CALC", "Published time: %s", zeit.c_str());
+    ESP_LOGI("CALC", "Published time: %s (Stunde=%d, Minute=%d, Sekunde=%d)", zeit.c_str(), istunde, iminute, isekunde);
 }
 
 // Publish MQTT discovery for calculated Betriebsart sensor
@@ -1695,14 +1727,61 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
     // Trigger calculated sensors when their source values update
     const char* signalName = ei->Name;
     
-    // Update date when TAG changes (implies day changed, includes month/year if needed)
-    if (strcmp(signalName, "TAG") == 0) {
-        publishDate();
+    // Store date/time component values
+    if (strcmp(signalName, "JAHR") == 0) {
+        char* endPtr;
+        long intValue = strtol(value.c_str(), &endPtr, 10);
+        if (endPtr != value.c_str() && *endPtr == '\0') {
+            lastJahr = static_cast<int>(intValue);
+            ESP_LOGD("CALC", "Updated JAHR: %d", lastJahr);
+        }
     }
     
-    // Update time when MINUTE changes (implies second changed, more efficient than every second)
+    if (strcmp(signalName, "MONAT") == 0) {
+        char* endPtr;
+        long intValue = strtol(value.c_str(), &endPtr, 10);
+        if (endPtr != value.c_str() && *endPtr == '\0') {
+            lastMonat = static_cast<int>(intValue);
+            ESP_LOGD("CALC", "Updated MONAT: %d", lastMonat);
+        }
+    }
+    
+    if (strcmp(signalName, "TAG") == 0) {
+        char* endPtr;
+        long intValue = strtol(value.c_str(), &endPtr, 10);
+        if (endPtr != value.c_str() && *endPtr == '\0') {
+            lastTag = static_cast<int>(intValue);
+            ESP_LOGD("CALC", "Updated TAG: %d", lastTag);
+            publishDate(); // Publish when TAG updates
+        }
+    }
+    
+    if (strcmp(signalName, "STUNDE") == 0) {
+        char* endPtr;
+        long intValue = strtol(value.c_str(), &endPtr, 10);
+        if (endPtr != value.c_str() && *endPtr == '\0') {
+            lastStunde = static_cast<int>(intValue);
+            ESP_LOGD("CALC", "Updated STUNDE: %d", lastStunde);
+        }
+    }
+    
     if (strcmp(signalName, "MINUTE") == 0) {
-        publishTime();
+        char* endPtr;
+        long intValue = strtol(value.c_str(), &endPtr, 10);
+        if (endPtr != value.c_str() && *endPtr == '\0') {
+            lastMinute = static_cast<int>(intValue);
+            ESP_LOGD("CALC", "Updated MINUTE: %d", lastMinute);
+            publishTime(); // Publish when MINUTE updates
+        }
+    }
+    
+    if (strcmp(signalName, "SEKUNDE") == 0) {
+        char* endPtr;
+        long intValue = strtol(value.c_str(), &endPtr, 10);
+        if (endPtr != value.c_str() && *endPtr == '\0') {
+            lastSekunde = static_cast<int>(intValue);
+            ESP_LOGD("CALC", "Updated SEKUNDE: %d", lastSekunde);
+        }
     }
     
     // Update Betriebsart when SOMMERBETRIEB changes
@@ -1994,11 +2073,11 @@ void updateTime(CanMember cm, const char *str_time)
     const char *csekunde = sekunde;
     ESP_LOGI("WRITE", "Stunde: %s, Minute: %s, Sekunde: %s", cstunde, cminute, csekunde);
     writeSignal(&cm, "STUNDE", cstunde);
-    id(STUNDE).update();
+    readSignal(&cm, "STUNDE");
     writeSignal(&cm, "MINUTE", cminute);
-    id(MINUTE).update();
+    readSignal(&cm, "MINUTE");
     writeSignal(&cm, "SEKUNDE", csekunde);
-    id(SEKUNDE).update();
+    readSignal(&cm, "SEKUNDE");
 }
 
 void updateDate(CanMember cm, const char *str_date)
@@ -2020,11 +2099,14 @@ void updateDate(CanMember cm, const char *str_date)
     const char *cday = day;
     ESP_LOGI("WRITE", "Year: %s, Month: %s, Day: %s", cyear, cmonth, cday);
     writeSignal(&cm, "JAHR", cyear);
-    id(JAHR).update();
+    readSignal(&cm, "JAHR");
     writeSignal(&cm, "MONAT", cmonth);
-    id(MONAT).update();
+    readSignal(&cm, "MONAT");
     writeSignal(&cm, "TAG", cday);
-    id(TAG).update();
+    readSignal(&cm, "TAG");
 }
 
-#endif
+#endif // !defined(HA_DUMMY_BUILD)
+
+#endif // ha_stiebel_control_H
+

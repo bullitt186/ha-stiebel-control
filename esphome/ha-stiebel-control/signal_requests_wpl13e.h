@@ -118,18 +118,18 @@ static const SignalRequest signalRequests[] = {
     // ENERGY COUNTERS (10 MINUTE INTERVAL)
     // Required for COP (Coefficient of Performance) calculations
     // ========================================================================
-    {"EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", FREQ_10MIN, cm_manager},
-    {"EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", FREQ_10MIN, cm_manager},
-    {"EL_AUFNAHMELEISTUNG_WW_TAG_KWH", FREQ_10MIN, cm_manager},
-    {"EL_AUFNAHMELEISTUNG_WW_SUM_MWH", FREQ_10MIN, cm_manager},
-    {"WAERMEERTRAG_2WE_WW_TAG_KWH", FREQ_10MIN, cm_manager},
-    {"WAERMEERTRAG_2WE_WW_SUM_MWH", FREQ_10MIN, cm_manager},
-    {"WAERMEERTRAG_2WE_HEIZ_TAG_KWH", FREQ_10MIN, cm_manager},
-    {"WAERMEERTRAG_2WE_HEIZ_SUM_MWH", FREQ_10MIN, cm_manager},
-    {"WAERMEERTRAG_WW_TAG_KWH", FREQ_10MIN, cm_manager},
-    {"WAERMEERTRAG_WW_SUM_MWH", FREQ_10MIN, cm_manager},
-    {"WAERMEERTRAG_HEIZ_TAG_KWH", FREQ_10MIN, cm_manager},
-    {"WAERMEERTRAG_HEIZ_SUM_MWH", FREQ_10MIN, cm_manager},
+    {"EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", FREQ_10MIN, cm_heizmodul},
+    {"EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", FREQ_10MIN, cm_heizmodul},
+    {"EL_AUFNAHMELEISTUNG_WW_TAG_KWH", FREQ_10MIN, cm_heizmodul},
+    {"EL_AUFNAHMELEISTUNG_WW_SUM_MWH", FREQ_10MIN, cm_heizmodul},
+    {"WAERMEERTRAG_2WE_WW_TAG_KWH", FREQ_10MIN, cm_heizmodul},
+    {"WAERMEERTRAG_2WE_WW_SUM_MWH", FREQ_10MIN, cm_heizmodul},
+    {"WAERMEERTRAG_2WE_HEIZ_TAG_KWH", FREQ_10MIN, cm_heizmodul},
+    {"WAERMEERTRAG_2WE_HEIZ_SUM_MWH", FREQ_10MIN, cm_heizmodul},
+    {"WAERMEERTRAG_WW_TAG_KWH", FREQ_10MIN, cm_heizmodul},
+    {"WAERMEERTRAG_WW_SUM_MWH", FREQ_10MIN, cm_heizmodul},
+    {"WAERMEERTRAG_HEIZ_TAG_KWH", FREQ_10MIN, cm_heizmodul},
+    {"WAERMEERTRAG_HEIZ_SUM_MWH", FREQ_10MIN, cm_heizmodul},
     
     // ========================================================================
     // RUNTIME COUNTERS (COMMENTED OUT - ENABLE IF NEEDED)

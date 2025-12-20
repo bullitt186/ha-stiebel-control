@@ -33,7 +33,6 @@ esphome:
     - ha-stiebel-control/config.h
     - ha-stiebel-control/ha-stiebel-control.h
     - ha-stiebel-control/signal_requests_wpl13e.h
-    - ha-stiebel-control/ha-dummy.cpp
 
   platformio_options:
     build_flags:
@@ -54,9 +53,9 @@ logger:
   baud_rate: 115200
   logs:
     # Reduce verbose CAN logging in production
-    canbus: INFO
+    canbus: DEBUG
     mqtt: INFO
-    PATTERN: DEBUG
+    PATTERN: WARN
     # Keep critical logs visible
     component: WARN
 
@@ -247,6 +246,15 @@ button:
         lambda: |-
           identifyCanMembers();
           return;
+
+  - platform: template
+    name: "Republish MQTT Discoveries"
+    id: republish_mqtt_discoveries
+    icon: "mdi:refresh"
+    on_press:
+      then:
+        lambda: |-
+          republishAllDiscoveries();
 
 #########################################
 #                                       #
