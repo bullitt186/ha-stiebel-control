@@ -24,11 +24,11 @@
 #include "ElsterTable.h"
 #include "KElsterTable.h"
 #include "config.h"
+#include "signal_requests_wpl13e.h"
 #include <sstream>
 #include <iomanip>
 #include <set>
 #include <map>
-
 // ============================================================================
 // CAN BUS MEMBER DEFINITIONS
 // ============================================================================
@@ -207,10 +207,6 @@ typedef struct {
     unsigned long frequency;     // Request frequency in seconds
     CanMemberType member;        // Use cm_other for "all members"
 } SignalRequest;
-
-// Include device-specific signal request table
-// To support a different model, create a new signal_requests_XXXX.h file
-#include "signal_requests_wpl13e.h"
 
 // Runtime state for signal request manager
 static bool requestManagerStarted = false;

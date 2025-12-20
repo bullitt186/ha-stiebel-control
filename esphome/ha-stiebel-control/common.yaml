@@ -24,14 +24,15 @@ esphome:
   name: heatingpump
   friendly_name: "Heating Pump CAN Interface"
   includes:
-    - ha-stiebel-control/config.h
     - ha-stiebel-control/elster/ElsterTable.h
     - ha-stiebel-control/elster/KElsterTable.h
     - ha-stiebel-control/elster/KElsterTable.cpp
     - ha-stiebel-control/elster/NUtils.h
     - ha-stiebel-control/elster/NUtils.cpp
     - ha-stiebel-control/elster/NTypes.h
+    - ha-stiebel-control/config.h
     - ha-stiebel-control/ha-stiebel-control.h
+    - ha-stiebel-control/signal_requests_wpl13e.h
   platformio_options:
     build_flags:
       - -DBLACKLIST_ENABLED=${blacklist_enabled}

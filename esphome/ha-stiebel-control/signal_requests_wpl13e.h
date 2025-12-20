@@ -12,7 +12,7 @@
 #define SIGNAL_REQUESTS_WPL13E_H
 
 #include "config.h"
-
+#include "ha-stiebel-control.h"
 
 
 // Configurable signal request table for WPL13E model
