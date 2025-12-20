@@ -33,6 +33,8 @@ esphome:
     - ha-stiebel-control/config.h
     - ha-stiebel-control/ha-stiebel-control.h
     - ha-stiebel-control/signal_requests_wpl13e.h
+    - ha-stiebel-control/ha-dummy.cpp
+
   platformio_options:
     build_flags:
       - -DBLACKLIST_ENABLED=${blacklist_enabled}

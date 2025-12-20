@@ -196,6 +196,14 @@ static std::map<std::string, int> noResponseCounts;
 // Track next scheduled request time per unique signal key (MEMBER_SIGNAL)
 static std::map<std::string, unsigned long> nextRequestTime;
 
+// Track starting position for round-robin signal processing (prevents starvation)
+static int signalProcessingStartIndex = 0;
+
+// Track sensor values for calculated sensors
+static float lastWpVorlaufIst = NAN;
+static float lastRuecklaufIstTemp = NAN;
+static float lastVerdichterValue = NAN;
+
 // ============================================================================
 // SIGNAL REQUEST CONFIGURATION
 // ============================================================================
@@ -411,9 +419,10 @@ void writeSignal(const CanMember *cm, const char *elsterName, const char *&str)
 }
 
 // Publish MQTT discovery for calculated date sensor
-void publishDateDiscovery() {
+void publishDateDiscovery(bool forceRepublish = false) {
     static bool discoveryPublished = false;
-    if (discoveryPublished) return;
+    if (discoveryPublished && !forceRepublish) return;
+    if (forceRepublish) discoveryPublished = false;
     
     const char* discoveryTopic = "homeassistant/sensor/heatingpump/calculated_date/config";
     
@@ -486,9 +495,10 @@ std::string formatNumber(int number, int width)
 }
 
 // Publish MQTT discovery for calculated time sensor
-void publishTimeDiscovery() {
+void publishTimeDiscovery(bool forceRepublish = false) {
     static bool discoveryPublished = false;
-    if (discoveryPublished) return;
+    if (discoveryPublished && !forceRepublish) return;
+    if (forceRepublish) discoveryPublished = false;
     
     const char* discoveryTopic = "homeassistant/sensor/heatingpump/calculated_time/config";
     
@@ -529,6 +539,219 @@ void publishTime()
     ESP_LOGD("CALC", "Published time: %s", zeit.c_str());
 }
 
+// Publish MQTT discovery for calculated Betriebsart sensor
+void publishBetriebsartDiscovery(bool forceRepublish = false) {
+    static bool discoveryPublished = false;
+    if (discoveryPublished && !forceRepublish) return;
+    if (forceRepublish) discoveryPublished = false;
+    
+    const char* discoveryTopic = "homeassistant/sensor/heatingpump/calculated_betriebsart/config";
+    
+    std::ostringstream payload;
+    payload << "{\"name\":\"Betriebsart\","
+            << "\"unique_id\":\"stiebel_calculated_betriebsart\","
+            << "\"state_topic\":\"heatingpump/calculated/betriebsart/state\","
+            << "\"icon\":\"mdi:cog\","
+            << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
+            << "\"name\":\"Stiebel Eltron Wärmepumpe\","
+            << "\"manufacturer\":\"Stiebel Eltron\"}}";
+    
+    std::string payloadStr = payload.str();
+    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    discoveryPublished = true;
+    ESP_LOGI("MQTT", "Discovery published for calculated Betriebsart sensor");
+}
+
+void publishBetriebsart(const std::string& sommerBetriebValue)
+{
+    // Determine Betriebsart based on SOMMERBETRIEB value
+    // SOMMERBETRIEB is et_little_bool type, so value is "on" or "off"
+    std::string betriebsart;
+    std::string icon;
+    
+    if (sommerBetriebValue == "on") {
+        betriebsart = "Sommerbetrieb";
+        icon = "mdi:white-balance-sunny";
+    } else {
+        betriebsart = "Normalbetrieb";
+        icon = "mdi:circle-outline";
+    }
+    
+    // Publish discovery first
+    publishBetriebsartDiscovery();
+    
+    // Publish state to MQTT
+    const char* stateTopic = "heatingpump/calculated/betriebsart/state";
+    id(mqtt_client).publish(stateTopic, betriebsart.c_str(), betriebsart.length(), 0, true);
+    ESP_LOGD("CALC", "Published Betriebsart: %s (SOMMERBETRIEB=%s)", betriebsart.c_str(), sommerBetriebValue.c_str());
+}
+
+// Publish MQTT discovery for calculated Delta T continuous sensor
+void publishDeltaTContinuousDiscovery(bool forceRepublish = false) {
+    static bool discoveryPublished = false;
+    if (discoveryPublished && !forceRepublish) return;
+    if (forceRepublish) discoveryPublished = false;
+    
+    const char* discoveryTopic = "homeassistant/sensor/heatingpump/calculated_delta_t_continuous/config";
+    
+    std::ostringstream payload;
+    payload << "{\"name\":\"Delta T WP (kontinuierlich)\","
+            << "\"unique_id\":\"stiebel_calculated_delta_t_continuous\","
+            << "\"state_topic\":\"heatingpump/calculated/delta_t_continuous/state\","
+            << "\"unit_of_measurement\":\"K\","
+            << "\"device_class\":\"temperature\","
+            << "\"state_class\":\"measurement\","
+            << "\"icon\":\"mdi:thermometer\","
+            << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
+            << "\"name\":\"Stiebel Eltron Wärmepumpe\","
+            << "\"manufacturer\":\"Stiebel Eltron\"}}";
+    
+    std::string payloadStr = payload.str();
+    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    discoveryPublished = true;
+    ESP_LOGI("MQTT", "Discovery published for Delta T continuous sensor");
+}
+
+void publishDeltaTContinuous()
+{
+    // Check if both temperature values are valid
+    if (std::isnan(lastWpVorlaufIst) || std::isnan(lastRuecklaufIstTemp)) {
+        ESP_LOGD("CALC", "Cannot calculate Delta T: missing temperature values");
+        return;
+    }
+    
+    // Validate temperature range (sanity check)
+    if (lastWpVorlaufIst < -50 || lastRuecklaufIstTemp < -50) {
+        ESP_LOGD("CALC", "Cannot calculate Delta T: temperatures out of range");
+        return;
+    }
+    
+    float deltaT = lastWpVorlaufIst - lastRuecklaufIstTemp;
+    
+    // Publish discovery first
+    publishDeltaTContinuousDiscovery();
+    
+    // Publish state to MQTT
+    char value[16];
+    snprintf(value, sizeof(value), "%.2f", deltaT);
+    const char* stateTopic = "heatingpump/calculated/delta_t_continuous/state";
+    id(mqtt_client).publish(stateTopic, value, strlen(value), 0, true);
+    ESP_LOGD("CALC", "Published Delta T continuous: %s K (VL=%.1f, RL=%.1f)", value, lastWpVorlaufIst, lastRuecklaufIstTemp);
+}
+
+// Publish MQTT discovery for calculated Delta T running sensor
+void publishDeltaTRunningDiscovery(bool forceRepublish = false) {
+    static bool discoveryPublished = false;
+    if (discoveryPublished && !forceRepublish) return;
+    if (forceRepublish) discoveryPublished = false;
+    
+    const char* discoveryTopic = "homeassistant/sensor/heatingpump/calculated_delta_t_running/config";
+    
+    std::ostringstream payload;
+    payload << "{\"name\":\"Delta T WP (nur bei Verdichter an)\","
+            << "\"unique_id\":\"stiebel_calculated_delta_t_running\","
+            << "\"state_topic\":\"heatingpump/calculated/delta_t_running/state\","
+            << "\"unit_of_measurement\":\"K\","
+            << "\"device_class\":\"temperature\","
+            << "\"state_class\":\"measurement\","
+            << "\"icon\":\"mdi:thermometer-chevron-up\","
+            << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
+            << "\"name\":\"Stiebel Eltron Wärmepumpe\","
+            << "\"manufacturer\":\"Stiebel Eltron\"}}";
+    
+    std::string payloadStr = payload.str();
+    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    discoveryPublished = true;
+    ESP_LOGI("MQTT", "Discovery published for Delta T running sensor");
+}
+
+void publishDeltaTRunning()
+{
+    // Check if compressor is running (value > 2 or not NaN and not 0)
+    bool compressorRunning = (!std::isnan(lastVerdichterValue) && lastVerdichterValue > 2.0);
+    
+    if (!compressorRunning) {
+        ESP_LOGD("CALC", "Cannot calculate Delta T running: compressor not active");
+        return;
+    }
+    
+    // Check if both temperature values are valid
+    if (std::isnan(lastWpVorlaufIst) || std::isnan(lastRuecklaufIstTemp)) {
+        ESP_LOGD("CALC", "Cannot calculate Delta T running: missing temperature values");
+        return;
+    }
+    
+    // Validate temperature range (sanity check)
+    if (lastWpVorlaufIst < -50 || lastRuecklaufIstTemp < -50) {
+        ESP_LOGD("CALC", "Cannot calculate Delta T running: temperatures out of range");
+        return;
+    }
+    
+    float deltaT = lastWpVorlaufIst - lastRuecklaufIstTemp;
+    
+    // Publish discovery first
+    publishDeltaTRunningDiscovery();
+    
+    // Publish state to MQTT
+    char value[16];
+    snprintf(value, sizeof(value), "%.2f", deltaT);
+    const char* stateTopic = "heatingpump/calculated/delta_t_running/state";
+    id(mqtt_client).publish(stateTopic, value, strlen(value), 0, true);
+    ESP_LOGD("CALC", "Published Delta T running: %s K", value);
+}
+
+// Publish MQTT discovery for calculated Compressor Active binary sensor
+void publishCompressorActiveDiscovery(bool forceRepublish = false) {
+    static bool discoveryPublished = false;
+    if (discoveryPublished && !forceRepublish) return;
+    if (forceRepublish) discoveryPublished = false;
+    
+    const char* discoveryTopic = "homeassistant/binary_sensor/heatingpump/calculated_compressor_active/config";
+    
+    std::ostringstream payload;
+    payload << "{\"name\":\"WP Verdichter aktiv\","
+            << "\"unique_id\":\"stiebel_calculated_compressor_active\","
+            << "\"state_topic\":\"heatingpump/calculated/compressor_active/state\","
+            << "\"device_class\":\"running\","
+            << "\"payload_on\":\"on\","
+            << "\"payload_off\":\"off\","
+            << "\"icon\":\"mdi:engine\","
+            << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
+            << "\"name\":\"Stiebel Eltron Wärmepumpe\","
+            << "\"manufacturer\":\"Stiebel Eltron\"}}";
+    
+    std::string payloadStr = payload.str();
+    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    discoveryPublished = true;
+    ESP_LOGI("MQTT", "Discovery published for Compressor Active sensor");
+}
+
+void publishCompressorActive()
+{
+    // Check if compressor value is valid
+    if (std::isnan(lastVerdichterValue)) {
+        ESP_LOGD("CALC", "Cannot determine compressor state: invalid value");
+        return;
+    }
+    
+    // Compressor is active if value > 2
+    bool isActive = (lastVerdichterValue > 2.0);
+    
+    // Publish discovery first
+    publishCompressorActiveDiscovery();
+    
+    // Publish state to MQTT
+    const char* state = isActive ? "on" : "off";
+    const char* stateTopic = "heatingpump/calculated/compressor_active/state";
+    id(mqtt_client).publish(stateTopic, state, strlen(state), 0, true);
+    ESP_LOGD("CALC", "Published Compressor Active: %s (value=%.1f)", state, lastVerdichterValue);
+    
+    // Also trigger Delta T running calculation when compressor state changes
+    if (isActive) {
+        publishDeltaTRunning();
+    }
+}
+
 // Helper: Check if string matches pattern (supports * wildcard)
 bool matchesPattern(const char* text, const char* pattern) {
     std::string t(text);
@@ -561,13 +784,27 @@ bool matchesPattern(const char* text, const char* pattern) {
 
 // Abbreviation list sorted by length (longest first)
 static const struct { const char* abbrev; const char* full; } abbrevList[] = {
+    {"AUFNAHMELEISTUNG", "Aufnahmeleistung"},  // 16 chars
+    {"LUEFTUNGSSTUFE", "Lüftungsstufe"},  // 14 chars
+    {"LEISTUNGSZWANG", "Leistungszwang"},   // 14 chars
+    {"FEHLERMELDUNG", "Fehlermeldung"},// 13 chars
     {"VOLUMENSTROM", "Volumenstrom"},  // 12 chars
-    {"HILFSKESSEL", "Hilfskessel"},  // 11 chars
+    {"QUELLENPUMPE", "Quellenpumpe"},  // 12 chars
+    {"STUETZSTELLE", "Stützstelle"},   // 12 chars
+    {"HILFSKESSEL", "Hilfskessel"},    // 11 chars
+    {"BETRIEBSART", "Betriebsart"},    // 11 chars
+    {"VERDAMPFER", "Verdampfer"},      // 10 chars
+    {"VERDICHTER", "Verdichter"},      // 10 chars
     {"DURCHFLUSS", "Durchfluss"},      // 10 chars
+    {"TEMPERATUR", "Temperatur"},      // 10 chars
+    {"TEMPORALE", "Temporale"},        // 9 chars
     {"RUECKLAUF", "Rücklauf"},         // 9 chars
     {"LAUFZEIT", "Laufzeit"},          // 8 chars
+    {"EINSTELL", "Einstellung"},       // 8 chars
     {"LEISTUNG", "Leistung"},          // 8 chars
     {"KUEHLUNG", "Kühlung"},           // 8 chars
+    {"BIVALENT", "Bivalent"},          // 8 chars
+    {"PARALLEL", "Parallel"},          // 8 chars
     {"FREQUENZ", "Frequenz"},          // 8 chars
     {"DREHZAHL", "Drehzahl"},          // 8 chars
     {"SPEICHER", "Speicher"},          // 8 chars
@@ -575,11 +812,16 @@ static const struct { const char* abbrev; const char* full; } abbrevList[] = {
     {"VORLAUF", "Vorlauf"},            // 7 chars
     {"SAMMLER", "Sammler"},            // 7 chars
     {"BETRIEB", "Betrieb"},            // 7 chars
+    {"HEIZUNG", "Heizung"},            // 7 chars
     {"ERTRAG", "Ertrag"},              // 6 chars
     {"AUSSEN", "Außen"},               // 6 chars
+    {"MINUTE", "Minute"},               // 6 chars
+    {"SOCKEL", "Sockel"},              // 6 chars
     {"KESSEL", "Kessel"},              // 6 chars
+    {"DAUER", "Dauer"},                // 5 chars
     {"DRUCK", "Druck"},                // 5 chars
     {"STROM", "Strom"},                // 5 chars
+    {"LUEFT", "Lüftung"},              // 5 chars
     {"PUMPE", "Pumpe"},                // 5 chars
     {"VERD", "Verdichter"},            // 4 chars
     {"TEMP", "Temperatur"},            // 4 chars
@@ -591,9 +833,13 @@ static const struct { const char* abbrev; const char* full; } abbrevList[] = {
     {"SUM", "Summe"},                  // 3 chars
     {"TAG", "Tag"},                    // 3 chars
     {"IST", "Ist"},                    // 3 chars
+    {"FKT", "Funktion"},               // 3 chars
+    {"HZG", "Heizung"},                // 3 chars
     {"WW", "Warmwasser"},              // 2 chars
     {"WP", "Wärmepumpe"},              // 2 chars
-    {"EL", "Elektrisch"}               // 2 chars
+    {"EL", "Elektrisch"},              // 2 chars
+    {"LZ", "Laufzeit"}                 // 2 chars
+
 };
 
 // Recursive helper to split a signal name fragment
@@ -721,54 +967,15 @@ inline const SignalConfig* getSignalConfig(const char* signalName, ElsterType ty
     return &signalMappings[sizeof(signalMappings)/sizeof(SignalConfig) - 1];
 }
 
-// Abbreviation expansion lookup table
-static const struct {
-    const char* abbrev;
-    const char* full;
-} abbreviations[] = {
-    {"TEMP", "Temperatur"},
-    {"WW", "Warmwasser"},
-    {"IST", "Ist"},
-    {"SOLL", "Soll"},
-    {"MAX", "Maximum"},
-    {"MIN", "Minimum"},
-    {"SUM", "Summe"},
-    {"TAG", "Tag"},
-    {"HEIZ", "Heizung"},
-    {"KUEHLUNG", "Kühlung"},
-    {"VERD", "Verdichter"},
-    {"EL", "Elektrisch"},
-    {"LEISTUNG", "Leistung"},
-    {"DRUCK", "Druck"},
-    {"VORLAUF", "Vorlauf"},
-    {"RUECKLAUF", "Rücklauf"},
-    {"AUSSEN", "Außen"},
-    {"RAUM", "Raum"},
-    {"SPEICHER", "Speicher"},
-    {"KESSEL", "Kessel"},
-    {"SAMMLER", "Sammler"},
-    {"LAUFZEIT", "Laufzeit"},
-    {"ERTRAG", "Ertrag"},
-    {"BETRIEB", "Betrieb"},
-    {"PUMPE", "Pumpe"},
-    {"DURCHFLUSS", "Durchfluss"},
-    {"VOLUMENSTROM", "Volumenstrom"},
-    {"SPANNUNG", "Spannung"},
-    {"STROM", "Strom"},
-    {"FREQUENZ", "Frequenz"},
-    {"DREHZAHL", "Drehzahl"},
-    {"WP", "Wärmepumpe"}
-};
-
 // Generate friendly name from signal name (kept in German as requested)
 inline std::string getFriendlyName(const char* signalName, const char* canMemberName) {
     // Step 1: Expand signal name (split concatenated words, add TEMP suffix)
     std::string name = expandSignalName(signalName);
     
     // Step 2: Apply abbreviation expansions to the separated words
-    for (size_t i = 0; i < sizeof(abbreviations)/sizeof(abbreviations[0]); i++) {
-        const char* abbrev = abbreviations[i].abbrev;
-        const char* full = abbreviations[i].full;
+    for (size_t i = 0; i < sizeof(abbrevList)/sizeof(abbrevList[0]); i++) {
+        const char* abbrev = abbrevList[i].abbrev;
+        const char* full = abbrevList[i].full;
         const size_t abbrevLen = strlen(abbrev);
         const size_t fullLen = strlen(full);
         size_t pos = 0;
@@ -797,6 +1004,39 @@ inline std::string getFriendlyName(const char* signalName, const char* canMember
             name[i] = ::tolower(name[i]);
             if (name[i] == ' ') capitalizeNext = true;
         }
+    }
+    
+    // Step 4: Convert German character sequences to proper umlauts
+    // This handles any remaining cases where abbreviations weren't fully replaced
+    size_t pos = 0;
+    while ((pos = name.find("Ae", pos)) != std::string::npos) {
+        name.replace(pos, 2, "Ä");
+        pos += 2; // UTF-8 Ä is 2 bytes
+    }
+    pos = 0;
+    while ((pos = name.find("Oe", pos)) != std::string::npos) {
+        name.replace(pos, 2, "Ö");
+        pos += 2;
+    }
+    pos = 0;
+    while ((pos = name.find("Ue", pos)) != std::string::npos) {
+        name.replace(pos, 2, "Ü");
+        pos += 2;
+    }
+    pos = 0;
+    while ((pos = name.find("ae", pos)) != std::string::npos) {
+        name.replace(pos, 2, "ä");
+        pos += 2;
+    }
+    pos = 0;
+    while ((pos = name.find("oe", pos)) != std::string::npos) {
+        name.replace(pos, 2, "ö");
+        pos += 2;
+    }
+    pos = 0;
+    while ((pos = name.find("ue", pos)) != std::string::npos) {
+        name.replace(pos, 2, "ü");
+        pos += 2;
     }
     
     return name;
@@ -948,6 +1188,15 @@ void republishAllDiscoveries() {
     for (const auto& signal : signalsToRepublish) {
         ESP_LOGD("MQTT", "Marked for republish: %s", signal.c_str());
     }
+    
+    // Reset calculated sensor discovery flags and republish
+    ESP_LOGI("MQTT", "Republishing calculated sensor discoveries");
+    publishDateDiscovery(true);
+    publishTimeDiscovery(true);
+    publishBetriebsartDiscovery(true);
+    publishDeltaTContinuousDiscovery(true);
+    publishDeltaTRunningDiscovery(true);
+    publishCompressorActiveDiscovery(true);
     
     ESP_LOGI("MQTT", "Discovery refresh complete - will republish as signals are received");
 }
@@ -1456,6 +1705,48 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
         publishTime();
     }
     
+    // Update Betriebsart when SOMMERBETRIEB changes
+    if (strcmp(signalName, "SOMMERBETRIEB") == 0) {
+        publishBetriebsart(value);
+    }
+    
+    // Store and update temperature values for Delta T calculations
+    if (strcmp(signalName, "WPVORLAUFIST") == 0) {
+        char* endPtr;
+        float floatValue = strtof(value.c_str(), &endPtr);
+        if (endPtr != value.c_str() && *endPtr == '\0') {
+            lastWpVorlaufIst = floatValue;
+            publishDeltaTContinuous();
+            publishDeltaTRunning(); // Also update running Delta T if compressor is on
+        } else {
+            ESP_LOGW("CALC", "Failed to parse WPVORLAUFIST value: %s", value.c_str());
+        }
+    }
+    
+    if (strcmp(signalName, "RUECKLAUFISTTEMP") == 0) {
+        char* endPtr;
+        float floatValue = strtof(value.c_str(), &endPtr);
+        if (endPtr != value.c_str() && *endPtr == '\0') {
+            lastRuecklaufIstTemp = floatValue;
+            publishDeltaTContinuous();
+            publishDeltaTRunning(); // Also update running Delta T if compressor is on
+        } else {
+            ESP_LOGW("CALC", "Failed to parse RUECKLAUFISTTEMP value: %s", value.c_str());
+        }
+    }
+    
+    // Store and update compressor value
+    if (strcmp(signalName, "VERDICHTER") == 0) {
+        char* endPtr;
+        float floatValue = strtof(value.c_str(), &endPtr);
+        if (endPtr != value.c_str() && *endPtr == '\0') {
+            lastVerdichterValue = floatValue;
+            publishCompressorActive();
+        } else {
+            ESP_LOGW("CALC", "Failed to parse VERDICHTER value: %s", value.c_str());
+        }
+    }
+    
     // Store energy values and recalculate COP
     if (strcmp(signalName, "EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH") == 0 ||
         strcmp(signalName, "EL_AUFNAHMELEISTUNG_WW_SUM_MWH") == 0 ||
@@ -1559,12 +1850,19 @@ void processSignalRequests() {
     // Randomization in scheduling prevents bursts
     int requestsSentThisIteration = 0;
     
-    // Process each signal in the request table up to rate limit
-    for (int i = 0; i < SIGNAL_REQUEST_COUNT && requestsSentThisIteration < MAX_REQUESTS_PER_ITERATION; i++) {
-        const SignalRequest& req = signalRequests[i];
+    // Round-robin processing: start from last position to prevent starvation of signals at end of array
+    // Process all signals, wrapping around, until we hit rate limit or complete full cycle
+    int processedCount = 0;
+    int currentIndex = signalProcessingStartIndex;
+    
+    while (processedCount < SIGNAL_REQUEST_COUNT && requestsSentThisIteration < MAX_REQUESTS_PER_ITERATION) {
+        const SignalRequest& req = signalRequests[currentIndex];
+        processedCount++;
         
         const ElsterIndex* ei = GetElsterIndex(req.signalName);
         if (!ei || ei->Index == 0xFFFF) {
+            // Move to next signal and continue
+            currentIndex = (currentIndex + 1) % SIGNAL_REQUEST_COUNT;
             continue; // Signal not found in table
         }
         
@@ -1579,9 +1877,14 @@ void processSignalRequests() {
                 &CanMembers[cm_heizmodul]
             };
             
+            // Track how many members we've sent to in this cm_other group to stagger them
+            int sentInThisGroup = 0;
+            
             for (const auto* member : allMembers) {
+                // Don't break - just skip remaining members for this signal
+                // The outer loop will continue with next signal
                 if (requestsSentThisIteration >= MAX_REQUESTS_PER_ITERATION) {
-                    break; // Hit rate limit
+                    break; // Hit rate limit for this iteration
                 }
                 
                 // Use ei->Name (from ElsterTable) to match blacklist key format
@@ -1593,14 +1896,20 @@ void processSignalRequests() {
                 // Check if this signal is overdue (current time >= scheduled time)
                 if (nextScheduled == 0 || now >= nextScheduled) {
                     if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
-                        readSignal(member, ei);
-                        requestsSentThisIteration++;
-                        
-                        // Calculate next scheduled time: now + frequency + random delay
-                        unsigned long randomDelay = random(MIN_RANDOM_DELAY_MS, MAX_RANDOM_DELAY_MS + 1);
-                        nextRequestTime[key] = now + intervalMs + randomDelay;
-                        
-                        ESP_LOGD("REQUEST_MGR", "Sent %s, next in %lums", key.c_str(), intervalMs + randomDelay);
+                        // For cm_other: only send to ONE member per iteration to prevent bursts
+                        // Other members will be checked in subsequent iterations
+                        if (sentInThisGroup == 0) {
+                            readSignal(member, ei);
+                            requestsSentThisIteration++;
+                            sentInThisGroup++;
+                            
+                            // Calculate next scheduled time: now + frequency + random delay
+                            unsigned long randomDelay = random(MIN_RANDOM_DELAY_MS, MAX_RANDOM_DELAY_MS + 1);
+                            nextRequestTime[key] = now + intervalMs + randomDelay;
+                            
+                            ESP_LOGD("REQUEST_MGR", "Sent %s, next in %lums", key.c_str(), intervalMs + randomDelay);
+                        }
+                        // Else: skip this member for now, will be checked next iteration
                     } else {
                         ESP_LOGD("REQUEST_MGR", "Skipping blacklisted signal: %s", key.c_str());
                         // Reschedule for retry later (for recovery)
@@ -1636,7 +1945,13 @@ void processSignalRequests() {
                 }
             }
         }
+        
+        // Move to next signal in round-robin fashion (wrap around at end)
+        currentIndex = (currentIndex + 1) % SIGNAL_REQUEST_COUNT;
     }
+    
+    // Update starting position for next iteration
+    signalProcessingStartIndex = currentIndex;
     
     if (requestsSentThisIteration > 0) {
         ESP_LOGV("REQUEST_MGR", "Sent %d requests this iteration", requestsSentThisIteration);
