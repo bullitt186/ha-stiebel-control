@@ -165,6 +165,12 @@ interval:
       - lambda: |-
           processSignalRequests();
   
+  # Process calculated sensor updates (runs every second)
+  - interval: 1s
+    then:
+      - lambda: |-
+          processCalculatedSensors();
+  
   # Check for timed-out CAN requests every 10 seconds
   - interval: 10s
     then:

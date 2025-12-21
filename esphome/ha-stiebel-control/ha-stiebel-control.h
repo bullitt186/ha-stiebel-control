@@ -215,6 +215,12 @@ static int lastStunde = -1;
 static int lastMinute = -1;
 static int lastSekunde = -1;
 
+// Scheduled update times for calculated sensors (milliseconds)
+static unsigned long nextDeltaTUpdate = 0;
+static unsigned long nextCompressorUpdate = 0;
+static unsigned long nextDateTimeUpdate = 0;
+static unsigned long nextBetriebsartUpdate = 0;
+
 // UID cache to avoid repeated string operations on every signal update
 static std::unordered_map<std::string, std::string> uidCache;
 
@@ -301,6 +307,17 @@ CanMemberType lookupCanMemberType(uint32_t canId)
     return cm_other; // Return cm_other if member is not found
 }
 
+// Check if signal is in permanent blacklist
+// Only checks signal name (after underscore in "MEMBER_SIGNAL" format)
+inline bool isPermanentlyBlacklisted(const char* signalName) {
+    for (size_t i = 0; i < sizeof(PERMANENT_BLACKLIST) / sizeof(PERMANENT_BLACKLIST[0]); i++) {
+        if (strcmp(signalName, PERMANENT_BLACKLIST[i]) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 const ElsterIndex *processCanMessage(const std::vector<uint8_t> &msg, uint32_t can_id, std::string &signalValue)
 {
     // Return if the message is too small
@@ -342,7 +359,12 @@ const ElsterIndex *processCanMessage(const std::vector<uint8_t> &msg, uint32_t c
         break;
     }
 
-    ESP_LOGI("processCanMessage()", "%s (0x%02x):\t%s:\t%s\t(%s)", cm.Name, cm.CanId, ei->Name, charValue, ElsterTypeStr[ei->Type]);
+    // Only log non-blacklisted signals to reduce blocking during CAN bursts
+    // Blacklisted signals are already filtered in processAndUpdate() early check
+    if (!isPermanentlyBlacklisted(ei->Name))
+    {
+        ESP_LOGI("processCanMessage()", "%s (0x%02x):\t%s:\t%s\t(%s)", cm.Name, cm.CanId, ei->Name, charValue, ElsterTypeStr[ei->Type]);
+    }
 
     signalValue = charValue;
     return ei;
@@ -476,7 +498,7 @@ void publishDate()
     int itag = lastTag;
     
     // Log raw values for debugging
-    ESP_LOGD("CALC", "Date values: Jahr=%d, Monat=%d, Tag=%d", ijahr, imonat, itag);
+    // ESP_LOGD("CALC", "Date values: Jahr=%d, Monat=%d, Tag=%d", ijahr, imonat, itag);
     
     // Validate ranges
     if (ijahr < 0 || ijahr > 99 || imonat < 1 || imonat > 12 || itag < 1 || itag > 31) {
@@ -544,7 +566,7 @@ void publishTime()
     int isekunde = lastSekunde;
     
     // Log raw values for debugging
-    ESP_LOGD("CALC", "Time values: Stunde=%d, Minute=%d, Sekunde=%d", istunde, iminute, isekunde);
+    // ESP_LOGD("CALC", "Time values: Stunde=%d, Minute=%d, Sekunde=%d", istunde, iminute, isekunde);
     
     // Validate ranges
     if (istunde < 0 || istunde > 23 || iminute < 0 || iminute > 59 || isekunde < 0 || isekunde > 59) {
@@ -612,7 +634,7 @@ void publishBetriebsart(const std::string& sommerBetriebValue)
     // Publish state to MQTT
     const char* stateTopic = "heatingpump/calculated/betriebsart/state";
     id(mqtt_client).publish(stateTopic, betriebsart.c_str(), betriebsart.length(), 0, true);
-    ESP_LOGD("CALC", "Published Betriebsart: %s (SOMMERBETRIEB=%s)", betriebsart.c_str(), sommerBetriebValue.c_str());
+    // ESP_LOGD("CALC", "Published Betriebsart: %s (SOMMERBETRIEB=%s)", betriebsart.c_str(), sommerBetriebValue.c_str());
 }
 
 // Publish MQTT discovery for calculated Delta T continuous sensor
@@ -645,19 +667,17 @@ void publishDeltaTContinuous()
 {
     // Check if both temperature values are valid
     if (std::isnan(lastWpVorlaufIst) || std::isnan(lastRuecklaufIstTemp)) {
-        ESP_LOGD("CALC", "Cannot calculate Delta T: missing temperature values");
-        return;
+        return; // Silently skip if values not ready
     }
     
     // Validate temperature range (sanity check)
     if (lastWpVorlaufIst < -50 || lastRuecklaufIstTemp < -50) {
-        ESP_LOGD("CALC", "Cannot calculate Delta T: temperatures out of range");
-        return;
+        return; // Silently skip invalid ranges
     }
     
     float deltaT = lastWpVorlaufIst - lastRuecklaufIstTemp;
     
-    // Publish discovery first
+    // Publish discovery first (but only once - already cached)
     publishDeltaTContinuousDiscovery();
     
     // Publish state to MQTT
@@ -665,7 +685,6 @@ void publishDeltaTContinuous()
     snprintf(value, sizeof(value), "%.2f", deltaT);
     const char* stateTopic = "heatingpump/calculated/delta_t_continuous/state";
     id(mqtt_client).publish(stateTopic, value, strlen(value), 0, true);
-    ESP_LOGD("CALC", "Published Delta T continuous: %s K (VL=%.1f, RL=%.1f)", value, lastWpVorlaufIst, lastRuecklaufIstTemp);
 }
 
 // Publish MQTT discovery for calculated Delta T running sensor
@@ -700,25 +719,22 @@ void publishDeltaTRunning()
     bool compressorRunning = (!std::isnan(lastVerdichterValue) && lastVerdichterValue > 2.0);
     
     if (!compressorRunning) {
-        ESP_LOGD("CALC", "Cannot calculate Delta T running: compressor not active");
-        return;
+        return; // Silently skip if compressor not running
     }
     
     // Check if both temperature values are valid
     if (std::isnan(lastWpVorlaufIst) || std::isnan(lastRuecklaufIstTemp)) {
-        ESP_LOGD("CALC", "Cannot calculate Delta T running: missing temperature values");
-        return;
+        return; // Silently skip if values not ready
     }
     
     // Validate temperature range (sanity check)
     if (lastWpVorlaufIst < -50 || lastRuecklaufIstTemp < -50) {
-        ESP_LOGD("CALC", "Cannot calculate Delta T running: temperatures out of range");
-        return;
+        return; // Silently skip invalid ranges
     }
     
     float deltaT = lastWpVorlaufIst - lastRuecklaufIstTemp;
     
-    // Publish discovery first
+    // Publish discovery first (but only once - already cached)
     publishDeltaTRunningDiscovery();
     
     // Publish state to MQTT
@@ -726,7 +742,6 @@ void publishDeltaTRunning()
     snprintf(value, sizeof(value), "%.2f", deltaT);
     const char* stateTopic = "heatingpump/calculated/delta_t_running/state";
     id(mqtt_client).publish(stateTopic, value, strlen(value), 0, true);
-    ESP_LOGD("CALC", "Published Delta T running: %s K", value);
 }
 
 // Publish MQTT discovery for calculated Compressor Active binary sensor
@@ -759,26 +774,20 @@ void publishCompressorActive()
 {
     // Check if compressor value is valid
     if (std::isnan(lastVerdichterValue)) {
-        ESP_LOGD("CALC", "Cannot determine compressor state: invalid value");
-        return;
+        return; // Silently skip if value invalid
     }
     
     // Compressor is active if value > 2
     bool isActive = (lastVerdichterValue > 2.0);
     
-    // Publish discovery first
+    // Publish discovery first (but only once - already cached)
     publishCompressorActiveDiscovery();
     
     // Publish state to MQTT
     const char* state = isActive ? "on" : "off";
     const char* stateTopic = "heatingpump/calculated/compressor_active/state";
     id(mqtt_client).publish(stateTopic, state, strlen(state), 0, true);
-    ESP_LOGD("CALC", "Published Compressor Active: %s (value=%.1f)", state, lastVerdichterValue);
-    
-    // Also trigger Delta T running calculation when compressor state changes
-    if (isActive) {
-        publishDeltaTRunning();
-    }
+    // Note: Delta T running is published separately by scheduler
 }
 
 // Helper: Check if pattern appears anywhere in text (case-insensitive substring match)
@@ -1690,16 +1699,7 @@ constexpr uint32_t HASH_WAERMEERTRAG_2WE_HEIZ = hash("WAERMEERTRAG_2WE_HEIZ_SUM_
 constexpr uint32_t HASH_WAERMEERTRAG_WW = hash("WAERMEERTRAG_WW_SUM_MWH");
 constexpr uint32_t HASH_WAERMEERTRAG_HEIZ = hash("WAERMEERTRAG_HEIZ_SUM_MWH");
 
-// Check if signal is in permanent blacklist
-// Only checks signal name (after underscore in "MEMBER_SIGNAL" format)
-inline bool isPermanentlyBlacklisted(const char* signalName) {
-    for (size_t i = 0; i < sizeof(PERMANENT_BLACKLIST) / sizeof(PERMANENT_BLACKLIST[0]); i++) {
-        if (strcmp(signalName, PERMANENT_BLACKLIST[i]) == 0) {
-            return true;
-        }
-    }
-    return false;
-}
+
 
 void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &value)
 {
@@ -1825,7 +1825,7 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
             long intValue = strtol(value.c_str(), &endPtr, 10);
             if (endPtr != value.c_str() && *endPtr == '\0') {
                 lastJahr = static_cast<int>(intValue);
-                ESP_LOGD("CALC", "Updated JAHR: %d", lastJahr);
+                // ESP_LOGD("CALC", "Updated JAHR: %d", lastJahr);
             }
             break;
         }
@@ -1835,7 +1835,7 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
             long intValue = strtol(value.c_str(), &endPtr, 10);
             if (endPtr != value.c_str() && *endPtr == '\0') {
                 lastMonat = static_cast<int>(intValue);
-                ESP_LOGD("CALC", "Updated MONAT: %d", lastMonat);
+                // ESP_LOGD("CALC", "Updated MONAT: %d", lastMonat);
             }
             break;
         }
@@ -1845,7 +1845,7 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
             long intValue = strtol(value.c_str(), &endPtr, 10);
             if (endPtr != value.c_str() && *endPtr == '\0') {
                 lastTag = static_cast<int>(intValue);
-                ESP_LOGD("CALC", "Updated TAG: %d", lastTag);
+                // ESP_LOGD("CALC", "Updated TAG: %d", lastTag);
                 publishDate();
             }
             break;
@@ -1856,7 +1856,7 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
             long intValue = strtol(value.c_str(), &endPtr, 10);
             if (endPtr != value.c_str() && *endPtr == '\0') {
                 lastStunde = static_cast<int>(intValue);
-                ESP_LOGD("CALC", "Updated STUNDE: %d", lastStunde);
+                // ESP_LOGD("CALC", "Updated STUNDE: %d", lastStunde);
             }
             break;
         }
@@ -1866,7 +1866,7 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
             long intValue = strtol(value.c_str(), &endPtr, 10);
             if (endPtr != value.c_str() && *endPtr == '\0') {
                 lastMinute = static_cast<int>(intValue);
-                ESP_LOGD("CALC", "Updated MINUTE: %d", lastMinute);
+                // ESP_LOGD("CALC", "Updated MINUTE: %d", lastMinute);
                 publishTime();
             }
             break;
@@ -1877,7 +1877,7 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
             long intValue = strtol(value.c_str(), &endPtr, 10);
             if (endPtr != value.c_str() && *endPtr == '\0') {
                 lastSekunde = static_cast<int>(intValue);
-                ESP_LOGD("CALC", "Updated SEKUNDE: %d", lastSekunde);
+                // ESP_LOGD("CALC", "Updated SEKUNDE: %d", lastSekunde);
             }
             break;
         }
@@ -1891,8 +1891,7 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
             float floatValue = strtof(value.c_str(), &endPtr);
             if (endPtr != value.c_str() && *endPtr == '\0') {
                 lastWpVorlaufIst = floatValue;
-                publishDeltaTContinuous();
-                publishDeltaTRunning();
+                // Delta T will be calculated and published by scheduler
             } else {
                 ESP_LOGW("CALC", "Failed to parse WPVORLAUFIST value: %s", value.c_str());
             }
@@ -1904,8 +1903,7 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
             float floatValue = strtof(value.c_str(), &endPtr);
             if (endPtr != value.c_str() && *endPtr == '\0') {
                 lastRuecklaufIstTemp = floatValue;
-                publishDeltaTContinuous();
-                publishDeltaTRunning();
+                // Delta T will be calculated and published by scheduler
             } else {
                 ESP_LOGW("CALC", "Failed to parse RUECKLAUFISTTEMP value: %s", value.c_str());
             }
@@ -1917,7 +1915,7 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
             float floatValue = strtof(value.c_str(), &endPtr);
             if (endPtr != value.c_str() && *endPtr == '\0') {
                 lastVerdichterValue = floatValue;
-                publishCompressorActive();
+                // Compressor state will be calculated and published by scheduler
             } else {
                 ESP_LOGW("CALC", "Failed to parse VERDICHTER value: %s", value.c_str());
             }
@@ -1946,6 +1944,67 @@ unsigned long getRandomInRange(unsigned long min, unsigned long max) {
     if (min >= max) return min;
     unsigned long range = max - min;
     return min + (esp_random() % range);
+}
+
+// Process calculated sensor updates with frequency-based scheduling
+// This function should be called regularly from the main loop
+void processCalculatedSensors() {
+    unsigned long now = millis();
+    
+    // Initialize scheduled update times on first run (with random offsets to spread load)
+    static bool initialized = false;
+    if (!initialized && requestManagerStarted) {
+        // Initialize all calculated sensor schedules with random offsets
+        ESP_LOGI("CALC_SCHED", "Initializing calculated sensor schedules with random offsets");
+        
+        // Delta T sensors (30s frequency)
+        unsigned long deltaT_interval = CALC_DELTA_T_FREQUENCY * 1000UL;
+        nextDeltaTUpdate = now + getRandomInRange(0, deltaT_interval + 1);
+        
+        // Compressor sensor (30s frequency)
+        unsigned long compressor_interval = CALC_COMPRESSOR_FREQUENCY * 1000UL;
+        nextCompressorUpdate = now + getRandomInRange(0, compressor_interval + 1);
+        
+        // Date/Time sensors (1min frequency)
+        unsigned long datetime_interval = CALC_DATETIME_FREQUENCY * 1000UL;
+        nextDateTimeUpdate = now + getRandomInRange(0, datetime_interval + 1);
+        
+        // Betriebsart sensor (1min frequency)
+        unsigned long betriebsart_interval = CALC_BETRIEBSART_FREQUENCY * 1000UL;
+        nextBetriebsartUpdate = now + getRandomInRange(0, betriebsart_interval + 1);
+        
+        initialized = true;
+        ESP_LOGI("CALC_SCHED", "Calculated sensor scheduler initialized");
+    }
+    
+    if (!initialized) return; // Wait for request manager to start
+    
+    // Check and publish Delta T sensors
+    if (now >= nextDeltaTUpdate) {
+        publishDeltaTContinuous();
+        publishDeltaTRunning();
+        nextDeltaTUpdate = now + (CALC_DELTA_T_FREQUENCY * 1000UL) + getRandomInRange(0, 1000);
+    }
+    
+    // Check and publish Compressor sensor
+    if (now >= nextCompressorUpdate) {
+        publishCompressorActive();
+        nextCompressorUpdate = now + (CALC_COMPRESSOR_FREQUENCY * 1000UL) + getRandomInRange(0, 1000);
+    }
+    
+    // Check and publish Date/Time sensors
+    if (now >= nextDateTimeUpdate) {
+        publishDate();
+        publishTime();
+        nextDateTimeUpdate = now + (CALC_DATETIME_FREQUENCY * 1000UL) + getRandomInRange(0, 1000);
+    }
+    
+    // Check and publish Betriebsart sensor (only if SOMMERBETRIEB value is available)
+    if (now >= nextBetriebsartUpdate) {
+        // Betriebsart requires a value parameter, so we skip auto-publishing
+        // It will be published when SOMMERBETRIEB signal is received
+        nextBetriebsartUpdate = now + (CALC_BETRIEBSART_FREQUENCY * 1000UL) + getRandomInRange(0, 1000);
+    }
 }
 
 // Check for timed-out requests (no response received)
@@ -2132,11 +2191,11 @@ void processSignalRequests() {
                             unsigned long randomDelay = getRandomInRange(0, maxJitter + 1);
                             nextRequestTime[key] = now + intervalMs + randomDelay;
                             
-                            ESP_LOGD("REQUEST_MGR", "Sent %s, next in %lums", key.c_str(), intervalMs + randomDelay);
+                            // ESP_LOGD("REQUEST_MGR", "Sent %s, next in %lums", key.c_str(), intervalMs + randomDelay);
                         }
                         // Else: skip this member for now, will be checked next iteration
                     } else {
-                        ESP_LOGD("REQUEST_MGR", "Skipping blacklisted signal: %s", key.c_str());
+                        // ESP_LOGD("REQUEST_MGR", "Skipping blacklisted signal: %s", key.c_str());
                         // Reschedule for retry later (for recovery)
                         unsigned long maxJitter = (intervalMs / 20);
                         if (maxJitter < 500) maxJitter = 500;
@@ -2166,9 +2225,9 @@ void processSignalRequests() {
                     unsigned long randomDelay = getRandomInRange(0, maxJitter + 1);
                     nextRequestTime[key] = now + intervalMs + randomDelay;
                     
-                    ESP_LOGD("REQUEST_MGR", "Sent %s, next in %lums", key.c_str(), intervalMs + randomDelay);
+                    // ESP_LOGD("REQUEST_MGR", "Sent %s, next in %lums", key.c_str(), intervalMs + randomDelay);
                 } else {
-                    ESP_LOGD("REQUEST_MGR", "Skipping blacklisted signal: %s", key.c_str());
+                    // ESP_LOGD("REQUEST_MGR", "Skipping blacklisted signal: %s", key.c_str());
                     // Reschedule for retry later (for recovery)
                     unsigned long maxJitter = (intervalMs / 20);
                     if (maxJitter < 500) maxJitter = 500;
@@ -2201,6 +2260,26 @@ void identifyCanMembers()
 
 void processAndUpdate(uint32_t can_id, std::vector<uint8_t> msg)
 {
+    // Early blacklist check - extract signal name and check before expensive processing
+    if (msg.size() >= 7)
+    {
+        const ElsterIndex *ei_check;
+        if (msg[2] == 0xfa)
+        {
+            ei_check = GetElsterIndex(msg[4] + (msg[3] << 8));
+        }
+        else
+        {
+            ei_check = GetElsterIndex(msg[2]);
+        }
+        
+        // Skip permanently blacklisted signals immediately
+        if (isPermanentlyBlacklisted(ei_check->Name))
+        {
+            return; // Reject before lookup, parsing, formatting, logging
+        }
+    }
+    
     std::string value;
     const ElsterIndex *ei = processCanMessage(msg, can_id, value);
     updateSensor(can_id, ei, value);

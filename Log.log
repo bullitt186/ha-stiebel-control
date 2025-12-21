@@ -1,0 +1,1022 @@
+[13:12:18.345][I][processCanMessage():351]: HEIZMODUL (0x500):  WPVORLAUFIST:   27.2    (et_dec_val)
+[13:12:18.360][I][processCanMessage():351]: MANAGER (0x480):    MINUTE: 14      (et_little_endian)
+[13:12:18.360][D][CALC:1862]: Updated MINUTE: 14
+[13:12:18.360][D][CALC:553]: Time values: Stunde=13, Minute=14, Sekunde=6
+[13:12:18.364][I][CALC:574]: Published time: 13:14:06 (Stunde=13, Minute=14, Sekunde=6)
+[13:12:18.378][I][processCanMessage():351]: HEIZMODUL (0x500):  RUECKLAUFISTTEMP:       17.5    (et_dec_val)
+[13:12:18.425][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:12:19.791][I][readSignal():388]: READ "RAUMSOLLTEMP_I" (0x0005) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 05, 00, 00, 00, 00
+[13:12:19.794][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_I, next in 31174ms
+[13:12:19.827][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_I: 20.0    (et_dec_val)
+[13:12:20.795][I][readSignal():388]: READ "RAUMSOLLTEMP_III" (0x0007) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 07, 00, 00, 00, 00
+[13:12:20.796][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_III, next in 30731ms
+[13:12:20.830][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_III:       20.0    (et_dec_val)
+[13:12:21.793][I][readSignal():388]: READ "AUSSENTEMP" (0x000c) FROM HEIZMODUL (0x500 {0xa1, 0x00}): a1, 00, 0c, 00, 00, 00, 00
+[13:12:21.798][D][REQUEST_MGR:2221]: Sent HEIZMODUL_AUSSENTEMP, next in 31096ms
+[13:12:21.826][I][processCanMessage():351]: HEIZMODUL (0x500):  AUSSENTEMP:     4.5     (et_dec_val)
+[13:12:22.038][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.7     (et_dec_val)
+[13:12:22.045][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.3    (et_dec_val)
+[13:12:22.796][I][readSignal():388]: READ "VORLAUFISTTEMP" (0x000f) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0f, 00, 00, 00, 00
+[13:12:22.798][D][REQUEST_MGR:2221]: Sent KESSEL_VORLAUFISTTEMP, next in 30520ms
+[13:12:22.828][I][processCanMessage():351]: KESSEL (0x180):     VORLAUFISTTEMP: 26.8    (et_dec_val)
+[13:12:23.797][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP" (0x0013) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 13, 00, 00, 00, 00
+[13:12:23.801][D][REQUEST_MGR:2221]: Sent KESSEL_EINSTELL_SPEICHERSOLLTEMP, next in 30873ms
+[13:12:23.829][I][processCanMessage():351]: KESSEL (0x180):     EINSTELL_SPEICHERSOLLTEMP:      48.0    (et_dec_val)
+[13:12:24.801][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP" (0x0013) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 13, 00, 00, 00, 00
+[13:12:24.805][D][REQUEST_MGR:2221]: Sent MANAGER_EINSTELL_SPEICHERSOLLTEMP, next in 30029ms
+[13:12:24.837][I][processCanMessage():351]: MANAGER (0x480):    EINSTELL_SPEICHERSOLLTEMP:      48.0    (et_dec_val)
+[13:12:25.811][I][readSignal():388]: READ "WPVORLAUFIST" (0x01d6) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, fa, 01, d6, 00, 00
+[13:12:25.813][D][REQUEST_MGR:2221]: Sent KESSEL_WPVORLAUFIST, next in 31360ms
+[13:12:25.843][I][processCanMessage():351]: KESSEL (0x180):     WPVORLAUFIST:   29.8    (et_dec_val)
+[13:12:26.016][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_NUMMER:        0       (et_default)
+[13:12:26.042][I][processCanMessage():351]: HEIZMODUL (0x500):  SOFTWARE_NUMMER:        67      (et_default)
+[13:12:26.821][I][readSignal():388]: READ "VERDICHTER" (0x07a8) FROM HEIZMODUL (0x500 {0xa1, 0x00}): a1, 00, fa, 07, a8, 00, 00
+[13:12:26.828][D][REQUEST_MGR:2221]: Sent HEIZMODUL_VERDICHTER, next in 30251ms
+[13:12:26.875][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:12:27.031][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERBEDARF: 1024    (et_default)
+[13:12:27.057][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.7     (et_dec_val)
+[13:12:27.066][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.3    (et_dec_val)
+[13:12:27.925][I][readSignal():388]: READ "SEKUNDE" (0x0127) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 27, 00, 00
+[13:12:27.933][D][REQUEST_MGR:2221]: Sent MANAGER_SEKUNDE, next in 61589ms
+[13:12:27.960][I][processCanMessage():351]: MANAGER (0x480):    SEKUNDE:        9       (et_little_endian)
+[13:12:27.969][D][CALC:1873]: Updated SEKUNDE: 9
+[13:12:28.035][I][processCanMessage():351]: MANAGER (0x480):    WPVORLAUFIST:   0.0     (et_dec_val)
+[13:12:28.063][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       0.0     (et_dec_val)
+[13:12:28.074][D][mcp2515:341]: receive buffer overrun
+[13:12:28.080][I][processCanMessage():351]: MANAGER (0x480):    VERDICHTER:     0.0     (et_dec_val)
+[13:12:28.087][I][processCanMessage():351]: HEIZMODUL (0x500):  RUECKLAUFISTTEMP:       17.5    (et_dec_val)
+[13:12:28.100][I][processCanMessage():351]: HEIZMODUL (0x500):  WPVORLAUFIST:   27.2    (et_dec_val)
+[13:12:28.137][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:12:28.830][I][readSignal():388]: READ "ABTAUUNGAKTIV" (0x0061) FROM HEIZMODUL (0x500 {0xa1, 0x00}): a1, 00, 61, 00, 00, 00, 00
+[13:12:28.834][D][REQUEST_MGR:2221]: Sent HEIZMODUL_ABTAUUNGAKTIV, next in 61908ms
+[13:12:28.868][I][processCanMessage():351]: HEIZMODUL (0x500):  ABTAUUNGAKTIV:  off     (et_little_bool)
+[13:12:30.843][I][readSignal():388]: READ "KESSELSOLLTEMP" (0x0002) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 02, 00, 00, 00, 00
+[13:12:30.846][D][REQUEST_MGR:2221]: Sent KESSEL_KESSELSOLLTEMP, next in 31349ms
+[13:12:30.878][I][processCanMessage():351]: KESSEL (0x180):     KESSELSOLLTEMP: 26.3    (et_dec_val)
+[13:12:32.038][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.9     (et_dec_val)
+[13:12:32.052][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.3    (et_dec_val)
+[13:12:32.826][I][readSignal():388]: READ "RAUMSOLLTEMP_NACHT" (0x0008) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 08, 00, 00, 00, 00
+[13:12:32.832][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_NACHT, next in 30789ms
+[13:12:32.855][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_NACHT:     20.0    (et_dec_val)
+[13:12:34.830][I][readSignal():388]: READ "AUSSENTEMP" (0x000c) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0c, 00, 00, 00, 00
+[13:12:34.830][D][REQUEST_MGR:2221]: Sent KESSEL_AUSSENTEMP, next in 31133ms
+[13:12:34.859][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.9     (et_dec_val)
+[13:12:35.830][I][readSignal():388]: READ "SPEICHERISTTEMP" (0x000e) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0e, 00, 00, 00, 00
+[13:12:35.838][D][REQUEST_MGR:2221]: Sent KESSEL_SPEICHERISTTEMP, next in 31339ms
+[13:12:35.866][I][processCanMessage():351]: KESSEL (0x180):     SPEICHERISTTEMP:        46.4    (et_dec_val)
+[13:12:36.034][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_NUMMER:        0       (et_default)
+[13:12:36.045][I][processCanMessage():351]: HEIZMODUL (0x500):  SOFTWARE_NUMMER:        67      (et_default)
+[13:12:36.856][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP2" (0x0a06) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 0a, 06, 00, 00
+[13:12:36.863][D][REQUEST_MGR:2221]: Sent MANAGER_EINSTELL_SPEICHERSOLLTEMP2, next in 30821ms
+[13:12:36.890][I][processCanMessage():351]: MANAGER (0x480):    EINSTELL_SPEICHERSOLLTEMP2:     48.0    (et_dec_val)
+[13:12:37.041][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERBEDARF: 1024    (et_default)
+[13:12:37.047][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.9     (et_dec_val)
+[13:12:37.061][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.2    (et_dec_val)
+[13:12:37.930][I][readSignal():388]: READ "JAHR" (0x0124) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 24, 00, 00
+[13:12:37.936][D][REQUEST_MGR:2221]: Sent MANAGER_JAHR, next in 61138ms
+[13:12:37.961][I][processCanMessage():351]: MANAGER (0x480):    JAHR:   25      (et_little_endian)
+[13:12:37.968][D][CALC:1821]: Updated JAHR: 25
+[13:12:38.061][I][processCanMessage():351]: MANAGER (0x480):    WPVORLAUFIST:   0.0     (et_dec_val)
+[13:12:38.065][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       0.0     (et_dec_val)
+[13:12:38.065][I][processCanMessage():351]: HEIZMODUL (0x500):  WPVORLAUFIST:   27.2    (et_dec_val)
+[13:12:38.073][I][processCanMessage():351]: MANAGER (0x480):    VERDICHTER:     0.0     (et_dec_val)
+[13:12:38.099][I][processCanMessage():351]: HEIZMODUL (0x500):  RUECKLAUFISTTEMP:       17.5    (et_dec_val)
+[13:12:38.142][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:12:38.881][I][readSignal():388]: READ "SPEICHERSOLLTEMP" (0x0003) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 03, 00, 00, 00, 00
+[13:12:38.886][D][REQUEST_MGR:2221]: Sent MANAGER_SPEICHERSOLLTEMP, next in 30914ms
+[13:12:38.910][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERSOLLTEMP:       48.0    (et_dec_val)
+[13:12:39.844][I][readSignal():388]: READ "RUECKLAUFISTTEMP" (0x0016) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 16, 00, 00, 00, 00
+[13:12:39.850][D][REQUEST_MGR:2221]: Sent MANAGER_RUECKLAUFISTTEMP, next in 30785ms
+[13:12:39.883][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       27.0    (et_dec_val)
+[13:12:40.980][I][readSignal():388]: READ "EVU_SPERRE_AKTIV" (0x0074) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 74, 00, 00, 00, 00
+[13:12:40.983][D][REQUEST_MGR:2221]: Sent MANAGER_EVU_SPERRE_AKTIV, next in 61951ms
+[13:12:41.014][I][processCanMessage():351]: MANAGER (0x480):    EVU_SPERRE_AKTIV:       ?       (et_little_bool)
+[13:12:41.877][I][readSignal():388]: READ "RAUMSOLLTEMP_II" (0x0006) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 06, 00, 00, 00, 00
+[13:12:41.877][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_II, next in 31054ms
+[13:12:41.904][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_II:        20.0    (et_dec_val)
+[13:12:42.036][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.7     (et_dec_val)
+[13:12:42.055][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.3    (et_dec_val)
+[13:12:42.857][I][readSignal():388]: READ "SAMMLERISTTEMP" (0x000d) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0d, 00, 00, 00, 00
+[13:12:42.862][D][REQUEST_MGR:2221]: Sent KESSEL_SAMMLERISTTEMP, next in 30148ms
+[13:12:42.888][I][processCanMessage():351]: KESSEL (0x180):     SAMMLERISTTEMP: -40.0   (et_dec_val)
+[13:12:43.859][I][readSignal():388]: READ "RUECKLAUFISTTEMP" (0x0016) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 16, 00, 00, 00, 00
+[13:12:43.865][D][REQUEST_MGR:2221]: Sent KESSEL_RUECKLAUFISTTEMP, next in 30093ms
+[13:12:43.891][I][processCanMessage():351]: KESSEL (0x180):     RUECKLAUFISTTEMP:       27.0    (et_dec_val)
+[13:12:44.875][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP2" (0x0a06) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, fa, 0a, 06, 00, 00
+[13:12:44.892][D][REQUEST_MGR:2221]: Sent KESSEL_EINSTELL_SPEICHERSOLLTEMP2, next in 30076ms
+[13:12:44.909][I][processCanMessage():351]: KESSEL (0x180):     EINSTELL_SPEICHERSOLLTEMP2:     48.0    (et_dec_val)
+[13:12:45.962][I][readSignal():388]: READ "STUNDE" (0x0125) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 25, 00, 00
+[13:12:45.972][D][REQUEST_MGR:2221]: Sent MANAGER_STUNDE, next in 61995ms
+[13:12:45.997][I][processCanMessage():351]: MANAGER (0x480):    STUNDE: 13      (et_little_endian)
+[13:12:46.000][D][CALC:1852]: Updated STUNDE: 13
+[13:12:46.031][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_NUMMER:        0       (et_default)
+[13:12:46.035][I][processCanMessage():351]: HEIZMODUL (0x500):  SOFTWARE_NUMMER:        67      (et_default)
+[13:12:46.896][I][readSignal():388]: READ "SPEICHERSOLLTEMP" (0x0003) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 03, 00, 00, 00, 00
+[13:12:46.902][D][REQUEST_MGR:2221]: Sent KESSEL_SPEICHERSOLLTEMP, next in 30308ms
+[13:12:46.932][I][processCanMessage():351]: KESSEL (0x180):     SPEICHERSOLLTEMP:       48.0    (et_dec_val)
+[13:12:47.043][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERBEDARF: 1024    (et_default)
+[13:12:47.053][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.9     (et_dec_val)
+[13:12:47.072][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.3    (et_dec_val)
+[13:12:47.327][D][CALC:485]: Date values: Jahr=25, Monat=12, Tag=21
+[13:12:47.331][I][CALC:506]: Published date: 2025-12-21 (Jahr=25, Monat=12, Tag=21)
+[13:12:47.332][D][CALC:553]: Time values: Stunde=13, Minute=14, Sekunde=9
+[13:12:47.335][I][CALC:574]: Published time: 13:14:09 (Stunde=13, Minute=14, Sekunde=9)
+[13:12:47.921][I][readSignal():388]: READ "EL_AUFNAHMELEISTUNG_WW_SUM_MWH" (0x091d) FROM HEIZMODUL (0x500 {0xa1, 0x00}): a1, 00, fa, 09, 1d, 00, 00
+[13:12:47.925][D][REQUEST_MGR:2221]: Sent HEIZMODUL_EL_AUFNAHMELEISTUNG_WW_SUM_MWH, next in 610205ms
+[13:12:47.957][I][processCanMessage():351]: HEIZMODUL (0x500):  EL_AUFNAHMELEISTUNG_WW_SUM_MWH: 13.000  (et_double_val)
+[13:12:47.972][D][PATTERN:1001]: Signal 'EL_AUFNAHMELEISTUNG_WW_SUM_MWH' (expanded: 'EL AUFNAHMELEISTUNG WW SUM MWH') matched pattern 'MWH'
+[13:12:47.979][D][COP:1518]: Stored EL_AUFNAHMELEISTUNG_WW_SUM_MWH = 13.000
+[13:12:48.043][I][processCanMessage():351]: MANAGER (0x480):    WPVORLAUFIST:   0.0     (et_dec_val)
+[13:12:48.058][I][processCanMessage():351]: HEIZMODUL (0x500):  WPVORLAUFIST:   27.2    (et_dec_val)
+[13:12:48.068][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       0.0     (et_dec_val)
+[13:12:48.079][I][processCanMessage():351]: MANAGER (0x480):    VERDICHTER:     0.0     (et_dec_val)
+[13:12:48.097][I][processCanMessage():351]: HEIZMODUL (0x500):  RUECKLAUFISTTEMP:       17.5    (et_dec_val)
+[13:12:48.148][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:12:48.960][I][readSignal():388]: READ "KESSELSOLLTEMP" (0x0002) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 02, 00, 00, 00, 00
+[13:12:48.964][D][REQUEST_MGR:2221]: Sent MANAGER_KESSELSOLLTEMP, next in 30938ms
+[13:12:48.993][I][processCanMessage():351]: MANAGER (0x480):    KESSELSOLLTEMP: 26.1    (et_dec_val)
+[13:12:51.880][I][readSignal():388]: READ "RAUMSOLLTEMP_I" (0x0005) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 05, 00, 00, 00, 00
+[13:12:51.885][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_I, next in 30781ms
+[13:12:51.915][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_I: 20.0    (et_dec_val)
+[13:12:52.043][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.9     (et_dec_val)
+[13:12:52.053][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.2    (et_dec_val)
+[13:12:52.884][I][readSignal():388]: READ "RAUMSOLLTEMP_III" (0x0007) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 07, 00, 00, 00, 00
+[13:12:52.885][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_III, next in 30945ms
+[13:12:52.912][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_III:       20.0    (et_dec_val)
+[13:12:53.881][I][readSignal():388]: READ "AUSSENTEMP" (0x000c) FROM HEIZMODUL (0x500 {0xa1, 0x00}): a1, 00, 0c, 00, 00, 00, 00
+[13:12:53.886][D][REQUEST_MGR:2221]: Sent HEIZMODUL_AUSSENTEMP, next in 31248ms
+[13:12:53.914][I][processCanMessage():351]: HEIZMODUL (0x500):  AUSSENTEMP:     4.5     (et_dec_val)
+[13:12:54.883][I][readSignal():388]: READ "VORLAUFISTTEMP" (0x000f) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0f, 00, 00, 00, 00
+[13:12:54.887][D][REQUEST_MGR:2221]: Sent KESSEL_VORLAUFISTTEMP, next in 30033ms
+[13:12:54.915][I][processCanMessage():351]: KESSEL (0x180):     VORLAUFISTTEMP: 26.8    (et_dec_val)
+[13:12:55.884][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP" (0x0013) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 13, 00, 00, 00, 00
+[13:12:55.887][D][REQUEST_MGR:2221]: Sent KESSEL_EINSTELL_SPEICHERSOLLTEMP, next in 30983ms
+[13:12:55.921][I][processCanMessage():351]: KESSEL (0x180):     EINSTELL_SPEICHERSOLLTEMP:      48.0    (et_dec_val)
+[13:12:56.030][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_NUMMER:        0       (et_default)
+[13:12:56.032][I][processCanMessage():351]: HEIZMODUL (0x500):  SOFTWARE_NUMMER:        67      (et_default)
+[13:12:56.885][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP" (0x0013) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 13, 00, 00, 00, 00
+[13:12:56.896][D][REQUEST_MGR:2221]: Sent MANAGER_EINSTELL_SPEICHERSOLLTEMP, next in 31011ms
+[13:12:56.917][I][processCanMessage():351]: MANAGER (0x480):    EINSTELL_SPEICHERSOLLTEMP:      48.0    (et_dec_val)
+[13:12:57.047][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERBEDARF: 1024    (et_default)
+[13:12:57.051][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.8     (et_dec_val)
+[13:12:57.085][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.3    (et_dec_val)
+[13:12:57.892][I][readSignal():388]: READ "WPVORLAUFIST" (0x01d6) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, fa, 01, d6, 00, 00
+[13:12:57.897][D][REQUEST_MGR:2221]: Sent KESSEL_WPVORLAUFIST, next in 30217ms
+[13:12:57.926][I][processCanMessage():351]: KESSEL (0x180):     WPVORLAUFIST:   29.8    (et_dec_val)
+[13:12:58.041][I][processCanMessage():351]: MANAGER (0x480):    WPVORLAUFIST:   0.0     (et_dec_val)
+[13:12:58.077][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       0.0     (et_dec_val)
+[13:12:58.077][I][processCanMessage():351]: MANAGER (0x480):    VERDICHTER:     0.0     (et_dec_val)
+[13:12:58.081][I][processCanMessage():351]: HEIZMODUL (0x500):  WPVORLAUFIST:   27.2    (et_dec_val)
+[13:12:58.101][I][processCanMessage():351]: HEIZMODUL (0x500):  RUECKLAUFISTTEMP:       17.5    (et_dec_val)
+[13:12:58.142][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:12:58.898][I][readSignal():388]: READ "VERDICHTER" (0x07a8) FROM HEIZMODUL (0x500 {0xa1, 0x00}): a1, 00, fa, 07, a8, 00, 00
+[13:12:58.902][D][REQUEST_MGR:2221]: Sent HEIZMODUL_VERDICHTER, next in 31061ms
+[13:12:58.934][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:13:00.005][I][readSignal():388]: READ "MONAT" (0x0123) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 23, 00, 00
+[13:13:00.009][D][REQUEST_MGR:2221]: Sent MANAGER_MONAT, next in 61392ms
+[13:13:00.037][I][processCanMessage():351]: MANAGER (0x480):    MONAT:  12      (et_little_endian)
+[13:13:00.048][D][CALC:1831]: Updated MONAT: 12
+[13:13:00.897][I][readSignal():388]: READ "TAG" (0x0122) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 22, 00, 00
+[13:13:00.900][D][REQUEST_MGR:2221]: Sent MANAGER_TAG, next in 60673ms
+[13:13:00.928][I][processCanMessage():351]: MANAGER (0x480):    TAG:    21      (et_little_endian)
+[13:13:00.938][D][CALC:1841]: Updated TAG: 21
+[13:13:00.938][D][CALC:485]: Date values: Jahr=25, Monat=12, Tag=21
+[13:13:00.938][I][CALC:506]: Published date: 2025-12-21 (Jahr=25, Monat=12, Tag=21)
+[13:13:01.898][I][readSignal():388]: READ "MINUTE" (0x0126) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 26, 00, 00
+[13:13:01.902][D][REQUEST_MGR:2221]: Sent MANAGER_MINUTE, next in 60813ms
+[13:13:01.935][I][processCanMessage():351]: MANAGER (0x480):    MINUTE: 14      (et_little_endian)
+[13:13:01.935][D][CALC:1862]: Updated MINUTE: 14
+[13:13:01.935][D][CALC:553]: Time values: Stunde=13, Minute=14, Sekunde=9
+[13:13:01.937][I][CALC:574]: Published time: 13:14:09 (Stunde=13, Minute=14, Sekunde=9)
+[13:13:02.048][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.9     (et_dec_val)
+[13:13:02.056][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.2    (et_dec_val)
+[13:13:02.379][I][readSignal():388]: READ "PROGRAMMSCHALTER" (0x0112) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 12, 00, 00
+[13:13:02.407][I][processCanMessage():351]: MANAGER (0x480):    PROGRAMMSCHALTER:       Tagbetrieb      (et_betriebsart)
+[13:13:02.934][I][readSignal():388]: READ "KESSELSOLLTEMP" (0x0002) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 02, 00, 00, 00, 00
+[13:13:02.937][D][REQUEST_MGR:2221]: Sent KESSEL_KESSELSOLLTEMP, next in 31314ms
+[13:13:02.969][I][processCanMessage():351]: KESSEL (0x180):     KESSELSOLLTEMP: 26.3    (et_dec_val)
+[13:13:03.315][I][readSignal():388]: READ "WW_ECO" (0x027e) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 02, 7e, 00, 00
+[13:13:03.342][I][processCanMessage():351]: MANAGER (0x480):    WW_ECO: on      (et_bool)
+[13:13:03.908][I][readSignal():388]: READ "RAUMSOLLTEMP_NACHT" (0x0008) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 08, 00, 00, 00, 00
+[13:13:03.908][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_NACHT, next in 30899ms
+[13:13:03.931][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_NACHT:     20.0    (et_dec_val)
+[13:13:04.819][I][readSignal():388]: READ "SOMMERBETRIEB" (0xfdb4) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, fd, b4, 00, 00
+[13:13:04.854][I][processCanMessage():351]: MANAGER (0x480):    SOMMERBETRIEB:  on      (et_little_bool)
+[13:13:04.863][D][CALC:621]: Published Betriebsart: Sommerbetrieb (SOMMERBETRIEB=on)
+[13:13:06.062][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_NUMMER:        0       (et_default)
+[13:13:06.068][I][processCanMessage():351]: HEIZMODUL (0x500):  SOFTWARE_NUMMER:        67      (et_default)
+[13:13:06.909][I][readSignal():388]: READ "AUSSENTEMP" (0x000c) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0c, 00, 00, 00, 00
+[13:13:06.913][D][REQUEST_MGR:2221]: Sent KESSEL_AUSSENTEMP, next in 30087ms
+[13:13:06.948][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.8     (et_dec_val)
+[13:13:07.039][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERBEDARF: 1024    (et_default)
+[13:13:07.052][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.8     (et_dec_val)
+[13:13:07.068][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.3    (et_dec_val)
+[13:13:07.913][I][readSignal():388]: READ "SPEICHERISTTEMP" (0x000e) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0e, 00, 00, 00, 00
+[13:13:07.920][D][REQUEST_MGR:2221]: Sent KESSEL_SPEICHERISTTEMP, next in 30641ms
+[13:13:07.945][I][processCanMessage():351]: KESSEL (0x180):     SPEICHERISTTEMP:        46.3    (et_dec_val)
+[13:13:08.037][I][processCanMessage():351]: MANAGER (0x480):    WPVORLAUFIST:   0.0     (et_dec_val)
+[13:13:08.050][I][processCanMessage():351]: HEIZMODUL (0x500):  WPVORLAUFIST:   27.1    (et_dec_val)
+[13:13:08.060][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       0.0     (et_dec_val)
+[13:13:08.073][I][processCanMessage():351]: MANAGER (0x480):    VERDICHTER:     0.0     (et_dec_val)
+[13:13:08.105][I][processCanMessage():351]: HEIZMODUL (0x500):  RUECKLAUFISTTEMP:       17.5    (et_dec_val)
+[13:13:08.160][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:13:08.945][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP2" (0x0a06) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 0a, 06, 00, 00
+[13:13:08.945][D][REQUEST_MGR:2221]: Sent MANAGER_EINSTELL_SPEICHERSOLLTEMP2, next in 30148ms
+[13:13:08.974][I][processCanMessage():351]: MANAGER (0x480):    EINSTELL_SPEICHERSOLLTEMP2:     48.0    (et_dec_val)
+[13:13:10.022][I][readSignal():388]: READ "WP_STATUS" (0xfdae) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, fd, ae, 00, 00
+[13:13:10.024][D][REQUEST_MGR:2221]: Sent MANAGER_WP_STATUS, next in 61274ms
+[13:13:10.057][I][processCanMessage():351]: MANAGER (0x480):    WP_STATUS:      -255    (et_little_endian)
+[13:13:10.943][I][readSignal():388]: READ "SOMMERBETRIEB" (0xfdb4) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, fd, b4, 00, 00
+[13:13:10.945][D][REQUEST_MGR:2221]: Sent MANAGER_SOMMERBETRIEB, next in 60229ms
+[13:13:10.979][I][processCanMessage():351]: MANAGER (0x480):    SOMMERBETRIEB:  on      (et_little_bool)
+[13:13:10.991][D][CALC:621]: Published Betriebsart: Sommerbetrieb (SOMMERBETRIEB=on)
+[13:13:11.920][I][readSignal():388]: READ "SPEICHERSOLLTEMP" (0x0003) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 03, 00, 00, 00, 00
+[13:13:11.924][D][REQUEST_MGR:2221]: Sent MANAGER_SPEICHERSOLLTEMP, next in 31051ms
+[13:13:11.953][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERSOLLTEMP:       48.0    (et_dec_val)
+[13:13:12.044][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.9     (et_dec_val)
+[13:13:12.060][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.2    (et_dec_val)
+[13:13:12.925][I][readSignal():388]: READ "RAUMSOLLTEMP_II" (0x0006) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 06, 00, 00, 00, 00
+[13:13:12.939][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_II, next in 30047ms
+[13:13:12.954][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_II:        20.0    (et_dec_val)
+[13:13:13.932][I][readSignal():388]: READ "SAMMLERISTTEMP" (0x000d) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0d, 00, 00, 00, 00
+[13:13:13.932][D][REQUEST_MGR:2221]: Sent KESSEL_SAMMLERISTTEMP, next in 30503ms
+[13:13:13.955][I][processCanMessage():351]: KESSEL (0x180):     SAMMLERISTTEMP: -40.0   (et_dec_val)
+[13:13:14.927][I][readSignal():388]: READ "RUECKLAUFISTTEMP" (0x0016) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 16, 00, 00, 00, 00
+[13:13:14.931][D][REQUEST_MGR:2221]: Sent MANAGER_RUECKLAUFISTTEMP, next in 31385ms
+[13:13:14.962][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       27.0    (et_dec_val)
+[13:13:15.932][I][readSignal():388]: READ "RUECKLAUFISTTEMP" (0x0016) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 16, 00, 00, 00, 00
+[13:13:15.935][D][REQUEST_MGR:2221]: Sent KESSEL_RUECKLAUFISTTEMP, next in 30038ms
+[13:13:15.964][I][processCanMessage():351]: KESSEL (0x180):     RUECKLAUFISTTEMP:       27.0    (et_dec_val)
+[13:13:16.015][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_NUMMER:        0       (et_default)
+[13:13:16.031][I][processCanMessage():351]: HEIZMODUL (0x500):  SOFTWARE_NUMMER:        67      (et_default)
+[13:13:16.952][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP2" (0x0a06) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, fa, 0a, 06, 00, 00
+[13:13:16.952][D][REQUEST_MGR:2221]: Sent KESSEL_EINSTELL_SPEICHERSOLLTEMP2, next in 30626ms
+[13:13:16.983][I][processCanMessage():351]: KESSEL (0x180):     EINSTELL_SPEICHERSOLLTEMP2:     48.0    (et_dec_val)
+[13:13:17.033][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERBEDARF: 1024    (et_default)
+[13:13:17.060][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.8     (et_dec_val)
+[13:13:17.069][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.3    (et_dec_val)
+[13:13:18.068][I][readSignal():388]: READ "SPEICHERSOLLTEMP" (0x0003) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 03, 00, 00, 00, 00
+[13:13:18.078][D][REQUEST_MGR:2221]: Sent KESSEL_SPEICHERSOLLTEMP, next in 31203ms
+[13:13:18.080][I][processCanMessage():351]: MANAGER (0x480):    WPVORLAUFIST:   0.0     (et_dec_val)
+[13:13:18.090][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       0.0     (et_dec_val)
+[13:13:18.102][I][processCanMessage():351]: HEIZMODUL (0x500):  RUECKLAUFISTTEMP:       17.5    (et_dec_val)
+[13:13:18.113][I][processCanMessage():351]: MANAGER (0x480):    VERDICHTER:     0.0     (et_dec_val)
+[13:13:18.130][I][processCanMessage():351]: MANAGER (0x480):    MINUTE: 15      (et_little_endian)
+[13:13:18.131][D][CALC:1862]: Updated MINUTE: 15
+[13:13:18.131][D][CALC:553]: Time values: Stunde=13, Minute=15, Sekunde=9
+[13:13:18.133][I][CALC:574]: Published time: 13:15:09 (Stunde=13, Minute=15, Sekunde=9)
+[13:13:18.140][I][processCanMessage():351]: KESSEL (0x180):     SPEICHERSOLLTEMP:       48.0    (et_dec_val)
+[13:13:18.152][I][processCanMessage():351]: HEIZMODUL (0x500):  WPVORLAUFIST:   27.1    (et_dec_val)
+[13:13:18.161][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:13:18.173][W][component:490]: canbus took a long time for an operation (92 ms)
+[13:13:18.180][W][component:493]: Components should block for at most 30 ms
+[13:13:20.095][I][readSignal():388]: READ "KESSELSOLLTEMP" (0x0002) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 02, 00, 00, 00, 00
+[13:13:20.104][D][REQUEST_MGR:2221]: Sent MANAGER_KESSELSOLLTEMP, next in 30528ms
+[13:13:20.125][I][processCanMessage():351]: MANAGER (0x480):    KESSELSOLLTEMP: 26.3    (et_dec_val)
+[13:13:22.099][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.9     (et_dec_val)
+[13:13:22.110][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.3    (et_dec_val)
+[13:13:22.944][I][readSignal():388]: READ "RAUMSOLLTEMP_I" (0x0005) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 05, 00, 00, 00, 00
+[13:13:22.949][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_I, next in 30138ms
+[13:13:22.977][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_I: 20.0    (et_dec_val)
+[13:13:23.950][I][readSignal():388]: READ "RAUMSOLLTEMP_III" (0x0007) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 07, 00, 00, 00, 00
+[13:13:23.953][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_III, next in 31313ms
+[13:13:23.988][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_III:       20.0    (et_dec_val)
+[13:13:24.950][I][readSignal():388]: READ "VORLAUFISTTEMP" (0x000f) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0f, 00, 00, 00, 00
+[13:13:24.954][D][REQUEST_MGR:2221]: Sent KESSEL_VORLAUFISTTEMP, next in 31267ms
+[13:13:24.987][I][processCanMessage():351]: KESSEL (0x180):     VORLAUFISTTEMP: 26.8    (et_dec_val)
+[13:13:26.111][I][readSignal():388]: READ "AUSSENTEMP" (0x000c) FROM HEIZMODUL (0x500 {0xa1, 0x00}): a1, 00, 0c, 00, 00, 00, 00
+[13:13:26.112][D][REQUEST_MGR:2221]: Sent HEIZMODUL_AUSSENTEMP, next in 31314ms
+[13:13:26.115][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_NUMMER:        0       (et_default)
+[13:13:26.124][I][processCanMessage():351]: HEIZMODUL (0x500):  SOFTWARE_NUMMER:        67      (et_default)
+[13:13:26.133][I][processCanMessage():351]: HEIZMODUL (0x500):  AUSSENTEMP:     4.2     (et_dec_val)
+[13:13:26.956][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP" (0x0013) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 13, 00, 00, 00, 00
+[13:13:26.960][D][REQUEST_MGR:2221]: Sent KESSEL_EINSTELL_SPEICHERSOLLTEMP, next in 30770ms
+[13:13:26.989][I][processCanMessage():351]: KESSEL (0x180):     EINSTELL_SPEICHERSOLLTEMP:      48.0    (et_dec_val)
+[13:13:27.038][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERBEDARF: 1024    (et_default)
+[13:13:27.045][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.8     (et_dec_val)
+[13:13:27.076][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.2    (et_dec_val)
+[13:13:27.959][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP" (0x0013) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 13, 00, 00, 00, 00
+[13:13:27.963][D][REQUEST_MGR:2221]: Sent MANAGER_EINSTELL_SPEICHERSOLLTEMP, next in 30743ms
+[13:13:27.992][I][processCanMessage():351]: MANAGER (0x480):    EINSTELL_SPEICHERSOLLTEMP:      48.0    (et_dec_val)
+[13:13:28.043][I][processCanMessage():351]: MANAGER (0x480):    WPVORLAUFIST:   0.0     (et_dec_val)
+[13:13:28.056][I][processCanMessage():351]: HEIZMODUL (0x500):  WPVORLAUFIST:   27.1    (et_dec_val)
+[13:13:28.063][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       0.0     (et_dec_val)
+[13:13:28.079][I][processCanMessage():351]: MANAGER (0x480):    VERDICHTER:     0.0     (et_dec_val)
+[13:13:28.086][I][processCanMessage():351]: HEIZMODUL (0x500):  RUECKLAUFISTTEMP:       17.5    (et_dec_val)
+[13:13:28.117][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:13:28.961][I][readSignal():388]: READ "WPVORLAUFIST" (0x01d6) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, fa, 01, d6, 00, 00
+[13:13:28.966][D][REQUEST_MGR:2221]: Sent KESSEL_WPVORLAUFIST, next in 30553ms
+[13:13:28.994][I][processCanMessage():351]: KESSEL (0x180):     WPVORLAUFIST:   29.8    (et_dec_val)
+[13:13:29.967][I][readSignal():388]: READ "VERDICHTER" (0x07a8) FROM HEIZMODUL (0x500 {0xa1, 0x00}): a1, 00, fa, 07, a8, 00, 00
+[13:13:29.975][D][REQUEST_MGR:2221]: Sent HEIZMODUL_VERDICHTER, next in 31133ms
+[13:13:30.003][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:13:31.074][I][readSignal():388]: READ "SEKUNDE" (0x0127) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 27, 00, 00
+[13:13:31.076][D][REQUEST_MGR:2221]: Sent MANAGER_SEKUNDE, next in 60012ms
+[13:13:31.106][I][processCanMessage():351]: MANAGER (0x480):    SEKUNDE:        13      (et_little_endian)
+[13:13:31.111][D][CALC:1873]: Updated SEKUNDE: 13
+[13:13:31.978][I][readSignal():388]: READ "ABTAUUNGAKTIV" (0x0061) FROM HEIZMODUL (0x500 {0xa1, 0x00}): a1, 00, 61, 00, 00, 00, 00
+[13:13:31.987][D][REQUEST_MGR:2221]: Sent HEIZMODUL_ABTAUUNGAKTIV, next in 61093ms
+[13:13:32.007][I][processCanMessage():351]: HEIZMODUL (0x500):  ABTAUUNGAKTIV:  off     (et_little_bool)
+[13:13:32.037][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.9     (et_dec_val)
+[13:13:32.066][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.3    (et_dec_val)
+[13:13:34.987][I][readSignal():388]: READ "KESSELSOLLTEMP" (0x0002) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 02, 00, 00, 00, 00
+[13:13:34.991][D][REQUEST_MGR:2221]: Sent KESSEL_KESSELSOLLTEMP, next in 31474ms
+[13:13:35.022][I][processCanMessage():351]: KESSEL (0x180):     KESSELSOLLTEMP: 26.3    (et_dec_val)
+[13:13:35.966][I][readSignal():388]: READ "RAUMSOLLTEMP_NACHT" (0x0008) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 08, 00, 00, 00, 00
+[13:13:35.977][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_NACHT, next in 30370ms
+[13:13:35.999][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_NACHT:     20.0    (et_dec_val)
+[13:13:36.024][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_NUMMER:        0       (et_default)
+[13:13:36.032][I][processCanMessage():351]: HEIZMODUL (0x500):  SOFTWARE_NUMMER:        67      (et_default)
+[13:13:37.128][D][mcp2515:341]: receive buffer overrun
+[13:13:37.136][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERBEDARF: 1024    (et_default)
+[13:13:37.140][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.2    (et_dec_val)
+[13:13:37.151][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.9     (et_dec_val)
+[13:13:37.975][I][readSignal():388]: READ "AUSSENTEMP" (0x000c) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0c, 00, 00, 00, 00
+[13:13:37.985][D][REQUEST_MGR:2221]: Sent KESSEL_AUSSENTEMP, next in 30550ms
+[13:13:38.008][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.9     (et_dec_val)
+[13:13:38.053][I][processCanMessage():351]: MANAGER (0x480):    WPVORLAUFIST:   0.0     (et_dec_val)
+[13:13:38.062][I][processCanMessage():351]: HEIZMODUL (0x500):  WPVORLAUFIST:   27.1    (et_dec_val)
+[13:13:38.063][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       0.0     (et_dec_val)
+[13:13:38.077][I][processCanMessage():351]: MANAGER (0x480):    VERDICHTER:     0.0     (et_dec_val)
+[13:13:38.108][I][processCanMessage():351]: HEIZMODUL (0x500):  RUECKLAUFISTTEMP:       17.5    (et_dec_val)
+[13:13:38.125][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:13:38.980][I][readSignal():388]: READ "SPEICHERISTTEMP" (0x000e) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0e, 00, 00, 00, 00
+[13:13:38.990][D][REQUEST_MGR:2221]: Sent KESSEL_SPEICHERISTTEMP, next in 31163ms
+[13:13:39.009][I][processCanMessage():351]: KESSEL (0x180):     SPEICHERISTTEMP:        46.3    (et_dec_val)
+[13:13:40.010][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP2" (0x0a06) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 0a, 06, 00, 00
+[13:13:40.012][D][REQUEST_MGR:2221]: Sent MANAGER_EINSTELL_SPEICHERSOLLTEMP2, next in 30796ms
+[13:13:40.047][I][processCanMessage():351]: MANAGER (0x480):    EINSTELL_SPEICHERSOLLTEMP2:     48.0    (et_dec_val)
+[13:13:41.083][I][readSignal():388]: READ "JAHR" (0x0124) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 24, 00, 00
+[13:13:41.086][D][REQUEST_MGR:2221]: Sent MANAGER_JAHR, next in 61067ms
+[13:13:41.111][I][processCanMessage():351]: MANAGER (0x480):    JAHR:   25      (et_little_endian)
+[13:13:41.117][D][CALC:1821]: Updated JAHR: 25
+[13:13:42.140][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.8     (et_dec_val)
+[13:13:42.152][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.3    (et_dec_val)
+[13:13:42.999][I][readSignal():388]: READ "EVU_SPERRE_AKTIV" (0x0074) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 74, 00, 00, 00, 00
+[13:13:43.002][D][REQUEST_MGR:2221]: Sent MANAGER_EVU_SPERRE_AKTIV, next in 61477ms
+[13:13:43.031][I][processCanMessage():351]: MANAGER (0x480):    EVU_SPERRE_AKTIV:       ?       (et_little_bool)
+[13:13:44.007][I][readSignal():388]: READ "SPEICHERSOLLTEMP" (0x0003) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 03, 00, 00, 00, 00
+[13:13:44.012][D][REQUEST_MGR:2221]: Sent MANAGER_SPEICHERSOLLTEMP, next in 30747ms
+[13:13:44.045][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERSOLLTEMP:       48.0    (et_dec_val)
+[13:13:44.985][I][readSignal():388]: READ "RAUMSOLLTEMP_II" (0x0006) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 06, 00, 00, 00, 00
+[13:13:44.990][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_II, next in 31439ms
+[13:13:45.018][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_II:        20.0    (et_dec_val)
+[13:13:45.991][I][readSignal():388]: READ "SAMMLERISTTEMP" (0x000d) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0d, 00, 00, 00, 00
+[13:13:45.991][D][REQUEST_MGR:2221]: Sent KESSEL_SAMMLERISTTEMP, next in 30809ms
+[13:13:46.017][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_NUMMER:        0       (et_default)
+[13:13:46.046][I][processCanMessage():351]: KESSEL (0x180):     SAMMLERISTTEMP: -40.0   (et_dec_val)
+[13:13:46.055][I][processCanMessage():351]: HEIZMODUL (0x500):  SOFTWARE_NUMMER:        67      (et_default)
+[13:13:46.988][I][readSignal():388]: READ "RUECKLAUFISTTEMP" (0x0016) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 16, 00, 00, 00, 00
+[13:13:46.991][D][REQUEST_MGR:2221]: Sent MANAGER_RUECKLAUFISTTEMP, next in 30192ms
+[13:13:47.022][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       27.0    (et_dec_val)
+[13:13:47.039][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERBEDARF: 1024    (et_default)
+[13:13:47.055][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.9     (et_dec_val)
+[13:13:47.068][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.3    (et_dec_val)
+[13:13:47.987][I][readSignal():388]: READ "RUECKLAUFISTTEMP" (0x0016) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 16, 00, 00, 00, 00
+[13:13:47.991][D][REQUEST_MGR:2221]: Sent KESSEL_RUECKLAUFISTTEMP, next in 30005ms
+[13:13:48.022][I][processCanMessage():351]: KESSEL (0x180):     RUECKLAUFISTTEMP:       27.0    (et_dec_val)
+[13:13:48.035][I][processCanMessage():351]: MANAGER (0x480):    WPVORLAUFIST:   0.0     (et_dec_val)
+[13:13:48.050][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       0.0     (et_dec_val)
+[13:13:48.060][I][processCanMessage():351]: HEIZMODUL (0x500):  WPVORLAUFIST:   27.1    (et_dec_val)
+[13:13:48.075][I][processCanMessage():351]: MANAGER (0x480):    VERDICHTER:     0.0     (et_dec_val)
+[13:13:48.089][I][processCanMessage():351]: HEIZMODUL (0x500):  RUECKLAUFISTTEMP:       17.5    (et_dec_val)
+[13:13:48.117][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:13:48.506][D][CALC:485]: Date values: Jahr=25, Monat=12, Tag=21
+[13:13:48.511][I][CALC:506]: Published date: 2025-12-21 (Jahr=25, Monat=12, Tag=21)
+[13:13:48.514][D][CALC:553]: Time values: Stunde=13, Minute=15, Sekunde=13
+[13:13:48.523][I][CALC:574]: Published time: 13:15:13 (Stunde=13, Minute=15, Sekunde=13)
+[13:13:49.007][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP2" (0x0a06) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, fa, 0a, 06, 00, 00
+[13:13:49.010][D][REQUEST_MGR:2221]: Sent KESSEL_EINSTELL_SPEICHERSOLLTEMP2, next in 31263ms
+[13:13:49.042][I][processCanMessage():351]: KESSEL (0x180):     EINSTELL_SPEICHERSOLLTEMP2:     48.0    (et_dec_val)
+[13:13:50.094][I][readSignal():388]: READ "STUNDE" (0x0125) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 25, 00, 00
+[13:13:50.096][D][REQUEST_MGR:2221]: Sent MANAGER_STUNDE, next in 60549ms
+[13:13:50.125][I][processCanMessage():351]: MANAGER (0x480):    STUNDE: 13      (et_little_endian)
+[13:13:50.133][D][CALC:1852]: Updated STUNDE: 13
+[13:13:51.030][I][readSignal():388]: READ "KESSELSOLLTEMP" (0x0002) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 02, 00, 00, 00, 00
+[13:13:51.031][D][REQUEST_MGR:2221]: Sent MANAGER_KESSELSOLLTEMP, next in 31163ms
+[13:13:51.058][I][processCanMessage():351]: MANAGER (0x480):    KESSELSOLLTEMP: 26.2    (et_dec_val)
+[13:13:51.990][I][readSignal():388]: READ "SPEICHERSOLLTEMP" (0x0003) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 03, 00, 00, 00, 00
+[13:13:52.004][D][REQUEST_MGR:2221]: Sent KESSEL_SPEICHERSOLLTEMP, next in 30227ms
+[13:13:52.022][I][processCanMessage():351]: KESSEL (0x180):     SPEICHERSOLLTEMP:       48.0    (et_dec_val)
+[13:13:52.049][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.9     (et_dec_val)
+[13:13:52.079][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.2    (et_dec_val)
+[13:13:53.999][I][readSignal():388]: READ "RAUMSOLLTEMP_I" (0x0005) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 05, 00, 00, 00, 00
+[13:13:54.003][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_I, next in 30421ms
+[13:13:54.033][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_I: 20.0    (et_dec_val)
+[13:13:56.007][I][readSignal():388]: READ "RAUMSOLLTEMP_III" (0x0007) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 07, 00, 00, 00, 00
+[13:13:56.017][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_III, next in 30900ms
+[13:13:56.018][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_NUMMER:        0       (et_default)
+[13:13:56.024][I][processCanMessage():351]: HEIZMODUL (0x500):  SOFTWARE_NUMMER:        67      (et_default)
+[13:13:56.052][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_III:       20.0    (et_dec_val)
+[13:13:57.007][I][readSignal():388]: READ "VORLAUFISTTEMP" (0x000f) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0f, 00, 00, 00, 00
+[13:13:57.011][D][REQUEST_MGR:2221]: Sent KESSEL_VORLAUFISTTEMP, next in 31284ms
+[13:13:57.040][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERBEDARF: 1024    (et_default)
+[13:13:57.046][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.8     (et_dec_val)
+[13:13:57.065][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.2    (et_dec_val)
+[13:13:57.081][I][processCanMessage():351]: KESSEL (0x180):     VORLAUFISTTEMP: 26.8    (et_dec_val)
+[13:13:58.010][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP" (0x0013) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 13, 00, 00, 00, 00
+[13:13:58.015][D][REQUEST_MGR:2221]: Sent KESSEL_EINSTELL_SPEICHERSOLLTEMP, next in 30559ms
+[13:13:58.041][I][processCanMessage():351]: MANAGER (0x480):    WPVORLAUFIST:   0.0     (et_dec_val)
+[13:13:58.048][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       0.0     (et_dec_val)
+[13:13:58.061][I][processCanMessage():351]: HEIZMODUL (0x500):  WPVORLAUFIST:   27.1    (et_dec_val)
+[13:13:58.072][I][processCanMessage():351]: MANAGER (0x480):    VERDICHTER:     0.0     (et_dec_val)
+[13:13:58.081][I][processCanMessage():351]: HEIZMODUL (0x500):  RUECKLAUFISTTEMP:       17.5    (et_dec_val)
+[13:13:58.091][I][processCanMessage():351]: KESSEL (0x180):     EINSTELL_SPEICHERSOLLTEMP:      48.0    (et_dec_val)
+[13:13:58.122][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:13:59.008][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP" (0x0013) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 13, 00, 00, 00, 00
+[13:13:59.014][D][REQUEST_MGR:2221]: Sent MANAGER_EINSTELL_SPEICHERSOLLTEMP, next in 30720ms
+[13:13:59.043][I][processCanMessage():351]: MANAGER (0x480):    EINSTELL_SPEICHERSOLLTEMP:      48.0    (et_dec_val)
+[13:14:00.016][I][readSignal():388]: READ "WPVORLAUFIST" (0x01d6) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, fa, 01, d6, 00, 00
+[13:14:00.017][D][REQUEST_MGR:2221]: Sent KESSEL_WPVORLAUFIST, next in 30739ms
+[13:14:00.043][I][processCanMessage():351]: KESSEL (0x180):     WPVORLAUFIST:   29.8    (et_dec_val)
+[13:14:01.116][I][readSignal():388]: READ "WAERMEERTRAG_WW_SUM_MWH" (0x092d) FROM HEIZMODUL (0x500 {0xa1, 0x00}): a1, 00, fa, 09, 2d, 00, 00
+[13:14:01.118][D][REQUEST_MGR:2221]: Sent HEIZMODUL_WAERMEERTRAG_WW_SUM_MWH, next in 618545ms
+[13:14:01.150][I][processCanMessage():351]: HEIZMODUL (0x500):  WAERMEERTRAG_WW_SUM_MWH:        40.000  (et_double_val)
+[13:14:01.160][D][PATTERN:1001]: Signal 'WAERMEERTRAG_WW_SUM_MWH' (expanded: 'WAERME ERTRAG WW SUM MWH') matched pattern 'MWH'
+[13:14:01.164][D][COP:1518]: Stored WAERMEERTRAG_WW_SUM_MWH = 40.000
+[13:14:02.031][I][readSignal():388]: READ "MONAT" (0x0123) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 23, 00, 00
+[13:14:02.031][D][REQUEST_MGR:2221]: Sent MANAGER_MONAT, next in 60655ms
+[13:14:02.037][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     6.0     (et_dec_val)
+[13:14:02.052][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.2    (et_dec_val)
+[13:14:02.072][I][processCanMessage():351]: MANAGER (0x480):    MONAT:  12      (et_little_endian)
+[13:14:02.075][D][CALC:1831]: Updated MONAT: 12
+[13:14:02.379][I][readSignal():388]: READ "PROGRAMMSCHALTER" (0x0112) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 12, 00, 00
+[13:14:02.409][I][processCanMessage():351]: MANAGER (0x480):    PROGRAMMSCHALTER:       Tagbetrieb      (et_betriebsart)
+[13:14:03.011][I][readSignal():388]: READ "TAG" (0x0122) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 22, 00, 00
+[13:14:03.017][D][REQUEST_MGR:2221]: Sent MANAGER_TAG, next in 62249ms
+[13:14:03.043][I][processCanMessage():351]: MANAGER (0x480):    TAG:    21      (et_little_endian)
+[13:14:03.054][D][CALC:1841]: Updated TAG: 21
+[13:14:03.054][D][CALC:485]: Date values: Jahr=25, Monat=12, Tag=21
+[13:14:03.054][I][CALC:506]: Published date: 2025-12-21 (Jahr=25, Monat=12, Tag=21)
+[13:14:03.317][I][readSignal():388]: READ "WW_ECO" (0x027e) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 02, 7e, 00, 00
+[13:14:03.364][I][processCanMessage():351]: MANAGER (0x480):    WW_ECO: on      (et_bool)
+[13:14:04.012][I][readSignal():388]: READ "MINUTE" (0x0126) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 26, 00, 00
+[13:14:04.016][D][REQUEST_MGR:2221]: Sent MANAGER_MINUTE, next in 62933ms
+[13:14:04.043][I][processCanMessage():351]: MANAGER (0x480):    MINUTE: 15      (et_little_endian)
+[13:14:04.052][D][CALC:1862]: Updated MINUTE: 15
+[13:14:04.053][D][CALC:553]: Time values: Stunde=13, Minute=15, Sekunde=13
+[13:14:04.057][I][CALC:574]: Published time: 13:15:13 (Stunde=13, Minute=15, Sekunde=13)
+[13:14:04.589][I][DIAGNOSTICS:1425]: Published blacklist diagnostics: 0 blacklisted, 0 invalid, 0 no-response
+[13:14:04.820][I][readSignal():388]: READ "SOMMERBETRIEB" (0xfdb4) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, fd, b4, 00, 00
+[13:14:04.867][I][processCanMessage():351]: MANAGER (0x480):    SOMMERBETRIEB:  on      (et_little_bool)
+[13:14:04.867][D][CALC:621]: Published Betriebsart: Sommerbetrieb (SOMMERBETRIEB=on)
+[13:14:05.047][I][readSignal():388]: READ "AUSSENTEMP" (0x000c) FROM HEIZMODUL (0x500 {0xa1, 0x00}): a1, 00, 0c, 00, 00, 00, 00
+[13:14:05.049][D][REQUEST_MGR:2221]: Sent HEIZMODUL_AUSSENTEMP, next in 31215ms
+[13:14:05.080][I][processCanMessage():351]: HEIZMODUL (0x500):  AUSSENTEMP:     4.2     (et_dec_val)
+[13:14:06.028][I][readSignal():388]: READ "VERDICHTER" (0x07a8) FROM HEIZMODUL (0x500 {0xa1, 0x00}): a1, 00, fa, 07, a8, 00, 00
+[13:14:06.028][D][REQUEST_MGR:2221]: Sent HEIZMODUL_VERDICHTER, next in 30312ms
+[13:14:06.030][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_NUMMER:        0       (et_default)
+[13:14:06.035][I][processCanMessage():351]: HEIZMODUL (0x500):  SOFTWARE_NUMMER:        67      (et_default)
+[13:14:06.087][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:14:07.159][I][readSignal():388]: READ "KESSELSOLLTEMP" (0x0002) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 02, 00, 00, 00, 00
+[13:14:07.165][D][REQUEST_MGR:2221]: Sent KESSEL_KESSELSOLLTEMP, next in 30585ms
+[13:14:07.175][D][mcp2515:341]: receive buffer overrun
+[13:14:07.175][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERBEDARF: 1024    (et_default)
+[13:14:07.181][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.9     (et_dec_val)
+[13:14:07.198][I][processCanMessage():351]: KESSEL (0x180):     KESSELSOLLTEMP: 26.2    (et_dec_val)
+[13:14:08.016][I][readSignal():388]: READ "RAUMSOLLTEMP_NACHT" (0x0008) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 08, 00, 00, 00, 00
+[13:14:08.021][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_NACHT, next in 31316ms
+[13:14:08.033][I][processCanMessage():351]: MANAGER (0x480):    WPVORLAUFIST:   0.0     (et_dec_val)
+[13:14:08.049][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       0.0     (et_dec_val)
+[13:14:08.059][I][processCanMessage():351]: HEIZMODUL (0x500):  WPVORLAUFIST:   27.1    (et_dec_val)
+[13:14:08.071][I][processCanMessage():351]: MANAGER (0x480):    VERDICHTER:     0.0     (et_dec_val)
+[13:14:08.081][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_NACHT:     20.0    (et_dec_val)
+[13:14:08.094][I][processCanMessage():351]: HEIZMODUL (0x500):  RUECKLAUFISTTEMP:       17.5    (et_dec_val)
+[13:14:08.123][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:14:09.020][I][readSignal():388]: READ "AUSSENTEMP" (0x000c) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0c, 00, 00, 00, 00
+[13:14:09.032][D][REQUEST_MGR:2221]: Sent KESSEL_AUSSENTEMP, next in 31037ms
+[13:14:09.053][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.8     (et_dec_val)
+[13:14:11.032][I][readSignal():388]: READ "SPEICHERISTTEMP" (0x000e) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0e, 00, 00, 00, 00
+[13:14:11.036][D][REQUEST_MGR:2221]: Sent KESSEL_SPEICHERISTTEMP, next in 30264ms
+[13:14:11.065][I][processCanMessage():351]: KESSEL (0x180):     SPEICHERISTTEMP:        46.2    (et_dec_val)
+[13:14:12.059][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP2" (0x0a06) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 0a, 06, 00, 00
+[13:14:12.061][D][REQUEST_MGR:2221]: Sent MANAGER_EINSTELL_SPEICHERSOLLTEMP2, next in 30917ms
+[13:14:12.068][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.8     (et_dec_val)
+[13:14:12.083][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.3    (et_dec_val)
+[13:14:12.092][I][processCanMessage():351]: MANAGER (0x480):    EINSTELL_SPEICHERSOLLTEMP2:     48.0    (et_dec_val)
+[13:14:13.146][I][readSignal():388]: READ "WP_STATUS" (0xfdae) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, fd, ae, 00, 00
+[13:14:13.150][D][REQUEST_MGR:2221]: Sent MANAGER_WP_STATUS, next in 61176ms
+[13:14:13.184][I][processCanMessage():351]: MANAGER (0x480):    WP_STATUS:      -255    (et_little_endian)
+[13:14:14.057][I][readSignal():388]: READ "SOMMERBETRIEB" (0xfdb4) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, fd, b4, 00, 00
+[13:14:14.062][D][REQUEST_MGR:2221]: Sent MANAGER_SOMMERBETRIEB, next in 62450ms
+[13:14:14.096][I][processCanMessage():351]: MANAGER (0x480):    SOMMERBETRIEB:  on      (et_little_bool)
+[13:14:14.099][D][CALC:621]: Published Betriebsart: Sommerbetrieb (SOMMERBETRIEB=on)
+[13:14:15.042][I][readSignal():388]: READ "SPEICHERSOLLTEMP" (0x0003) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 03, 00, 00, 00, 00
+[13:14:15.046][D][REQUEST_MGR:2221]: Sent MANAGER_SPEICHERSOLLTEMP, next in 30510ms
+[13:14:15.074][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERSOLLTEMP:       48.0    (et_dec_val)
+[13:14:16.024][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_NUMMER:        0       (et_default)
+[13:14:16.034][I][processCanMessage():351]: HEIZMODUL (0x500):  SOFTWARE_NUMMER:        67      (et_default)
+[13:14:17.038][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERBEDARF: 1024    (et_default)
+[13:14:17.056][I][readSignal():388]: READ "RAUMSOLLTEMP_II" (0x0006) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 06, 00, 00, 00, 00
+[13:14:17.061][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_II, next in 31460ms
+[13:14:17.068][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     6.0     (et_dec_val)
+[13:14:17.079][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.2    (et_dec_val)
+[13:14:17.089][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_II:        20.0    (et_dec_val)
+[13:14:18.057][I][readSignal():388]: READ "SAMMLERISTTEMP" (0x000d) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0d, 00, 00, 00, 00
+[13:14:18.062][D][REQUEST_MGR:2221]: Sent KESSEL_SAMMLERISTTEMP, next in 30257ms
+[13:14:18.072][I][processCanMessage():351]: MISCHERMODUL_2 (0x601):     INITIALISIERUNG:        1       (et_little_endian)
+[13:14:18.078][I][processCanMessage():351]: MISCHERMODUL_3 (0x602):     INITIALISIERUNG:        1       (et_little_endian)
+[13:14:18.102][I][processCanMessage():351]: KESSEL (0x180):     INITIALISIERUNG:        1       (et_little_endian)
+[13:14:18.112][I][processCanMessage():351]: MANAGER (0x480):    INITIALISIERUNG:        1       (et_little_endian)
+[13:14:18.131][I][processCanMessage():351]: HEIZMODUL (0x500):  INITIALISIERUNG:        1       (et_little_endian)
+[13:14:18.136][I][processCanMessage():351]: KESSEL (0x180):     INITIALISIERUNG:        1       (et_little_endian)
+[13:14:18.152][I][processCanMessage():351]: MANAGER (0x480):    WPVORLAUFIST:   0.0     (et_dec_val)
+[13:14:18.164][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       0.0     (et_dec_val)
+[13:14:18.178][I][processCanMessage():351]: HEIZMODUL (0x500):  WPVORLAUFIST:   27.1    (et_dec_val)
+[13:14:18.189][I][processCanMessage():351]: MANAGER (0x480):    VERDICHTER:     0.0     (et_dec_val)
+[13:14:18.199][I][processCanMessage():351]: MANAGER (0x480):    MINUTE: 16      (et_little_endian)
+[13:14:18.205][D][CALC:1862]: Updated MINUTE: 16
+[13:14:18.206][D][CALC:553]: Time values: Stunde=13, Minute=16, Sekunde=13
+[13:14:18.213][I][CALC:574]: Published time: 13:16:13 (Stunde=13, Minute=16, Sekunde=13)
+[13:14:18.220][I][processCanMessage():351]: KESSEL (0x180):     SAMMLERISTTEMP: -40.0   (et_dec_val)
+[13:14:18.229][I][processCanMessage():351]: HEIZMODUL (0x500):  RUECKLAUFISTTEMP:       17.5    (et_dec_val)
+[13:14:18.280][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:14:19.057][I][readSignal():388]: READ "RUECKLAUFISTTEMP" (0x0016) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 16, 00, 00, 00, 00
+[13:14:19.061][D][REQUEST_MGR:2221]: Sent MANAGER_RUECKLAUFISTTEMP, next in 30639ms
+[13:14:19.091][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       27.0    (et_dec_val)
+[13:14:19.644][I][processCanMessage():351]: HEIZMODUL (0x500):  FEHLERMELDUNG:  0       (et_default)
+[13:14:19.694][I][processCanMessage():351]: HEIZMODUL (0x500):  SOLAR_KOLLEKTOR_3_I_ANTEIL:     0       (et_default)
+[13:14:19.739][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDAMPFERTEMP: 9       (et_byte)
+[13:14:19.791][I][processCanMessage():351]: HEIZMODUL (0x500):  GERAETE_ID:     67-16   (et_dev_id)
+[13:14:19.835][I][processCanMessage():351]: HEIZMODUL (0x500):  SPEICHER_STATUS:        129     (et_little_endian)
+[13:14:19.842][W][PATTERN:1010]: Signal 'SPEICHER_STATUS' (expanded: 'SPEICHER STATUS') using default pattern (no match found)
+[13:14:19.877][I][processCanMessage():351]: HEIZMODUL (0x500):  SCHALTFKT_IWS:  0       (et_default)
+[13:14:19.947][I][processCanMessage():351]: HEIZMODUL (0x500):  INDEX_NOT_FOUND:        0       (et_default)
+[13:14:19.992][I][processCanMessage():351]: HEIZMODUL (0x500):  ABTAUUNGAKTIV:  off     (et_little_bool)
+[13:14:20.044][I][processCanMessage():351]: MANAGER (0x480):    ACCESS_EEPROM:  1       (et_little_endian)
+[13:14:20.044][I][processCanMessage():351]: HEIZMODUL (0x500):  STUETZSTELLE_ND1:       100     (et_default)
+[13:14:20.048][I][processCanMessage():351]: MANAGER (0x480):    GERAETEKONFIGURATION:   0       (et_default)
+[13:14:20.057][I][readSignal():388]: READ "RUECKLAUFISTTEMP" (0x0016) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 16, 00, 00, 00, 00
+[13:14:20.063][D][REQUEST_MGR:2221]: Sent KESSEL_RUECKLAUFISTTEMP, next in 31042ms
+[13:14:20.079][I][processCanMessage():351]: MANAGER (0x480):    ANFAHRENT:      0       (et_default)
+[13:14:20.093][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       27.0    (et_dec_val)
+[13:14:20.117][I][processCanMessage():351]: HEIZMODUL (0x500):  STUETZSTELLE_ND2:       1700    (et_default)
+[13:14:20.121][I][processCanMessage():351]: MANAGER (0x480):    PROGRAMMSCHALTER:       Tagbetrieb      (et_betriebsart)
+[13:14:20.130][I][processCanMessage():351]: MANAGER (0x480):    SAMMEL_RELAISSTATUS:    0       (et_default)
+[13:14:20.142][W][PATTERN:1010]: Signal 'SAMMEL_RELAISSTATUS' (expanded: 'SAMM EL R EL AISSTATUS') using default pattern (no match found)
+[13:14:20.149][I][processCanMessage():351]: HEIZMODUL (0x500):  STUETZSTELLE_HD1:       100     (et_default)
+[13:14:20.152][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     6.0     (et_dec_val)
+[13:14:20.159][I][processCanMessage():351]: MANAGER (0x480):    ZWISCHENEINSPRITZUNG_ISTTEMP:   0       (et_default)
+[13:14:20.186][I][processCanMessage():351]: MANAGER (0x480):    LUEFT_PASSIVKUEHLUNG_UEBER_FORTLUEFTER: 0       (et_default)
+[13:14:20.196][W][PATTERN:1010]: Signal 'LUEFT_PASSIVKUEHLUNG_UEBER_FORTLUEFTER' (expanded: 'LUEFT PASSIV KUEHLUNG UEBER FORT LUEFT ER') using default pattern (no match found)
+[13:14:20.202][I][processCanMessage():351]: MANAGER (0x480):    MINUTE: 16      (et_little_endian)
+[13:14:20.210][D][CALC:1862]: Updated MINUTE: 16
+[13:14:20.212][D][CALC:553]: Time values: Stunde=13, Minute=16, Sekunde=13
+[13:14:20.220][I][CALC:574]: Published time: 13:16:13 (Stunde=13, Minute=16, Sekunde=13)
+[13:14:20.222][I][processCanMessage():351]: MANAGER (0x480):    STUNDE: 13      (et_little_endian)
+[13:14:20.225][D][CALC:1852]: Updated STUNDE: 13
+[13:14:20.232][I][processCanMessage():351]: MANAGER (0x480):    TAG:    21      (et_little_endian)
+[13:14:20.238][D][CALC:1841]: Updated TAG: 21
+[13:14:20.240][D][CALC:485]: Date values: Jahr=25, Monat=12, Tag=21
+[13:14:20.247][I][CALC:506]: Published date: 2025-12-21 (Jahr=25, Monat=12, Tag=21)
+[13:14:20.247][D][mcp2515:341]: receive buffer overrun
+[13:14:20.256][I][processCanMessage():351]: HEIZMODUL (0x500):  BETRIEBSART_WP: 0       (et_default)
+[13:14:20.265][W][PATTERN:1010]: Signal 'BETRIEBSART_WP' (expanded: 'BETRIEBSART WP') using default pattern (no match found)
+[13:14:20.270][D][mcp2515:341]: receive buffer overrun
+[13:14:20.274][I][processCanMessage():351]: MANAGER (0x480):    MONAT:  12      (et_little_endian)
+[13:14:20.284][D][CALC:1831]: Updated MONAT: 12
+[13:14:20.287][D][mcp2515:341]: receive buffer overrun
+[13:14:20.296][I][processCanMessage():351]: MANAGER (0x480):    JAHR:   25      (et_little_endian)
+[13:14:20.303][D][CALC:1821]: Updated JAHR: 25
+[13:14:20.308][D][mcp2515:341]: receive buffer overrun
+[13:14:20.318][I][processCanMessage():351]: MANAGER (0x480):    INDEX_NOT_FOUND:        0       (et_default)
+[13:14:20.324][I][processCanMessage():351]: MANAGER (0x480):    QUELLENPUMPEN_STATUS:   0       (et_default)
+[13:14:20.333][I][processCanMessage():351]: HEIZMODUL (0x500):  K_OS_RMX_RESERVE_INFO3: 0       (et_default)
+[13:14:20.340][I][processCanMessage():351]: MANAGER (0x480):    TEMPORALE_LUEFTUNGSSTUFE_DAUER: 0       (et_default)
+[13:14:20.348][D][PATTERN:1001]: Signal 'TEMPORALE_LUEFTUNGSSTUFE_DAUER' (expanded: 'TEMPORALE LUEFTUNGSSTUFE DAUER') matched pattern 'TEMP'
+[13:14:20.358][I][processCanMessage():351]: MANAGER (0x480):    PARAMETERSATZ:  0       (et_default)
+[13:14:20.364][I][processCanMessage():351]: HEIZMODUL (0x500):  STUETZSTELLE_HD2:       3100    (et_default)
+[13:14:20.374][I][processCanMessage():351]: MANAGER (0x480):    HARDWARE_NUMMER:        0       (et_default)
+[13:14:20.376][W][component:490]: canbus took a long time for an operation (193 ms)
+[13:14:20.383][W][component:493]: Components should block for at most 30 ms
+[13:14:20.401][I][processCanMessage():351]: HEIZMODUL (0x500):  FEHLER_PARAMETERSATZ_IWS:       0       (et_default)
+[13:14:20.406][I][processCanMessage():351]: MANAGER (0x480):    WPVORLAUFIST:   0.0     (et_dec_val)
+[13:14:20.423][I][processCanMessage():351]: MANAGER (0x480):    WP_STATUS:      1       (et_little_endian)
+[13:14:20.432][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       0.0     (et_dec_val)
+[13:14:20.442][I][processCanMessage():351]: HEIZMODUL (0x500):  PARAMETERSATZ:  12      (et_default)
+[13:14:20.451][I][processCanMessage():351]: KESSEL (0x180):     BUSKONTROLLE:   0       (et_default)
+[13:14:20.456][I][processCanMessage():351]: MANAGER (0x480):    GERAETE_ID:     165-29  (et_dev_id)
+[13:14:20.486][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_NUMMER:        -23296  (et_default)
+[13:14:20.492][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_VERSION:       7424    (et_default)
+[13:14:20.501][I][processCanMessage():351]: HEIZMODUL (0x500):  HARDWARE_NUMMER:        -255    (et_default)
+[13:14:20.508][I][processCanMessage():351]: MANAGER (0x480):    TEILVORRANG_WW: 0       (et_default)
+[13:14:20.517][W][PATTERN:1010]: Signal 'TEILVORRANG_WW' (expanded: 'TEILVORRANG WW') using default pattern (no match found)
+[13:14:20.529][I][processCanMessage():351]: MANAGER (0x480):    LZ_VERD_1_HEIZBETRIEB:  0.000   (et_mil_val)
+[13:14:20.539][D][PATTERN:1001]: Signal 'LZ_VERD_1_HEIZBETRIEB' (expanded: 'LZ VERD 1 HEIZ BETRIEB') matched pattern 'LZ'
+[13:14:20.551][I][processCanMessage():351]: MANAGER (0x480):    LZ_VERD_2_HEIZBETRIEB:  0.000   (et_mil_val)
+[13:14:20.559][D][PATTERN:1001]: Signal 'LZ_VERD_2_HEIZBETRIEB' (expanded: 'LZ VERD 2 HEIZ BETRIEB') matched pattern 'LZ'
+[13:14:20.570][I][processCanMessage():351]: MANAGER (0x480):    LZ_VERD_1_2_HEIZBETRIEB:        0.000   (et_mil_val)
+[13:14:20.580][D][PATTERN:1001]: Signal 'LZ_VERD_1_2_HEIZBETRIEB' (expanded: 'LZ VERD 1 2 HEIZ BETRIEB') matched pattern 'LZ'
+[13:14:20.590][I][processCanMessage():351]: MANAGER (0x480):    LZ_VERD_1_WW_BETRIEB:   0       (et_default)
+[13:14:20.607][D][PATTERN:1001]: Signal 'LZ_VERD_1_WW_BETRIEB' (expanded: 'LZ VERD 1 WW BETRIEB') matched pattern 'LZ'
+[13:14:20.607][D][mcp2515:341]: receive buffer overrun
+[13:14:20.608][I][processCanMessage():351]: MANAGER (0x480):    LZ_VERD_2_WW_BETRIEB:   0       (et_default)
+[13:14:20.618][D][PATTERN:1001]: Signal 'LZ_VERD_2_WW_BETRIEB' (expanded: 'LZ VERD 2 WW BETRIEB') matched pattern 'LZ'
+[13:14:20.631][D][mcp2515:341]: receive buffer overrun
+[13:14:20.631][I][processCanMessage():351]: MANAGER (0x480):    LZ_VERD_1_2_WW_BETRIEB: 0       (et_default)
+[13:14:20.649][D][PATTERN:1001]: Signal 'LZ_VERD_1_2_WW_BETRIEB' (expanded: 'LZ VERD 1 2 WW BETRIEB') matched pattern 'LZ'
+[13:14:20.650][D][mcp2515:341]: receive buffer overrun
+[13:14:20.650][I][processCanMessage():351]: HEIZMODUL (0x500):  RUECKLAUFISTTEMP:       17.5    (et_dec_val)
+[13:14:20.663][I][processCanMessage():351]: MANAGER (0x480):    LZ_VERD_2_KUEHLBETRIEB: 0.000   (et_mil_val)
+[13:14:20.687][D][PATTERN:1001]: Signal 'LZ_VERD_2_KUEHLBETRIEB' (expanded: 'LZ VERD 2 KUEHL BETRIEB') matched pattern 'LZ'
+[13:14:20.687][I][processCanMessage():351]: MANAGER (0x480):    LZ_VERD_1_2_KUEHLBETRIEB:       0.000   (et_mil_val)
+[13:14:20.687][D][PATTERN:1001]: Signal 'LZ_VERD_1_2_KUEHLBETRIEB' (expanded: 'LZ VERD 1 2 KUEHL BETRIEB') matched pattern 'LZ'
+[13:14:20.687][D][mcp2515:341]: receive buffer overrun
+[13:14:20.689][I][processCanMessage():351]: MANAGER (0x480):    LAUFZEIT_VERD_BEI_SPEICHERBEDARF:       0       (et_default)
+[13:14:20.705][D][PATTERN:1001]: Signal 'LAUFZEIT_VERD_BEI_SPEICHERBEDARF' (expanded: 'LAUFZEIT VERD BEI SPEICHER BEDARF') matched pattern 'ZEIT'
+[13:14:20.709][I][processCanMessage():351]: KESSEL (0x180):     RUECKLAUFISTTEMP:       27.0    (et_dec_val)
+[13:14:20.718][I][processCanMessage():351]: HEIZMODUL (0x500):  WPVORLAUFIST:   27.1    (et_dec_val)
+[13:14:20.729][I][processCanMessage():351]: HEIZMODUL (0x500):  LZ_VERD_2_HEIZBETRIEB:  0.425   (et_mil_val)
+[13:14:20.738][W][component:490]: canbus took a long time for an operation (227 ms)
+[13:14:20.740][W][component:493]: Components should block for at most 30 ms
+[13:14:20.776][I][processCanMessage():351]: HEIZMODUL (0x500):  LZ_VERD_1_2_HEIZBETRIEB:        0.000   (et_mil_val)
+[13:14:20.827][I][processCanMessage():351]: HEIZMODUL (0x500):  LZ_VERD_1_WW_BETRIEB:   -255    (et_default)
+[13:14:20.902][I][processCanMessage():351]: HEIZMODUL (0x500):  LZ_VERD_2_WW_BETRIEB:   4353    (et_default)
+[13:14:20.937][I][processCanMessage():351]: HEIZMODUL (0x500):  LZ_VERD_1_2_WW_BETRIEB: 0       (et_default)
+[13:14:20.991][I][processCanMessage():351]: HEIZMODUL (0x500):  LZ_VERD_1_KUEHLBETRIEB: -255    (et_mil_val)
+[13:14:21.001][D][PATTERN:1001]: Signal 'LZ_VERD_1_KUEHLBETRIEB' (expanded: 'LZ VERD 1 KUEHL BETRIEB') matched pattern 'LZ'
+[13:14:21.039][I][processCanMessage():351]: HEIZMODUL (0x500):  LZ_VERD_2_KUEHLBETRIEB: -255    (et_mil_val)
+[13:14:21.074][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP2" (0x0a06) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, fa, 0a, 06, 00, 00
+[13:14:21.079][D][REQUEST_MGR:2221]: Sent KESSEL_EINSTELL_SPEICHERSOLLTEMP2, next in 30383ms
+[13:14:21.118][I][processCanMessage():351]: HEIZMODUL (0x500):  LZ_VERD_1_2_KUEHLBETRIEB:       0.000   (et_mil_val)
+[13:14:21.123][I][processCanMessage():351]: KESSEL (0x180):     EINSTELL_SPEICHERSOLLTEMP2:     48.0    (et_dec_val)
+[13:14:23.207][I][readSignal():388]: READ "KESSELSOLLTEMP" (0x0002) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 02, 00, 00, 00, 00
+[13:14:23.215][D][REQUEST_MGR:2221]: Sent MANAGER_KESSELSOLLTEMP, next in 30273ms
+[13:14:23.240][I][processCanMessage():351]: MANAGER (0x480):    KESSELSOLLTEMP: 26.1    (et_dec_val)
+[13:14:24.069][I][readSignal():388]: READ "SPEICHERSOLLTEMP" (0x0003) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 03, 00, 00, 00, 00
+[13:14:24.073][D][REQUEST_MGR:2221]: Sent KESSEL_SPEICHERSOLLTEMP, next in 30087ms
+[13:14:24.103][I][processCanMessage():351]: KESSEL (0x180):     SPEICHERSOLLTEMP:       48.0    (et_dec_val)
+[13:14:25.073][I][readSignal():388]: READ "RAUMSOLLTEMP_I" (0x0005) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 05, 00, 00, 00, 00
+[13:14:25.074][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_I, next in 31483ms
+[13:14:25.111][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_I: 20.0    (et_dec_val)
+[13:14:27.081][I][readSignal():388]: READ "RAUMSOLLTEMP_III" (0x0007) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 07, 00, 00, 00, 00
+[13:14:27.083][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_III, next in 30924ms
+[13:14:27.112][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_III:       20.0    (et_dec_val)
+[13:14:29.020][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_NUMMER:        0       (et_default)
+[13:14:29.024][I][processCanMessage():351]: HEIZMODUL (0x500):  SOFTWARE_NUMMER:        67      (et_default)
+[13:14:29.086][I][readSignal():388]: READ "VORLAUFISTTEMP" (0x000f) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0f, 00, 00, 00, 00
+[13:14:29.091][D][REQUEST_MGR:2221]: Sent KESSEL_VORLAUFISTTEMP, next in 30140ms
+[13:14:29.122][I][processCanMessage():351]: KESSEL (0x180):     VORLAUFISTTEMP: 26.9    (et_dec_val)
+[13:14:30.087][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP" (0x0013) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 13, 00, 00, 00, 00
+[13:14:30.094][D][REQUEST_MGR:2221]: Sent KESSEL_EINSTELL_SPEICHERSOLLTEMP, next in 30507ms
+[13:14:30.138][I][processCanMessage():351]: KESSEL (0x180):     EINSTELL_SPEICHERSOLLTEMP:      48.0    (et_dec_val)
+[13:14:31.096][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP" (0x0013) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 13, 00, 00, 00, 00
+[13:14:31.097][D][REQUEST_MGR:2221]: Sent MANAGER_EINSTELL_SPEICHERSOLLTEMP, next in 30131ms
+[13:14:31.118][I][processCanMessage():351]: MANAGER (0x480):    EINSTELL_SPEICHERSOLLTEMP:      48.0    (et_dec_val)
+[13:14:32.046][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERBEDARF: 1024    (et_default)
+[13:14:32.057][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.9     (et_dec_val)
+[13:14:32.074][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.2    (et_dec_val)
+[13:14:32.093][I][readSignal():388]: READ "WPVORLAUFIST" (0x01d6) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, fa, 01, d6, 00, 00
+[13:14:32.096][D][REQUEST_MGR:2221]: Sent KESSEL_WPVORLAUFIST, next in 31359ms
+[13:14:32.125][I][processCanMessage():351]: KESSEL (0x180):     WPVORLAUFIST:   29.8    (et_dec_val)
+[13:14:33.210][I][readSignal():388]: READ "SEKUNDE" (0x0127) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 27, 00, 00
+[13:14:33.216][D][REQUEST_MGR:2221]: Sent MANAGER_SEKUNDE, next in 62428ms
+[13:14:33.243][I][processCanMessage():351]: MANAGER (0x480):    SEKUNDE:        15      (et_little_endian)
+[13:14:33.250][D][CALC:1873]: Updated SEKUNDE: 15
+[13:14:34.106][I][readSignal():388]: READ "ABTAUUNGAKTIV" (0x0061) FROM HEIZMODUL (0x500 {0xa1, 0x00}): a1, 00, 61, 00, 00, 00, 00
+[13:14:34.113][D][REQUEST_MGR:2221]: Sent HEIZMODUL_ABTAUUNGAKTIV, next in 62703ms
+[13:14:34.140][I][processCanMessage():351]: HEIZMODUL (0x500):  ABTAUUNGAKTIV:  off     (et_little_bool)
+[13:14:37.012][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_NUMMER:        0       (et_default)
+[13:14:37.019][I][processCanMessage():351]: HEIZMODUL (0x500):  SOFTWARE_NUMMER:        67      (et_default)
+[13:14:37.029][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.8     (et_dec_val)
+[13:14:37.057][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.2    (et_dec_val)
+[13:14:37.125][I][readSignal():388]: READ "AUSSENTEMP" (0x000c) FROM HEIZMODUL (0x500 {0xa1, 0x00}): a1, 00, 0c, 00, 00, 00, 00
+[13:14:37.127][D][REQUEST_MGR:2221]: Sent HEIZMODUL_AUSSENTEMP, next in 30981ms
+[13:14:37.157][I][processCanMessage():351]: HEIZMODUL (0x500):  AUSSENTEMP:     4.2     (et_dec_val)
+[13:14:38.028][I][processCanMessage():351]: MANAGER (0x480):    WPVORLAUFIST:   0.0     (et_dec_val)
+[13:14:38.073][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       0.0     (et_dec_val)
+[13:14:38.073][I][processCanMessage():351]: MANAGER (0x480):    VERDICHTER:     0.0     (et_dec_val)
+[13:14:38.073][I][processCanMessage():351]: HEIZMODUL (0x500):  WPVORLAUFIST:   27.1    (et_dec_val)
+[13:14:38.137][I][readSignal():388]: READ "VERDICHTER" (0x07a8) FROM HEIZMODUL (0x500 {0xa1, 0x00}): a1, 00, fa, 07, a8, 00, 00
+[13:14:38.137][D][REQUEST_MGR:2221]: Sent HEIZMODUL_VERDICHTER, next in 30798ms
+[13:14:38.137][I][processCanMessage():351]: HEIZMODUL (0x500):  RUECKLAUFISTTEMP:       17.5    (et_dec_val)
+[13:14:38.156][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:14:38.195][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:14:39.252][I][readSignal():388]: READ "KESSELSOLLTEMP" (0x0002) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 02, 00, 00, 00, 00
+[13:14:39.256][D][REQUEST_MGR:2221]: Sent KESSEL_KESSELSOLLTEMP, next in 30200ms
+[13:14:39.311][I][processCanMessage():351]: KESSEL (0x180):     KESSELSOLLTEMP: 26.2    (et_dec_val)
+[13:14:40.114][I][readSignal():388]: READ "RAUMSOLLTEMP_NACHT" (0x0008) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 08, 00, 00, 00, 00
+[13:14:40.126][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_NACHT, next in 30850ms
+[13:14:40.149][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_NACHT:     20.0    (et_dec_val)
+[13:14:41.115][I][readSignal():388]: READ "AUSSENTEMP" (0x000c) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0c, 00, 00, 00, 00
+[13:14:41.121][D][REQUEST_MGR:2221]: Sent KESSEL_AUSSENTEMP, next in 30809ms
+[13:14:41.148][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.8     (et_dec_val)
+[13:14:42.046][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERBEDARF: 1024    (et_default)
+[13:14:42.048][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.8     (et_dec_val)
+[13:14:42.076][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.3    (et_dec_val)
+[13:14:42.119][I][readSignal():388]: READ "SPEICHERISTTEMP" (0x000e) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0e, 00, 00, 00, 00
+[13:14:42.126][D][REQUEST_MGR:2221]: Sent KESSEL_SPEICHERISTTEMP, next in 30062ms
+[13:14:42.149][I][processCanMessage():351]: KESSEL (0x180):     SPEICHERISTTEMP:        46.2    (et_dec_val)
+[13:14:43.144][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP2" (0x0a06) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 0a, 06, 00, 00
+[13:14:43.146][D][REQUEST_MGR:2221]: Sent MANAGER_EINSTELL_SPEICHERSOLLTEMP2, next in 31022ms
+[13:14:43.179][I][processCanMessage():351]: MANAGER (0x480):    EINSTELL_SPEICHERSOLLTEMP2:     48.0    (et_dec_val)
+[13:14:44.210][I][readSignal():388]: READ "JAHR" (0x0124) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 24, 00, 00
+[13:14:44.216][D][REQUEST_MGR:2221]: Sent MANAGER_JAHR, next in 62524ms
+[13:14:44.243][I][processCanMessage():351]: MANAGER (0x480):    JAHR:   25      (et_little_endian)
+[13:14:44.250][D][CALC:1821]: Updated JAHR: 25
+[13:14:45.137][I][readSignal():388]: READ "EVU_SPERRE_AKTIV" (0x0074) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 74, 00, 00, 00, 00
+[13:14:45.142][D][REQUEST_MGR:2221]: Sent MANAGER_EVU_SPERRE_AKTIV, next in 60933ms
+[13:14:45.173][I][processCanMessage():351]: MANAGER (0x480):    EVU_SPERRE_AKTIV:       ?       (et_little_bool)
+[13:14:46.027][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_NUMMER:        0       (et_default)
+[13:14:46.040][I][processCanMessage():351]: HEIZMODUL (0x500):  SOFTWARE_NUMMER:        67      (et_default)
+[13:14:46.142][I][readSignal():388]: READ "SPEICHERSOLLTEMP" (0x0003) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 03, 00, 00, 00, 00
+[13:14:46.146][D][REQUEST_MGR:2221]: Sent MANAGER_SPEICHERSOLLTEMP, next in 31299ms
+[13:14:46.176][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERSOLLTEMP:       48.0    (et_dec_val)
+[13:14:47.039][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.9     (et_dec_val)
+[13:14:47.060][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.2    (et_dec_val)
+[13:14:48.039][I][processCanMessage():351]: MANAGER (0x480):    WPVORLAUFIST:   0.0     (et_dec_val)
+[13:14:48.056][I][processCanMessage():351]: HEIZMODUL (0x500):  WPVORLAUFIST:   27.1    (et_dec_val)
+[13:14:48.059][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       0.0     (et_dec_val)
+[13:14:48.071][I][processCanMessage():351]: MANAGER (0x480):    VERDICHTER:     0.0     (et_dec_val)
+[13:14:48.107][I][processCanMessage():351]: HEIZMODUL (0x500):  RUECKLAUFISTTEMP:       17.4    (et_dec_val)
+[13:14:48.286][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:14:48.819][D][CALC:485]: Date values: Jahr=25, Monat=12, Tag=21
+[13:14:48.825][I][CALC:506]: Published date: 2025-12-21 (Jahr=25, Monat=12, Tag=21)
+[13:14:48.825][D][CALC:553]: Time values: Stunde=13, Minute=16, Sekunde=15
+[13:14:48.828][I][CALC:574]: Published time: 13:16:15 (Stunde=13, Minute=16, Sekunde=15)
+[13:14:49.130][I][readSignal():388]: READ "RAUMSOLLTEMP_II" (0x0006) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 06, 00, 00, 00, 00
+[13:14:49.136][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_II, next in 30973ms
+[13:14:49.164][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_II:        20.0    (et_dec_val)
+[13:14:50.135][I][readSignal():388]: READ "SAMMLERISTTEMP" (0x000d) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0d, 00, 00, 00, 00
+[13:14:50.140][D][REQUEST_MGR:2221]: Sent KESSEL_SAMMLERISTTEMP, next in 30635ms
+[13:14:50.167][I][processCanMessage():351]: KESSEL (0x180):     SAMMLERISTTEMP: -40.0   (et_dec_val)
+[13:14:51.138][I][readSignal():388]: READ "RUECKLAUFISTTEMP" (0x0016) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 16, 00, 00, 00, 00
+[13:14:51.142][D][REQUEST_MGR:2221]: Sent MANAGER_RUECKLAUFISTTEMP, next in 31221ms
+[13:14:51.170][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       27.0    (et_dec_val)
+[13:14:52.027][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERBEDARF: 1024    (et_default)
+[13:14:52.053][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.8     (et_dec_val)
+[13:14:52.062][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.2    (et_dec_val)
+[13:14:52.136][I][readSignal():388]: READ "RUECKLAUFISTTEMP" (0x0016) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 16, 00, 00, 00, 00
+[13:14:52.141][D][REQUEST_MGR:2221]: Sent KESSEL_RUECKLAUFISTTEMP, next in 31003ms
+[13:14:52.170][I][processCanMessage():351]: KESSEL (0x180):     RUECKLAUFISTTEMP:       27.0    (et_dec_val)
+[13:14:53.152][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP2" (0x0a06) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, fa, 0a, 06, 00, 00
+[13:14:53.156][D][REQUEST_MGR:2221]: Sent KESSEL_EINSTELL_SPEICHERSOLLTEMP2, next in 30061ms
+[13:14:53.188][I][processCanMessage():351]: KESSEL (0x180):     EINSTELL_SPEICHERSOLLTEMP2:     48.0    (et_dec_val)
+[13:14:53.661][I][processCanMessage():351]: HEIZMODUL (0x500):  INITIALISIERUNG:        1       (et_little_endian)
+[13:14:53.666][I][processCanMessage():351]: MANAGER (0x480):    INITIALISIERUNG:        1       (et_little_endian)
+[13:14:54.243][I][readSignal():388]: READ "STUNDE" (0x0125) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 25, 00, 00
+[13:14:54.245][D][REQUEST_MGR:2221]: Sent MANAGER_STUNDE, next in 62375ms
+[13:14:54.276][I][processCanMessage():351]: MANAGER (0x480):    STUNDE: 13      (et_little_endian)
+[13:14:54.279][D][CALC:1852]: Updated STUNDE: 13
+[13:14:55.031][I][processCanMessage():351]: MANAGER (0x480):    ACCESS_EEPROM:  1       (et_little_endian)
+[13:14:55.058][I][processCanMessage():351]: MANAGER (0x480):    GERAETEKONFIGURATION:   0       (et_default)
+[13:14:55.068][I][processCanMessage():351]: MANAGER (0x480):    ANFAHRENT:      0       (et_default)
+[13:14:55.085][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       27.0    (et_dec_val)
+[13:14:55.124][I][processCanMessage():351]: MANAGER (0x480):    SAMMEL_RELAISSTATUS:    0       (et_default)
+[13:14:55.129][I][processCanMessage():351]: MANAGER (0x480):    PROGRAMMSCHALTER:       Tagbetrieb      (et_betriebsart)
+[13:14:55.174][I][readSignal():388]: READ "KESSELSOLLTEMP" (0x0002) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 02, 00, 00, 00, 00
+[13:14:55.178][D][REQUEST_MGR:2221]: Sent MANAGER_KESSELSOLLTEMP, next in 30539ms
+[13:14:55.184][D][mcp2515:341]: receive buffer overrun
+[13:14:55.191][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.7     (et_dec_val)
+[13:14:55.200][I][processCanMessage():351]: MANAGER (0x480):    MINUTE: 16      (et_little_endian)
+[13:14:55.207][D][CALC:1862]: Updated MINUTE: 16
+[13:14:55.217][D][CALC:553]: Time values: Stunde=13, Minute=16, Sekunde=15
+[13:14:55.218][I][CALC:574]: Published time: 13:16:15 (Stunde=13, Minute=16, Sekunde=15)
+[13:14:55.222][I][processCanMessage():351]: MANAGER (0x480):    STUNDE: 13      (et_little_endian)
+[13:14:55.224][D][CALC:1852]: Updated STUNDE: 13
+[13:14:55.229][I][processCanMessage():351]: MANAGER (0x480):    TAG:    21      (et_little_endian)
+[13:14:55.235][D][CALC:1841]: Updated TAG: 21
+[13:14:55.245][D][CALC:485]: Date values: Jahr=25, Monat=12, Tag=21
+[13:14:55.245][I][CALC:506]: Published date: 2025-12-21 (Jahr=25, Monat=12, Tag=21)
+[13:14:55.248][I][processCanMessage():351]: MANAGER (0x480):    MONAT:  12      (et_little_endian)
+[13:14:55.253][D][CALC:1831]: Updated MONAT: 12
+[13:14:55.260][I][processCanMessage():351]: MANAGER (0x480):    JAHR:   25      (et_little_endian)
+[13:14:55.269][D][CALC:1821]: Updated JAHR: 25
+[13:14:55.273][I][processCanMessage():351]: MANAGER (0x480):    ZWISCHENEINSPRITZUNG_ISTTEMP:   0       (et_default)
+[13:14:55.285][I][processCanMessage():351]: MANAGER (0x480):    INDEX_NOT_FOUND:        0       (et_default)
+[13:14:55.294][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERBEDARF: 1024    (et_default)
+[13:14:55.313][I][processCanMessage():351]: MANAGER (0x480):    QUELLENPUMPEN_STATUS:   0       (et_default)
+[13:14:55.343][I][processCanMessage():351]: MANAGER (0x480):    TEMPORALE_LUEFTUNGSSTUFE_DAUER: 0       (et_default)
+[13:14:55.352][I][processCanMessage():351]: MANAGER (0x480):    PARAMETERSATZ:  0       (et_default)
+[13:14:55.365][I][processCanMessage():351]: HEIZMODUL (0x500):  PARAMETERSATZ:  12      (et_default)
+[13:14:55.373][I][processCanMessage():351]: MANAGER (0x480):    HARDWARE_NUMMER:        0       (et_default)
+[13:14:55.386][I][processCanMessage():351]: MANAGER (0x480):    WP_STATUS:      1       (et_little_endian)
+[13:14:55.402][I][processCanMessage():351]: MANAGER (0x480):    WPVORLAUFIST:   0.0     (et_dec_val)
+[13:14:55.407][I][processCanMessage():351]: HEIZMODUL (0x500):  HARDWARE_NUMMER:        -255    (et_default)
+[13:14:55.427][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       0.0     (et_dec_val)
+[13:14:55.442][I][processCanMessage():351]: KESSEL (0x180):     BUSKONTROLLE:   0       (et_default)
+[13:14:55.455][I][processCanMessage():351]: HEIZMODUL (0x500):  WPVORLAUFIST:   27.1    (et_dec_val)
+[13:14:55.465][I][processCanMessage():351]: MANAGER (0x480):    GERAETE_ID:     165-29  (et_dev_id)
+[13:14:55.475][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_NUMMER:        -23296  (et_default)
+[13:14:55.499][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_VERSION:       7424    (et_default)
+[13:14:55.503][I][processCanMessage():351]: MANAGER (0x480):    TEILVORRANG_WW: 0       (et_default)
+[13:14:55.513][I][processCanMessage():351]: HEIZMODUL (0x500):  RUECKLAUFISTTEMP:       17.4    (et_dec_val)
+[13:14:55.525][I][processCanMessage():351]: MANAGER (0x480):    LZ_VERD_1_HEIZBETRIEB:  0.000   (et_mil_val)
+[13:14:55.538][I][processCanMessage():351]: MANAGER (0x480):    LZ_VERD_2_HEIZBETRIEB:  0.000   (et_mil_val)
+[13:14:55.557][I][processCanMessage():351]: MANAGER (0x480):    LZ_VERD_1_2_HEIZBETRIEB:        0.000   (et_mil_val)
+[13:14:55.569][I][processCanMessage():351]: HEIZMODUL (0x500):  LZ_VERD_1_HEIZBETRIEB:  -255    (et_mil_val)
+[13:14:55.580][I][processCanMessage():351]: MANAGER (0x480):    LZ_VERD_1_WW_BETRIEB:   0       (et_default)
+[13:14:55.590][I][processCanMessage():351]: MANAGER (0x480):    LZ_VERD_2_WW_BETRIEB:   0       (et_default)
+[13:14:55.610][I][processCanMessage():351]: MANAGER (0x480):    LZ_VERD_1_2_WW_BETRIEB: 0       (et_default)
+[13:14:55.628][I][processCanMessage():351]: MANAGER (0x480):    LZ_VERD_1_KUEHLBETRIEB: 0.000   (et_mil_val)
+[13:14:55.637][I][processCanMessage():351]: MANAGER (0x480):    LZ_VERD_2_KUEHLBETRIEB: 0.000   (et_mil_val)
+[13:14:55.662][I][processCanMessage():351]: MANAGER (0x480):    LZ_VERD_1_2_KUEHLBETRIEB:       0.000   (et_mil_val)
+[13:14:55.663][I][processCanMessage():351]: HEIZMODUL (0x500):  LZ_VERD_2_HEIZBETRIEB:  0.425   (et_mil_val)
+[13:14:55.677][I][processCanMessage():351]: MANAGER (0x480):    LAUFZEIT_VERD_BEI_SPEICHERBEDARF:       0       (et_default)
+[13:14:55.691][I][processCanMessage():351]: MANAGER (0x480):    KESSELSOLLTEMP: 26.2    (et_dec_val)
+[13:14:55.709][I][processCanMessage():351]: HEIZMODUL (0x500):  LZ_VERD_1_2_HEIZBETRIEB:        0.000   (et_mil_val)
+[13:14:55.764][I][processCanMessage():351]: HEIZMODUL (0x500):  LZ_VERD_1_WW_BETRIEB:   -255    (et_default)
+[13:14:55.820][I][processCanMessage():351]: HEIZMODUL (0x500):  LZ_VERD_2_WW_BETRIEB:   4353    (et_default)
+[13:14:55.866][I][processCanMessage():351]: HEIZMODUL (0x500):  LZ_VERD_1_2_WW_BETRIEB: 0       (et_default)
+[13:14:55.919][I][processCanMessage():351]: HEIZMODUL (0x500):  LZ_VERD_1_KUEHLBETRIEB: -255    (et_mil_val)
+[13:14:55.957][I][processCanMessage():351]: HEIZMODUL (0x500):  LZ_VERD_2_KUEHLBETRIEB: -255    (et_mil_val)
+[13:14:56.010][I][processCanMessage():351]: HEIZMODUL (0x500):  LZ_VERD_1_2_KUEHLBETRIEB:       0.000   (et_mil_val)
+[13:14:56.056][I][processCanMessage():351]: HEIZMODUL (0x500):  FEHLERMELDUNG:  0       (et_default)
+[13:14:56.127][I][processCanMessage():351]: HEIZMODUL (0x500):  SOLAR_KOLLEKTOR_3_I_ANTEIL:     0       (et_default)
+[13:14:56.139][I][readSignal():388]: READ "SPEICHERSOLLTEMP" (0x0003) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 03, 00, 00, 00, 00
+[13:14:56.141][D][REQUEST_MGR:2221]: Sent KESSEL_SPEICHERSOLLTEMP, next in 31478ms
+[13:14:56.149][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDAMPFERTEMP: 9       (et_byte)
+[13:14:56.158][I][processCanMessage():351]: KESSEL (0x180):     SPEICHERSOLLTEMP:       48.0    (et_dec_val)
+[13:14:56.192][I][processCanMessage():351]: HEIZMODUL (0x500):  GERAETE_ID:     67-16   (et_dev_id)
+[13:14:56.249][I][processCanMessage():351]: HEIZMODUL (0x500):  SPEICHER_STATUS:        129     (et_little_endian)
+[13:14:56.325][I][processCanMessage():351]: HEIZMODUL (0x500):  SCHALTFKT_IWS:  0       (et_default)
+[13:14:56.374][I][processCanMessage():351]: HEIZMODUL (0x500):  INDEX_NOT_FOUND:        0       (et_default)
+[13:14:56.404][I][processCanMessage():351]: HEIZMODUL (0x500):  ABTAUUNGAKTIV:  off     (et_little_bool)
+[13:14:56.456][I][processCanMessage():351]: HEIZMODUL (0x500):  STUETZSTELLE_ND1:       100     (et_default)
+[13:14:56.509][I][processCanMessage():351]: HEIZMODUL (0x500):  STUETZSTELLE_ND2:       1700    (et_default)
+[13:14:56.558][I][processCanMessage():351]: HEIZMODUL (0x500):  STUETZSTELLE_HD1:       100     (et_default)
+[13:14:56.667][I][processCanMessage():351]: HEIZMODUL (0x500):  STUETZSTELLE_HD2:       3100    (et_default)
+[13:14:56.717][I][processCanMessage():351]: HEIZMODUL (0x500):  BETRIEBSART_WP: 0       (et_default)
+[13:14:56.770][I][processCanMessage():351]: HEIZMODUL (0x500):  FATAL_ERROR:    0       (et_default)
+[13:14:56.803][I][processCanMessage():351]: HEIZMODUL (0x500):  K_OS_RMX_RESERVE_INFO3: 0       (et_default)
+[13:14:56.861][I][processCanMessage():351]: HEIZMODUL (0x500):  FEHLER_PARAMETERSATZ_IWS:       0       (et_default)
+[13:14:57.145][I][readSignal():388]: READ "RAUMSOLLTEMP_I" (0x0005) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 05, 00, 00, 00, 00
+[13:14:57.145][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_I, next in 30004ms
+[13:14:57.173][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_I: 20.0    (et_dec_val)
+[13:14:58.146][I][readSignal():388]: READ "RAUMSOLLTEMP_III" (0x0007) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 07, 00, 00, 00, 00
+[13:14:58.150][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_III, next in 31108ms
+[13:14:58.187][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_III:       20.0    (et_dec_val)
+[13:15:00.155][I][readSignal():388]: READ "VORLAUFISTTEMP" (0x000f) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0f, 00, 00, 00, 00
+[13:15:00.155][D][REQUEST_MGR:2221]: Sent KESSEL_VORLAUFISTTEMP, next in 31187ms
+[13:15:00.184][I][processCanMessage():351]: KESSEL (0x180):     VORLAUFISTTEMP: 26.8    (et_dec_val)
+[13:15:01.154][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP" (0x0013) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 13, 00, 00, 00, 00
+[13:15:01.156][D][REQUEST_MGR:2221]: Sent KESSEL_EINSTELL_SPEICHERSOLLTEMP, next in 30515ms
+[13:15:01.190][I][processCanMessage():351]: KESSEL (0x180):     EINSTELL_SPEICHERSOLLTEMP:      48.0    (et_dec_val)
+[13:15:02.153][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP" (0x0013) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 13, 00, 00, 00, 00
+[13:15:02.160][D][REQUEST_MGR:2221]: Sent MANAGER_EINSTELL_SPEICHERSOLLTEMP, next in 30245ms
+[13:15:02.205][I][processCanMessage():351]: MANAGER (0x480):    EINSTELL_SPEICHERSOLLTEMP:      48.0    (et_dec_val)
+[13:15:02.386][I][readSignal():388]: READ "PROGRAMMSCHALTER" (0x0112) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 12, 00, 00
+[13:15:02.408][I][processCanMessage():351]: MANAGER (0x480):    PROGRAMMSCHALTER:       Tagbetrieb      (et_betriebsart)
+[13:15:03.281][I][readSignal():388]: READ "MONAT" (0x0123) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 23, 00, 00
+[13:15:03.281][D][REQUEST_MGR:2221]: Sent MANAGER_MONAT, next in 60397ms
+[13:15:03.323][I][processCanMessage():351]: MANAGER (0x480):    MONAT:  12      (et_little_endian)
+[13:15:03.323][D][CALC:1831]: Updated MONAT: 12
+[13:15:03.331][I][readSignal():388]: READ "WW_ECO" (0x027e) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 02, 7e, 00, 00
+[13:15:03.378][I][processCanMessage():351]: MANAGER (0x480):    WW_ECO: on      (et_bool)
+[13:15:04.008][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_NUMMER:        0       (et_default)
+[13:15:04.034][I][processCanMessage():351]: HEIZMODUL (0x500):  SOFTWARE_NUMMER:        67      (et_default)
+[13:15:04.197][I][readSignal():388]: READ "WPVORLAUFIST" (0x01d6) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, fa, 01, d6, 00, 00
+[13:15:04.202][D][REQUEST_MGR:2221]: Sent KESSEL_WPVORLAUFIST, next in 30980ms
+[13:15:04.227][I][processCanMessage():351]: KESSEL (0x180):     WPVORLAUFIST:   29.8    (et_dec_val)
+[13:15:04.824][I][readSignal():388]: READ "SOMMERBETRIEB" (0xfdb4) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, fd, b4, 00, 00
+[13:15:04.854][I][processCanMessage():351]: MANAGER (0x480):    SOMMERBETRIEB:  on      (et_little_bool)
+[13:15:04.860][D][CALC:621]: Published Betriebsart: Sommerbetrieb (SOMMERBETRIEB=on)
+[13:15:06.292][I][readSignal():388]: READ "TAG" (0x0122) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 22, 00, 00
+[13:15:06.295][D][REQUEST_MGR:2221]: Sent MANAGER_TAG, next in 61362ms
+[13:15:06.323][I][processCanMessage():351]: MANAGER (0x480):    TAG:    21      (et_little_endian)
+[13:15:06.324][D][CALC:1841]: Updated TAG: 21
+[13:15:06.324][D][CALC:485]: Date values: Jahr=25, Monat=12, Tag=21
+[13:15:06.328][I][CALC:506]: Published date: 2025-12-21 (Jahr=25, Monat=12, Tag=21)
+[13:15:07.031][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERBEDARF: 1024    (et_default)
+[13:15:07.054][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.8     (et_dec_val)
+[13:15:07.066][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.3    (et_dec_val)
+[13:15:07.169][I][readSignal():388]: READ "MINUTE" (0x0126) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 26, 00, 00
+[13:15:07.173][D][REQUEST_MGR:2221]: Sent MANAGER_MINUTE, next in 60724ms
+[13:15:07.204][I][processCanMessage():351]: MANAGER (0x480):    MINUTE: 16      (et_little_endian)
+[13:15:07.208][D][CALC:1862]: Updated MINUTE: 16
+[13:15:07.210][D][CALC:553]: Time values: Stunde=13, Minute=16, Sekunde=15
+[13:15:07.222][I][CALC:574]: Published time: 13:16:15 (Stunde=13, Minute=16, Sekunde=15)
+[13:15:08.036][I][processCanMessage():351]: MANAGER (0x480):    WPVORLAUFIST:   0.0     (et_dec_val)
+[13:15:08.045][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       0.0     (et_dec_val)
+[13:15:08.061][I][processCanMessage():351]: HEIZMODUL (0x500):  WPVORLAUFIST:   27.1    (et_dec_val)
+[13:15:08.078][I][processCanMessage():351]: MANAGER (0x480):    VERDICHTER:     0.0     (et_dec_val)
+[13:15:08.083][I][processCanMessage():351]: HEIZMODUL (0x500):  RUECKLAUFISTTEMP:       17.4    (et_dec_val)
+[13:15:08.137][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:15:08.214][I][readSignal():388]: READ "AUSSENTEMP" (0x000c) FROM HEIZMODUL (0x500 {0xa1, 0x00}): a1, 00, 0c, 00, 00, 00, 00
+[13:15:08.214][D][REQUEST_MGR:2221]: Sent HEIZMODUL_AUSSENTEMP, next in 30184ms
+[13:15:08.239][I][processCanMessage():351]: HEIZMODUL (0x500):  AUSSENTEMP:     4.1     (et_dec_val)
+[13:15:09.186][I][readSignal():388]: READ "VERDICHTER" (0x07a8) FROM HEIZMODUL (0x500 {0xa1, 0x00}): a1, 00, fa, 07, a8, 00, 00
+[13:15:09.189][D][REQUEST_MGR:2221]: Sent HEIZMODUL_VERDICHTER, next in 30836ms
+[13:15:09.217][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:15:10.321][I][readSignal():388]: READ "KESSELSOLLTEMP" (0x0002) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 02, 00, 00, 00, 00
+[13:15:10.327][D][REQUEST_MGR:2221]: Sent KESSEL_KESSELSOLLTEMP, next in 30256ms
+[13:15:10.353][I][processCanMessage():351]: KESSEL (0x180):     KESSELSOLLTEMP: 26.1    (et_dec_val)
+[13:15:11.176][I][readSignal():388]: READ "RAUMSOLLTEMP_NACHT" (0x0008) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 08, 00, 00, 00, 00
+[13:15:11.180][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_NACHT, next in 30121ms
+[13:15:11.211][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_NACHT:     20.0    (et_dec_val)
+[13:15:12.036][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     6.0     (et_dec_val)
+[13:15:12.065][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.2    (et_dec_val)
+[13:15:12.186][I][readSignal():388]: READ "AUSSENTEMP" (0x000c) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0c, 00, 00, 00, 00
+[13:15:12.186][D][REQUEST_MGR:2221]: Sent KESSEL_AUSSENTEMP, next in 30242ms
+[13:15:12.206][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     6.0     (et_dec_val)
+[13:15:13.179][I][readSignal():388]: READ "SPEICHERISTTEMP" (0x000e) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0e, 00, 00, 00, 00
+[13:15:13.183][D][REQUEST_MGR:2221]: Sent KESSEL_SPEICHERISTTEMP, next in 30124ms
+[13:15:13.211][I][processCanMessage():351]: KESSEL (0x180):     SPEICHERISTTEMP:        46.3    (et_dec_val)
+[13:15:14.204][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP2" (0x0a06) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 0a, 06, 00, 00
+[13:15:14.208][D][REQUEST_MGR:2221]: Sent MANAGER_EINSTELL_SPEICHERSOLLTEMP2, next in 30785ms
+[13:15:14.243][I][processCanMessage():351]: MANAGER (0x480):    EINSTELL_SPEICHERSOLLTEMP2:     48.0    (et_dec_val)
+[13:15:15.290][I][readSignal():388]: READ "WP_STATUS" (0xfdae) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, fd, ae, 00, 00
+[13:15:15.294][D][REQUEST_MGR:2221]: Sent MANAGER_WP_STATUS, next in 60567ms
+[13:15:15.329][I][processCanMessage():351]: MANAGER (0x480):    WP_STATUS:      -255    (et_little_endian)
+[13:15:16.024][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_NUMMER:        0       (et_default)
+[13:15:16.051][I][processCanMessage():351]: HEIZMODUL (0x500):  SOFTWARE_NUMMER:        67      (et_default)
+[13:15:17.039][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERBEDARF: 1024    (et_default)
+[13:15:17.068][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     6.0     (et_dec_val)
+[13:15:17.073][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.2    (et_dec_val)
+[13:15:17.219][I][readSignal():388]: READ "SOMMERBETRIEB" (0xfdb4) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, fd, b4, 00, 00
+[13:15:17.223][D][REQUEST_MGR:2221]: Sent MANAGER_SOMMERBETRIEB, next in 62358ms
+[13:15:17.261][I][processCanMessage():351]: MANAGER (0x480):    SOMMERBETRIEB:  on      (et_little_bool)
+[13:15:17.276][D][CALC:621]: Published Betriebsart: Sommerbetrieb (SOMMERBETRIEB=on)
+[13:15:18.076][I][processCanMessage():351]: MANAGER (0x480):    WPVORLAUFIST:   0.0     (et_dec_val)
+[13:15:18.089][I][processCanMessage():351]: HEIZMODUL (0x500):  WPVORLAUFIST:   27.1    (et_dec_val)
+[13:15:18.096][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       0.0     (et_dec_val)
+[13:15:18.126][D][mcp2515:341]: receive buffer overrun
+[13:15:18.134][I][processCanMessage():351]: MANAGER (0x480):    VERDICHTER:     0.0     (et_dec_val)
+[13:15:18.141][I][processCanMessage():351]: MANAGER (0x480):    MINUTE: 17      (et_little_endian)
+[13:15:18.149][D][CALC:1862]: Updated MINUTE: 17
+[13:15:18.151][D][CALC:553]: Time values: Stunde=13, Minute=17, Sekunde=15
+[13:15:18.169][I][CALC:574]: Published time: 13:17:15 (Stunde=13, Minute=17, Sekunde=15)
+[13:15:18.169][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:15:18.172][I][processCanMessage():351]: HEIZMODUL (0x500):  RUECKLAUFISTTEMP:       17.4    (et_dec_val)
+[13:15:18.199][I][readSignal():388]: READ "SPEICHERSOLLTEMP" (0x0003) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 03, 00, 00, 00, 00
+[13:15:18.205][D][REQUEST_MGR:2221]: Sent MANAGER_SPEICHERSOLLTEMP, next in 31260ms
+[13:15:18.232][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERSOLLTEMP:       48.0    (et_dec_val)
+[13:15:19.018][I][processCanMessage():351]: PC (0x680): BUSKONFIGURATION:       2048    (et_default)
+[13:15:20.211][I][readSignal():388]: READ "RAUMSOLLTEMP_II" (0x0006) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 06, 00, 00, 00, 00
+[13:15:20.213][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_II, next in 30207ms
+[13:15:20.246][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_II:        20.0    (et_dec_val)
+[13:15:21.214][I][readSignal():388]: READ "SAMMLERISTTEMP" (0x000d) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0d, 00, 00, 00, 00
+[13:15:21.217][D][REQUEST_MGR:2221]: Sent KESSEL_SAMMLERISTTEMP, next in 31035ms
+[13:15:21.249][I][processCanMessage():351]: KESSEL (0x180):     SAMMLERISTTEMP: -40.0   (et_dec_val)
+[13:15:22.038][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     6.0     (et_dec_val)
+[13:15:22.052][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.2    (et_dec_val)
+[13:15:23.226][I][readSignal():388]: READ "RUECKLAUFISTTEMP" (0x0016) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 16, 00, 00, 00, 00
+[13:15:23.233][D][REQUEST_MGR:2221]: Sent MANAGER_RUECKLAUFISTTEMP, next in 30917ms
+[13:15:23.259][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       26.9    (et_dec_val)
+[13:15:24.235][I][readSignal():388]: READ "RUECKLAUFISTTEMP" (0x0016) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 16, 00, 00, 00, 00
+[13:15:24.235][D][REQUEST_MGR:2221]: Sent KESSEL_RUECKLAUFISTTEMP, next in 30496ms
+[13:15:24.256][I][processCanMessage():351]: KESSEL (0x180):     RUECKLAUFISTTEMP:       27.0    (et_dec_val)
+[13:15:25.241][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP2" (0x0a06) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, fa, 0a, 06, 00, 00
+[13:15:25.246][D][REQUEST_MGR:2221]: Sent KESSEL_EINSTELL_SPEICHERSOLLTEMP2, next in 31397ms
+[13:15:25.282][I][processCanMessage():351]: KESSEL (0x180):     EINSTELL_SPEICHERSOLLTEMP2:     48.0    (et_dec_val)
+[13:15:26.030][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_NUMMER:        0       (et_default)
+[13:15:26.060][I][processCanMessage():351]: HEIZMODUL (0x500):  SOFTWARE_NUMMER:        67      (et_default)
+[13:15:26.361][I][readSignal():388]: READ "KESSELSOLLTEMP" (0x0002) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 02, 00, 00, 00, 00
+[13:15:26.365][D][REQUEST_MGR:2221]: Sent MANAGER_KESSELSOLLTEMP, next in 31058ms
+[13:15:26.396][I][processCanMessage():351]: MANAGER (0x480):    KESSELSOLLTEMP: 26.1    (et_dec_val)
+[13:15:27.037][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERBEDARF: 1024    (et_default)
+[13:15:27.064][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     6.1     (et_dec_val)
+[13:15:27.071][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.2    (et_dec_val)
+[13:15:27.232][I][readSignal():388]: READ "RAUMSOLLTEMP_I" (0x0005) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 05, 00, 00, 00, 00
+[13:15:27.235][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_I, next in 30919ms
+[13:15:27.261][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_I: 20.0    (et_dec_val)
+[13:15:28.043][I][processCanMessage():351]: MANAGER (0x480):    WPVORLAUFIST:   0.0     (et_dec_val)
+[13:15:28.058][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       0.0     (et_dec_val)
+[13:15:28.070][I][processCanMessage():351]: HEIZMODUL (0x500):  WPVORLAUFIST:   27.1    (et_dec_val)
+[13:15:28.079][I][processCanMessage():351]: MANAGER (0x480):    VERDICHTER:     0.0     (et_dec_val)
+[13:15:28.131][I][processCanMessage():351]: HEIZMODUL (0x500):  RUECKLAUFISTTEMP:       17.5    (et_dec_val)
+[13:15:28.183][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:15:28.383][I][readSignal():388]: READ "SPEICHERSOLLTEMP" (0x0003) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 03, 00, 00, 00, 00
+[13:15:28.388][D][REQUEST_MGR:2221]: Sent KESSEL_SPEICHERSOLLTEMP, next in 30108ms
+[13:15:28.416][I][processCanMessage():351]: KESSEL (0x180):     SPEICHERSOLLTEMP:       48.0    (et_dec_val)
+[13:15:30.258][I][readSignal():388]: READ "RAUMSOLLTEMP_III" (0x0007) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 07, 00, 00, 00, 00
+[13:15:30.258][D][REQUEST_MGR:2221]: Sent MANAGER_RAUMSOLLTEMP_III, next in 31213ms
+[13:15:30.278][I][processCanMessage():351]: MANAGER (0x480):    RAUMSOLLTEMP_III:       20.0    (et_dec_val)
+[13:15:32.035][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.9     (et_dec_val)
+[13:15:32.046][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.2    (et_dec_val)
+[13:15:32.245][I][readSignal():388]: READ "VORLAUFISTTEMP" (0x000f) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 0f, 00, 00, 00, 00
+[13:15:32.250][D][REQUEST_MGR:2221]: Sent KESSEL_VORLAUFISTTEMP, next in 30954ms
+[13:15:32.278][I][processCanMessage():351]: KESSEL (0x180):     VORLAUFISTTEMP: 26.8    (et_dec_val)
+[13:15:33.247][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP" (0x0013) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, 13, 00, 00, 00, 00
+[13:15:33.251][D][REQUEST_MGR:2221]: Sent KESSEL_EINSTELL_SPEICHERSOLLTEMP, next in 30313ms
+[13:15:33.280][I][processCanMessage():351]: KESSEL (0x180):     EINSTELL_SPEICHERSOLLTEMP:      48.0    (et_dec_val)
+[13:15:34.248][I][readSignal():388]: READ "EINSTELL_SPEICHERSOLLTEMP" (0x0013) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, 13, 00, 00, 00, 00
+[13:15:34.252][D][REQUEST_MGR:2221]: Sent MANAGER_EINSTELL_SPEICHERSOLLTEMP, next in 30112ms
+[13:15:34.280][I][processCanMessage():351]: MANAGER (0x480):    EINSTELL_SPEICHERSOLLTEMP:      48.0    (et_dec_val)
+[13:15:35.254][I][readSignal():388]: READ "WPVORLAUFIST" (0x01d6) FROM KESSEL (0x180 {0x31, 0x00}): 31, 00, fa, 01, d6, 00, 00
+[13:15:35.265][D][REQUEST_MGR:2221]: Sent KESSEL_WPVORLAUFIST, next in 30687ms
+[13:15:35.285][I][processCanMessage():351]: KESSEL (0x180):     WPVORLAUFIST:   29.8    (et_dec_val)
+[13:15:36.023][I][processCanMessage():351]: MANAGER (0x480):    SOFTWARE_NUMMER:        0       (et_default)
+[13:15:36.026][I][processCanMessage():351]: HEIZMODUL (0x500):  SOFTWARE_NUMMER:        67      (et_default)
+[13:15:36.369][I][readSignal():388]: READ "SEKUNDE" (0x0127) FROM MANAGER (0x480 {0x91, 0x00}): 91, 00, fa, 01, 27, 00, 00
+[13:15:36.373][D][REQUEST_MGR:2221]: Sent MANAGER_SEKUNDE, next in 61646ms
+[13:15:36.401][I][processCanMessage():351]: MANAGER (0x480):    SEKUNDE:        18      (et_little_endian)
+[13:15:36.407][D][CALC:1873]: Updated SEKUNDE: 18
+[13:15:37.039][I][processCanMessage():351]: MANAGER (0x480):    SPEICHERBEDARF: 1024    (et_default)
+[13:15:37.065][I][processCanMessage():351]: KESSEL (0x180):     AUSSENTEMP:     5.8     (et_dec_val)
+[13:15:37.074][I][processCanMessage():351]: KESSEL (0x180):     HILFSKESSELSOLL:        25.3    (et_dec_val)
+[13:15:37.270][I][readSignal():388]: READ "ABTAUUNGAKTIV" (0x0061) FROM HEIZMODUL (0x500 {0xa1, 0x00}): a1, 00, 61, 00, 00, 00, 00
+[13:15:37.281][D][REQUEST_MGR:2221]: Sent HEIZMODUL_ABTAUUNGAKTIV, next in 60152ms
+[13:15:37.304][I][processCanMessage():351]: HEIZMODUL (0x500):  ABTAUUNGAKTIV:  off     (et_little_bool)
+[13:15:38.071][I][processCanMessage():351]: MANAGER (0x480):    WPVORLAUFIST:   0.0     (et_dec_val)
+[13:15:38.071][I][processCanMessage():351]: MANAGER (0x480):    RUECKLAUFISTTEMP:       0.0     (et_dec_val)
+[13:15:38.071][I][processCanMessage():351]: HEIZMODUL (0x500):  WPVORLAUFIST:   27.1    (et_dec_val)
+[13:15:38.071][I][processCanMessage():351]: MANAGER (0x480):    VERDICHTER:     0.0     (et_dec_val)
+[13:15:38.080][I][processCanMessage():351]: HEIZMODUL (0x500):  RUECKLAUFISTTEMP:       17.5    (et_dec_val)
+[13:15:38.160][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)
+[13:15:39.289][I][readSignal():388]: READ "AUSSENTEMP" (0x000c) FROM HEIZMODUL (0x500 {0xa1, 0x00}): a1, 00, 0c, 00, 00, 00, 00
+[13:15:39.300][D][REQUEST_MGR:2221]: Sent HEIZMODUL_AUSSENTEMP, next in 30087ms
+[13:15:39.325][I][processCanMessage():351]: HEIZMODUL (0x500):  AUSSENTEMP:     4.2     (et_dec_val)
+[13:15:40.275][I][readSignal():388]: READ "VERDICHTER" (0x07a8) FROM HEIZMODUL (0x500 {0xa1, 0x00}): a1, 00, fa, 07, a8, 00, 00
+[13:15:40.287][D][REQUEST_MGR:2221]: Sent HEIZMODUL_VERDICHTER, next in 31058ms
+[13:15:40.313][I][processCanMessage():351]: HEIZMODUL (0x500):  VERDICHTER:     0.8     (et_dec_val)

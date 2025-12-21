@@ -83,6 +83,29 @@
 #define FREQ_60MIN 3600
 
 // ============================================================================
+// CALCULATED SENSOR SETTINGS
+// ============================================================================
+
+// Update frequency for calculated sensors (in seconds)
+// These values determine how often calculated values are published
+// Setting lower values increases MQTT traffic but provides more responsive updates
+
+// Delta T sensors update frequency (based on temperature sensor frequency)
+#define CALC_DELTA_T_FREQUENCY FREQ_30S
+
+// Compressor active sensor update frequency (based on VERDICHTER frequency)
+#define CALC_COMPRESSOR_FREQUENCY FREQ_30S
+
+// Date/Time sensors update frequency (based on date/time signal frequency)
+#define CALC_DATETIME_FREQUENCY FREQ_1MIN
+
+// Betriebsart sensor update frequency (based on SOMMERBETRIEB frequency)
+#define CALC_BETRIEBSART_FREQUENCY FREQ_1MIN
+
+// COP sensors update frequency (based on energy counter frequency)
+#define CALC_COP_FREQUENCY FREQ_10MIN
+
+// ============================================================================
 // COP CALCULATION SETTINGS
 // ============================================================================
 
