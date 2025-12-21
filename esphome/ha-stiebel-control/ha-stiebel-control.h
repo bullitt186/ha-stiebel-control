@@ -100,11 +100,32 @@ typedef struct {
     const char* stateClass;      // measurement, total, total_increasing
 } SignalConfig;
 
+// ============================================================================
+// AUTOMATIC SENSOR TYPE DETECTION (based on ElsterTable data types)
+// ============================================================================
+// The system automatically determines Home Assistant component type:
+//   - et_bool, et_little_bool  → binary_sensor (payload_on: "on", payload_off: "off")
+//   - All other types          → sensor (numeric/text values)
+//
+// SignalConfig patterns below configure device_class, unit, icon, and state_class.
+// Boolean sensors automatically get binary_sensor type regardless of pattern.
+// ============================================================================
+
 // Configurable signal mapping table - EDIT THIS to customize sensors
 static const SignalConfig signalMappings[] = {
     
     // Temperature sensors
     {"TEMP", "temperature", "°C", "mdi:thermometer", "measurement"},
+    
+    // Boolean/Binary sensors (automatically detected as binary_sensor, these provide device_class)
+    {"EVU_SPERRE_AKTIV", "power", "", "mdi:transmission-tower-off", ""},  // Grid lock active
+    {"ABTAUUNGAKTIV", "running", "", "mdi:snowflake-melt", ""},           // Defrost active
+    {"ANTILEG_AKTIV", "running", "", "mdi:bacteria", ""},                 // Anti-legionella active
+    {"EINMAL_WW_AKTIV", "running", "", "mdi:water-boiler", ""},          // One-time hot water active
+    {"SOMMERBETRIEB", "heat", "", "mdi:white-balance-sunny", ""},        // Summer mode
+    {"WW_ECO", "running", "", "mdi:leaf", ""},                          // Hot water eco mode
+    {"*_AKTIV", "running", "", "mdi:check-circle", ""},                  // Generic active status
+    {"*AKTIV*", "running", "", "mdi:power", ""},                         // Generic active pattern
     
     // Energy sensors
     {"KWH", "energy", "kWh", "mdi:lightning-bolt", "total_increasing"},
@@ -160,7 +181,7 @@ static const SignalConfig signalMappings[] = {
     
     // Status indicators
     {"*STATUS*", "", "", "mdi:information", "measurement"},
-    {"*SPERRE*", "", "", "mdi:lock", ""},
+    {"*SPERRE*", "lock", "", "mdi:lock", ""},  // Lock/blockage signals
     {"*PUMPE*", "", "", "mdi:pump", ""},
     {"*BRENNER*", "", "", "mdi:fire", ""},
     {"*MISCHER*", "", "", "mdi:valve", ""},
@@ -1146,6 +1167,8 @@ void publishMqttDiscovery(uint32_t can_id, const ElsterIndex *ei) {
     discoveredSignals.insert(uid);
     
     // Determine component type based on ElsterType
+    // Boolean types (et_bool, et_little_bool) → binary_sensor
+    // All other types → sensor
     const char* component = "sensor";
     if (ei->Type == et_bool || ei->Type == et_little_bool) {
         component = "binary_sensor";
