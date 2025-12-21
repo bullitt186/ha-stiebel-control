@@ -214,6 +214,9 @@ static int lastStunde = -1;
 static int lastMinute = -1;
 static int lastSekunde = -1;
 
+// UID cache to avoid repeated string operations on every signal update
+static std::map<std::string, std::string> uidCache;
+
 // ============================================================================
 // SIGNAL REQUEST CONFIGURATION
 // ============================================================================
@@ -949,6 +952,31 @@ inline std::string expandSignalName(const char* signalName) {
     return name;
 }
 
+// Get or create cached UID for a signal (eliminates repeated string ops)
+inline std::string getOrCreateUID(uint32_t can_id, const char* signalName) {
+    // Create cache key
+    char cacheKey[256];
+    snprintf(cacheKey, sizeof(cacheKey), "%u:%s", can_id, signalName);
+    
+    // Check cache first
+    auto it = uidCache.find(cacheKey);
+    if (it != uidCache.end()) {
+        return it->second;
+    }
+    
+    // Generate UID if not cached
+    const CanMember &cm = lookupCanMember(can_id);
+    char uid[128];
+    snprintf(uid, sizeof(uid), "stiebel_%s_%s", cm.Name, signalName);
+    std::string result(uid);
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    std::replace(result.begin(), result.end(), ' ', '_');
+    
+    // Store in cache
+    uidCache[cacheKey] = result;
+    return result;
+}
+
 // Get signal configuration based on expanded name and type
 inline const SignalConfig* getSignalConfig(const char* signalName, ElsterType type) {
     // First expand the signal name
@@ -1075,12 +1103,8 @@ void publishMqttDiscovery(uint32_t can_id, const ElsterIndex *ei) {
     const CanMember &cm = lookupCanMember(can_id);
     const SignalConfig* config = getSignalConfig(ei->Name, (ElsterType)ei->Type);
     
-    // Generate unique ID (lowercase, no spaces)
-    char uniqueId[128];
-    snprintf(uniqueId, sizeof(uniqueId), "stiebel_%s_%s", cm.Name, ei->Name);
-    std::string uid(uniqueId);
-    std::transform(uid.begin(), uid.end(), uid.begin(), ::tolower);
-    std::replace(uid.begin(), uid.end(), ' ', '_');
+    // Get cached UID (avoids repeated string operations)
+    std::string uid = getOrCreateUID(can_id, ei->Name);
     
     // Check if already discovered
     if (discoveredSignals.find(uid) != discoveredSignals.end()) {
@@ -1632,11 +1656,7 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
                          ei->Name, cm.Name, invalidSignalCounts[key], value.c_str());
                 
                 // Remove from Home Assistant by sending empty discovery message
-                char uniqueId[128];
-                snprintf(uniqueId, sizeof(uniqueId), "stiebel_%s_%s", cm.Name, ei->Name);
-                std::string uid(uniqueId);
-                std::transform(uid.begin(), uid.end(), uid.begin(), ::tolower);
-                std::replace(uid.begin(), uid.end(), ' ', '_');
+                std::string uid = getOrCreateUID(can_id, ei->Name);
                 
                 const char* component = (ei->Type == et_bool || ei->Type == et_little_bool) ? "binary_sensor" : "sensor";
                 char discoveryTopic[256];
@@ -1811,6 +1831,14 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
     }
 }
 
+// Helper function to generate random number in range [min, max) using ESP32 hardware RNG
+// esp_random() uses hardware entropy sources and doesn't need seeding
+unsigned long getRandomInRange(unsigned long min, unsigned long max) {
+    if (min >= max) return min;
+    unsigned long range = max - min;
+    return min + (esp_random() % range);
+}
+
 // Check for timed-out requests (no response received)
 void checkPendingRequests() {
     unsigned long now = millis();
@@ -1879,24 +1907,57 @@ void checkPendingRequests() {
 
 // Process signal request table with frequency-based scheduling
 void processSignalRequests() {
+    unsigned long now = millis();
+    
     // Startup delay: wait before starting signal requests
     if (!requestManagerStarted) {
         if (requestManagerStartTime == 0) {
-            requestManagerStartTime = millis();
+            requestManagerStartTime = now;
             ESP_LOGI("REQUEST_MGR", "Starting signal request manager (%ds startup delay)", STARTUP_DELAY_MS / 1000);
             return;
         }
         
-        if (millis() - requestManagerStartTime < STARTUP_DELAY_MS) {
+        if (now - requestManagerStartTime < STARTUP_DELAY_MS) {
             return; // Still in startup delay
         }
         
         requestManagerStarted = true;
         ESP_LOGI("REQUEST_MGR", "Signal request manager active - processing %d signal definitions", 
                  SIGNAL_REQUEST_COUNT);
+        
+        // Initialize all signal schedules with random offsets to spread out initial load
+        ESP_LOGI("REQUEST_MGR", "Initializing signal schedules with random offsets to prevent burst");
+        for (int i = 0; i < SIGNAL_REQUEST_COUNT; i++) {
+            const SignalRequest& req = signalRequests[i];
+            const ElsterIndex* ei = GetElsterIndex(req.signalName);
+            if (!ei || ei->Index == 0xFFFF) continue;
+            
+            unsigned long intervalMs = req.frequency * 1000UL;
+            
+            if (req.member == cm_other) {
+                // Schedule for all members
+                const CanMember* allMembers[] = {
+                    &CanMembers[cm_kessel],
+                    &CanMembers[cm_manager],
+                    &CanMembers[cm_heizmodul]
+                };
+                for (size_t m = 0; m < 3; m++) {
+                    std::string key = std::string(allMembers[m]->Name) + "_" + ei->Name;
+                    // Random offset between 0 and full interval using ESP32 hardware RNG
+                    unsigned long randomOffset = getRandomInRange(0, intervalMs + 1);
+                    nextRequestTime[key] = now + randomOffset;
+                }
+            } else {
+                // Schedule for specific member
+                const CanMember* member = &CanMembers[req.member];
+                std::string key = std::string(member->Name) + "_" + ei->Name;
+                // Random offset between 0 and full interval using ESP32 hardware RNG
+                unsigned long randomOffset = getRandomInRange(0, intervalMs + 1);
+                nextRequestTime[key] = now + randomOffset;
+            }
+        }
+        ESP_LOGI("REQUEST_MGR", "Initialized %d signal schedules", nextRequestTime.size());
     }
-    
-    unsigned long now = millis();
     
     // Rate limiting: send up to MAX_REQUESTS_PER_ITERATION requests per iteration
     // Randomization in scheduling prevents bursts
@@ -1946,7 +2007,7 @@ void processSignalRequests() {
                 unsigned long nextScheduled = nextRequestTime[key];
                 
                 // Check if this signal is overdue (current time >= scheduled time)
-                if (nextScheduled == 0 || now >= nextScheduled) {
+                if (now >= nextScheduled) {
                     if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
                         // For cm_other: only send to ONE member per iteration to prevent bursts
                         // Other members will be checked in subsequent iterations
@@ -1955,8 +2016,11 @@ void processSignalRequests() {
                             requestsSentThisIteration++;
                             sentInThisGroup++;
                             
-                            // Calculate next scheduled time: now + frequency + random delay
-                            unsigned long randomDelay = random(MIN_RANDOM_DELAY_MS, MAX_RANDOM_DELAY_MS + 1);
+                            // Calculate next scheduled time with random offset (0 to 5% of interval)
+                            // This keeps signals from synchronizing while staying close to target frequency
+                            unsigned long maxJitter = (intervalMs / 20); // 5% of interval
+                            if (maxJitter < 500) maxJitter = 500; // Minimum 500ms jitter
+                            unsigned long randomDelay = getRandomInRange(0, maxJitter + 1);
                             nextRequestTime[key] = now + intervalMs + randomDelay;
                             
                             ESP_LOGD("REQUEST_MGR", "Sent %s, next in %lums", key.c_str(), intervalMs + randomDelay);
@@ -1965,7 +2029,9 @@ void processSignalRequests() {
                     } else {
                         ESP_LOGD("REQUEST_MGR", "Skipping blacklisted signal: %s", key.c_str());
                         // Reschedule for retry later (for recovery)
-                        unsigned long randomDelay = random(MIN_RANDOM_DELAY_MS, MAX_RANDOM_DELAY_MS + 1);
+                        unsigned long maxJitter = (intervalMs / 20);
+                        if (maxJitter < 500) maxJitter = 500;
+                        unsigned long randomDelay = getRandomInRange(0, maxJitter + 1);
                         nextRequestTime[key] = now + intervalMs + randomDelay;
                     }
                 }
@@ -1979,20 +2045,25 @@ void processSignalRequests() {
             unsigned long nextScheduled = nextRequestTime[key];
             
             // Check if this signal is overdue (current time >= scheduled time)
-            if (nextScheduled == 0 || now >= nextScheduled) {
+            if (now >= nextScheduled) {
                 if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
                     readSignal(member, ei);
                     requestsSentThisIteration++;
                     
-                    // Calculate next scheduled time: now + frequency + random delay
-                    unsigned long randomDelay = random(MIN_RANDOM_DELAY_MS, MAX_RANDOM_DELAY_MS + 1);
+                    // Calculate next scheduled time with random offset (0 to 5% of interval)
+                    // This keeps signals from synchronizing while staying close to target frequency
+                    unsigned long maxJitter = (intervalMs / 20); // 5% of interval
+                    if (maxJitter < 500) maxJitter = 500; // Minimum 500ms jitter
+                    unsigned long randomDelay = getRandomInRange(0, maxJitter + 1);
                     nextRequestTime[key] = now + intervalMs + randomDelay;
                     
                     ESP_LOGD("REQUEST_MGR", "Sent %s, next in %lums", key.c_str(), intervalMs + randomDelay);
                 } else {
                     ESP_LOGD("REQUEST_MGR", "Skipping blacklisted signal: %s", key.c_str());
                     // Reschedule for retry later (for recovery)
-                    unsigned long randomDelay = random(MIN_RANDOM_DELAY_MS, MAX_RANDOM_DELAY_MS + 1);
+                    unsigned long maxJitter = (intervalMs / 20);
+                    if (maxJitter < 500) maxJitter = 500;
+                    unsigned long randomDelay = getRandomInRange(0, maxJitter + 1);
                     nextRequestTime[key] = now + intervalMs + randomDelay;
                 }
             }

@@ -37,6 +37,8 @@ esphome:
   platformio_options:
     build_flags:
       - -DBLACKLIST_ENABLED=${blacklist_enabled}
+  
+
 
 esp32:
   board: esp32dev
@@ -51,6 +53,19 @@ esp32:
 logger:
   level: DEBUG
   baud_rate: 115200
+  logs:
+    # Reduce noise from noisy components while keeping mcp2515 at DEBUG
+    component: INFO
+    mqtt: INFO
+    api: INFO
+    ota: INFO
+    wifi: INFO
+    sensor: INFO
+    binary_sensor: INFO
+    text_sensor: INFO
+    button: INFO
+    interval: INFO
+    canbus: WARN
 
 #########################################
 #                                       #
