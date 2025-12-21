@@ -8,16 +8,6 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-// ============================================================================
-// BLACKLIST AND VALIDATION SETTINGS
-// ============================================================================
-
-// Number of consecutive invalid values before a signal is blacklisted
-#define BLACKLIST_INVALID_THRESHOLD 10
-
-// Number of consecutive timeouts before a signal is blacklisted
-#define BLACKLIST_TIMEOUT_THRESHOLD 10
-
 // Timeout for CAN request responses (milliseconds)
 #define CAN_REQUEST_TIMEOUT_MS 5000
 

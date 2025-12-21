@@ -100,6 +100,66 @@ typedef struct {
     const char* stateClass;      // measurement, total, total_increasing
 } SignalConfig;
 
+// Abbreviation list sorted by length (longest first)
+static const struct { const char* abbrev; const char* full; } abbrevList[] = {
+    {"AUFNAHMELEISTUNG", "Aufnahmeleistung"},  // 16 chars
+    {"LUEFTUNGSSTUFE", "Lüftungsstufe"},  // 14 chars
+    {"LEISTUNGSZWANG", "Leistungszwang"},   // 14 chars
+    {"FEHLERMELDUNG", "Fehlermeldung"},// 13 chars
+    {"VOLUMENSTROM", "Volumenstrom"},  // 12 chars
+    {"QUELLENPUMPE", "Quellenpumpe"},  // 12 chars
+    {"STUETZSTELLE", "Stützstelle"},   // 12 chars
+    {"HILFSKESSEL", "Hilfskessel"},    // 11 chars
+    {"BETRIEBSART", "Betriebsart"},    // 11 chars
+    {"VERDAMPFER", "Verdampfer"},      // 10 chars
+    {"VERDICHTER", "Verdichter"},      // 10 chars
+    {"DURCHFLUSS", "Durchfluss"},      // 10 chars
+    {"TEMPERATUR", "Temperatur"},      // 10 chars
+    {"TEMPORALE", "Temporale"},        // 9 chars
+    {"RUECKLAUF", "Rücklauf"},         // 9 chars
+    {"LAUFZEIT", "Laufzeit"},          // 8 chars
+    {"EINSTELL", "Einstellung"},       // 8 chars
+    {"LEISTUNG", "Leistung"},          // 8 chars
+    {"KUEHLUNG", "Kühlung"},           // 8 chars
+    {"BIVALENT", "Bivalent"},          // 8 chars
+    {"PARALLEL", "Parallel"},          // 8 chars
+    {"FREQUENZ", "Frequenz"},          // 8 chars
+    {"DREHZAHL", "Drehzahl"},          // 8 chars
+    {"SPEICHER", "Speicher"},          // 8 chars
+    {"SPANNUNG", "Spannung"},          // 8 chars
+    {"VORLAUF", "Vorlauf"},            // 7 chars
+    {"SAMMLER", "Sammler"},            // 7 chars
+    {"BETRIEB", "Betrieb"},            // 7 chars
+    {"HEIZUNG", "Heizung"},            // 7 chars
+    {"ERTRAG", "Ertrag"},              // 6 chars
+    {"AUSSEN", "Außen"},               // 6 chars
+    {"MINUTE", "Minute"},               // 6 chars
+    {"SOCKEL", "Sockel"},              // 6 chars
+    {"KESSEL", "Kessel"},              // 6 chars
+    {"DAUER", "Dauer"},                // 5 chars
+    {"DRUCK", "Druck"},                // 5 chars
+    {"STROM", "Strom"},                // 5 chars
+    {"LUEFT", "Lüftung"},              // 5 chars
+    {"PUMPE", "Pumpe"},                // 5 chars
+    {"VERD", "Verdichter"},            // 4 chars
+    {"TEMP", "Temperatur"},            // 4 chars
+    {"HEIZ", "Heizung"},               // 4 chars
+    {"RAUM", "Raum"},                  // 4 chars
+    {"SOLL", "Soll"},                  // 4 chars
+    {"MAX", "Maximum"},                // 3 chars
+    {"MIN", "Minimum"},                // 3 chars
+    {"SUM", "Summe"},                  // 3 chars
+    {"TAG", "Tag"},                    // 3 chars
+    {"IST", "Ist"},                    // 3 chars
+    {"FKT", "Funktion"},               // 3 chars
+    {"HZG", "Heizung"},                // 3 chars
+    {"WW", "Warmwasser"},              // 2 chars
+    {"WP", "Wärmepumpe"},              // 2 chars
+    {"EL", "Elektrisch"},              // 2 chars
+    {"LZ", "Laufzeit"}                 // 2 chars
+
+};
+
 // ============================================================================
 // AUTOMATIC SENSOR TYPE DETECTION (based on ElsterTable data types)
 // ============================================================================
@@ -118,14 +178,10 @@ static const SignalConfig signalMappings[] = {
     {"TEMP", "temperature", "°C", "mdi:thermometer", "measurement"},
     
     // Boolean/Binary sensors (automatically detected as binary_sensor, these provide device_class)
-    {"EVU_SPERRE_AKTIV", "power", "", "mdi:transmission-tower-off", ""},  // Grid lock active
-    {"ABTAUUNGAKTIV", "running", "", "mdi:snowflake-melt", ""},           // Defrost active
-    {"ANTILEG_AKTIV", "running", "", "mdi:bacteria", ""},                 // Anti-legionella active
-    {"EINMAL_WW_AKTIV", "running", "", "mdi:water-boiler", ""},          // One-time hot water active
+    {"EVU SPERRE AKTIV", "power", "", "mdi:transmission-tower-off", ""},  // Grid lock active
     {"SOMMERBETRIEB", "heat", "", "mdi:white-balance-sunny", ""},        // Summer mode
-    {"WW_ECO", "running", "", "mdi:leaf", ""},                          // Hot water eco mode
-    {"*_AKTIV", "running", "", "mdi:check-circle", ""},                  // Generic active status
-    {"*AKTIV*", "running", "", "mdi:power", ""},                         // Generic active pattern
+    {"WW ECO", "running", "", "mdi:leaf", ""},                          // Hot water eco mode
+    {"AKTIV", "running", "", "mdi:power", ""},                         // Generic active pattern
     
     // Energy sensors
     {"KWH", "energy", "kWh", "mdi:lightning-bolt", "total_increasing"},
@@ -141,20 +197,20 @@ static const SignalConfig signalMappings[] = {
     {"SEKUNDE", "", "", "mdi:clock", "measurement"},
 
     // Power sensors
-    {"*LEISTUNG*", "power", "W", "mdi:flash", "measurement"},
+    {"LEISTUNG", "power", "W", "mdi:flash", "measurement"},
     
     // Pressure sensors
     {"DRUCK", "pressure", "bar", "mdi:gauge", "measurement"},
     
     // Flow/Volume sensors
-    {"*VOLUMENSTROM*", "volume_flow_rate", "l/min", "mdi:pump", "measurement"},
-    {"*DURCHFLUSS*", "volume_flow_rate", "l/min", "mdi:water-pump", "measurement"},
+    {"VOLUMENSTROM", "volume_flow_rate", "l/min", "mdi:pump", "measurement"},
+    {"DURCHFLUSS", "volume_flow_rate", "l/min", "mdi:water-pump", "measurement"},
     {"DURCHFLUSSMENGE*", "volume", "l", "mdi:gauge", "total_increasing"},
     
     // Electrical sensors
-    {"*SPANNUNG*", "voltage", "V", "mdi:sine-wave", "measurement"},
-    {"*STROM*", "current", "A", "mdi:current-ac", "measurement"},
-    {"*FREQUENZ*", "frequency", "Hz", "mdi:sine-wave", "measurement"},
+    {"SPANNUNG", "voltage", "V", "mdi:sine-wave", "measurement"},
+    {"STROM", "current", "A", "mdi:current-ac", "measurement"},
+    {"FREQUENZ", "frequency", "Hz", "mdi:sine-wave", "measurement"},
     
     // Speed/RPM sensors
     {"DREHZAHL", "frequency", "rpm", "mdi:fan", "measurement"},
@@ -167,36 +223,81 @@ static const SignalConfig signalMappings[] = {
     {"DAUER", "duration", "min", "mdi:timer", "measurement"},
     {"LZ", "duration", "h", "mdi:timer", "total_increasing"},
     {"STILLSTANDZEIT*", "duration", "h", "mdi:timer-off", "total_increasing"},
-    {"*ZEIT*", "duration", "min", "mdi:clock", "measurement"},
-    {"*DAUER*", "duration", "min", "mdi:timer", "measurement"},
+    {"ZEIT", "duration", "min", "mdi:clock", "measurement"},
+    {"DAUER", "duration", "min", "mdi:timer", "measurement"},
     
     // Percentage sensors
-    {"MODGRAD*", "power_factor", "%", "mdi:percent", "measurement"},
+    {"MODGRAD", "power_factor", "%", "mdi:percent", "measurement"},
     
     // Version/Config (no unit)
     {"SOFTWARE_VERSION", "", "", "mdi:application-cog", ""},
     {"SOFTWARE_NUMMER", "", "", "mdi:application-cog", ""},
     {"GERAETE_ID", "", "", "mdi:identifier", ""},
-    {"FIRMWARE*", "", "", "mdi:chip", ""},
+    {"FIRMWARE", "", "", "mdi:chip", ""},
     
     // Status indicators
-    {"*STATUS*", "", "", "mdi:information", "measurement"},
-    {"*SPERRE*", "lock", "", "mdi:lock", ""},  // Lock/blockage signals
-    {"*PUMPE*", "", "", "mdi:pump", ""},
-    {"*BRENNER*", "", "", "mdi:fire", ""},
-    {"*MISCHER*", "", "", "mdi:valve", ""},
-    {"*VENTIL*", "", "", "mdi:valve", ""},
-    {"*RELAIS*", "", "", "mdi:electric-switch", ""},
-    {"VERDICHTER*", "", "", "mdi:air-conditioner", ""},
+    {"STATUS", "", "", "mdi:information", "measurement"},
+    {"SPERRE", "lock", "", "mdi:lock", ""},  // Lock/blockage signals
+    {"PUMPE", "", "", "mdi:pump", ""},
+    {"BRENNER", "", "", "mdi:fire", ""},
+    {"MISCHER", "", "", "mdi:valve", ""},
+    {"VENTIL", "", "", "mdi:valve", ""},
+    {"RELAIS", "", "", "mdi:electric-switch", ""},
+    {"VERDICHTER", "", "", "mdi:air-conditioner", ""},
     
     // Cooling/Heating mode indicators
-    {"*KUEHLUNG*", "", "", "mdi:snowflake", ""},
-    {"*HEIZ*", "", "", "mdi:radiator", ""},
-    {"*BETRIEB*", "", "", "mdi:cog", ""},
+    {"KUEHLUNG", "", "", "mdi:snowflake", ""},
+    {"HEIZ", "", "", "mdi:radiator", ""},
+    {"BETRIEB", "", "", "mdi:cog", ""},
     
     // Default fallback (must be last)
     {"*", "", "", "mdi:flash", "measurement"}
 };
+
+// ============================================================================
+// CALCULATED SENSOR DISCOVERY CONFIGURATION
+// ============================================================================
+
+struct CalculatedSensorConfig {
+    const char* uniqueId;          // Unique ID for Home Assistant
+    const char* name;              // Friendly name
+    const char* stateTopic;        // MQTT state topic
+    const char* component;         // "sensor" or "binary_sensor"
+    const char* deviceClass;       // Device class (empty string if none)
+    const char* unit;              // Unit of measurement (empty string if none)
+    const char* stateClass;        // State class (empty string if none)
+    const char* icon;              // MDI icon
+    const char* payloadOn;         // For binary sensors (empty string if not applicable)
+    const char* payloadOff;        // For binary sensors (empty string if not applicable)
+};
+
+static const CalculatedSensorConfig calculatedSensors[] = {
+    // Date sensor
+    {"stiebel_calculated_date", "Datum", "heatingpump/calculated/date/state", 
+     "sensor", "", "", "", "mdi:calendar", "", ""},
+    
+    // Time sensor
+    {"stiebel_calculated_time", "Uhrzeit", "heatingpump/calculated/time/state", 
+     "sensor", "", "", "", "mdi:clock", "", ""},
+    
+    // Betriebsart sensor
+    {"stiebel_calculated_betriebsart", "Betriebsart", "heatingpump/calculated/betriebsart/state", 
+     "sensor", "", "", "", "mdi:cog", "", ""},
+    
+    // Delta T continuous
+    {"stiebel_calculated_delta_t_continuous", "Delta T WP (kontinuierlich)", "heatingpump/calculated/delta_t_continuous/state", 
+     "sensor", "temperature", "K", "measurement", "mdi:thermometer", "", ""},
+    
+    // Delta T running (only when compressor active)
+    {"stiebel_calculated_delta_t_running", "Delta T WP (nur bei Verdichter an)", "heatingpump/calculated/delta_t_running/state", 
+     "sensor", "temperature", "K", "measurement", "mdi:thermometer-chevron-up", "", ""},
+    
+    // Compressor active binary sensor
+    {"stiebel_calculated_compressor_active", "WP Verdichter aktiv", "heatingpump/calculated/compressor_active/state", 
+     "binary_sensor", "running", "", "", "mdi:engine", "on", "off"}
+};
+
+static const size_t CALCULATED_SENSOR_COUNT = sizeof(calculatedSensors) / sizeof(CalculatedSensorConfig);
 
 // ============================================================================
 // RUNTIME STATE TRACKING
@@ -205,17 +306,8 @@ static const SignalConfig signalMappings[] = {
 // Track which signals have been discovered
 static std::set<std::string> discoveredSignals;
 
-// Track signals that returned invalid values (blacklisted until reboot)
-static std::set<std::string> blacklistedSignals;
-
-// Track consecutive invalid value counts per signal (reset on valid value)
-static std::unordered_map<std::string, int> invalidSignalCounts;
-
-// Track pending requests with timestamps (to detect no-response)
-static std::unordered_map<std::string, unsigned long> pendingRequests;
-
-// Track consecutive no-response counts per signal
-static std::unordered_map<std::string, int> noResponseCounts;
+// Track which calculated sensors have been discovered
+static std::set<std::string> discoveredCalculatedSensors;
 
 // Track next scheduled request time per unique signal key (MEMBER_SIGNAL)
 static std::unordered_map<std::string, unsigned long> nextRequestTime;
@@ -380,12 +472,7 @@ const ElsterIndex *processCanMessage(const std::vector<uint8_t> &msg, uint32_t c
         break;
     }
 
-    // Only log non-blacklisted signals to reduce blocking during CAN bursts
-    // Blacklisted signals are already filtered in processAndUpdate() early check
-    if (!isPermanentlyBlacklisted(ei->Name))
-    {
-        ESP_LOGI("processCanMessage()", "%s (0x%02x):\t%s:\t%s\t(%s)", cm.Name, cm.CanId, ei->Name, charValue, ElsterTypeStr[ei->Type]);
-    }
+    ESP_LOGI("processCanMessage()", "%s (0x%02x):\t%s:\t%s\t(%s)", cm.Name, cm.CanId, ei->Name, charValue, ElsterTypeStr[ei->Type]);
 
     signalValue = charValue;
     return ei;
@@ -423,10 +510,6 @@ void readSignal(const CanMember *cm, const ElsterIndex *ei)
     char logmsg[120];
     snprintf(logmsg, sizeof(logmsg), "READ \"%s\" (0x%04x) FROM %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x", ei->Name, ei->Index, cm->Name, cm->CanId, readId[0], readId[1], data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
     ESP_LOGI("readSignal()", "%s", logmsg);
-
-    // Mark request as pending with current timestamp
-    std::string key = std::string(cm->Name) + "_" + ei->Name;
-    pendingRequests[key] = millis();
 
     id(my_mcp2515).send_data(CanMembers[cm_pc].CanId, use_extended_id, data);
 }
@@ -482,31 +565,82 @@ void writeSignal(const CanMember *cm, const char *elsterName, const char *&str)
     return;
 }
 
-// Publish MQTT discovery for calculated date sensor
-void publishDateDiscovery(bool forceRepublish = false) {
-    static bool discoveryPublished = false;
-    if (discoveryPublished && !forceRepublish) return;
-    if (forceRepublish) discoveryPublished = false;
+// Unified function to publish MQTT discovery for calculated sensors
+void publishCalculatedSensorDiscovery(const CalculatedSensorConfig& config, bool forceRepublish = false) {
+    // Check if already published (unless force republish)
+    if (!forceRepublish && discoveredCalculatedSensors.find(config.uniqueId) != discoveredCalculatedSensors.end()) {
+        return;
+    }
     
-    const char* discoveryTopic = "homeassistant/sensor/heatingpump/calculated_date/config";
+    // Mark as discovered
+    discoveredCalculatedSensors.insert(config.uniqueId);
     
+    // Build discovery topic
+    char discoveryTopic[256];
+    snprintf(discoveryTopic, sizeof(discoveryTopic), 
+             "homeassistant/%s/heatingpump/%s/config", config.component, config.uniqueId);
+    
+    // Build JSON payload
     std::ostringstream payload;
-    payload << "{\"name\":\"Datum\","
-            << "\"unique_id\":\"stiebel_calculated_date\","
-            << "\"state_topic\":\"heatingpump/calculated/date/state\","
-            << "\"icon\":\"mdi:calendar\","
-            << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
+    payload << "{\"name\":\"" << config.name << "\","
+            << "\"unique_id\":\"" << config.uniqueId << "\","
+            << "\"state_topic\":\"" << config.stateTopic << "\"";
+    
+    // Add device class if specified
+    if (config.deviceClass[0] != '\0') {
+        payload << ",\"device_class\":\"" << config.deviceClass << "\"";
+    }
+    
+    // Add unit if specified
+    if (config.unit[0] != '\0') {
+        payload << ",\"unit_of_measurement\":\"" << config.unit << "\"";
+    }
+    
+    // Add state class if specified
+    if (config.stateClass[0] != '\0') {
+        payload << ",\"state_class\":\"" << config.stateClass << "\"";
+    }
+    
+    // Add icon if specified
+    if (config.icon[0] != '\0') {
+        payload << ",\"icon\":\"" << config.icon << "\"";
+    }
+    
+    // For binary sensors, add payload on/off
+    if (config.payloadOn[0] != '\0' && config.payloadOff[0] != '\0') {
+        payload << ",\"payload_on\":\"" << config.payloadOn << "\","
+                << "\"payload_off\":\"" << config.payloadOff << "\"";
+    }
+    
+    // Add device info
+    payload << ",\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
             << "\"name\":\"Stiebel Eltron Wärmepumpe\","
             << "\"manufacturer\":\"Stiebel Eltron\"}}";
     
+    // Publish discovery message
     std::string payloadStr = payload.str();
     id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
-    discoveryPublished = true;
-    ESP_LOGI("MQTT", "Discovery published for calculated date sensor");
+    
+    ESP_LOGI("MQTT", "Discovery published for calculated sensor: %s", config.name);
+}
+
+// Publish all calculated sensor discoveries (used during startup and republish)
+void publishAllCalculatedSensorDiscoveries(bool forceRepublish = false) {
+    if (forceRepublish) {
+        discoveredCalculatedSensors.clear();
+        ESP_LOGI("MQTT", "Republishing all calculated sensor discoveries");
+    }
+    
+    for (size_t i = 0; i < CALCULATED_SENSOR_COUNT; i++) {
+        publishCalculatedSensorDiscovery(calculatedSensors[i], forceRepublish);
+    }
 }
 
 void publishDate()
 {
+    // Publish discovery (only once - cached)
+    publishCalculatedSensorDiscovery(calculatedSensors[0]);
+    
     // Validate that all values have been received
     if (lastJahr < 0 || lastMonat < 0 || lastTag < 0) {
         ESP_LOGW("CALC", "Cannot publish date: sensors not initialized (Jahr=%d, Monat=%d, Tag=%d)", 
@@ -534,9 +668,6 @@ void publishDate()
     
     std::string datum = "20" + jahr + "-" + monat + "-" + tag;
     
-    // Publish discovery first
-    publishDateDiscovery();
-    
     // Publish state to MQTT
     const char* stateTopic = "heatingpump/calculated/date/state";
     id(mqtt_client).publish(stateTopic, datum.c_str(), datum.length(), 0, true);
@@ -548,29 +679,6 @@ std::string formatNumber(int number, int width)
     std::ostringstream oss;
     oss << std::setw(width) << std::setfill('0') << number;
     return oss.str();
-}
-
-// Publish MQTT discovery for calculated time sensor
-void publishTimeDiscovery(bool forceRepublish = false) {
-    static bool discoveryPublished = false;
-    if (discoveryPublished && !forceRepublish) return;
-    if (forceRepublish) discoveryPublished = false;
-    
-    const char* discoveryTopic = "homeassistant/sensor/heatingpump/calculated_time/config";
-    
-    std::ostringstream payload;
-    payload << "{\"name\":\"Zeit\","
-            << "\"unique_id\":\"stiebel_calculated_time\","
-            << "\"state_topic\":\"heatingpump/calculated/time/state\","
-            << "\"icon\":\"mdi:clock-outline\","
-            << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
-            << "\"name\":\"Stiebel Eltron Wärmepumpe\","
-            << "\"manufacturer\":\"Stiebel Eltron\"}}";
-    
-    std::string payloadStr = payload.str();
-    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
-    discoveryPublished = true;
-    ESP_LOGI("MQTT", "Discovery published for calculated time sensor");
 }
 
 void publishTime()
@@ -602,36 +710,10 @@ void publishTime()
 
     std::string zeit = stunde + ":" + minute + ":" + sekunde;
     
-    // Publish discovery first
-    publishTimeDiscovery();
-    
     // Publish state to MQTT
     const char* stateTopic = "heatingpump/calculated/time/state";
     id(mqtt_client).publish(stateTopic, zeit.c_str(), zeit.length(), 0, true);
     ESP_LOGI("CALC", "Published time: %s (Stunde=%d, Minute=%d, Sekunde=%d)", zeit.c_str(), istunde, iminute, isekunde);
-}
-
-// Publish MQTT discovery for calculated Betriebsart sensor
-void publishBetriebsartDiscovery(bool forceRepublish = false) {
-    static bool discoveryPublished = false;
-    if (discoveryPublished && !forceRepublish) return;
-    if (forceRepublish) discoveryPublished = false;
-    
-    const char* discoveryTopic = "homeassistant/sensor/heatingpump/calculated_betriebsart/config";
-    
-    std::ostringstream payload;
-    payload << "{\"name\":\"Betriebsart\","
-            << "\"unique_id\":\"stiebel_calculated_betriebsart\","
-            << "\"state_topic\":\"heatingpump/calculated/betriebsart/state\","
-            << "\"icon\":\"mdi:cog\","
-            << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
-            << "\"name\":\"Stiebel Eltron Wärmepumpe\","
-            << "\"manufacturer\":\"Stiebel Eltron\"}}";
-    
-    std::string payloadStr = payload.str();
-    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
-    discoveryPublished = true;
-    ESP_LOGI("MQTT", "Discovery published for calculated Betriebsart sensor");
 }
 
 void publishBetriebsart(const std::string& sommerBetriebValue)
@@ -649,43 +731,17 @@ void publishBetriebsart(const std::string& sommerBetriebValue)
         icon = "mdi:circle-outline";
     }
     
-    // Publish discovery first
-    publishBetriebsartDiscovery();
-    
     // Publish state to MQTT
     const char* stateTopic = "heatingpump/calculated/betriebsart/state";
     id(mqtt_client).publish(stateTopic, betriebsart.c_str(), betriebsart.length(), 0, true);
     // ESP_LOGD("CALC", "Published Betriebsart: %s (SOMMERBETRIEB=%s)", betriebsart.c_str(), sommerBetriebValue.c_str());
 }
 
-// Publish MQTT discovery for calculated Delta T continuous sensor
-void publishDeltaTContinuousDiscovery(bool forceRepublish = false) {
-    static bool discoveryPublished = false;
-    if (discoveryPublished && !forceRepublish) return;
-    if (forceRepublish) discoveryPublished = false;
-    
-    const char* discoveryTopic = "homeassistant/sensor/heatingpump/calculated_delta_t_continuous/config";
-    
-    std::ostringstream payload;
-    payload << "{\"name\":\"Delta T WP (kontinuierlich)\","
-            << "\"unique_id\":\"stiebel_calculated_delta_t_continuous\","
-            << "\"state_topic\":\"heatingpump/calculated/delta_t_continuous/state\","
-            << "\"unit_of_measurement\":\"K\","
-            << "\"device_class\":\"temperature\","
-            << "\"state_class\":\"measurement\","
-            << "\"icon\":\"mdi:thermometer\","
-            << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
-            << "\"name\":\"Stiebel Eltron Wärmepumpe\","
-            << "\"manufacturer\":\"Stiebel Eltron\"}}";
-    
-    std::string payloadStr = payload.str();
-    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
-    discoveryPublished = true;
-    ESP_LOGI("MQTT", "Discovery published for Delta T continuous sensor");
-}
-
 void publishDeltaTContinuous()
 {
+    // Publish discovery (only once - cached)
+    publishCalculatedSensorDiscovery(calculatedSensors[3]);
+    
     // Check if both temperature values are valid
     if (std::isnan(lastWpVorlaufIst) || std::isnan(lastRuecklaufIstTemp)) {
         return; // Silently skip if values not ready
@@ -698,9 +754,6 @@ void publishDeltaTContinuous()
     
     float deltaT = lastWpVorlaufIst - lastRuecklaufIstTemp;
     
-    // Publish discovery first (but only once - already cached)
-    publishDeltaTContinuousDiscovery();
-    
     // Publish state to MQTT
     char value[16];
     snprintf(value, sizeof(value), "%.2f", deltaT);
@@ -708,34 +761,11 @@ void publishDeltaTContinuous()
     id(mqtt_client).publish(stateTopic, value, strlen(value), 0, true);
 }
 
-// Publish MQTT discovery for calculated Delta T running sensor
-void publishDeltaTRunningDiscovery(bool forceRepublish = false) {
-    static bool discoveryPublished = false;
-    if (discoveryPublished && !forceRepublish) return;
-    if (forceRepublish) discoveryPublished = false;
-    
-    const char* discoveryTopic = "homeassistant/sensor/heatingpump/calculated_delta_t_running/config";
-    
-    std::ostringstream payload;
-    payload << "{\"name\":\"Delta T WP (nur bei Verdichter an)\","
-            << "\"unique_id\":\"stiebel_calculated_delta_t_running\","
-            << "\"state_topic\":\"heatingpump/calculated/delta_t_running/state\","
-            << "\"unit_of_measurement\":\"K\","
-            << "\"device_class\":\"temperature\","
-            << "\"state_class\":\"measurement\","
-            << "\"icon\":\"mdi:thermometer-chevron-up\","
-            << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
-            << "\"name\":\"Stiebel Eltron Wärmepumpe\","
-            << "\"manufacturer\":\"Stiebel Eltron\"}}";
-    
-    std::string payloadStr = payload.str();
-    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
-    discoveryPublished = true;
-    ESP_LOGI("MQTT", "Discovery published for Delta T running sensor");
-}
-
 void publishDeltaTRunning()
 {
+    // Publish discovery (only once - cached)
+    publishCalculatedSensorDiscovery(calculatedSensors[4]);
+    
     // Check if compressor is running (value > 2 or not NaN and not 0)
     bool compressorRunning = (!std::isnan(lastVerdichterValue) && lastVerdichterValue > 2.0);
     
@@ -755,9 +785,6 @@ void publishDeltaTRunning()
     
     float deltaT = lastWpVorlaufIst - lastRuecklaufIstTemp;
     
-    // Publish discovery first (but only once - already cached)
-    publishDeltaTRunningDiscovery();
-    
     // Publish state to MQTT
     char value[16];
     snprintf(value, sizeof(value), "%.2f", deltaT);
@@ -765,34 +792,11 @@ void publishDeltaTRunning()
     id(mqtt_client).publish(stateTopic, value, strlen(value), 0, true);
 }
 
-// Publish MQTT discovery for calculated Compressor Active binary sensor
-void publishCompressorActiveDiscovery(bool forceRepublish = false) {
-    static bool discoveryPublished = false;
-    if (discoveryPublished && !forceRepublish) return;
-    if (forceRepublish) discoveryPublished = false;
-    
-    const char* discoveryTopic = "homeassistant/binary_sensor/heatingpump/calculated_compressor_active/config";
-    
-    std::ostringstream payload;
-    payload << "{\"name\":\"WP Verdichter aktiv\","
-            << "\"unique_id\":\"stiebel_calculated_compressor_active\","
-            << "\"state_topic\":\"heatingpump/calculated/compressor_active/state\","
-            << "\"device_class\":\"running\","
-            << "\"payload_on\":\"on\","
-            << "\"payload_off\":\"off\","
-            << "\"icon\":\"mdi:engine\","
-            << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
-            << "\"name\":\"Stiebel Eltron Wärmepumpe\","
-            << "\"manufacturer\":\"Stiebel Eltron\"}}";
-    
-    std::string payloadStr = payload.str();
-    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
-    discoveryPublished = true;
-    ESP_LOGI("MQTT", "Discovery published for Compressor Active sensor");
-}
-
 void publishCompressorActive()
 {
+    // Publish discovery (only once - cached)
+    publishCalculatedSensorDiscovery(calculatedSensors[5]);
+    
     // Check if compressor value is valid
     if (std::isnan(lastVerdichterValue)) {
         return; // Silently skip if value invalid
@@ -800,9 +804,6 @@ void publishCompressorActive()
     
     // Compressor is active if value > 2
     bool isActive = (lastVerdichterValue > 2.0);
-    
-    // Publish discovery first (but only once - already cached)
-    publishCompressorActiveDiscovery();
     
     // Publish state to MQTT
     const char* state = isActive ? "on" : "off";
@@ -824,65 +825,7 @@ bool matchesPattern(const char* text, const char* pattern) {
     return t.find(p) != std::string::npos;
 }
 
-// Abbreviation list sorted by length (longest first)
-static const struct { const char* abbrev; const char* full; } abbrevList[] = {
-    {"AUFNAHMELEISTUNG", "Aufnahmeleistung"},  // 16 chars
-    {"LUEFTUNGSSTUFE", "Lüftungsstufe"},  // 14 chars
-    {"LEISTUNGSZWANG", "Leistungszwang"},   // 14 chars
-    {"FEHLERMELDUNG", "Fehlermeldung"},// 13 chars
-    {"VOLUMENSTROM", "Volumenstrom"},  // 12 chars
-    {"QUELLENPUMPE", "Quellenpumpe"},  // 12 chars
-    {"STUETZSTELLE", "Stützstelle"},   // 12 chars
-    {"HILFSKESSEL", "Hilfskessel"},    // 11 chars
-    {"BETRIEBSART", "Betriebsart"},    // 11 chars
-    {"VERDAMPFER", "Verdampfer"},      // 10 chars
-    {"VERDICHTER", "Verdichter"},      // 10 chars
-    {"DURCHFLUSS", "Durchfluss"},      // 10 chars
-    {"TEMPERATUR", "Temperatur"},      // 10 chars
-    {"TEMPORALE", "Temporale"},        // 9 chars
-    {"RUECKLAUF", "Rücklauf"},         // 9 chars
-    {"LAUFZEIT", "Laufzeit"},          // 8 chars
-    {"EINSTELL", "Einstellung"},       // 8 chars
-    {"LEISTUNG", "Leistung"},          // 8 chars
-    {"KUEHLUNG", "Kühlung"},           // 8 chars
-    {"BIVALENT", "Bivalent"},          // 8 chars
-    {"PARALLEL", "Parallel"},          // 8 chars
-    {"FREQUENZ", "Frequenz"},          // 8 chars
-    {"DREHZAHL", "Drehzahl"},          // 8 chars
-    {"SPEICHER", "Speicher"},          // 8 chars
-    {"SPANNUNG", "Spannung"},          // 8 chars
-    {"VORLAUF", "Vorlauf"},            // 7 chars
-    {"SAMMLER", "Sammler"},            // 7 chars
-    {"BETRIEB", "Betrieb"},            // 7 chars
-    {"HEIZUNG", "Heizung"},            // 7 chars
-    {"ERTRAG", "Ertrag"},              // 6 chars
-    {"AUSSEN", "Außen"},               // 6 chars
-    {"MINUTE", "Minute"},               // 6 chars
-    {"SOCKEL", "Sockel"},              // 6 chars
-    {"KESSEL", "Kessel"},              // 6 chars
-    {"DAUER", "Dauer"},                // 5 chars
-    {"DRUCK", "Druck"},                // 5 chars
-    {"STROM", "Strom"},                // 5 chars
-    {"LUEFT", "Lüftung"},              // 5 chars
-    {"PUMPE", "Pumpe"},                // 5 chars
-    {"VERD", "Verdichter"},            // 4 chars
-    {"TEMP", "Temperatur"},            // 4 chars
-    {"HEIZ", "Heizung"},               // 4 chars
-    {"RAUM", "Raum"},                  // 4 chars
-    {"SOLL", "Soll"},                  // 4 chars
-    {"MAX", "Maximum"},                // 3 chars
-    {"MIN", "Minimum"},                // 3 chars
-    {"SUM", "Summe"},                  // 3 chars
-    {"TAG", "Tag"},                    // 3 chars
-    {"IST", "Ist"},                    // 3 chars
-    {"FKT", "Funktion"},               // 3 chars
-    {"HZG", "Heizung"},                // 3 chars
-    {"WW", "Warmwasser"},              // 2 chars
-    {"WP", "Wärmepumpe"},              // 2 chars
-    {"EL", "Elektrisch"},              // 2 chars
-    {"LZ", "Laufzeit"}                 // 2 chars
 
-};
 
 // Recursive helper to split a signal name fragment
 inline std::string splitFragment(const std::string& fragment) {
@@ -1258,11 +1201,34 @@ void publishMqttDiscovery(uint32_t can_id, const ElsterIndex *ei) {
 void republishAllDiscoveries() {
     ESP_LOGI("MQTT", "Republishing all MQTT discoveries (%d signals)", discoveredSignals.size());
     
-    // Create a copy of discovered signals to iterate over
-    std::set<std::string> signalsToRepublish = discoveredSignals;
+    // Create a copy of discovered signals to iterate over, filtering out blacklisted signals
+    std::set<std::string> signalsToRepublish;
+    int blacklistedCount = 0;
     
-    // Clear the set so signals can be republished
-    discoveredSignals.clear();
+    for (const auto& uid : discoveredSignals) {
+        // Extract signal name from UID (format: "can_id_signalName")
+        // Find last underscore to get signal name
+        size_t lastUnderscore = uid.find_last_of('_');
+        if (lastUnderscore != std::string::npos) {
+            std::string signalName = uid.substr(lastUnderscore + 1);
+            
+            // Skip blacklisted signals
+            if (isPermanentlyBlacklisted(signalName.c_str())) {
+                blacklistedCount++;
+                ESP_LOGD("MQTT", "Skipping blacklisted signal during republish: %s", signalName.c_str());
+                continue;
+            }
+        }
+        
+        signalsToRepublish.insert(uid);
+    }
+    
+    if (blacklistedCount > 0) {
+        ESP_LOGI("MQTT", "Filtered out %d blacklisted signals during republish", blacklistedCount);
+    }
+    
+    // Clear the set and re-add only non-blacklisted signals
+    discoveredSignals = signalsToRepublish;
     
     // Force republish by reading all known signals
     // This will trigger processAndUpdate which calls publishMqttDiscovery
@@ -1270,14 +1236,8 @@ void republishAllDiscoveries() {
         ESP_LOGD("MQTT", "Marked for republish: %s", signal.c_str());
     }
     
-    // Reset calculated sensor discovery flags and republish
-    ESP_LOGI("MQTT", "Republishing calculated sensor discoveries");
-    publishDateDiscovery(true);
-    publishTimeDiscovery(true);
-    publishBetriebsartDiscovery(true);
-    publishDeltaTContinuousDiscovery(true);
-    publishDeltaTRunningDiscovery(true);
-    publishCompressorActiveDiscovery(true);
+    // Republish all calculated sensor discoveries using unified system
+    publishAllCalculatedSensorDiscoveries(true);
     
     ESP_LOGI("MQTT", "Discovery refresh complete - will republish as signals are received");
 }
@@ -1303,167 +1263,7 @@ void publishMqttState(uint32_t can_id, const ElsterIndex *ei, const std::string 
     id(mqtt_client).publish(stateTopic, value.c_str(), value.length(), 0, true);
 }
 
-// Publish blacklist diagnostics sensors to Home Assistant
-void publishBlacklistDiagnostics() {
-    // 1. Blacklisted signals sensor (permanent blocks)
-    {
-        const char* discoveryTopic = "homeassistant/sensor/heatingpump/blacklisted_signals/config";
-        const char* stateTopic = "heatingpump/diagnostics/blacklisted_signals/state";
-        const char* attributesTopic = "heatingpump/diagnostics/blacklisted_signals/attributes";
-        
-        // Discovery message
-        std::ostringstream discovery;
-        discovery << "{\"name\":\"Blacklisted Signals\","
-                  << "\"unique_id\":\"stiebel_blacklisted_signals\","
-                  << "\"state_topic\":\"" << stateTopic << "\","
-                  << "\"json_attributes_topic\":\"" << attributesTopic << "\","
-                  << "\"icon\":\"mdi:block-helper\","
-                  << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
-                  << "\"name\":\"Stiebel Eltron Wärmepumpe\","
-                  << "\"manufacturer\":\"Stiebel Eltron\"}}";
-        
-        std::string discoveryStr = discovery.str();
-        id(mqtt_client).publish(discoveryTopic, discoveryStr.c_str(), discoveryStr.length(), 0, true);
-        
-        // State: count of blacklisted signals
-        std::string stateStr = std::to_string(blacklistedSignals.size());
-        id(mqtt_client).publish(stateTopic, stateStr.c_str(), stateStr.length(), 0, true);
-        
-        // Attributes: list of blacklisted signals with reason
-        std::ostringstream attributes;
-        attributes << "{\"signals\":[";
-        bool first = true;
-        for (const auto& signal : blacklistedSignals) {
-            if (!first) attributes << ",";
-            first = false;
-            
-            // Extract member and signal name
-            size_t pos = signal.find('_');
-            std::string member = (pos != std::string::npos) ? signal.substr(0, pos) : "unknown";
-            std::string signalName = (pos != std::string::npos) ? signal.substr(pos + 1) : signal;
-            
-            // Determine reason (check both maps)
-            std::string reason = "unknown";
-            if (invalidSignalCounts.find(signal) != invalidSignalCounts.end() && 
-                invalidSignalCounts.at(signal) >= 3) {
-                reason = "invalid_values";
-            } else if (noResponseCounts.find(signal) != noResponseCounts.end() && 
-                       noResponseCounts.at(signal) >= 3) {
-                reason = "no_response";
-            }
-            
-            attributes << "{\"key\":\"" << signal << "\","
-                      << "\"member\":\"" << member << "\","
-                      << "\"signal\":\"" << signalName << "\","
-                      << "\"reason\":\"" << reason << "\"}";
-        }
-        attributes << "],\"count\":" << blacklistedSignals.size() << "}";
-        
-        std::string attributesStr = attributes.str();
-        id(mqtt_client).publish(attributesTopic, attributesStr.c_str(), attributesStr.length(), 0, true);
-    }
-    
-    // 2. Invalid value counts sensor
-    {
-        const char* discoveryTopic = "homeassistant/sensor/heatingpump/invalid_value_signals/config";
-        const char* stateTopic = "heatingpump/diagnostics/invalid_value_signals/state";
-        const char* attributesTopic = "heatingpump/diagnostics/invalid_value_signals/attributes";
-        
-        // Discovery message
-        std::ostringstream discovery;
-        discovery << "{\"name\":\"Invalid Value Signals\","
-                  << "\"unique_id\":\"stiebel_invalid_value_signals\","
-                  << "\"state_topic\":\"" << stateTopic << "\","
-                  << "\"json_attributes_topic\":\"" << attributesTopic << "\","
-                  << "\"icon\":\"mdi:alert-circle\","
-                  << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
-                  << "\"name\":\"Stiebel Eltron Wärmepumpe\","
-                  << "\"manufacturer\":\"Stiebel Eltron\"}}";
-        
-        std::string discoveryStr = discovery.str();
-        id(mqtt_client).publish(discoveryTopic, discoveryStr.c_str(), discoveryStr.length(), 0, true);
-        
-        // State: count of signals with invalid values
-        std::string stateStr = std::to_string(invalidSignalCounts.size());
-        id(mqtt_client).publish(stateTopic, stateStr.c_str(), stateStr.length(), 0, true);
-        
-        // Attributes: signals with invalid value counts
-        std::ostringstream attributes;
-        attributes << "{\"signals\":[";
-        bool first = true;
-        for (const auto& entry : invalidSignalCounts) {
-            if (!first) attributes << ",";
-            first = false;
-            
-            // Extract member and signal name
-            size_t pos = entry.first.find('_');
-            std::string member = (pos != std::string::npos) ? entry.first.substr(0, pos) : "unknown";
-            std::string signalName = (pos != std::string::npos) ? entry.first.substr(pos + 1) : entry.first;
-            
-            attributes << "{\"key\":\"" << entry.first << "\","
-                      << "\"member\":\"" << member << "\","
-                      << "\"signal\":\"" << signalName << "\","
-                      << "\"count\":" << entry.second << ","
-                      << "\"status\":\"" << (entry.second >= BLACKLIST_INVALID_THRESHOLD ? "blacklisted" : "warning") << "\"}";
-        }
-        attributes << "],\"count\":" << invalidSignalCounts.size() << "}";
-        
-        std::string attributesStr = attributes.str();
-        id(mqtt_client).publish(attributesTopic, attributesStr.c_str(), attributesStr.length(), 0, true);
-    }
-    
-    // 3. No-response counts sensor
-    {
-        const char* discoveryTopic = "homeassistant/sensor/heatingpump/no_response_signals/config";
-        const char* stateTopic = "heatingpump/diagnostics/no_response_signals/state";
-        const char* attributesTopic = "heatingpump/diagnostics/no_response_signals/attributes";
-        
-        // Discovery message
-        std::ostringstream discovery;
-        discovery << "{\"name\":\"No Response Signals\","
-                  << "\"unique_id\":\"stiebel_no_response_signals\","
-                  << "\"state_topic\":\"" << stateTopic << "\","
-                  << "\"json_attributes_topic\":\"" << attributesTopic << "\","
-                  << "\"icon\":\"mdi:connection\","
-                  << "\"device\":{\"identifiers\":[\"" << MAIN_DEVICE_ID << "\"],"
-                  << "\"name\":\"" << MAIN_DEVICE_NAME << "\","
-                  << "\"manufacturer\":\"Stiebel Eltron\"}}";
-        
-        std::string discoveryStr = discovery.str();
-        id(mqtt_client).publish(discoveryTopic, discoveryStr.c_str(), discoveryStr.length(), 0, true);
-        
-        // State: count of signals with no responses
-        std::string stateStr = std::to_string(noResponseCounts.size());
-        id(mqtt_client).publish(stateTopic, stateStr.c_str(), stateStr.length(), 0, true);
-        
-        // Attributes: signals with no-response counts
-        std::ostringstream attributes;
-        attributes << "{\"signals\":[";
-        bool first = true;
-        for (const auto& entry : noResponseCounts) {
-            if (!first) attributes << ",";
-            first = false;
-            
-            // Extract member and signal name
-            size_t pos = entry.first.find('_');
-            std::string member = (pos != std::string::npos) ? entry.first.substr(0, pos) : "unknown";
-            std::string signalName = (pos != std::string::npos) ? entry.first.substr(pos + 1) : entry.first;
-            
-            attributes << "{\"key\":\"" << entry.first << "\","
-                      << "\"member\":\"" << member << "\","
-                      << "\"signal\":\"" << signalName << "\","
-                      << "\"count\":" << entry.second << ","
-                      << "\"status\":\"" << (entry.second >= BLACKLIST_TIMEOUT_THRESHOLD ? "blacklisted" : "warning") << "\"}";
-        }
-        attributes << "],\"count\":" << noResponseCounts.size() << "}";
-        
-        std::string attributesStr = attributes.str();
-        id(mqtt_client).publish(attributesTopic, attributesStr.c_str(), attributesStr.length(), 0, true);
-    }
-    
-    ESP_LOGI("DIAGNOSTICS", "Published blacklist diagnostics: %d blacklisted, %d invalid, %d no-response",
-             blacklistedSignals.size(), invalidSignalCounts.size(), noResponseCounts.size());
-}
+// Diagnostics removed for simplification
 
 // Track which COP values we have valid data for
 static std::unordered_map<std::string, float> copEnergyValues;
@@ -1620,66 +1420,9 @@ void updateCOPCalculations() {
     }
 }
 
-// Check if value is invalid/unsupported
-bool isInvalidValue(const ElsterIndex *ei, const std::string &value) {
-    if (value.empty()) return true;
-    
-    // Check for common invalid string values (but allow valid state strings)
-    if (value == "SNA" || value == "---" || value == "N/A") return true;
-    
-    // Allow common valid state strings (case-insensitive check)
-    std::string lowerValue = value;
-    std::transform(lowerValue.begin(), lowerValue.end(), lowerValue.begin(), ::tolower);
-    if (lowerValue == "on" || lowerValue == "off" || 
-        lowerValue == "ein" || lowerValue == "aus" ||
-        lowerValue == "true" || lowerValue == "false" ||
-        lowerValue == "yes" || lowerValue == "no" ||
-        lowerValue == "ja" || lowerValue == "nein") {
-        return false; // Valid state string
-    }
-    
-    // Check numeric types for invalid values
-    if (ei->Type == et_byte || ei->Type == et_cent_val || ei->Type == et_dec_val || 
-        ei->Type == et_double_val || ei->Type == et_triple_val) {
-        
-        // Check if string contains valid numeric characters
-        bool hasDigit = false;
-        bool hasDecimal = false;
-        for (size_t i = 0; i < value.length(); i++) {
-            char c = value[i];
-            if (c >= '0' && c <= '9') {
-                hasDigit = true;
-            } else if (c == '.') {
-                hasDecimal = true;
-            } else if (c != '-' && c != ' ' && c != '+') {
-                return true; // Invalid character for number
-            }
-        }
-        if (!hasDigit) return true; // No digits found
-        
-        // Check for exact invalid string values (more reliable than float comparison)
-        if (value == "-255" || value == "-32768" || value == "32767" ||
-            value == "-327.68" || value == "327.68" || value == "-327.67" || value == "327.67") {
-            return true;
-        }
-        
-        // Parse value and check for invalid ranges
-        float fval = std::stof(value);
-        if (fval < -300.0f || fval > 1000.0f) {
-            return true;
-        }
-        
-        // For values near common invalid markers, use tolerance check
-        const float epsilon = 0.01f;
-        if (std::abs(fval - (-255.0f)) < epsilon || 
-            std::abs(fval - (-32768.0f)) < epsilon ||
-            std::abs(fval - 32767.0f) < epsilon) {
-            return true;
-        }
-    }
-    
-    return false;
-}
+// Validation removed for simplification - all values are published as-is
+// Invalid values like -255, -32768, etc. will be visible in Home Assistant
+// Users can filter these in HA automations/dashboards if needed
 
 // ============================================================================
 // COMPILE-TIME STRING HASHING FOR FAST SIGNAL DISPATCH
@@ -1728,97 +1471,21 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
 {
     const CanMember &cm = lookupCanMember(can_id);
     
-    // Early blacklist check - check signal name against permanent blacklist first (fastest)
-    // This avoids string concatenation for blacklisted signals
-    if (isPermanentlyBlacklisted(ei->Name)) {
-        return; // Don't process permanently blacklisted signals
+    // Skip empty values
+    if (value.empty()) {
+        return;
     }
     
-    // Build key for dynamic blacklist check
-    std::string key = std::string(cm.Name) + "_" + ei->Name;
-    
-    // Check dynamic blacklist (invalid signals)
-    if (blacklistedSignals.find(key) != blacklistedSignals.end()) {
-        return; // Don't process dynamically blacklisted signals
-    }
-    
-    // Response received - remove from pending requests and reset no-response counter
-    if (pendingRequests.find(key) != pendingRequests.end()) {
-        pendingRequests.erase(key);
-    }
-    if (noResponseCounts.find(key) != noResponseCounts.end()) {
-        noResponseCounts.erase(key);
-    }
-    
-    // Check for invalid values and track consecutive failures
-    if (isInvalidValue(ei, value)) {
-        // Increment invalid count for this signal
-        invalidSignalCounts[key]++;
-        
-        // Only blacklist after BLACKLIST_INVALID_THRESHOLD consecutive invalid values
-        if (invalidSignalCounts[key] >= BLACKLIST_INVALID_THRESHOLD) {
-#if BLACKLIST_ENABLED
-            if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
-                blacklistedSignals.insert(key);
-                ESP_LOGW("BLACKLIST", "Signal %s from %s returned %d consecutive invalid values (last: '%s') - blacklisted",
-                         ei->Name, cm.Name, invalidSignalCounts[key], value.c_str());
-                
-                // Remove from Home Assistant by sending empty discovery message
-                std::string uid = getOrCreateUID(can_id, ei->Name);
-                
-                const char* component = (ei->Type == et_bool || ei->Type == et_little_bool) ? "binary_sensor" : "sensor";
-                char discoveryTopic[256];
-                snprintf(discoveryTopic, sizeof(discoveryTopic), 
-                         "homeassistant/%s/heatingpump/%s/config", component, uid.c_str());
-                
-                // Send empty payload to remove entity from HA
-                id(mqtt_client).publish(discoveryTopic, "", 0, 0, true);
-                
-                // Clear retained state value
-                char stateTopic[128];
-                snprintf(stateTopic, sizeof(stateTopic), "heatingpump/%s/%s/state", cm.Name, ei->Name);
-                id(mqtt_client).publish(stateTopic, "", 0, 0, true);
-                
-                ESP_LOGI("BLACKLIST", "Removed discovery and state for %s from Home Assistant", uid.c_str());
-                
-                // Update diagnostics sensors
-                publishBlacklistDiagnostics();
-            }
-#else
-            ESP_LOGW("BLACKLIST", "Signal %s from %s returned %d consecutive invalid values (last: '%s') - blacklisting disabled",
-                     ei->Name, cm.Name, invalidSignalCounts[key], value.c_str());
-#endif
-        } else {
-            ESP_LOGD("BLACKLIST", "Signal %s from %s invalid (%d/%d): '%s'",
-                     ei->Name, cm.Name, invalidSignalCounts[key], BLACKLIST_INVALID_THRESHOLD, value.c_str());
+    // Invert boolean logic for EVU_SPERRE_AKTIV signal
+    // CAN: 1 = lock inactive (off), 0 = lock active (on)
+    // MQTT: "off" = lock inactive, "on" = lock active
+    std::string publishValue = value;
+    if (strcmp(ei->Name, "EVU_SPERRE_AKTIV") == 0) {
+        if (value == "on") {
+            publishValue = "off";
+        } else if (value == "off") {
+            publishValue = "on";
         }
-        return; // Don't publish invalid values
-    }
-    
-    // Valid value received - remove from blacklist if present
-    if (blacklistedSignals.find(key) != blacklistedSignals.end()) {
-        blacklistedSignals.erase(key);
-        ESP_LOGI("BLACKLIST", "Signal %s from %s recovered with valid value '%s' - removed from blacklist",
-                 ei->Name, cm.Name, value.c_str());
-        
-        // Clear discovery cache so it gets republished
-        char uniqueId[128];
-        snprintf(uniqueId, sizeof(uniqueId), "stiebel_%s_%s", cm.Name, ei->Name);
-        std::string uid(uniqueId);
-        std::transform(uid.begin(), uid.end(), uid.begin(), ::tolower);
-        std::replace(uid.begin(), uid.end(), ' ', '_');
-        discoveredSignals.erase(uid);
-        
-        // Update diagnostics sensors
-        publishBlacklistDiagnostics();
-    }
-    
-    // Reset invalid and no-response counters
-    if (invalidSignalCounts.find(key) != invalidSignalCounts.end()) {
-        invalidSignalCounts.erase(key);
-    }
-    if (noResponseCounts.find(key) != noResponseCounts.end()) {
-        noResponseCounts.erase(key);
     }
     
     // Check if discovery is needed (fast check only - don't publish yet)
@@ -1836,7 +1503,7 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
     }
     
     // Publish state immediately (this is fast - just MQTT publish)
-    publishMqttState(can_id, ei, value);
+    publishMqttState(can_id, ei, publishValue);
     
     // Fast signal dispatch using compile-time hash (O(1) switch/jump table)
     const char* signalName = ei->Name;
@@ -2030,71 +1697,8 @@ void processCalculatedSensors() {
     }
 }
 
-// Check for timed-out requests (no response received)
-void checkPendingRequests() {
-    unsigned long now = millis();
-    
-    // Create list of timed-out requests
-    std::vector<std::string> timedOut;
-    for (auto it = pendingRequests.begin(); it != pendingRequests.end(); ++it) {
-        if (now - it->second > CAN_REQUEST_TIMEOUT_MS) {
-            timedOut.push_back(it->first);
-        }
-    }
-    
-    // Process timed-out requests
-    for (const auto& key : timedOut) {
-        pendingRequests.erase(key);
-        noResponseCounts[key]++;
-        
-        // Blacklist after N consecutive no-responses
-        if (noResponseCounts[key] >= BLACKLIST_TIMEOUT_THRESHOLD) {
-            if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
-                blacklistedSignals.insert(key);
-                // Parse key to get member and signal name
-                size_t underscorePos = key.find('_');
-                if (underscorePos != std::string::npos) {
-                    std::string memberName = key.substr(0, underscorePos);
-                    std::string signalName = key.substr(underscorePos + 1);
-                    ESP_LOGW("BLACKLIST", "Signal %s from %s: no response after %d attempts - blacklisted",
-                             signalName.c_str(), memberName.c_str(), noResponseCounts[key]);
-                    // Remove from Home Assistant
-                    char uniqueId[128];
-                    snprintf(uniqueId, sizeof(uniqueId), "stiebel_%s", key.c_str());
-                    std::string uid(uniqueId);
-                    std::transform(uid.begin(), uid.end(), uid.begin(), ::tolower);
-                    char discoveryTopic[256];
-                    snprintf(discoveryTopic, sizeof(discoveryTopic), 
-                             "homeassistant/sensor/heatingpump/%s/config", uid.c_str());
-                    id(mqtt_client).publish(discoveryTopic, "", 0, 0, true);
-                    // Also try binary_sensor
-                    snprintf(discoveryTopic, sizeof(discoveryTopic), 
-                             "homeassistant/binary_sensor/heatingpump/%s/config", uid.c_str());
-                    id(mqtt_client).publish(discoveryTopic, "", 0, 0, true);
-                    // Clear retained state value
-                    char stateTopic[128];
-                    snprintf(stateTopic, sizeof(stateTopic), "heatingpump/%s/%s/state", memberName.c_str(), signalName.c_str());
-                    id(mqtt_client).publish(stateTopic, "", 0, 0, true);
-                    // Update diagnostics sensors
-                    publishBlacklistDiagnostics();
-                }
-            }
-        } else {
-            // Parse key for logging
-            size_t underscorePos = key.find('_');
-            if (underscorePos != std::string::npos) {
-                std::string memberName = key.substr(0, underscorePos);
-                std::string signalName = key.substr(underscorePos + 1);
-                ESP_LOGD("NO_RESPONSE", "Signal %s from %s: no response (%d/3)",
-                         signalName.c_str(), memberName.c_str(), noResponseCounts[key]);
-            }
-        }
-    }
-    
-    if (!timedOut.empty()) {
-        ESP_LOGI("NO_RESPONSE", "Detected %d timed-out requests", timedOut.size());
-    }
-}
+// Timeout tracking removed for simplification
+// Signals that don't respond will simply not update in Home Assistant
 
 // Process signal request table with frequency-based scheduling
 void processSignalRequests() {
@@ -2122,6 +1726,9 @@ void processSignalRequests() {
             const SignalRequest& req = signalRequests[i];
             const ElsterIndex* ei = GetElsterIndex(req.signalName);
             if (!ei || ei->Index == 0xFFFF) continue;
+            
+            // Skip blacklisted signals during initialization
+            if (isPermanentlyBlacklisted(ei->Name)) continue;
             
             unsigned long intervalMs = req.frequency * 1000UL;
             
@@ -2170,6 +1777,12 @@ void processSignalRequests() {
             continue; // Signal not found in table
         }
         
+        // Skip blacklisted signals - don't request them on CAN bus
+        if (isPermanentlyBlacklisted(ei->Name)) {
+            currentIndex = (currentIndex + 1) % SIGNAL_REQUEST_COUNT;
+            continue; // Signal is blacklisted
+        }
+        
         unsigned long intervalMs = req.frequency * 1000UL;
         
         // Determine which members to request from
@@ -2199,32 +1812,23 @@ void processSignalRequests() {
                 
                 // Check if this signal is overdue (current time >= scheduled time)
                 if (now >= nextScheduled) {
-                    if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
-                        // For cm_other: only send to ONE member per iteration to prevent bursts
-                        // Other members will be checked in subsequent iterations
-                        if (sentInThisGroup == 0) {
-                            readSignal(member, ei);
-                            requestsSentThisIteration++;
-                            sentInThisGroup++;
-                            
-                            // Calculate next scheduled time with random offset (0 to 5% of interval)
-                            // This keeps signals from synchronizing while staying close to target frequency
-                            unsigned long maxJitter = (intervalMs / 20); // 5% of interval
-                            if (maxJitter < 500) maxJitter = 500; // Minimum 500ms jitter
-                            unsigned long randomDelay = getRandomInRange(0, maxJitter + 1);
-                            nextRequestTime[key] = now + intervalMs + randomDelay;
-                            
-                            // ESP_LOGD("REQUEST_MGR", "Sent %s, next in %lums", key.c_str(), intervalMs + randomDelay);
-                        }
-                        // Else: skip this member for now, will be checked next iteration
-                    } else {
-                        // ESP_LOGD("REQUEST_MGR", "Skipping blacklisted signal: %s", key.c_str());
-                        // Reschedule for retry later (for recovery)
-                        unsigned long maxJitter = (intervalMs / 20);
-                        if (maxJitter < 500) maxJitter = 500;
+                    // For cm_other: only send to ONE member per iteration to prevent bursts
+                    // Other members will be checked in subsequent iterations
+                    if (sentInThisGroup == 0) {
+                        readSignal(member, ei);
+                        requestsSentThisIteration++;
+                        sentInThisGroup++;
+                        
+                        // Calculate next scheduled time with random offset (0 to 5% of interval)
+                        // This keeps signals from synchronizing while staying close to target frequency
+                        unsigned long maxJitter = (intervalMs / 20); // 5% of interval
+                        if (maxJitter < 500) maxJitter = 500; // Minimum 500ms jitter
                         unsigned long randomDelay = getRandomInRange(0, maxJitter + 1);
                         nextRequestTime[key] = now + intervalMs + randomDelay;
+                        
+                        // ESP_LOGD("REQUEST_MGR", "Sent %s, next in %lums", key.c_str(), intervalMs + randomDelay);
                     }
+                    // Else: skip this member for now, will be checked next iteration
                 }
             }
         } else {
@@ -2237,38 +1841,22 @@ void processSignalRequests() {
             
             // Check if this signal is overdue (current time >= scheduled time)
             if (now >= nextScheduled) {
-                if (blacklistedSignals.find(key) == blacklistedSignals.end()) {
-                    readSignal(member, ei);
-                    requestsSentThisIteration++;
-                    
-                    // Calculate next scheduled time with random offset (0 to 5% of interval)
-                    // This keeps signals from synchronizing while staying close to target frequency
-                    unsigned long maxJitter = (intervalMs / 20); // 5% of interval
-                    if (maxJitter < 500) maxJitter = 500; // Minimum 500ms jitter
-                    unsigned long randomDelay = getRandomInRange(0, maxJitter + 1);
-                    nextRequestTime[key] = now + intervalMs + randomDelay;
-                    
-                    // ESP_LOGD("REQUEST_MGR", "Sent %s, next in %lums", key.c_str(), intervalMs + randomDelay);
-                } else {
-                    // ESP_LOGD("REQUEST_MGR", "Skipping blacklisted signal: %s", key.c_str());
-                    // Reschedule for retry later (for recovery)
-                    unsigned long maxJitter = (intervalMs / 20);
-                    if (maxJitter < 500) maxJitter = 500;
-                    unsigned long randomDelay = getRandomInRange(0, maxJitter + 1);
-                    nextRequestTime[key] = now + intervalMs + randomDelay;
-                }
+                readSignal(member, ei);
+                requestsSentThisIteration++;
+                
+                // Calculate next scheduled time with random offset (0 to 5% of interval)
+                // This keeps signals from synchronizing while staying close to target frequency
+                unsigned long maxJitter = (intervalMs / 20); // 5% of interval
+                if (maxJitter < 500) maxJitter = 500; // Minimum 500ms jitter
+                unsigned long randomDelay = getRandomInRange(0, maxJitter + 1);
+                nextRequestTime[key] = now + intervalMs + randomDelay;
+                
+                // ESP_LOGD("REQUEST_MGR", "Sent %s, next in %lums", key.c_str(), intervalMs + randomDelay);
             }
         }
         
         // Move to next signal in round-robin fashion (wrap around at end)
         currentIndex = (currentIndex + 1) % SIGNAL_REQUEST_COUNT;
-    }
-    
-    // Update starting position for next iteration
-    signalProcessingStartIndex = currentIndex;
-    
-    if (requestsSentThisIteration > 0) {
-        ESP_LOGV("REQUEST_MGR", "Sent %d requests this iteration", requestsSentThisIteration);
     }
 }
 
@@ -2283,28 +1871,16 @@ void identifyCanMembers()
 
 void processAndUpdate(uint32_t can_id, std::vector<uint8_t> msg)
 {
-    // Early blacklist check - extract signal name and check before expensive processing
-    if (msg.size() >= 7)
-    {
-        const ElsterIndex *ei_check;
-        if (msg[2] == 0xfa)
-        {
-            ei_check = GetElsterIndex(msg[4] + (msg[3] << 8));
-        }
-        else
-        {
-            ei_check = GetElsterIndex(msg[2]);
-        }
-        
-        // Skip permanently blacklisted signals immediately
-        if (isPermanentlyBlacklisted(ei_check->Name))
-        {
-            return; // Reject before lookup, parsing, formatting, logging
-        }
-    }
-    
+ 
     std::string value;
     const ElsterIndex *ei = processCanMessage(msg, can_id, value);
+
+    // Skip permanently blacklisted signals
+    if (isPermanentlyBlacklisted(ei->Name))
+    {
+        return; // Reject before lookup, parsing, formatting, logging
+    }
+
     updateSensor(can_id, ei, value);
     return;
 }

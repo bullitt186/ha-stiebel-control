@@ -16,10 +16,6 @@
 #  along with this program. If not, see http://www.gnu.org/licenses/ .
 #
 
-substitutions:
-  # Blacklist configuration: set to "1" to enable, "0" to disable
-  blacklist_enabled: "1"
-
 esphome:
   name: heatingpump
   friendly_name: "Heating Pump CAN Interface"
@@ -34,9 +30,6 @@ esphome:
     - ha-stiebel-control/ha-stiebel-control.h
     - ha-stiebel-control/signal_requests_wpl13e.h
 
-  platformio_options:
-    build_flags:
-      - -DBLACKLIST_ENABLED=${blacklist_enabled}
   
 
 
@@ -117,7 +110,6 @@ mqtt:
         format: "Connected to MQTT broker"
     - lambda: |-
         publishMainDevice();
-        publishBlacklistDiagnostics();
   on_disconnect:
     - logger.log:
         level: WARN
@@ -171,24 +163,12 @@ interval:
       - lambda: |-
           processCalculatedSensors();
   
-  # Check for timed-out CAN requests every 10 seconds
-  - interval: 10s
-    then:
-      - lambda: |-
-          checkPendingRequests();
-  
   # Republish MQTT discovery every 15 minutes for reliability
   - interval: 15min
     then:
       - lambda: |-
           republishAllDiscoveries();
   
-  # Publish blacklist diagnostics every 5 minutes
-  - interval: 5min
-    then:
-      - lambda: |-
-          publishBlacklistDiagnostics();
-
 #########################################
 #                                       #
 #   TEXT SENSOREN                       #
