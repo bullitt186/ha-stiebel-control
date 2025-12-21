@@ -28,6 +28,7 @@
 #include <iomanip>
 #include <set>
 #include <map>
+#include <unordered_map>
 #include <vector>
 #include <algorithm>
 #include <cmath>
@@ -187,16 +188,16 @@ static std::set<std::string> discoveredSignals;
 static std::set<std::string> blacklistedSignals;
 
 // Track consecutive invalid value counts per signal (reset on valid value)
-static std::map<std::string, int> invalidSignalCounts;
+static std::unordered_map<std::string, int> invalidSignalCounts;
 
 // Track pending requests with timestamps (to detect no-response)
-static std::map<std::string, unsigned long> pendingRequests;
+static std::unordered_map<std::string, unsigned long> pendingRequests;
 
 // Track consecutive no-response counts per signal
-static std::map<std::string, int> noResponseCounts;
+static std::unordered_map<std::string, int> noResponseCounts;
 
 // Track next scheduled request time per unique signal key (MEMBER_SIGNAL)
-static std::map<std::string, unsigned long> nextRequestTime;
+static std::unordered_map<std::string, unsigned long> nextRequestTime;
 
 // Track starting position for round-robin signal processing (prevents starvation)
 static int signalProcessingStartIndex = 0;
@@ -215,7 +216,7 @@ static int lastMinute = -1;
 static int lastSekunde = -1;
 
 // UID cache to avoid repeated string operations on every signal update
-static std::map<std::string, std::string> uidCache;
+static std::unordered_map<std::string, std::string> uidCache;
 
 // ============================================================================
 // SIGNAL REQUEST CONFIGURATION
@@ -1414,7 +1415,7 @@ void publishBlacklistDiagnostics() {
 }
 
 // Track which COP values we have valid data for
-static std::map<std::string, float> copEnergyValues;
+static std::unordered_map<std::string, float> copEnergyValues;
 
 // Publish MQTT discovery for COP sensors
 void publishCOPDiscovery() {
@@ -1633,6 +1634,11 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
 {
     const CanMember &cm = lookupCanMember(can_id);
     std::string key = std::string(cm.Name) + "_" + ei->Name;
+    
+    // Early blacklist check - skip all processing for permanently blacklisted signals
+    if (blacklistedSignals.find(key) != blacklistedSignals.end()) {
+        return; // Don't process blacklisted signals at all
+    }
     
     // Response received - remove from pending requests and reset no-response counter
     if (pendingRequests.find(key) != pendingRequests.end()) {
