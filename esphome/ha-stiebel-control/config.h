@@ -29,7 +29,7 @@
 #define STARTUP_DELAY_MS 30000
 
 // Maximum number of requests to send per iteration (rate limiting)
-#define MAX_REQUESTS_PER_ITERATION 5
+#define MAX_REQUESTS_PER_ITERATION 1
 
 // Minimum random delay between requests (milliseconds)
 #define MIN_RANDOM_DELAY_MS 200
