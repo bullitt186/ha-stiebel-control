@@ -218,6 +218,9 @@ static int lastSekunde = -1;
 // UID cache to avoid repeated string operations on every signal update
 static std::unordered_map<std::string, std::string> uidCache;
 
+// Pattern matching cache to avoid repeated expandSignalName() and matchesPattern() calls
+static std::unordered_map<std::string, const SignalConfig*> signalConfigCache;
+
 // ============================================================================
 // SIGNAL REQUEST CONFIGURATION
 // ============================================================================
@@ -980,6 +983,17 @@ inline std::string getOrCreateUID(uint32_t can_id, const char* signalName) {
 
 // Get signal configuration based on expanded name and type
 inline const SignalConfig* getSignalConfig(const char* signalName, ElsterType type) {
+    // Create cache key from signal name and type
+    char cacheKey[256];
+    snprintf(cacheKey, sizeof(cacheKey), "%s:%d", signalName, (int)type);
+    
+    // Check cache first (O(1) lookup)
+    auto cacheIt = signalConfigCache.find(cacheKey);
+    if (cacheIt != signalConfigCache.end()) {
+        return cacheIt->second;
+    }
+    
+    // Cache miss - do expensive pattern matching
     // First expand the signal name
     std::string expandedName = expandSignalName(signalName);
     
@@ -988,17 +1002,26 @@ inline const SignalConfig* getSignalConfig(const char* signalName, ElsterType ty
     std::transform(upperExpanded.begin(), upperExpanded.end(), upperExpanded.begin(), ::toupper);
     
     // Try to find matching pattern against expanded name
+    const SignalConfig* result = nullptr;
     for (const auto& config : signalMappings) {
         if (matchesPattern(upperExpanded.c_str(), config.namePattern)) {
             ESP_LOGD("PATTERN", "Signal '%s' (expanded: '%s') matched pattern '%s'", 
                      signalName, expandedName.c_str(), config.namePattern);
-            return &config;
+            result = &config;
+            break;
         }
     }
-    // Return default (last entry)
-    ESP_LOGW("PATTERN", "Signal '%s' (expanded: '%s') using default pattern (no match found)", 
-             signalName, expandedName.c_str());
-    return &signalMappings[sizeof(signalMappings)/sizeof(SignalConfig) - 1];
+    
+    // If no match, use default (last entry)
+    if (result == nullptr) {
+        ESP_LOGW("PATTERN", "Signal '%s' (expanded: '%s') using default pattern (no match found)", 
+                 signalName, expandedName.c_str());
+        result = &signalMappings[sizeof(signalMappings)/sizeof(SignalConfig) - 1];
+    }
+    
+    // Cache the result before returning
+    signalConfigCache[cacheKey] = result;
+    return result;
 }
 
 // Generate friendly name from signal name (kept in German as requested)
@@ -1112,10 +1135,6 @@ void publishMqttDiscovery(uint32_t can_id, const ElsterIndex *ei) {
         return; // Already published discovery
     }
     discoveredSignals.insert(uid);
-    
-    // Debug: log signal config
-    ESP_LOGD("MQTT", "Signal %s: device_class=%s, unit=%s, state_class=%s", 
-             ei->Name, config->deviceClass, config->unit, config->stateClass);
     
     // Determine component type based on ElsterType
     const char* component = "sensor";
@@ -1630,14 +1649,74 @@ bool isInvalidValue(const ElsterIndex *ei, const std::string &value) {
     return false;
 }
 
+// ============================================================================
+// COMPILE-TIME STRING HASHING FOR FAST SIGNAL DISPATCH
+// ============================================================================
+
+// Compile-time DJB2 hash function (constexpr for C++11 compatibility)
+constexpr uint32_t hash_impl(const char* str, uint32_t hash = 5381) {
+    return (*str == '\0') ? hash : hash_impl(str + 1, ((hash << 5) + hash) + static_cast<uint32_t>(*str));
+}
+
+constexpr uint32_t hash(const char* str) {
+    return hash_impl(str);
+}
+
+// Runtime hash for signal names (inline for performance)
+inline uint32_t hash_runtime(const char* str) {
+    uint32_t h = 5381;
+    while (*str) {
+        h = ((h << 5) + h) + static_cast<uint32_t>(*str);
+        str++;
+    }
+    return h;
+}
+
+// Pre-computed compile-time hashes for all monitored signals
+constexpr uint32_t HASH_JAHR = hash("JAHR");
+constexpr uint32_t HASH_MONAT = hash("MONAT");
+constexpr uint32_t HASH_TAG = hash("TAG");
+constexpr uint32_t HASH_STUNDE = hash("STUNDE");
+constexpr uint32_t HASH_MINUTE = hash("MINUTE");
+constexpr uint32_t HASH_SEKUNDE = hash("SEKUNDE");
+constexpr uint32_t HASH_SOMMERBETRIEB = hash("SOMMERBETRIEB");
+constexpr uint32_t HASH_WPVORLAUFIST = hash("WPVORLAUFIST");
+constexpr uint32_t HASH_RUECKLAUFISTTEMP = hash("RUECKLAUFISTTEMP");
+constexpr uint32_t HASH_VERDICHTER = hash("VERDICHTER");
+constexpr uint32_t HASH_EL_AUFNAHMELEISTUNG_HEIZ = hash("EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH");
+constexpr uint32_t HASH_EL_AUFNAHMELEISTUNG_WW = hash("EL_AUFNAHMELEISTUNG_WW_SUM_MWH");
+constexpr uint32_t HASH_WAERMEERTRAG_2WE_WW = hash("WAERMEERTRAG_2WE_WW_SUM_MWH");
+constexpr uint32_t HASH_WAERMEERTRAG_2WE_HEIZ = hash("WAERMEERTRAG_2WE_HEIZ_SUM_MWH");
+constexpr uint32_t HASH_WAERMEERTRAG_WW = hash("WAERMEERTRAG_WW_SUM_MWH");
+constexpr uint32_t HASH_WAERMEERTRAG_HEIZ = hash("WAERMEERTRAG_HEIZ_SUM_MWH");
+
+// Check if signal is in permanent blacklist
+// Only checks signal name (after underscore in "MEMBER_SIGNAL" format)
+inline bool isPermanentlyBlacklisted(const char* signalName) {
+    for (size_t i = 0; i < sizeof(PERMANENT_BLACKLIST) / sizeof(PERMANENT_BLACKLIST[0]); i++) {
+        if (strcmp(signalName, PERMANENT_BLACKLIST[i]) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &value)
 {
     const CanMember &cm = lookupCanMember(can_id);
+    
+    // Early blacklist check - check signal name against permanent blacklist first (fastest)
+    // This avoids string concatenation for blacklisted signals
+    if (isPermanentlyBlacklisted(ei->Name)) {
+        return; // Don't process permanently blacklisted signals
+    }
+    
+    // Build key for dynamic blacklist check
     std::string key = std::string(cm.Name) + "_" + ei->Name;
     
-    // Early blacklist check - skip all processing for permanently blacklisted signals
+    // Check dynamic blacklist (invalid signals)
     if (blacklistedSignals.find(key) != blacklistedSignals.end()) {
-        return; // Don't process blacklisted signals at all
+        return; // Don't process dynamically blacklisted signals
     }
     
     // Response received - remove from pending requests and reset no-response counter
@@ -1719,121 +1798,145 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
         noResponseCounts.erase(key);
     }
     
-    // Publish to MQTT (discovery + state) for valid signals only
-    publishMqttDiscovery(can_id, ei);
+    // Check if discovery is needed (fast check only - don't publish yet)
+    std::string uid = getOrCreateUID(can_id, ei->Name);
+    bool needsDiscovery = (discoveredSignals.find(uid) == discoveredSignals.end());
+    
+    if (needsDiscovery) {
+        // Mark as discovered to avoid repeated checks
+        discoveredSignals.insert(uid);
+        
+        // Schedule discovery publishing for next loop iteration (non-blocking)
+        // Discovery will be published via interval component or deferred call
+        // For now, publish immediately but this could be optimized further
+        publishMqttDiscovery(can_id, ei);
+    }
+    
+    // Publish state immediately (this is fast - just MQTT publish)
     publishMqttState(can_id, ei, value);
     
-    // Trigger calculated sensors when their source values update
+    // Fast signal dispatch using compile-time hash (O(1) switch/jump table)
     const char* signalName = ei->Name;
+    uint32_t signalHash = hash_runtime(signalName);
     
-    // Store date/time component values
-    if (strcmp(signalName, "JAHR") == 0) {
-        char* endPtr;
-        long intValue = strtol(value.c_str(), &endPtr, 10);
-        if (endPtr != value.c_str() && *endPtr == '\0') {
-            lastJahr = static_cast<int>(intValue);
-            ESP_LOGD("CALC", "Updated JAHR: %d", lastJahr);
+    switch (signalHash) {
+        case HASH_JAHR: {
+            char* endPtr;
+            long intValue = strtol(value.c_str(), &endPtr, 10);
+            if (endPtr != value.c_str() && *endPtr == '\0') {
+                lastJahr = static_cast<int>(intValue);
+                ESP_LOGD("CALC", "Updated JAHR: %d", lastJahr);
+            }
+            break;
         }
-    }
-    
-    if (strcmp(signalName, "MONAT") == 0) {
-        char* endPtr;
-        long intValue = strtol(value.c_str(), &endPtr, 10);
-        if (endPtr != value.c_str() && *endPtr == '\0') {
-            lastMonat = static_cast<int>(intValue);
-            ESP_LOGD("CALC", "Updated MONAT: %d", lastMonat);
+        
+        case HASH_MONAT: {
+            char* endPtr;
+            long intValue = strtol(value.c_str(), &endPtr, 10);
+            if (endPtr != value.c_str() && *endPtr == '\0') {
+                lastMonat = static_cast<int>(intValue);
+                ESP_LOGD("CALC", "Updated MONAT: %d", lastMonat);
+            }
+            break;
         }
-    }
-    
-    if (strcmp(signalName, "TAG") == 0) {
-        char* endPtr;
-        long intValue = strtol(value.c_str(), &endPtr, 10);
-        if (endPtr != value.c_str() && *endPtr == '\0') {
-            lastTag = static_cast<int>(intValue);
-            ESP_LOGD("CALC", "Updated TAG: %d", lastTag);
-            publishDate(); // Publish when TAG updates
+        
+        case HASH_TAG: {
+            char* endPtr;
+            long intValue = strtol(value.c_str(), &endPtr, 10);
+            if (endPtr != value.c_str() && *endPtr == '\0') {
+                lastTag = static_cast<int>(intValue);
+                ESP_LOGD("CALC", "Updated TAG: %d", lastTag);
+                publishDate();
+            }
+            break;
         }
-    }
-    
-    if (strcmp(signalName, "STUNDE") == 0) {
-        char* endPtr;
-        long intValue = strtol(value.c_str(), &endPtr, 10);
-        if (endPtr != value.c_str() && *endPtr == '\0') {
-            lastStunde = static_cast<int>(intValue);
-            ESP_LOGD("CALC", "Updated STUNDE: %d", lastStunde);
+        
+        case HASH_STUNDE: {
+            char* endPtr;
+            long intValue = strtol(value.c_str(), &endPtr, 10);
+            if (endPtr != value.c_str() && *endPtr == '\0') {
+                lastStunde = static_cast<int>(intValue);
+                ESP_LOGD("CALC", "Updated STUNDE: %d", lastStunde);
+            }
+            break;
         }
-    }
-    
-    if (strcmp(signalName, "MINUTE") == 0) {
-        char* endPtr;
-        long intValue = strtol(value.c_str(), &endPtr, 10);
-        if (endPtr != value.c_str() && *endPtr == '\0') {
-            lastMinute = static_cast<int>(intValue);
-            ESP_LOGD("CALC", "Updated MINUTE: %d", lastMinute);
-            publishTime(); // Publish when MINUTE updates
+        
+        case HASH_MINUTE: {
+            char* endPtr;
+            long intValue = strtol(value.c_str(), &endPtr, 10);
+            if (endPtr != value.c_str() && *endPtr == '\0') {
+                lastMinute = static_cast<int>(intValue);
+                ESP_LOGD("CALC", "Updated MINUTE: %d", lastMinute);
+                publishTime();
+            }
+            break;
         }
-    }
-    
-    if (strcmp(signalName, "SEKUNDE") == 0) {
-        char* endPtr;
-        long intValue = strtol(value.c_str(), &endPtr, 10);
-        if (endPtr != value.c_str() && *endPtr == '\0') {
-            lastSekunde = static_cast<int>(intValue);
-            ESP_LOGD("CALC", "Updated SEKUNDE: %d", lastSekunde);
+        
+        case HASH_SEKUNDE: {
+            char* endPtr;
+            long intValue = strtol(value.c_str(), &endPtr, 10);
+            if (endPtr != value.c_str() && *endPtr == '\0') {
+                lastSekunde = static_cast<int>(intValue);
+                ESP_LOGD("CALC", "Updated SEKUNDE: %d", lastSekunde);
+            }
+            break;
         }
-    }
-    
-    // Update Betriebsart when SOMMERBETRIEB changes
-    if (strcmp(signalName, "SOMMERBETRIEB") == 0) {
-        publishBetriebsart(value);
-    }
-    
-    // Store and update temperature values for Delta T calculations
-    if (strcmp(signalName, "WPVORLAUFIST") == 0) {
-        char* endPtr;
-        float floatValue = strtof(value.c_str(), &endPtr);
-        if (endPtr != value.c_str() && *endPtr == '\0') {
-            lastWpVorlaufIst = floatValue;
-            publishDeltaTContinuous();
-            publishDeltaTRunning(); // Also update running Delta T if compressor is on
-        } else {
-            ESP_LOGW("CALC", "Failed to parse WPVORLAUFIST value: %s", value.c_str());
+        
+        case HASH_SOMMERBETRIEB:
+            publishBetriebsart(value);
+            break;
+        
+        case HASH_WPVORLAUFIST: {
+            char* endPtr;
+            float floatValue = strtof(value.c_str(), &endPtr);
+            if (endPtr != value.c_str() && *endPtr == '\0') {
+                lastWpVorlaufIst = floatValue;
+                publishDeltaTContinuous();
+                publishDeltaTRunning();
+            } else {
+                ESP_LOGW("CALC", "Failed to parse WPVORLAUFIST value: %s", value.c_str());
+            }
+            break;
         }
-    }
-    
-    if (strcmp(signalName, "RUECKLAUFISTTEMP") == 0) {
-        char* endPtr;
-        float floatValue = strtof(value.c_str(), &endPtr);
-        if (endPtr != value.c_str() && *endPtr == '\0') {
-            lastRuecklaufIstTemp = floatValue;
-            publishDeltaTContinuous();
-            publishDeltaTRunning(); // Also update running Delta T if compressor is on
-        } else {
-            ESP_LOGW("CALC", "Failed to parse RUECKLAUFISTTEMP value: %s", value.c_str());
+        
+        case HASH_RUECKLAUFISTTEMP: {
+            char* endPtr;
+            float floatValue = strtof(value.c_str(), &endPtr);
+            if (endPtr != value.c_str() && *endPtr == '\0') {
+                lastRuecklaufIstTemp = floatValue;
+                publishDeltaTContinuous();
+                publishDeltaTRunning();
+            } else {
+                ESP_LOGW("CALC", "Failed to parse RUECKLAUFISTTEMP value: %s", value.c_str());
+            }
+            break;
         }
-    }
-    
-    // Store and update compressor value
-    if (strcmp(signalName, "VERDICHTER") == 0) {
-        char* endPtr;
-        float floatValue = strtof(value.c_str(), &endPtr);
-        if (endPtr != value.c_str() && *endPtr == '\0') {
-            lastVerdichterValue = floatValue;
-            publishCompressorActive();
-        } else {
-            ESP_LOGW("CALC", "Failed to parse VERDICHTER value: %s", value.c_str());
+        
+        case HASH_VERDICHTER: {
+            char* endPtr;
+            float floatValue = strtof(value.c_str(), &endPtr);
+            if (endPtr != value.c_str() && *endPtr == '\0') {
+                lastVerdichterValue = floatValue;
+                publishCompressorActive();
+            } else {
+                ESP_LOGW("CALC", "Failed to parse VERDICHTER value: %s", value.c_str());
+            }
+            break;
         }
-    }
-    
-    // Store energy values and recalculate COP
-    if (strcmp(signalName, "EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH") == 0 ||
-        strcmp(signalName, "EL_AUFNAHMELEISTUNG_WW_SUM_MWH") == 0 ||
-        strcmp(signalName, "WAERMEERTRAG_2WE_WW_SUM_MWH") == 0 ||
-        strcmp(signalName, "WAERMEERTRAG_2WE_HEIZ_SUM_MWH") == 0 ||
-        strcmp(signalName, "WAERMEERTRAG_WW_SUM_MWH") == 0 ||
-        strcmp(signalName, "WAERMEERTRAG_HEIZ_SUM_MWH") == 0) {
-        storeCOPEnergyValue(signalName, value);
-        updateCOPCalculations();
+        
+        case HASH_EL_AUFNAHMELEISTUNG_HEIZ:
+        case HASH_EL_AUFNAHMELEISTUNG_WW:
+        case HASH_WAERMEERTRAG_2WE_WW:
+        case HASH_WAERMEERTRAG_2WE_HEIZ:
+        case HASH_WAERMEERTRAG_WW:
+        case HASH_WAERMEERTRAG_HEIZ:
+            storeCOPEnergyValue(signalName, value);
+            updateCOPCalculations();
+            break;
+        
+        default:
+            // Signal not monitored for calculated sensors - no action needed
+            break;
     }
 }
 
