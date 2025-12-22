@@ -196,6 +196,8 @@ static const WritableSelectConfig writableSelects[] = {
 static const size_t WRITABLE_SELECT_COUNT = sizeof(writableSelects) / sizeof(WritableSelectConfig);
 
 // ============================================================================
+// WRITABLE DATETIME CONFIGURATION (for MQTT Datetime entities)
+// ============================================================================
 // RUNTIME STATE TRACKING
 // ============================================================================
 
@@ -721,6 +723,12 @@ void publishAllWritableSelectDiscoveries(bool forceRepublish = false) {
     }
 }
 
+// ============================================================================
+// Note: Datetime controls are now implemented using Home Assistant input_datetime
+// helpers synced via text_sensor platform and triggered by buttons.
+// MQTT datetime discovery is not supported by Home Assistant.
+// ============================================================================
+
 void publishDate()
 {
     // Publish discovery (only once - cached)
@@ -793,6 +801,9 @@ void publishTime()
     id(mqtt_client).publish(stateTopic, zeit, strlen(zeit), 0, true);
     ESP_LOGI("CALC", "Published time: %s (Stunde=%d, Minute=%d, Sekunde=%d)", zeit, istunde, iminute, isekunde);
 }
+
+// Datetime states are now handled by Home Assistant input_datetime helpers
+// Read by ESPHome text_sensors and written via button triggers
 
 void publishBetriebsart(const std::string& sommerBetriebValue)
 {

@@ -104,6 +104,8 @@ mqtt:
         publishAllWritableNumberDiscoveries();
         // Publish MQTT select discoveries for operating mode control
         publishAllWritableSelectDiscoveries();
+        // Publish MQTT datetime discoveries for time/date control
+        publishAllWritableDatetimeDiscoveries();
         ESP_LOGI("MQTT_CONN", "Discovery publication complete");
   on_disconnect:
     - logger.log:
@@ -122,6 +124,7 @@ mqtt:
             republishAllDiscoveries();
             publishAllWritableNumberDiscoveries(true);
             publishAllWritableSelectDiscoveries(true);
+            publishAllWritableDatetimeDiscoveries(true);
             publishAllCalculatedSensorDiscoveries(true);
             ESP_LOGI("MQTT_CMD", "All discoveries republished");
     
@@ -188,6 +191,7 @@ interval:
           republishAllDiscoveries();
           publishAllWritableNumberDiscoveries(true);
           publishAllWritableSelectDiscoveries(true);
+          publishAllWritableDatetimeDiscoveries(true);
   
 #########################################
 #                                       #
@@ -203,12 +207,12 @@ text_sensor:
   - platform: homeassistant
     name: "Wärmepumpe Datum Setpoint"
     id: warmepumpe_datum
-    entity_id: input_datetime.warmepumpe_datum
+    entity_id: input_datetime.heatingpump_date
 
   - platform: homeassistant
     name: "Wärmepumpe Uhrzeit Setpoint"
     id: warmepumpe_uhrzeit
-    entity_id: input_datetime.warmepumpe_uhrzeit
+    entity_id: input_datetime.heatingpump_time
 
   #########################################
   #                                       #

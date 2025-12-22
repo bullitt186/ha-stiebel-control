@@ -1,3 +1,17 @@
+# Input datetime helpers for heat pump time/date control
+input_datetime:
+  heatingpump_time:
+    name: "Wärmepumpe Uhrzeit"
+    has_date: false
+    has_time: true
+    icon: "mdi:clock-outline"
+    
+  heatingpump_date:
+    name: "Wärmepumpe Datum"
+    has_date: true
+    has_time: false
+    icon: "mdi:calendar"
+
 mqtt:
   number:
     - name: "Speichersolltemp"
