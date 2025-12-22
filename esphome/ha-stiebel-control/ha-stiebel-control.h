@@ -137,6 +137,65 @@ static const CalculatedSensorConfig calculatedSensors[] = {
 static const size_t CALCULATED_SENSOR_COUNT = sizeof(calculatedSensors) / sizeof(CalculatedSensorConfig);
 
 // ============================================================================
+// WRITABLE NUMBER CONFIGURATION (for MQTT Number entities)
+// ============================================================================
+
+struct WritableNumberConfig {
+    const char* signalName;        // CAN signal name like "EINSTELL_SPEICHERSOLLTEMP"
+    const char* friendlyName;      // Display name in Home Assistant
+    CanMemberType member;          // Which CAN member to write to
+    float min;                     // Minimum value
+    float max;                     // Maximum value
+    float step;                    // Step size
+    const char* unit;              // Unit of measurement
+    const char* icon;              // MDI icon
+    const char* deviceClass;       // HA device class
+};
+
+static const WritableNumberConfig writableNumbers[] = {
+    // Primary storage target temperature
+    {"EINSTELL_SPEICHERSOLLTEMP", "Speicher Soll Temperatur Einstellung", 
+     cm_manager, 20.0, 60.0, 1.0, "°C", "mdi:thermometer-high", "temperature"},
+    
+    // Secondary storage target temperature (comfort/eco modes)
+    {"EINSTELL_SPEICHERSOLLTEMP2", "Speicher Soll Temperatur 2 Einstellung", 
+     cm_manager, 20.0, 60.0, 1.0, "°C", "mdi:thermometer-low", "temperature"}
+};
+
+static const size_t WRITABLE_NUMBER_COUNT = sizeof(writableNumbers) / sizeof(WritableNumberConfig);
+
+// ============================================================================
+// WRITABLE SELECT CONFIGURATION (for MQTT Select entities)
+// ============================================================================
+
+struct WritableSelectConfig {
+    const char* signalName;        // CAN signal name like "PROGRAMMSCHALTER"
+    const char* friendlyName;      // Display name in Home Assistant
+    CanMemberType member;          // Which CAN member to write to
+    const char** options;          // Array of option strings
+    size_t optionCount;            // Number of options
+    const char* icon;              // MDI icon
+};
+
+// Operating mode options for PROGRAMMSCHALTER
+static const char* programmschalterOptions[] = {
+    "Notbetrieb",      // Emergency operation
+    "Bereitschaft",    // Standby
+    "Automatik",       // Automatic
+    "Tagbetrieb",      // Day operation
+    "Absenkbetrieb",   // Night/reduced operation
+    "Warmwasser"       // Hot water only
+};
+
+static const WritableSelectConfig writableSelects[] = {
+    // Heat pump operating mode
+    {"PROGRAMMSCHALTER", "Programmschalter", 
+     cm_manager, programmschalterOptions, 6, "mdi:dip-switch"}
+};
+
+static const size_t WRITABLE_SELECT_COUNT = sizeof(writableSelects) / sizeof(WritableSelectConfig);
+
+// ============================================================================
 // RUNTIME STATE TRACKING
 // ============================================================================
 
@@ -145,6 +204,12 @@ static std::set<std::string> discoveredSignals;
 
 // Track which calculated sensors have been discovered
 static std::set<std::string> discoveredCalculatedSensors;
+
+// Track which writable numbers have been discovered
+static std::set<std::string> discoveredWritableNumbers;
+
+// Track which writable selects have been discovered
+static std::set<std::string> discoveredWritableSelects;
 
 // Track next scheduled request time per unique signal key (MEMBER_SIGNAL)
 static std::unordered_map<std::string, unsigned long> nextRequestTime;
@@ -481,6 +546,178 @@ void publishAllCalculatedSensorDiscoveries(bool forceRepublish = false) {
     
     for (size_t i = 0; i < CALCULATED_SENSOR_COUNT; i++) {
         publishCalculatedSensorDiscovery(calculatedSensors[i], forceRepublish);
+    }
+}
+
+// ============================================================================
+// MQTT WRITABLE NUMBER (for temperature setpoints, etc.)
+// ============================================================================
+
+// Publish MQTT discovery for a writable number entity
+void publishWritableNumberDiscovery(const WritableNumberConfig& config, bool forceRepublish = false) {
+    // Get CanMember for building topics
+    const CanMember* cm = &CanMembers[config.member];
+    
+    // Build unique ID
+    char uniqueId[128];
+    snprintf(uniqueId, sizeof(uniqueId), "stiebel_%s_%s", cm->Name, config.signalName);
+    std::string uid(uniqueId);
+    std::transform(uid.begin(), uid.end(), uid.begin(), ::tolower);
+    
+    // Check if already published (unless force republish)
+    if (!forceRepublish && discoveredWritableNumbers.find(uid) != discoveredWritableNumbers.end()) {
+        return;
+    }
+    
+    // Mark as discovered
+    discoveredWritableNumbers.insert(uid);
+    
+    // Build discovery topic: homeassistant/number/heatingpump/<unique_id>/config
+    char discoveryTopic[256];
+    snprintf(discoveryTopic, sizeof(discoveryTopic), 
+             "homeassistant/number/heatingpump/%s/config", uid.c_str());
+    
+    // Build command topic: heatingpump/<MEMBER>/<SIGNAL>/set
+    char commandTopic[128];
+    snprintf(commandTopic, sizeof(commandTopic), "heatingpump/%s/%s/set", cm->Name, config.signalName);
+    
+    // Build state topic: heatingpump/<MEMBER>/<SIGNAL>/state
+    char stateTopic[128];
+    snprintf(stateTopic, sizeof(stateTopic), "heatingpump/%s/%s/state", cm->Name, config.signalName);
+    
+    // Build JSON payload
+    std::ostringstream payload;
+    payload << "{\"name\":\"" << config.friendlyName << "\","
+            << "\"unique_id\":\"" << uid << "\","
+            << "\"command_topic\":\"" << commandTopic << "\","
+            << "\"state_topic\":\"" << stateTopic << "\","
+            << "\"min\":" << config.min << ","
+            << "\"max\":" << config.max << ","
+            << "\"step\":" << config.step << ","
+            << "\"mode\":\"box\","
+            << "\"unit_of_measurement\":\"" << config.unit << "\","
+            << "\"device_class\":\"" << config.deviceClass << "\","
+            << "\"icon\":\"" << config.icon << "\",";
+    
+    // Add device info - use same device ID format as sensors (uppercase member name)
+    char canMemberDeviceId[64];
+    snprintf(canMemberDeviceId, sizeof(canMemberDeviceId), "stiebel_%s", cm->Name);
+    
+    const char* canMemberFriendlyName = cm->Name;
+    if (strcmp(cm->Name, "KESSEL") == 0) canMemberFriendlyName = "Kessel";
+    else if (strcmp(cm->Name, "MANAGER") == 0) canMemberFriendlyName = "Manager";
+    else if (strcmp(cm->Name, "HEIZMODUL") == 0) canMemberFriendlyName = "Heizmodul";
+    
+    payload << "\"device\":{\"identifiers\":[\"" << canMemberDeviceId << "\"],"
+            << "\"name\":\"" << canMemberFriendlyName << "\","
+            << "\"via_device\":\"stiebel_eltron_wpl13e\","
+            << "\"manufacturer\":\"Stiebel Eltron\"}}";
+    
+    // Publish discovery message
+    std::string payloadStr = payload.str();
+    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    
+    ESP_LOGI("MQTT", "Discovery published for writable number: %s", config.friendlyName);
+}
+
+// Publish all writable number discoveries
+void publishAllWritableNumberDiscoveries(bool forceRepublish = false) {
+    if (forceRepublish) {
+        discoveredWritableNumbers.clear();
+        ESP_LOGI("MQTT", "Republishing all writable number discoveries");
+    }
+    
+    for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; i++) {
+        publishWritableNumberDiscovery(writableNumbers[i], forceRepublish);
+    }
+}
+
+// ============================================================================
+// WRITABLE SELECT DISCOVERY (MQTT Select entities)
+// ============================================================================
+
+void publishWritableSelectDiscovery(const WritableSelectConfig& config, bool forceRepublish = false) {
+    // Get CAN member
+    const CanMember* cm = &CanMembers[config.member];
+    
+    // Build unique ID (lowercase with underscores)
+    char uniqueId[128];
+    snprintf(uniqueId, sizeof(uniqueId), "stiebel_%s_%s", cm->Name, config.signalName);
+    std::string uniqueIdStr(uniqueId);
+    std::transform(uniqueIdStr.begin(), uniqueIdStr.end(), uniqueIdStr.begin(), ::tolower);
+    
+    // Check if already published (unless forcing)
+    if (!forceRepublish && discoveredWritableSelects.count(uniqueIdStr) > 0) {
+        return;
+    }
+    
+    // Build discovery topic
+    std::ostringstream discoveryTopicStream;
+    discoveryTopicStream << "homeassistant/select/heatingpump/" << uniqueIdStr << "/config";
+    std::string discoveryTopic = discoveryTopicStream.str();
+    
+    // Build command and state topics
+    std::ostringstream commandTopicStream;
+    commandTopicStream << "heatingpump/" << cm->Name << "/" << config.signalName << "/set";
+    std::string commandTopic = commandTopicStream.str();
+    
+    std::ostringstream stateTopicStream;
+    stateTopicStream << "heatingpump/" << cm->Name << "/" << config.signalName << "/state";
+    std::string stateTopic = stateTopicStream.str();
+    
+    // Build JSON payload
+    std::ostringstream payload;
+    payload << "{\"name\":\"" << config.friendlyName << "\","
+            << "\"unique_id\":\"" << uniqueIdStr << "\","
+            << "\"command_topic\":\"" << commandTopic << "\","
+            << "\"state_topic\":\"" << stateTopic << "\","
+            << "\"options\":[";
+    
+    // Add options array
+    for (size_t i = 0; i < config.optionCount; i++) {
+        if (i > 0) payload << ",";
+        payload << "\"" << config.options[i] << "\"";
+    }
+    payload << "],";
+    
+    // Add icon if specified
+    if (config.icon && strlen(config.icon) > 0) {
+        payload << "\"icon\":\"" << config.icon << "\",";
+    }
+    
+    // Add device info - use same device ID format as sensors (uppercase member name)
+    char canMemberDeviceId[64];
+    snprintf(canMemberDeviceId, sizeof(canMemberDeviceId), "stiebel_%s", cm->Name);
+    
+    const char* canMemberFriendlyName = cm->Name;
+    if (strcmp(cm->Name, "KESSEL") == 0) canMemberFriendlyName = "Kessel";
+    else if (strcmp(cm->Name, "MANAGER") == 0) canMemberFriendlyName = "Manager";
+    else if (strcmp(cm->Name, "HEIZMODUL") == 0) canMemberFriendlyName = "Heizmodul";
+    
+    payload << "\"device\":{\"identifiers\":[\"" << canMemberDeviceId << "\"],"
+            << "\"name\":\"" << canMemberFriendlyName << "\","
+            << "\"via_device\":\"stiebel_eltron_wpl13e\","
+            << "\"manufacturer\":\"Stiebel Eltron\"}}";
+    
+    // Publish discovery message
+    std::string payloadStr = payload.str();
+    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    
+    // Mark as discovered
+    discoveredWritableSelects.insert(uniqueIdStr);
+    
+    ESP_LOGI("MQTT", "Discovery published for writable select: %s", config.friendlyName);
+}
+
+// Publish all writable select discoveries
+void publishAllWritableSelectDiscoveries(bool forceRepublish = false) {
+    if (forceRepublish) {
+        discoveredWritableSelects.clear();
+        ESP_LOGI("MQTT", "Republishing all writable select discoveries");
+    }
+    
+    for (size_t i = 0; i < WRITABLE_SELECT_COUNT; i++) {
+        publishWritableSelectDiscovery(writableSelects[i], forceRepublish);
     }
 }
 
