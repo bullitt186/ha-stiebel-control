@@ -214,7 +214,7 @@ static const ElsterIndex ElsterTable[] =
   { "DREHZAHLREG_JA_NEIN", 0x0070, 0, "Drehzahl Reg Ja Nein", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "ANFORDERUNG_LEISTUNGSZWANG", 0x0071, 0, "Anforderung Leistungszwang", NULL, NULL, NULL, NULL, NULL, NULL, NULL, true, false },
   { "ANTILEG_AKTIV", 0x0072, et_bool, "Antileg Aktiv", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "EVU_SPERRE_AKTIV", 0x0074, et_bool, "EVU Sperre Aktiv", "binary_sensor", "lock", "", "", "mdi:lock", NULL, NULL, false, true },
+  { "EVU_SPERRE_AKTIV", 0x0074, et_bool, "EVU Sperre Aktiv", "binary_sensor", "lock", "", "", "mdi:lock", "on", "off", false, true },
   { "PUFFERTEMP_OBEN1", 0x0076, et_dec_val, "Puffer Temperatur Oben 1", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "PUFFERTEMP_MITTE1", 0x0077, et_dec_val, "Puffer Temperatur Mitte 1", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "PUFFERTEMP_UNTEN1", 0x0078, et_dec_val, "Puffer Temperatur Unten 1", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
