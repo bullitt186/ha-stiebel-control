@@ -524,6 +524,9 @@ void publishDate()
 
 void publishTime()
 {
+    // Publish discovery (only once - cached)
+    publishCalculatedSensorDiscovery(calculatedSensors[1]);
+    
     // Validate that all values have been received
     if (lastStunde < 0 || lastMinute < 0 || lastSekunde < 0) {
         ESP_LOGW("CALC", "Cannot publish time: sensors not initialized (Stunde=%d, Minute=%d, Sekunde=%d)", 
@@ -556,6 +559,9 @@ void publishTime()
 
 void publishBetriebsart(const std::string& sommerBetriebValue)
 {
+    // Publish discovery (only once - cached)
+    publishCalculatedSensorDiscovery(calculatedSensors[2]);
+    
     // Determine Betriebsart based on SOMMERBETRIEB value
     // SOMMERBETRIEB is et_little_bool type, so value is "on" or "off"
     std::string betriebsart;
