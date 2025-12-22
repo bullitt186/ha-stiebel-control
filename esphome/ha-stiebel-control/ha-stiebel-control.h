@@ -201,32 +201,26 @@ static unsigned long requestManagerStartTime = 0;
 #if !defined(HA_DUMMY_BUILD)
 
 /**
+ * Simple struct for CAN ID bytes (avoids heap allocation)
+ */
+struct CanIdBytes {
+    uint8_t first;
+    uint8_t second;
+};
+
+/**
  * Generate CAN read ID from member CAN ID
  */
-std::vector<uint8_t> generate_read_id(unsigned short can_id)
+CanIdBytes generate_read_id(unsigned short can_id)
 {
-    std::vector<uint8_t> read_id;
     uint8_t address = (can_id & 0x780) / 8;
-    uint8_t first_byte_read = (address & 0xF0) + 1;
-    uint8_t second_byte = can_id & 7;
-
-    read_id.push_back(first_byte_read);
-    read_id.push_back(second_byte);
-
-    return read_id;
+    return {static_cast<uint8_t>((address & 0xF0) + 1), static_cast<uint8_t>(can_id & 7)};
 }
 
-std::vector<uint8_t> generate_write_id(unsigned short can_id)
+CanIdBytes generate_write_id(unsigned short can_id)
 {
-    std::vector<uint8_t> write_id;
     uint8_t address = (can_id & 0x780) / 8;
-    uint8_t first_byte_write = (address & 0xF0);
-    uint8_t second_byte = can_id & 7;
-
-    write_id.push_back(first_byte_write);
-    write_id.push_back(second_byte);
-
-    return write_id;
+    return {static_cast<uint8_t>(address & 0xF0), static_cast<uint8_t>(can_id & 7)};
 }
 
 const CanMember &lookupCanMember(uint32_t canId)
@@ -238,18 +232,6 @@ const CanMember &lookupCanMember(uint32_t canId)
     }
     // Return the last element if member is not found
     return CanMembers[sizeof(CanMembers) / sizeof(CanMembers[0]) - 1];
-}
-
-CanMemberType lookupCanMemberType(uint32_t canId)
-{
-    for (size_t i = 0; i < sizeof(CanMembers) / sizeof(CanMember); ++i)
-    {
-        if (CanMembers[i].CanId == canId)
-        {
-            return static_cast<CanMemberType>(i);
-        }
-    }
-    return cm_other; // Return cm_other if member is not found
 }
 
 // Check if signal is permanently blacklisted (lookup in ElsterTable)
@@ -350,12 +332,12 @@ void readSignal(const CanMember *cm, const ElsterIndex *ei)
     const uint8_t IndexByte1 = static_cast<uint8_t>(ei->Index >> 8);
     const uint8_t IndexByte2 = static_cast<uint8_t>(ei->Index & 0xFF);
     std::vector<uint8_t> data;
-    std::vector<uint8_t> readId = generate_read_id(cm->CanId);
+    CanIdBytes readId = generate_read_id(cm->CanId);
 
     if (IndexByte1 == 0x00)
     {
-        data = {readId[0],
-                readId[1],
+        data = {readId.first,
+                readId.second,
                 IndexByte2,
                 0x00,
                 0x00,
@@ -364,8 +346,8 @@ void readSignal(const CanMember *cm, const ElsterIndex *ei)
     }
     else
     {
-        data = {readId[0],
-                readId[1],
+        data = {readId.first,
+                readId.second,
                 0xFA,
                 IndexByte1,
                 IndexByte2,
@@ -374,7 +356,7 @@ void readSignal(const CanMember *cm, const ElsterIndex *ei)
     }
 
     char logmsg[120];
-    snprintf(logmsg, sizeof(logmsg), "READ \"%s\" (0x%04x) FROM %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x", ei->Name, ei->Index, cm->Name, cm->CanId, readId[0], readId[1], data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
+    snprintf(logmsg, sizeof(logmsg), "READ \"%s\" (0x%04x) FROM %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x", ei->Name, ei->Index, cm->Name, cm->CanId, readId.first, readId.second, data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
     ESP_LOGI("readSignal()", "%s", logmsg);
 
     id(my_mcp2515).send_data(CanMembers[cm_pc].CanId, use_extended_id, data);
@@ -393,12 +375,12 @@ void writeSignal(const CanMember *cm, const ElsterIndex *ei, const char *&str)
     uint8_t IndexByte1 = static_cast<uint8_t>(ei->Index >> 8);
     uint8_t IndexByte2 = static_cast<uint8_t>(ei->Index & 0xFF);
     std::vector<uint8_t> data;
-    std::vector<uint8_t> writeId = generate_write_id(cm->CanId);
+    CanIdBytes writeId = generate_write_id(cm->CanId);
 
     if (IndexByte1 == 0x00)
     {
-        data = {writeId[0],
-                writeId[1],
+        data = {writeId.first,
+                writeId.second,
                 IndexByte2,
                 static_cast<uint8_t>(writeValue >> 8),
                 static_cast<uint8_t>(writeValue & 0xFF),
@@ -407,8 +389,8 @@ void writeSignal(const CanMember *cm, const ElsterIndex *ei, const char *&str)
     }
     else
     {
-        data = {writeId[0],
-                writeId[1],
+        data = {writeId.first,
+                writeId.second,
                 0xfa,
                 IndexByte1,
                 IndexByte2,
@@ -418,7 +400,7 @@ void writeSignal(const CanMember *cm, const ElsterIndex *ei, const char *&str)
 
     char logmsg[120];
     snprintf(logmsg, sizeof(logmsg), "WRITE \"%s\" (0x%04x): \"%d\" TO: %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x",
-             ei->Name, ei->Index, writeValue, cm->Name, cm->CanId, writeId[0], writeId[1],
+             ei->Name, ei->Index, writeValue, cm->Name, cm->CanId, writeId.first, writeId.second,
              data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
     ESP_LOGI("writeSignal()", "%s", logmsg);
 
@@ -540,13 +522,6 @@ void publishDate()
     ESP_LOGI("CALC", "Published date: %s (Jahr=%d, Monat=%d, Tag=%d)", datum.c_str(), ijahr, imonat, itag);
 }
 
-std::string formatNumber(int number, int width)
-{
-    std::ostringstream oss;
-    oss << std::setw(width) << std::setfill('0') << number;
-    return oss.str();
-}
-
 void publishTime()
 {
     // Validate that all values have been received
@@ -569,17 +544,14 @@ void publishTime()
         return;
     }
     
-    // Format time components
-    std::string stunde = formatNumber(istunde, 2);
-    std::string minute = formatNumber(iminute, 2);
-    std::string sekunde = formatNumber(isekunde, 2);
-
-    std::string zeit = stunde + ":" + minute + ":" + sekunde;
+    // Format time directly without helper function
+    char zeit[9];
+    snprintf(zeit, sizeof(zeit), "%02d:%02d:%02d", istunde, iminute, isekunde);
     
     // Publish state to MQTT
     const char* stateTopic = "heatingpump/calculated/time/state";
-    id(mqtt_client).publish(stateTopic, zeit.c_str(), zeit.length(), 0, true);
-    ESP_LOGI("CALC", "Published time: %s (Stunde=%d, Minute=%d, Sekunde=%d)", zeit.c_str(), istunde, iminute, isekunde);
+    id(mqtt_client).publish(stateTopic, zeit, strlen(zeit), 0, true);
+    ESP_LOGI("CALC", "Published time: %s (Stunde=%d, Minute=%d, Sekunde=%d)", zeit, istunde, iminute, isekunde);
 }
 
 void publishBetriebsart(const std::string& sommerBetriebValue)
@@ -701,29 +673,6 @@ inline std::string getOrCreateUID(const CanMember &cm, const char* signalName) {
     // Store in cache
     uidCache[cacheKey] = result;
     return result;
-}
-
-// Publish main device (parent for all CAN member sub-devices)
-inline void publishMainDevice() {
-    const char* mainDeviceId = "stiebel_eltron_wpl13e";
-    
-    // Publish a sensor to register the main device
-    const char* discoveryTopic = "homeassistant/sensor/heatingpump/main_device/config";
-    
-    std::ostringstream payload;
-    payload << "{\"name\":\"Wärmepumpe Status\","
-            << "\"unique_id\":\"" << mainDeviceId << "_status\","
-            << "\"state_topic\":\"heatingpump/status\","
-            << "\"icon\":\"mdi:heat-pump\","
-            << "\"device\":{\"identifiers\":[\"" << mainDeviceId << "\"],"
-            << "\"name\":\"Stiebel Eltron Wärmepumpe\","
-            << "\"model\":\"WPL 13 E\","
-            << "\"manufacturer\":\"Stiebel Eltron\"}}";
-    
-    std::string payloadStr = payload.str();
-    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
-    
-    ESP_LOGI("MQTT", "Main device published: Stiebel Eltron Wärmepumpe");
 }
 
 // Publish MQTT Discovery config for a signal
@@ -1491,15 +1440,6 @@ void processSignalRequests() {
         // Move to next signal in round-robin fashion (wrap around at end)
         currentIndex = (currentIndex + 1) % SIGNAL_REQUEST_COUNT;
     }
-}
-
-void identifyCanMembers()
-{
-    ESP_LOGI("identifyCanMembers()", "Identifying CAN Members...");
-    readSignal(&CanMembers[cm_heizmodul], GetElsterIndex("GERAETE_ID"));
-
-    ESP_LOGI("identifyCanMembers()", "Identified CAN Members!");
-    return;
 }
 
 void processAndUpdate(uint32_t can_id, std::vector<uint8_t> msg)

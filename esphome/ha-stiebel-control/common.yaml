@@ -97,8 +97,6 @@ mqtt:
     - logger.log: 
         level: INFO
         format: "Connected to MQTT broker"
-    - lambda: |-
-        publishMainDevice();
   on_disconnect:
     - logger.log:
         level: WARN
@@ -219,16 +217,6 @@ button:
       then:
         lambda: |-
           updateDate(CanMembers[cm_manager], id(warmepumpe_datum).state.c_str());
-
-  - platform: template
-    name: "Identify CAN Members"
-    id: identify_can_members
-    internal: true
-    on_press:
-      then:
-        lambda: |-
-          identifyCanMembers();
-          return;
 
   - platform: template
     name: "Republish MQTT Discoveries"

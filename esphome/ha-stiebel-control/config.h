@@ -8,9 +8,6 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-// Timeout for CAN request responses (milliseconds)
-#define CAN_REQUEST_TIMEOUT_MS 5000
-
 // ============================================================================
 // REQUEST MANAGER SETTINGS
 // ============================================================================
@@ -20,44 +17,6 @@
 
 // Maximum number of requests to send per iteration (rate limiting)
 #define MAX_REQUESTS_PER_ITERATION 1
-
-// Minimum random delay between requests (milliseconds)
-#define MIN_RANDOM_DELAY_MS 200
-
-// Maximum random delay between requests (milliseconds)
-#define MAX_RANDOM_DELAY_MS 1000
-
-// ============================================================================
-// MQTT SETTINGS
-// ============================================================================
-
-// MQTT topic prefix for all messages
-#define MQTT_TOPIC_PREFIX "heatingpump"
-
-// MQTT discovery prefix (Home Assistant default)
-#define MQTT_DISCOVERY_PREFIX "homeassistant"
-
-// Main device identifier
-#define MAIN_DEVICE_ID "stiebel_eltron_wpl13e"
-
-// Main device name
-#define MAIN_DEVICE_NAME "Stiebel Eltron Wärmepumpe"
-
-// ============================================================================
-// BUFFER SIZES
-// ============================================================================
-
-// Maximum size for unique ID strings
-#define MAX_UNIQUE_ID_SIZE 128
-
-// Maximum size for MQTT topic strings
-#define MAX_TOPIC_SIZE 256
-
-// Maximum size for log messages
-#define MAX_LOG_MSG_SIZE 256
-
-// Maximum size for formatted values
-#define MAX_VALUE_SIZE 32
 
 // ============================================================================
 // TIMING INTERVALS (for use in signalRequests table)
@@ -91,9 +50,6 @@
 
 // Betriebsart sensor update frequency (based on SOMMERBETRIEB frequency)
 #define CALC_BETRIEBSART_FREQUENCY FREQ_1MIN
-
-// COP sensors update frequency (based on energy counter frequency)
-#define CALC_COP_FREQUENCY FREQ_10MIN
 
 // ============================================================================
 // COP CALCULATION SETTINGS
