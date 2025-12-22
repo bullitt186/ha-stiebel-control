@@ -19,9 +19,15 @@
 
 
 #include <string.h>
+#include <unordered_map>
+#include <string>
 #include "NUtils.h"
 #include "KElsterTable.h"
 #include "ElsterTable.h"
+
+// Lazy-initialized caches for O(1) lookups after first access
+static std::unordered_map<unsigned short, const ElsterIndex*> indexCache;
+static std::unordered_map<std::string, const ElsterIndex*> nameCache;
 
 
 void SetValueType(char * Val, unsigned char Type, unsigned short Value)
@@ -169,12 +175,24 @@ const char * ElsterTypeToName(unsigned Type)
 
 const ElsterIndex * GetElsterIndex(unsigned short Index)
 {
+  // Check cache first - O(1) for subsequent lookups
+  auto it = indexCache.find(Index);
+  if (it != indexCache.end()) {
+    return it->second;
+  }
+
+  // Cache miss - do linear search O(n)
   int i;
+  for (i = 0; i <= High(ElsterTable); i++) {
+    if (ElsterTable[i].Index == Index) {
+      const ElsterIndex* result = &ElsterTable[i];
+      indexCache[Index] = result;  // Cache for next time
+      return result;
+    }
+  }
 
-  for (i = 0; i <= High(ElsterTable); i++)
-    if (ElsterTable[i].Index == Index)
-      return &ElsterTable[i];
-
+  // Not found - cache default and return
+  indexCache[Index] = &ElsterTable[0];
   return &ElsterTable[0];
 }
 

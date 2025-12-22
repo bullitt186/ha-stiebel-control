@@ -250,6 +250,14 @@ button:
         lambda: |-
           republishAllDiscoveries();
 
+  - platform: restart
+    name: "Restart"
+    id: restart_button
+
+  - platform: factory_reset
+    name: "Factory Reset (Clear NVS)"
+    icon: "mdi:restart-alert"
+
 #########################################
 #                                       #
 #   SPI Konfiguration                   #
