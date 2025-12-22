@@ -231,11 +231,9 @@ std::vector<uint8_t> generate_write_id(unsigned short can_id)
 
 const CanMember &lookupCanMember(uint32_t canId)
 {
-    for (const CanMember &member : CanMembers)
-    {
-        if (member.CanId == canId)
-        {
-            return member;
+    for (size_t i = 0; i < sizeof(CanMembers) / sizeof(CanMember); ++i) {
+        if (CanMembers[i].CanId == canId) {
+            return CanMembers[i];
         }
     }
     // Return the last element if member is not found
@@ -254,9 +252,9 @@ CanMemberType lookupCanMemberType(uint32_t canId)
     return cm_other; // Return cm_other if member is not found
 }
 
-// Check if signal is blacklisted (now stored in ElsterIndex)
+// Check if signal is permanently blacklisted (lookup in ElsterTable)
 inline bool isPermanentlyBlacklisted(const char* signalName) {
-    const ElsterIndex* ei = GetElsterIndex(signalName);
+    const ElsterIndex *ei = GetElsterIndex(signalName);
     return ei->isBlacklisted;
 }
 
@@ -298,7 +296,7 @@ inline void getTypeDefaults(ElsterType type, const char*& component, const char*
     }
 }
 
-const ElsterIndex *processCanMessage(const std::vector<uint8_t> &msg, uint32_t can_id, std::string &signalValue)
+const ElsterIndex *processCanMessage(const std::vector<uint8_t> &msg, uint32_t can_id, std::string &signalValue, const CanMember **outCanMember)
 {
     // Return if the message is too small
     if (msg.size() < 7)
@@ -307,6 +305,7 @@ const ElsterIndex *processCanMessage(const std::vector<uint8_t> &msg, uint32_t c
     }
 
     const CanMember &cm = lookupCanMember(can_id);
+    *outCanMember = &cm;  // Return CanMember to caller
 
     const ElsterIndex *ei;
     uint8_t byte1;
@@ -681,10 +680,10 @@ void publishCompressorActive()
 
 // Helper: Check if pattern appears anywhere in text (case-insensitive substring match)
 // Get or create cached UID for a signal (eliminates repeated string ops)
-inline std::string getOrCreateUID(uint32_t can_id, const char* signalName) {
+inline std::string getOrCreateUID(const CanMember &cm, const char* signalName) {
     // Create cache key
     char cacheKey[256];
-    snprintf(cacheKey, sizeof(cacheKey), "%u:%s", can_id, signalName);
+    snprintf(cacheKey, sizeof(cacheKey), "%u:%s", cm.CanId, signalName);
     
     // Check cache first
     auto it = uidCache.find(cacheKey);
@@ -692,8 +691,7 @@ inline std::string getOrCreateUID(uint32_t can_id, const char* signalName) {
         return it->second;
     }
     
-    // Generate UID if not cached
-    const CanMember &cm = lookupCanMember(can_id);
+    // Generate UID if not cached (no need to lookup CanMember - already have it)
     char uid[128];
     snprintf(uid, sizeof(uid), "stiebel_%s_%s", cm.Name, signalName);
     std::string result(uid);
@@ -729,11 +727,10 @@ inline void publishMainDevice() {
 }
 
 // Publish MQTT Discovery config for a signal
-void publishMqttDiscovery(uint32_t can_id, const ElsterIndex *ei) {
-    const CanMember &cm = lookupCanMember(can_id);
+void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
     
     // Get cached UID (avoids repeated string operations)
-    std::string uid = getOrCreateUID(can_id, ei->Name);
+    std::string uid = getOrCreateUID(cm, ei->Name);
     
     // Note: Caller is responsible for checking discoveredSignals and inserting uid
     // This function just publishes the MQTT discovery message
@@ -887,14 +884,12 @@ void republishAllDiscoveries() {
 }
 
 // Publish signal state to MQTT
-void publishMqttState(uint32_t can_id, const ElsterIndex *ei, const std::string &value) {
+void publishMqttState(const CanMember &cm, const ElsterIndex *ei, const std::string &value) {
     // Input validation
     if (!ei || !ei->Name || value.empty()) {
         ESP_LOGW("MQTT", "Invalid signal data, skipping state publish");
         return;
     }
-    
-    const CanMember &cm = lookupCanMember(can_id);
     
     // Build state topic with bounds checking
     char stateTopic[128];
@@ -1111,10 +1106,8 @@ constexpr uint32_t HASH_WAERMEERTRAG_HEIZ = hash("WAERMEERTRAG_HEIZ_SUM_MWH");
 
 
 
-void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &value)
+void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string &value)
 {
-    const CanMember &cm = lookupCanMember(can_id);
-    
     // Skip empty values
     if (value.empty()) {
         return;
@@ -1132,22 +1125,18 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
         }
     }
     
-    // Check if discovery is needed (fast check only - don't publish yet)
-    std::string uid = getOrCreateUID(can_id, ei->Name);
+    // Check if discovery is needed
+    std::string uid = getOrCreateUID(cm, ei->Name);
     bool needsDiscovery = (discoveredSignals.find(uid) == discoveredSignals.end());
     
     if (needsDiscovery) {
-        // Mark as discovered to avoid repeated checks
+        // Mark as discovered and publish discovery immediately
         discoveredSignals.insert(uid);
-        
-        // Schedule discovery publishing for next loop iteration (non-blocking)
-        // Discovery will be published via interval component or deferred call
-        // For now, publish immediately but this could be optimized further
-        publishMqttDiscovery(can_id, ei);
+        publishMqttDiscovery(cm, ei);
     }
     
-    // Publish state immediately (this is fast - just MQTT publish)
-    publishMqttState(can_id, ei, publishValue);
+    // Publish state
+    publishMqttState(cm, ei, publishValue);
     
     // Fast signal dispatch using compile-time hash (O(1) switch/jump table)
     const char* signalName = ei->Name;
@@ -1517,7 +1506,8 @@ void processAndUpdate(uint32_t can_id, std::vector<uint8_t> msg)
 {
  
     std::string value;
-    const ElsterIndex *ei = processCanMessage(msg, can_id, value);
+    const CanMember *cm = nullptr;
+    const ElsterIndex *ei = processCanMessage(msg, can_id, value, &cm);
 
     // Skip permanently blacklisted signals
     if (isPermanentlyBlacklisted(ei->Name))
@@ -1525,7 +1515,7 @@ void processAndUpdate(uint32_t can_id, std::vector<uint8_t> msg)
         return; // Reject before lookup, parsing, formatting, logging
     }
 
-    updateSensor(can_id, ei, value);
+    updateSensor(*cm, ei, value);
     return;
 }
 

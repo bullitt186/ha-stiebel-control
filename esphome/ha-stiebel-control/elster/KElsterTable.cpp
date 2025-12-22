@@ -167,27 +167,27 @@ const char * ElsterTypeToName(unsigned Type)
   return ElsterTypeStr[et_default];
 }
 
-
 const ElsterIndex * GetElsterIndex(unsigned short Index)
 {
-    for (int i = 0; i <= (int) High(ElsterTable); i++) {
-      if (ElsterTable[i].Index == Index) {
-        return &ElsterTable[i];
-      }
-    }
-    return &ElsterTable[0];
+  int i;
+
+  for (i = 0; i <= High(ElsterTable); i++)
+    if (ElsterTable[i].Index == Index)
+      return &ElsterTable[i];
+
+  return &ElsterTable[0];
 }
 
 const ElsterIndex * GetElsterIndex(const char* str)
 {
-    for (int i = 0; i <= (int) High(ElsterTable); i++) {
-      if (!strcmp(ElsterTable[i].Name, str)) {
-        return &ElsterTable[i];
-      }
-    }
-    return &ElsterTable[0];
-}
+  int i;
 
+  for (i = 0; i <= High(ElsterTable); i++)
+    if (!strcmp(ElsterTable[i].Name, str))
+      return &ElsterTable[i];
+
+  return &ElsterTable[0];
+}
 
 static bool Get_Time(const char * & str, int & hour, int & min)
 {
