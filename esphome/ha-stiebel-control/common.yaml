@@ -104,8 +104,7 @@ mqtt:
         publishAllWritableNumberDiscoveries();
         // Publish MQTT select discoveries for operating mode control
         publishAllWritableSelectDiscoveries();
-        // Publish MQTT datetime discoveries for time/date control
-        publishAllWritableDatetimeDiscoveries();
+        // Datetime control now handled by Home Assistant input_datetime helpers
         ESP_LOGI("MQTT_CONN", "Discovery publication complete");
   on_disconnect:
     - logger.log:
@@ -124,7 +123,6 @@ mqtt:
             republishAllDiscoveries();
             publishAllWritableNumberDiscoveries(true);
             publishAllWritableSelectDiscoveries(true);
-            publishAllWritableDatetimeDiscoveries(true);
             publishAllCalculatedSensorDiscoveries(true);
             ESP_LOGI("MQTT_CMD", "All discoveries republished");
     
@@ -191,7 +189,6 @@ interval:
           republishAllDiscoveries();
           publishAllWritableNumberDiscoveries(true);
           publishAllWritableSelectDiscoveries(true);
-          publishAllWritableDatetimeDiscoveries(true);
   
 #########################################
 #                                       #
