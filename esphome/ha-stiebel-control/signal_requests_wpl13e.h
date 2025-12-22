@@ -31,7 +31,6 @@ static const SignalRequest signalRequests[] = {
     // ========================================================================
     // STATUS AND CONTROL SIGNALS
     // ========================================================================
-    {"WP_STATUS", FREQ_1MIN, cm_manager},
     {"EVU_SPERRE_AKTIV", FREQ_1MIN, cm_manager},
     {"ABTAUUNGAKTIV", FREQ_1MIN, cm_heizmodul},
     {"BETRIEBSART_WP", FREQ_10MIN, cm_manager},

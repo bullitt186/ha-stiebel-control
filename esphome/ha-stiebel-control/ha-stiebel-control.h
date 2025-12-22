@@ -735,11 +735,8 @@ void publishMqttDiscovery(uint32_t can_id, const ElsterIndex *ei) {
     // Get cached UID (avoids repeated string operations)
     std::string uid = getOrCreateUID(can_id, ei->Name);
     
-    // Check if already discovered
-    if (discoveredSignals.find(uid) != discoveredSignals.end()) {
-        return; // Already published discovery
-    }
-    discoveredSignals.insert(uid);
+    // Note: Caller is responsible for checking discoveredSignals and inserting uid
+    // This function just publishes the MQTT discovery message
     
     // Get friendly name: use ei->friendlyName or fallback to ei->Name
     const char* friendlyName = (ei->hasMetadata && ei->friendlyName) ? ei->friendlyName : ei->Name;
