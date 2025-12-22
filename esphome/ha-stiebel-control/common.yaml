@@ -237,7 +237,7 @@ button:
   - platform: template
     name: "Update Uhrzeit"
     id: update_uhrzeit
-    internal: true
+    icon: "mdi:clock-check"
     on_press:
       then:
         lambda: |-
@@ -246,7 +246,7 @@ button:
   - platform: template
     name: "Update Datum"
     id: update_datum
-    internal: true
+    icon: "mdi:calendar-check"
     on_press:
       then:
         lambda: |-
