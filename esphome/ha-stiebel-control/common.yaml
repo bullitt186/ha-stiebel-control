@@ -30,6 +30,7 @@ esphome:
     - ha-stiebel-control/ha-stiebel-control.h
     - ha-stiebel-control/signal_requests_wpl13e.h
 
+
   
 
 
@@ -44,21 +45,9 @@ esp32:
 #                                       #
 #########################################
 logger:
-  level: DEBUG
+  level: INFO
   baud_rate: 115200
-  logs:
-    # Reduce noise from noisy components while keeping mcp2515 at DEBUG
-    component: INFO
-    mqtt: INFO
-    api: INFO
-    ota: INFO
-    wifi: INFO
-    sensor: INFO
-    binary_sensor: INFO
-    text_sensor: INFO
-    button: INFO
-    interval: INFO
-    canbus: WARN
+
 
 #########################################
 #                                       #

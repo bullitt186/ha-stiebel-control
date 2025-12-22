@@ -198,12 +198,27 @@ const ElsterIndex * GetElsterIndex(unsigned short Index)
 
 const ElsterIndex * GetElsterIndex(const char* str)
 {
+  // Convert to std::string for cache key
+  std::string key(str);
+  
+  // Check cache first - O(1) for subsequent lookups
+  auto it = nameCache.find(key);
+  if (it != nameCache.end()) {
+    return it->second;
+  }
+
+  // Cache miss - do linear search O(n)
   int i;
+  for (i = 0; i <= High(ElsterTable); i++) {
+    if (!strcmp(ElsterTable[i].Name, str)) {
+      const ElsterIndex* result = &ElsterTable[i];
+      nameCache[key] = result;  // Cache for next time
+      return result;
+    }
+  }
 
-  for (i = 0; i <= High(ElsterTable); i++)
-    if (!strcmp(ElsterTable[i].Name, str))
-      return &ElsterTable[i];
-
+  // Not found - cache default and return
+  nameCache[key] = &ElsterTable[0];
   return &ElsterTable[0];
 }
 
