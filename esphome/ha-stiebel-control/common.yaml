@@ -30,6 +30,7 @@ esphome:
     - ha-stiebel-control/ha-stiebel-control.h
     - ha-stiebel-control/signal_requests_wpl13e.h
 
+
   
 
 
@@ -44,21 +45,9 @@ esp32:
 #                                       #
 #########################################
 logger:
-  level: DEBUG
+  level: INFO
   baud_rate: 115200
-  logs:
-    # Reduce noise from noisy components while keeping mcp2515 at DEBUG
-    component: INFO
-    mqtt: INFO
-    api: INFO
-    ota: INFO
-    wifi: INFO
-    sensor: INFO
-    binary_sensor: INFO
-    text_sensor: INFO
-    button: INFO
-    interval: INFO
-    canbus: WARN
+
 
 #########################################
 #                                       #
@@ -108,8 +97,15 @@ mqtt:
     - logger.log: 
         level: INFO
         format: "Connected to MQTT broker"
+        tag: "MQTT_CONN"
     - lambda: |-
-        publishMainDevice();
+        ESP_LOGI("MQTT_CONN", "Publishing writable entity discoveries...");
+        // Publish MQTT number discoveries for writable temperature setpoints
+        publishAllWritableNumberDiscoveries();
+        // Publish MQTT select discoveries for operating mode control
+        publishAllWritableSelectDiscoveries();
+        // Datetime control now handled by Home Assistant input_datetime helpers
+        ESP_LOGI("MQTT_CONN", "Discovery publication complete");
   on_disconnect:
     - logger.log:
         level: WARN
@@ -119,30 +115,53 @@ mqtt:
       then:
         - logger.log: "Manual reconnect triggered"
     
-    # Temperature setpoint controls
-    - topic: heatingpump/command/speichersolltemp/set
+    # Force republish all discoveries (including writable entities)
+    - topic: heatingpump/republish_discoveries
       then:
         - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received speichersolltemp command: %s", x.c_str());
+            ESP_LOGI("MQTT_CMD", "Manual discovery republish triggered");
+            republishAllDiscoveries();
+            publishAllWritableNumberDiscoveries(true);
+            publishAllWritableSelectDiscoveries(true);
+            publishAllCalculatedSensorDiscoveries(true);
+            ESP_LOGI("MQTT_CMD", "All discoveries republished");
+    
+    # Temperature setpoint controls
+    - topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP command: %s", x.c_str());
+            // Ensure discovery is published
+            publishWritableNumberDiscovery(writableNumbers[0]);
+            // Write to CAN bus
             const char* value = x.c_str();
             writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP", value);
+            // Read back to update state
             readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP");
     
-    - topic: heatingpump/command/speichersolltemp2/set
+    - topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP2/set
       then:
         - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received speichersolltemp2 command: %s", x.c_str());
+            ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP2 command: %s", x.c_str());
+            // Ensure discovery is published
+            publishWritableNumberDiscovery(writableNumbers[1]);
+            // Write to CAN bus
             const char* value = x.c_str();
             writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP2", value);
+            // Read back to update state
             readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP2");
     
-    # Mode control
-    - topic: heatingpump/command/programmschalter/set
+    # Operating mode control
+    - topic: heatingpump/MANAGER/PROGRAMMSCHALTER/set
       then:
         - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received programmschalter command: %s", x.c_str());
+            ESP_LOGI("MQTT_CMD", "Received PROGRAMMSCHALTER command: %s", x.c_str());
+            // Ensure discovery is published
+            publishWritableSelectDiscovery(writableSelects[0]);
+            // Write to CAN bus
             const char* value = x.c_str();
             writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", value);
+            // Read back to update state
             readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
 
 #########################################
@@ -168,6 +187,8 @@ interval:
     then:
       - lambda: |-
           republishAllDiscoveries();
+          publishAllWritableNumberDiscoveries(true);
+          publishAllWritableSelectDiscoveries(true);
   
 #########################################
 #                                       #
@@ -183,12 +204,12 @@ text_sensor:
   - platform: homeassistant
     name: "Wärmepumpe Datum Setpoint"
     id: warmepumpe_datum
-    entity_id: input_datetime.warmepumpe_datum
+    entity_id: input_datetime.heatingpump_date
 
   - platform: homeassistant
     name: "Wärmepumpe Uhrzeit Setpoint"
     id: warmepumpe_uhrzeit
-    entity_id: input_datetime.warmepumpe_uhrzeit
+    entity_id: input_datetime.heatingpump_time
 
   #########################################
   #                                       #
@@ -216,7 +237,7 @@ button:
   - platform: template
     name: "Update Uhrzeit"
     id: update_uhrzeit
-    internal: true
+    icon: "mdi:clock-check"
     on_press:
       then:
         lambda: |-
@@ -225,21 +246,11 @@ button:
   - platform: template
     name: "Update Datum"
     id: update_datum
-    internal: true
+    icon: "mdi:calendar-check"
     on_press:
       then:
         lambda: |-
           updateDate(CanMembers[cm_manager], id(warmepumpe_datum).state.c_str());
-
-  - platform: template
-    name: "Identify CAN Members"
-    id: identify_can_members
-    internal: true
-    on_press:
-      then:
-        lambda: |-
-          identifyCanMembers();
-          return;
 
   - platform: template
     name: "Republish MQTT Discoveries"
@@ -249,6 +260,14 @@ button:
       then:
         lambda: |-
           republishAllDiscoveries();
+
+  - platform: restart
+    name: "Restart"
+    id: restart_button
+
+  - platform: factory_reset
+    name: "Factory Reset (Clear NVS)"
+    icon: "mdi:restart-alert"
 
 #########################################
 #                                       #

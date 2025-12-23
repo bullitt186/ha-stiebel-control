@@ -91,169 +91,6 @@ typedef enum
 // MQTT AUTO-DISCOVERY CONFIGURATION
 // ============================================================================
 
-// Signal configuration structure for MQTT auto-discovery
-typedef struct {
-    const char* namePattern;     // Pattern to match signal name (use * for wildcard)
-    const char* deviceClass;     // HA device class (temperature, energy, power, etc.)
-    const char* unit;            // Unit of measurement
-    const char* icon;            // MDI icon
-    const char* stateClass;      // measurement, total, total_increasing
-} SignalConfig;
-
-// Abbreviation list sorted by length (longest first)
-static const struct { const char* abbrev; const char* full; } abbrevList[] = {
-    {"AUFNAHMELEISTUNG", "Aufnahmeleistung"},  // 16 chars
-    {"LUEFTUNGSSTUFE", "Lüftungsstufe"},  // 14 chars
-    {"LEISTUNGSZWANG", "Leistungszwang"},   // 14 chars
-    {"FEHLERMELDUNG", "Fehlermeldung"},// 13 chars
-    {"VOLUMENSTROM", "Volumenstrom"},  // 12 chars
-    {"QUELLENPUMPE", "Quellenpumpe"},  // 12 chars
-    {"STUETZSTELLE", "Stützstelle"},   // 12 chars
-    {"HILFSKESSEL", "Hilfskessel"},    // 11 chars
-    {"BETRIEBSART", "Betriebsart"},    // 11 chars
-    {"VERDAMPFER", "Verdampfer"},      // 10 chars
-    {"VERDICHTER", "Verdichter"},      // 10 chars
-    {"DURCHFLUSS", "Durchfluss"},      // 10 chars
-    {"TEMPERATUR", "Temperatur"},      // 10 chars
-    {"TEMPORALE", "Temporale"},        // 9 chars
-    {"RUECKLAUF", "Rücklauf"},         // 9 chars
-    {"LAUFZEIT", "Laufzeit"},          // 8 chars
-    {"EINSTELL", "Einstellung"},       // 8 chars
-    {"LEISTUNG", "Leistung"},          // 8 chars
-    {"KUEHLUNG", "Kühlung"},           // 8 chars
-    {"BIVALENT", "Bivalent"},          // 8 chars
-    {"PARALLEL", "Parallel"},          // 8 chars
-    {"FREQUENZ", "Frequenz"},          // 8 chars
-    {"DREHZAHL", "Drehzahl"},          // 8 chars
-    {"SPEICHER", "Speicher"},          // 8 chars
-    {"SPANNUNG", "Spannung"},          // 8 chars
-    {"VORLAUF", "Vorlauf"},            // 7 chars
-    {"SAMMLER", "Sammler"},            // 7 chars
-    {"BETRIEB", "Betrieb"},            // 7 chars
-    {"HEIZUNG", "Heizung"},            // 7 chars
-    {"ERTRAG", "Ertrag"},              // 6 chars
-    {"AUSSEN", "Außen"},               // 6 chars
-    {"MINUTE", "Minute"},               // 6 chars
-    {"SOCKEL", "Sockel"},              // 6 chars
-    {"KESSEL", "Kessel"},              // 6 chars
-    {"DAUER", "Dauer"},                // 5 chars
-    {"DRUCK", "Druck"},                // 5 chars
-    {"STROM", "Strom"},                // 5 chars
-    {"LUEFT", "Lüftung"},              // 5 chars
-    {"PUMPE", "Pumpe"},                // 5 chars
-    {"VERD", "Verdichter"},            // 4 chars
-    {"TEMP", "Temperatur"},            // 4 chars
-    {"HEIZ", "Heizung"},               // 4 chars
-    {"RAUM", "Raum"},                  // 4 chars
-    {"SOLL", "Soll"},                  // 4 chars
-    {"MAX", "Maximum"},                // 3 chars
-    {"MIN", "Minimum"},                // 3 chars
-    {"SUM", "Summe"},                  // 3 chars
-    {"TAG", "Tag"},                    // 3 chars
-    {"IST", "Ist"},                    // 3 chars
-    {"FKT", "Funktion"},               // 3 chars
-    {"HZG", "Heizung"},                // 3 chars
-    {"WW", "Warmwasser"},              // 2 chars
-    {"WP", "Wärmepumpe"},              // 2 chars
-    {"EL", "Elektrisch"},              // 2 chars
-    {"LZ", "Laufzeit"}                 // 2 chars
-
-};
-
-// ============================================================================
-// AUTOMATIC SENSOR TYPE DETECTION (based on ElsterTable data types)
-// ============================================================================
-// The system automatically determines Home Assistant component type:
-//   - et_bool, et_little_bool  → binary_sensor (payload_on: "on", payload_off: "off")
-//   - All other types          → sensor (numeric/text values)
-//
-// SignalConfig patterns below configure device_class, unit, icon, and state_class.
-// Boolean sensors automatically get binary_sensor type regardless of pattern.
-// ============================================================================
-
-// Configurable signal mapping table - EDIT THIS to customize sensors
-static const SignalConfig signalMappings[] = {
-    
-    // Temperature sensors
-    {"TEMP", "temperature", "°C", "mdi:thermometer", "measurement"},
-    
-    // Boolean/Binary sensors (automatically detected as binary_sensor, these provide device_class)
-    {"EVU SPERRE AKTIV", "power", "", "mdi:transmission-tower-off", ""},  // Grid lock active
-    {"SOMMERBETRIEB", "heat", "", "mdi:white-balance-sunny", ""},        // Summer mode
-    {"WW ECO", "running", "", "mdi:leaf", ""},                          // Hot water eco mode
-    {"AKTIV", "running", "", "mdi:power", ""},                         // Generic active pattern
-    
-    // Energy sensors
-    {"KWH", "energy", "kWh", "mdi:lightning-bolt", "total_increasing"},
-    {"MWH", "energy", "MWh", "mdi:lightning-bolt", "total_increasing"},
-    {"WH", "energy", "Wh", "mdi:lightning-bolt", "total_increasing"},
-
-        // Date/Time components (must be before wildcard patterns that could match)
-    {"JAHR", "", "", "mdi:calendar", "measurement"},
-    {"MONAT", "", "", "mdi:calendar", "measurement"},
-    {"TAG", "", "", "mdi:calendar", "measurement"},
-    {"STUNDE", "", "", "mdi:clock", "measurement"},
-    {"MINUTE", "", "", "mdi:clock", "measurement"},
-    {"SEKUNDE", "", "", "mdi:clock", "measurement"},
-
-    // Power sensors
-    {"LEISTUNG", "power", "W", "mdi:flash", "measurement"},
-    
-    // Pressure sensors
-    {"DRUCK", "pressure", "bar", "mdi:gauge", "measurement"},
-    
-    // Flow/Volume sensors
-    {"VOLUMENSTROM", "volume_flow_rate", "l/min", "mdi:pump", "measurement"},
-    {"DURCHFLUSS", "volume_flow_rate", "l/min", "mdi:water-pump", "measurement"},
-    {"DURCHFLUSSMENGE*", "volume", "l", "mdi:gauge", "total_increasing"},
-    
-    // Electrical sensors
-    {"SPANNUNG", "voltage", "V", "mdi:sine-wave", "measurement"},
-    {"STROM", "current", "A", "mdi:current-ac", "measurement"},
-    {"FREQUENZ", "frequency", "Hz", "mdi:sine-wave", "measurement"},
-    
-    // Speed/RPM sensors
-    {"DREHZAHL", "frequency", "rpm", "mdi:fan", "measurement"},
-    
-    // Humidity sensor
-    {"FEUCHTE*", "humidity", "%", "mdi:water-percent", "measurement"},
-    
-    // Duration/Time sensors
-    {"ZEIT", "duration", "min", "mdi:clock", "measurement"},
-    {"DAUER", "duration", "min", "mdi:timer", "measurement"},
-    {"LZ", "duration", "h", "mdi:timer", "total_increasing"},
-    {"STILLSTANDZEIT*", "duration", "h", "mdi:timer-off", "total_increasing"},
-    {"ZEIT", "duration", "min", "mdi:clock", "measurement"},
-    {"DAUER", "duration", "min", "mdi:timer", "measurement"},
-    
-    // Percentage sensors
-    {"MODGRAD", "power_factor", "%", "mdi:percent", "measurement"},
-    
-    // Version/Config (no unit)
-    {"SOFTWARE_VERSION", "", "", "mdi:application-cog", ""},
-    {"SOFTWARE_NUMMER", "", "", "mdi:application-cog", ""},
-    {"GERAETE_ID", "", "", "mdi:identifier", ""},
-    {"FIRMWARE", "", "", "mdi:chip", ""},
-    
-    // Status indicators
-    {"STATUS", "", "", "mdi:information", "measurement"},
-    {"SPERRE", "lock", "", "mdi:lock", ""},  // Lock/blockage signals
-    {"PUMPE", "", "", "mdi:pump", ""},
-    {"BRENNER", "", "", "mdi:fire", ""},
-    {"MISCHER", "", "", "mdi:valve", ""},
-    {"VENTIL", "", "", "mdi:valve", ""},
-    {"RELAIS", "", "", "mdi:electric-switch", ""},
-    {"VERDICHTER", "", "", "mdi:air-conditioner", ""},
-    
-    // Cooling/Heating mode indicators
-    {"KUEHLUNG", "", "", "mdi:snowflake", ""},
-    {"HEIZ", "", "", "mdi:radiator", ""},
-    {"BETRIEB", "", "", "mdi:cog", ""},
-    
-    // Default fallback (must be last)
-    {"*", "", "", "mdi:flash", "measurement"}
-};
-
 // ============================================================================
 // CALCULATED SENSOR DISCOVERY CONFIGURATION
 // ============================================================================
@@ -300,6 +137,67 @@ static const CalculatedSensorConfig calculatedSensors[] = {
 static const size_t CALCULATED_SENSOR_COUNT = sizeof(calculatedSensors) / sizeof(CalculatedSensorConfig);
 
 // ============================================================================
+// WRITABLE NUMBER CONFIGURATION (for MQTT Number entities)
+// ============================================================================
+
+struct WritableNumberConfig {
+    const char* signalName;        // CAN signal name like "EINSTELL_SPEICHERSOLLTEMP"
+    const char* friendlyName;      // Display name in Home Assistant
+    CanMemberType member;          // Which CAN member to write to
+    float min;                     // Minimum value
+    float max;                     // Maximum value
+    float step;                    // Step size
+    const char* unit;              // Unit of measurement
+    const char* icon;              // MDI icon
+    const char* deviceClass;       // HA device class
+};
+
+static const WritableNumberConfig writableNumbers[] = {
+    // Primary storage target temperature
+    {"EINSTELL_SPEICHERSOLLTEMP", "Speicher Soll Temperatur Einstellung", 
+     cm_manager, 20.0, 60.0, 1.0, "°C", "mdi:thermometer-high", "temperature"},
+    
+    // Secondary storage target temperature (comfort/eco modes)
+    {"EINSTELL_SPEICHERSOLLTEMP2", "Speicher Soll Temperatur 2 Einstellung", 
+     cm_manager, 20.0, 60.0, 1.0, "°C", "mdi:thermometer-low", "temperature"}
+};
+
+static const size_t WRITABLE_NUMBER_COUNT = sizeof(writableNumbers) / sizeof(WritableNumberConfig);
+
+// ============================================================================
+// WRITABLE SELECT CONFIGURATION (for MQTT Select entities)
+// ============================================================================
+
+struct WritableSelectConfig {
+    const char* signalName;        // CAN signal name like "PROGRAMMSCHALTER"
+    const char* friendlyName;      // Display name in Home Assistant
+    CanMemberType member;          // Which CAN member to write to
+    const char** options;          // Array of option strings
+    size_t optionCount;            // Number of options
+    const char* icon;              // MDI icon
+};
+
+// Operating mode options for PROGRAMMSCHALTER
+static const char* programmschalterOptions[] = {
+    "Notbetrieb",      // Emergency operation
+    "Bereitschaft",    // Standby
+    "Automatik",       // Automatic
+    "Tagbetrieb",      // Day operation
+    "Absenkbetrieb",   // Night/reduced operation
+    "Warmwasser"       // Hot water only
+};
+
+static const WritableSelectConfig writableSelects[] = {
+    // Heat pump operating mode
+    {"PROGRAMMSCHALTER", "Programmschalter", 
+     cm_manager, programmschalterOptions, 6, "mdi:dip-switch"}
+};
+
+static const size_t WRITABLE_SELECT_COUNT = sizeof(writableSelects) / sizeof(WritableSelectConfig);
+
+// ============================================================================
+// WRITABLE DATETIME CONFIGURATION (for MQTT Datetime entities)
+// ============================================================================
 // RUNTIME STATE TRACKING
 // ============================================================================
 
@@ -308,6 +206,12 @@ static std::set<std::string> discoveredSignals;
 
 // Track which calculated sensors have been discovered
 static std::set<std::string> discoveredCalculatedSensors;
+
+// Track which writable numbers have been discovered
+static std::set<std::string> discoveredWritableNumbers;
+
+// Track which writable selects have been discovered
+static std::set<std::string> discoveredWritableSelects;
 
 // Track next scheduled request time per unique signal key (MEMBER_SIGNAL)
 static std::unordered_map<std::string, unsigned long> nextRequestTime;
@@ -337,9 +241,6 @@ static unsigned long nextBetriebsartUpdate = 0;
 // UID cache to avoid repeated string operations on every signal update
 static std::unordered_map<std::string, std::string> uidCache;
 
-// Pattern matching cache to avoid repeated expandSignalName() and matchesPattern() calls
-static std::unordered_map<std::string, const SignalConfig*> signalConfigCache;
-
 // ============================================================================
 // SIGNAL REQUEST CONFIGURATION
 // ============================================================================
@@ -367,71 +268,84 @@ static unsigned long requestManagerStartTime = 0;
 #if !defined(HA_DUMMY_BUILD)
 
 /**
+ * Simple struct for CAN ID bytes (avoids heap allocation)
+ */
+struct CanIdBytes {
+    uint8_t first;
+    uint8_t second;
+};
+
+/**
  * Generate CAN read ID from member CAN ID
  */
-std::vector<uint8_t> generate_read_id(unsigned short can_id)
+CanIdBytes generate_read_id(unsigned short can_id)
 {
-    std::vector<uint8_t> read_id;
     uint8_t address = (can_id & 0x780) / 8;
-    uint8_t first_byte_read = (address & 0xF0) + 1;
-    uint8_t second_byte = can_id & 7;
-
-    read_id.push_back(first_byte_read);
-    read_id.push_back(second_byte);
-
-    return read_id;
+    return {static_cast<uint8_t>((address & 0xF0) + 1), static_cast<uint8_t>(can_id & 7)};
 }
 
-std::vector<uint8_t> generate_write_id(unsigned short can_id)
+CanIdBytes generate_write_id(unsigned short can_id)
 {
-    std::vector<uint8_t> write_id;
     uint8_t address = (can_id & 0x780) / 8;
-    uint8_t first_byte_write = (address & 0xF0);
-    uint8_t second_byte = can_id & 7;
-
-    write_id.push_back(first_byte_write);
-    write_id.push_back(second_byte);
-
-    return write_id;
+    return {static_cast<uint8_t>(address & 0xF0), static_cast<uint8_t>(can_id & 7)};
 }
 
 const CanMember &lookupCanMember(uint32_t canId)
 {
-    for (const CanMember &member : CanMembers)
-    {
-        if (member.CanId == canId)
-        {
-            return member;
+    for (size_t i = 0; i < sizeof(CanMembers) / sizeof(CanMember); ++i) {
+        if (CanMembers[i].CanId == canId) {
+            return CanMembers[i];
         }
     }
     // Return the last element if member is not found
     return CanMembers[sizeof(CanMembers) / sizeof(CanMembers[0]) - 1];
 }
 
-CanMemberType lookupCanMemberType(uint32_t canId)
-{
-    for (size_t i = 0; i < sizeof(CanMembers) / sizeof(CanMember); ++i)
-    {
-        if (CanMembers[i].CanId == canId)
-        {
-            return static_cast<CanMemberType>(i);
-        }
-    }
-    return cm_other; // Return cm_other if member is not found
-}
-
-// Check if signal is in permanent blacklist
-// Only checks signal name (after underscore in "MEMBER_SIGNAL" format)
+// Check if signal is permanently blacklisted (lookup in ElsterTable)
 inline bool isPermanentlyBlacklisted(const char* signalName) {
-    for (size_t i = 0; i < sizeof(PERMANENT_BLACKLIST) / sizeof(PERMANENT_BLACKLIST[0]); i++) {
-        if (strcmp(signalName, PERMANENT_BLACKLIST[i]) == 0) {
-            return true;
-        }
-    }
-    return false;
+    const ElsterIndex *ei = GetElsterIndex(signalName);
+    return ei->isBlacklisted;
 }
 
-const ElsterIndex *processCanMessage(const std::vector<uint8_t> &msg, uint32_t can_id, std::string &signalValue)
+// Helper: Get type-based defaults for Home Assistant metadata
+inline void getTypeDefaults(ElsterType type, const char*& component, const char*& deviceClass, const char*& unit, const char*& stateClass, const char*& icon) {
+    switch(type) {
+        case et_dec_val:
+        case et_cent_val:
+        case et_mil_val:
+            component = "sensor"; deviceClass = "temperature"; unit = "°C"; stateClass = "measurement"; icon = "mdi:thermometer";
+            break;
+        case et_bool:
+        case et_little_bool:
+            component = "binary_sensor"; deviceClass = ""; unit = ""; stateClass = ""; icon = "mdi:electric-switch";
+            break;
+        case et_byte:
+        case et_little_endian:
+            component = "sensor"; deviceClass = ""; unit = ""; stateClass = "measurement"; icon = "mdi:counter";
+            break;
+        case et_err_nr:
+            component = "sensor"; deviceClass = ""; unit = ""; stateClass = ""; icon = "mdi:alert-circle";
+            break;
+        case et_dev_id:
+        case et_dev_nr:
+            component = "text"; deviceClass = ""; unit = ""; stateClass = ""; icon = "mdi:identifier";
+            break;
+        case et_betriebsart:
+            component = "sensor"; deviceClass = "enum"; unit = ""; stateClass = ""; icon = "mdi:hvac";
+            break;
+        case et_zeit:
+            component = "sensor"; deviceClass = "timestamp"; unit = ""; stateClass = ""; icon = "mdi:clock";
+            break;
+        case et_datum:
+            component = "sensor"; deviceClass = "date"; unit = ""; stateClass = ""; icon = "mdi:calendar";
+            break;
+        default:
+            component = "sensor"; deviceClass = ""; unit = ""; stateClass = ""; icon = "mdi:gauge";
+            break;
+    }
+}
+
+const ElsterIndex *processCanMessage(const std::vector<uint8_t> &msg, uint32_t can_id, std::string &signalValue, const CanMember **outCanMember)
 {
     // Return if the message is too small
     if (msg.size() < 7)
@@ -440,6 +354,7 @@ const ElsterIndex *processCanMessage(const std::vector<uint8_t> &msg, uint32_t c
     }
 
     const CanMember &cm = lookupCanMember(can_id);
+    *outCanMember = &cm;  // Return CanMember to caller
 
     const ElsterIndex *ei;
     uint8_t byte1;
@@ -484,12 +399,12 @@ void readSignal(const CanMember *cm, const ElsterIndex *ei)
     const uint8_t IndexByte1 = static_cast<uint8_t>(ei->Index >> 8);
     const uint8_t IndexByte2 = static_cast<uint8_t>(ei->Index & 0xFF);
     std::vector<uint8_t> data;
-    std::vector<uint8_t> readId = generate_read_id(cm->CanId);
+    CanIdBytes readId = generate_read_id(cm->CanId);
 
     if (IndexByte1 == 0x00)
     {
-        data = {readId[0],
-                readId[1],
+        data = {readId.first,
+                readId.second,
                 IndexByte2,
                 0x00,
                 0x00,
@@ -498,8 +413,8 @@ void readSignal(const CanMember *cm, const ElsterIndex *ei)
     }
     else
     {
-        data = {readId[0],
-                readId[1],
+        data = {readId.first,
+                readId.second,
                 0xFA,
                 IndexByte1,
                 IndexByte2,
@@ -508,7 +423,7 @@ void readSignal(const CanMember *cm, const ElsterIndex *ei)
     }
 
     char logmsg[120];
-    snprintf(logmsg, sizeof(logmsg), "READ \"%s\" (0x%04x) FROM %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x", ei->Name, ei->Index, cm->Name, cm->CanId, readId[0], readId[1], data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
+    snprintf(logmsg, sizeof(logmsg), "READ \"%s\" (0x%04x) FROM %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x", ei->Name, ei->Index, cm->Name, cm->CanId, readId.first, readId.second, data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
     ESP_LOGI("readSignal()", "%s", logmsg);
 
     id(my_mcp2515).send_data(CanMembers[cm_pc].CanId, use_extended_id, data);
@@ -527,12 +442,12 @@ void writeSignal(const CanMember *cm, const ElsterIndex *ei, const char *&str)
     uint8_t IndexByte1 = static_cast<uint8_t>(ei->Index >> 8);
     uint8_t IndexByte2 = static_cast<uint8_t>(ei->Index & 0xFF);
     std::vector<uint8_t> data;
-    std::vector<uint8_t> writeId = generate_write_id(cm->CanId);
+    CanIdBytes writeId = generate_write_id(cm->CanId);
 
     if (IndexByte1 == 0x00)
     {
-        data = {writeId[0],
-                writeId[1],
+        data = {writeId.first,
+                writeId.second,
                 IndexByte2,
                 static_cast<uint8_t>(writeValue >> 8),
                 static_cast<uint8_t>(writeValue & 0xFF),
@@ -541,8 +456,8 @@ void writeSignal(const CanMember *cm, const ElsterIndex *ei, const char *&str)
     }
     else
     {
-        data = {writeId[0],
-                writeId[1],
+        data = {writeId.first,
+                writeId.second,
                 0xfa,
                 IndexByte1,
                 IndexByte2,
@@ -552,7 +467,7 @@ void writeSignal(const CanMember *cm, const ElsterIndex *ei, const char *&str)
 
     char logmsg[120];
     snprintf(logmsg, sizeof(logmsg), "WRITE \"%s\" (0x%04x): \"%d\" TO: %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x",
-             ei->Name, ei->Index, writeValue, cm->Name, cm->CanId, writeId[0], writeId[1],
+             ei->Name, ei->Index, writeValue, cm->Name, cm->CanId, writeId.first, writeId.second,
              data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
     ESP_LOGI("writeSignal()", "%s", logmsg);
 
@@ -636,6 +551,184 @@ void publishAllCalculatedSensorDiscoveries(bool forceRepublish = false) {
     }
 }
 
+// ============================================================================
+// MQTT WRITABLE NUMBER (for temperature setpoints, etc.)
+// ============================================================================
+
+// Publish MQTT discovery for a writable number entity
+void publishWritableNumberDiscovery(const WritableNumberConfig& config, bool forceRepublish = false) {
+    // Get CanMember for building topics
+    const CanMember* cm = &CanMembers[config.member];
+    
+    // Build unique ID
+    char uniqueId[128];
+    snprintf(uniqueId, sizeof(uniqueId), "stiebel_%s_%s", cm->Name, config.signalName);
+    std::string uid(uniqueId);
+    std::transform(uid.begin(), uid.end(), uid.begin(), ::tolower);
+    
+    // Check if already published (unless force republish)
+    if (!forceRepublish && discoveredWritableNumbers.find(uid) != discoveredWritableNumbers.end()) {
+        return;
+    }
+    
+    // Mark as discovered
+    discoveredWritableNumbers.insert(uid);
+    
+    // Build discovery topic: homeassistant/number/heatingpump/<unique_id>/config
+    char discoveryTopic[256];
+    snprintf(discoveryTopic, sizeof(discoveryTopic), 
+             "homeassistant/number/heatingpump/%s/config", uid.c_str());
+    
+    // Build command topic: heatingpump/<MEMBER>/<SIGNAL>/set
+    char commandTopic[128];
+    snprintf(commandTopic, sizeof(commandTopic), "heatingpump/%s/%s/set", cm->Name, config.signalName);
+    
+    // Build state topic: heatingpump/<MEMBER>/<SIGNAL>/state
+    char stateTopic[128];
+    snprintf(stateTopic, sizeof(stateTopic), "heatingpump/%s/%s/state", cm->Name, config.signalName);
+    
+    // Build JSON payload
+    std::ostringstream payload;
+    payload << "{\"name\":\"" << config.friendlyName << "\","
+            << "\"unique_id\":\"" << uid << "\","
+            << "\"command_topic\":\"" << commandTopic << "\","
+            << "\"state_topic\":\"" << stateTopic << "\","
+            << "\"min\":" << config.min << ","
+            << "\"max\":" << config.max << ","
+            << "\"step\":" << config.step << ","
+            << "\"mode\":\"box\","
+            << "\"unit_of_measurement\":\"" << config.unit << "\","
+            << "\"device_class\":\"" << config.deviceClass << "\","
+            << "\"icon\":\"" << config.icon << "\",";
+    
+    // Add device info - use same device ID format as sensors (uppercase member name)
+    char canMemberDeviceId[64];
+    snprintf(canMemberDeviceId, sizeof(canMemberDeviceId), "stiebel_%s", cm->Name);
+    
+    const char* canMemberFriendlyName = cm->Name;
+    if (strcmp(cm->Name, "KESSEL") == 0) canMemberFriendlyName = "Kessel";
+    else if (strcmp(cm->Name, "MANAGER") == 0) canMemberFriendlyName = "Manager";
+    else if (strcmp(cm->Name, "HEIZMODUL") == 0) canMemberFriendlyName = "Heizmodul";
+    
+    payload << "\"device\":{\"identifiers\":[\"" << canMemberDeviceId << "\"],"
+            << "\"name\":\"" << canMemberFriendlyName << "\","
+            << "\"via_device\":\"stiebel_eltron_wpl13e\","
+            << "\"manufacturer\":\"Stiebel Eltron\"}}";
+    
+    // Publish discovery message
+    std::string payloadStr = payload.str();
+    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    
+    ESP_LOGI("MQTT", "Discovery published for writable number: %s", config.friendlyName);
+}
+
+// Publish all writable number discoveries
+void publishAllWritableNumberDiscoveries(bool forceRepublish = false) {
+    if (forceRepublish) {
+        discoveredWritableNumbers.clear();
+        ESP_LOGI("MQTT", "Republishing all writable number discoveries");
+    }
+    
+    for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; i++) {
+        publishWritableNumberDiscovery(writableNumbers[i], forceRepublish);
+    }
+}
+
+// ============================================================================
+// WRITABLE SELECT DISCOVERY (MQTT Select entities)
+// ============================================================================
+
+void publishWritableSelectDiscovery(const WritableSelectConfig& config, bool forceRepublish = false) {
+    // Get CAN member
+    const CanMember* cm = &CanMembers[config.member];
+    
+    // Build unique ID (lowercase with underscores)
+    char uniqueId[128];
+    snprintf(uniqueId, sizeof(uniqueId), "stiebel_%s_%s", cm->Name, config.signalName);
+    std::string uniqueIdStr(uniqueId);
+    std::transform(uniqueIdStr.begin(), uniqueIdStr.end(), uniqueIdStr.begin(), ::tolower);
+    
+    // Check if already published (unless forcing)
+    if (!forceRepublish && discoveredWritableSelects.count(uniqueIdStr) > 0) {
+        return;
+    }
+    
+    // Build discovery topic
+    std::ostringstream discoveryTopicStream;
+    discoveryTopicStream << "homeassistant/select/heatingpump/" << uniqueIdStr << "/config";
+    std::string discoveryTopic = discoveryTopicStream.str();
+    
+    // Build command and state topics
+    std::ostringstream commandTopicStream;
+    commandTopicStream << "heatingpump/" << cm->Name << "/" << config.signalName << "/set";
+    std::string commandTopic = commandTopicStream.str();
+    
+    std::ostringstream stateTopicStream;
+    stateTopicStream << "heatingpump/" << cm->Name << "/" << config.signalName << "/state";
+    std::string stateTopic = stateTopicStream.str();
+    
+    // Build JSON payload
+    std::ostringstream payload;
+    payload << "{\"name\":\"" << config.friendlyName << "\","
+            << "\"unique_id\":\"" << uniqueIdStr << "\","
+            << "\"command_topic\":\"" << commandTopic << "\","
+            << "\"state_topic\":\"" << stateTopic << "\","
+            << "\"options\":[";
+    
+    // Add options array
+    for (size_t i = 0; i < config.optionCount; i++) {
+        if (i > 0) payload << ",";
+        payload << "\"" << config.options[i] << "\"";
+    }
+    payload << "],";
+    
+    // Add icon if specified
+    if (config.icon && strlen(config.icon) > 0) {
+        payload << "\"icon\":\"" << config.icon << "\",";
+    }
+    
+    // Add device info - use same device ID format as sensors (uppercase member name)
+    char canMemberDeviceId[64];
+    snprintf(canMemberDeviceId, sizeof(canMemberDeviceId), "stiebel_%s", cm->Name);
+    
+    const char* canMemberFriendlyName = cm->Name;
+    if (strcmp(cm->Name, "KESSEL") == 0) canMemberFriendlyName = "Kessel";
+    else if (strcmp(cm->Name, "MANAGER") == 0) canMemberFriendlyName = "Manager";
+    else if (strcmp(cm->Name, "HEIZMODUL") == 0) canMemberFriendlyName = "Heizmodul";
+    
+    payload << "\"device\":{\"identifiers\":[\"" << canMemberDeviceId << "\"],"
+            << "\"name\":\"" << canMemberFriendlyName << "\","
+            << "\"via_device\":\"stiebel_eltron_wpl13e\","
+            << "\"manufacturer\":\"Stiebel Eltron\"}}";
+    
+    // Publish discovery message
+    std::string payloadStr = payload.str();
+    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    
+    // Mark as discovered
+    discoveredWritableSelects.insert(uniqueIdStr);
+    
+    ESP_LOGI("MQTT", "Discovery published for writable select: %s", config.friendlyName);
+}
+
+// Publish all writable select discoveries
+void publishAllWritableSelectDiscoveries(bool forceRepublish = false) {
+    if (forceRepublish) {
+        discoveredWritableSelects.clear();
+        ESP_LOGI("MQTT", "Republishing all writable select discoveries");
+    }
+    
+    for (size_t i = 0; i < WRITABLE_SELECT_COUNT; i++) {
+        publishWritableSelectDiscovery(writableSelects[i], forceRepublish);
+    }
+}
+
+// ============================================================================
+// Note: Datetime controls are now implemented using Home Assistant input_datetime
+// helpers synced via text_sensor platform and triggered by buttons.
+// MQTT datetime discovery is not supported by Home Assistant.
+// ============================================================================
+
 void publishDate()
 {
     // Publish discovery (only once - cached)
@@ -674,15 +767,11 @@ void publishDate()
     ESP_LOGI("CALC", "Published date: %s (Jahr=%d, Monat=%d, Tag=%d)", datum.c_str(), ijahr, imonat, itag);
 }
 
-std::string formatNumber(int number, int width)
-{
-    std::ostringstream oss;
-    oss << std::setw(width) << std::setfill('0') << number;
-    return oss.str();
-}
-
 void publishTime()
 {
+    // Publish discovery (only once - cached)
+    publishCalculatedSensorDiscovery(calculatedSensors[1]);
+    
     // Validate that all values have been received
     if (lastStunde < 0 || lastMinute < 0 || lastSekunde < 0) {
         ESP_LOGW("CALC", "Cannot publish time: sensors not initialized (Stunde=%d, Minute=%d, Sekunde=%d)", 
@@ -703,21 +792,24 @@ void publishTime()
         return;
     }
     
-    // Format time components
-    std::string stunde = formatNumber(istunde, 2);
-    std::string minute = formatNumber(iminute, 2);
-    std::string sekunde = formatNumber(isekunde, 2);
-
-    std::string zeit = stunde + ":" + minute + ":" + sekunde;
+    // Format time directly without helper function
+    char zeit[9];
+    snprintf(zeit, sizeof(zeit), "%02d:%02d:%02d", istunde, iminute, isekunde);
     
     // Publish state to MQTT
     const char* stateTopic = "heatingpump/calculated/time/state";
-    id(mqtt_client).publish(stateTopic, zeit.c_str(), zeit.length(), 0, true);
-    ESP_LOGI("CALC", "Published time: %s (Stunde=%d, Minute=%d, Sekunde=%d)", zeit.c_str(), istunde, iminute, isekunde);
+    id(mqtt_client).publish(stateTopic, zeit, strlen(zeit), 0, true);
+    ESP_LOGI("CALC", "Published time: %s (Stunde=%d, Minute=%d, Sekunde=%d)", zeit, istunde, iminute, isekunde);
 }
+
+// Datetime states are now handled by Home Assistant input_datetime helpers
+// Read by ESPHome text_sensors and written via button triggers
 
 void publishBetriebsart(const std::string& sommerBetriebValue)
 {
+    // Publish discovery (only once - cached)
+    publishCalculatedSensorDiscovery(calculatedSensors[2]);
+    
     // Determine Betriebsart based on SOMMERBETRIEB value
     // SOMMERBETRIEB is et_little_bool type, so value is "on" or "off"
     std::string betriebsart;
@@ -813,127 +905,11 @@ void publishCompressorActive()
 }
 
 // Helper: Check if pattern appears anywhere in text (case-insensitive substring match)
-bool matchesPattern(const char* text, const char* pattern) {
-    std::string t(text);
-    std::string p(pattern);
-    
-    // Convert to uppercase for case-insensitive matching
-    std::transform(t.begin(), t.end(), t.begin(), ::toupper);
-    std::transform(p.begin(), p.end(), p.begin(), ::toupper);
-    
-    // Check if pattern appears anywhere in text
-    return t.find(p) != std::string::npos;
-}
-
-
-
-// Recursive helper to split a signal name fragment
-inline std::string splitFragment(const std::string& fragment) {
-    // Stop if fragment is too short
-    if (fragment.length() <= 1) {
-        return fragment;
-    }
-    
-    // Convert to uppercase for case-insensitive search
-    std::string upperFragment = fragment;
-    std::transform(upperFragment.begin(), upperFragment.end(), upperFragment.begin(), ::toupper);
-    
-    // Try each abbreviation (longest first)
-    for (size_t i = 0; i < sizeof(abbrevList)/sizeof(abbrevList[0]); i++) {
-        const char* abbrev = abbrevList[i].abbrev;
-        size_t abbrevLen = strlen(abbrev);
-        
-        // Search for this abbreviation in the uppercase fragment
-        size_t pos = upperFragment.find(abbrev);
-        if (pos != std::string::npos) {
-            // Found! Split into left, match, right (use original fragment for extraction)
-            std::string left = fragment.substr(0, pos);
-            std::string match = fragment.substr(pos, abbrevLen);  // Preserve original case
-            std::string right = fragment.substr(pos + abbrevLen);
-            
-            // Recursively process left and right parts
-            std::string processedLeft = splitFragment(left);
-            std::string processedRight = splitFragment(right);
-            
-            // Combine with spaces
-            std::string result;
-            if (!processedLeft.empty()) {
-                result = processedLeft + " ";
-            }
-            result += match;
-            if (!processedRight.empty()) {
-                result += " " + processedRight;
-            }
-            
-            return result;
-        }
-    }
-    
-    // No match found, return fragment as-is
-    return fragment;
-}
-
-// Expand signal name by splitting concatenated abbreviations and adding TEMP suffix
-// E.g., "WPVORLAUFIST" -> "WP VORLAUF IST TEMP"
-inline std::string expandSignalName(const char* signalName) {
-    std::string name(signalName);
-    
-    // Step 1: Replace underscores with spaces
-    std::replace(name.begin(), name.end(), '_', ' ');
-    
-    // Step 2-4: Process each space-separated token
-    std::istringstream tokenStream(name);
-    std::string token;
-    std::ostringstream result;
-    bool first = true;
-    
-    while (tokenStream >> token) {
-        if (!first) result << " ";
-        first = false;
-        
-        // Recursively split this token
-        result << splitFragment(token);
-    }
-    
-    name = result.str();
-    
-    // Step 5: Trim and clean up excess whitespace
-    size_t start = name.find_first_not_of(" ");
-    size_t end = name.find_last_not_of(" ");
-    if (start != std::string::npos) {
-        name = name.substr(start, end - start + 1);
-    } else {
-        name = "";
-    }
-    
-    // Reduce multiple spaces to single space
-    size_t spacePos = 0;
-    while ((spacePos = name.find("  ", spacePos)) != std::string::npos) {
-        name.replace(spacePos, 2, " ");
-    }
-    
-    // Add "TEMP" suffix if name ends with "SOLL" or "IST" (temperature indicators)
-    if (name.length() >= 4) {
-        std::string upperName = name;
-        std::transform(upperName.begin(), upperName.end(), upperName.begin(), ::toupper);
-        
-        if (upperName.substr(upperName.length() - 4) == "SOLL" || 
-            upperName.substr(upperName.length() - 3) == "IST") {
-            // Check if TEMP is not already present
-            if (upperName.find("TEMP") == std::string::npos) {
-                name += " TEMP";
-            }
-        }
-    }
-    
-    return name;
-}
-
 // Get or create cached UID for a signal (eliminates repeated string ops)
-inline std::string getOrCreateUID(uint32_t can_id, const char* signalName) {
+inline std::string getOrCreateUID(const CanMember &cm, const char* signalName) {
     // Create cache key
     char cacheKey[256];
-    snprintf(cacheKey, sizeof(cacheKey), "%u:%s", can_id, signalName);
+    snprintf(cacheKey, sizeof(cacheKey), "%u:%s", cm.CanId, signalName);
     
     // Check cache first
     auto it = uidCache.find(cacheKey);
@@ -941,8 +917,7 @@ inline std::string getOrCreateUID(uint32_t can_id, const char* signalName) {
         return it->second;
     }
     
-    // Generate UID if not cached
-    const CanMember &cm = lookupCanMember(can_id);
+    // Generate UID if not cached (no need to lookup CanMember - already have it)
     char uid[128];
     snprintf(uid, sizeof(uid), "stiebel_%s_%s", cm.Name, signalName);
     std::string result(uid);
@@ -954,167 +929,39 @@ inline std::string getOrCreateUID(uint32_t can_id, const char* signalName) {
     return result;
 }
 
-// Get signal configuration based on expanded name and type
-inline const SignalConfig* getSignalConfig(const char* signalName, ElsterType type) {
-    // Create cache key from signal name and type
-    char cacheKey[256];
-    snprintf(cacheKey, sizeof(cacheKey), "%s:%d", signalName, (int)type);
-    
-    // Check cache first (O(1) lookup)
-    auto cacheIt = signalConfigCache.find(cacheKey);
-    if (cacheIt != signalConfigCache.end()) {
-        return cacheIt->second;
-    }
-    
-    // Cache miss - do expensive pattern matching
-    // First expand the signal name
-    std::string expandedName = expandSignalName(signalName);
-    
-    // Convert to uppercase for pattern matching
-    std::string upperExpanded = expandedName;
-    std::transform(upperExpanded.begin(), upperExpanded.end(), upperExpanded.begin(), ::toupper);
-    
-    // Try to find matching pattern against expanded name
-    const SignalConfig* result = nullptr;
-    for (const auto& config : signalMappings) {
-        if (matchesPattern(upperExpanded.c_str(), config.namePattern)) {
-            ESP_LOGD("PATTERN", "Signal '%s' (expanded: '%s') matched pattern '%s'", 
-                     signalName, expandedName.c_str(), config.namePattern);
-            result = &config;
-            break;
-        }
-    }
-    
-    // If no match, use default (last entry)
-    if (result == nullptr) {
-        ESP_LOGW("PATTERN", "Signal '%s' (expanded: '%s') using default pattern (no match found)", 
-                 signalName, expandedName.c_str());
-        result = &signalMappings[sizeof(signalMappings)/sizeof(SignalConfig) - 1];
-    }
-    
-    // Cache the result before returning
-    signalConfigCache[cacheKey] = result;
-    return result;
-}
-
-// Generate friendly name from signal name (kept in German as requested)
-inline std::string getFriendlyName(const char* signalName, const char* canMemberName) {
-    // Step 1: Expand signal name (split concatenated words, add TEMP suffix)
-    std::string name = expandSignalName(signalName);
-    
-    // Step 2: Apply abbreviation expansions to the separated words
-    for (size_t i = 0; i < sizeof(abbrevList)/sizeof(abbrevList[0]); i++) {
-        const char* abbrev = abbrevList[i].abbrev;
-        const char* full = abbrevList[i].full;
-        const size_t abbrevLen = strlen(abbrev);
-        const size_t fullLen = strlen(full);
-        size_t pos = 0;
-        
-        // Replace whole-word matches only (surrounded by spaces or start/end)
-        while ((pos = name.find(abbrev, pos)) != std::string::npos) {
-            bool hasBefore = (pos == 0 || name[pos - 1] == ' ');
-            bool hasAfter = (pos + abbrevLen >= name.length() || name[pos + abbrevLen] == ' ');
-            
-            if (hasBefore && hasAfter) {
-                name.replace(pos, abbrevLen, full);
-                pos += fullLen;
-            } else {
-                pos += abbrevLen;
-            }
-        }
-    }
-    
-    // Step 3: Convert to title case
-    bool capitalizeNext = true;
-    for (size_t i = 0; i < name.length(); i++) {
-        if (capitalizeNext && std::isalpha(name[i])) {
-            name[i] = ::toupper(name[i]);
-            capitalizeNext = false;
-        } else {
-            name[i] = ::tolower(name[i]);
-            if (name[i] == ' ') capitalizeNext = true;
-        }
-    }
-    
-    // Step 4: Convert German character sequences to proper umlauts
-    // This handles any remaining cases where abbreviations weren't fully replaced
-    size_t pos = 0;
-    while ((pos = name.find("Ae", pos)) != std::string::npos) {
-        name.replace(pos, 2, "Ä");
-        pos += 2; // UTF-8 Ä is 2 bytes
-    }
-    pos = 0;
-    while ((pos = name.find("Oe", pos)) != std::string::npos) {
-        name.replace(pos, 2, "Ö");
-        pos += 2;
-    }
-    pos = 0;
-    while ((pos = name.find("Ue", pos)) != std::string::npos) {
-        name.replace(pos, 2, "Ü");
-        pos += 2;
-    }
-    pos = 0;
-    while ((pos = name.find("ae", pos)) != std::string::npos) {
-        name.replace(pos, 2, "ä");
-        pos += 2;
-    }
-    pos = 0;
-    while ((pos = name.find("oe", pos)) != std::string::npos) {
-        name.replace(pos, 2, "ö");
-        pos += 2;
-    }
-    pos = 0;
-    while ((pos = name.find("ue", pos)) != std::string::npos) {
-        name.replace(pos, 2, "ü");
-        pos += 2;
-    }
-    
-    return name;
-}
-
-// Publish main device (parent for all CAN member sub-devices)
-inline void publishMainDevice() {
-    const char* mainDeviceId = "stiebel_eltron_wpl13e";
-    
-    // Publish a sensor to register the main device
-    const char* discoveryTopic = "homeassistant/sensor/heatingpump/main_device/config";
-    
-    std::ostringstream payload;
-    payload << "{\"name\":\"Wärmepumpe Status\","
-            << "\"unique_id\":\"" << mainDeviceId << "_status\","
-            << "\"state_topic\":\"heatingpump/status\","
-            << "\"icon\":\"mdi:heat-pump\","
-            << "\"device\":{\"identifiers\":[\"" << mainDeviceId << "\"],"
-            << "\"name\":\"Stiebel Eltron Wärmepumpe\","
-            << "\"model\":\"WPL 13 E\","
-            << "\"manufacturer\":\"Stiebel Eltron\"}}";
-    
-    std::string payloadStr = payload.str();
-    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
-    
-    ESP_LOGI("MQTT", "Main device published: Stiebel Eltron Wärmepumpe");
-}
-
 // Publish MQTT Discovery config for a signal
-void publishMqttDiscovery(uint32_t can_id, const ElsterIndex *ei) {
-    const CanMember &cm = lookupCanMember(can_id);
-    const SignalConfig* config = getSignalConfig(ei->Name, (ElsterType)ei->Type);
+void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
     
     // Get cached UID (avoids repeated string operations)
-    std::string uid = getOrCreateUID(can_id, ei->Name);
+    std::string uid = getOrCreateUID(cm, ei->Name);
     
-    // Check if already discovered
-    if (discoveredSignals.find(uid) != discoveredSignals.end()) {
-        return; // Already published discovery
-    }
-    discoveredSignals.insert(uid);
+    // Note: Caller is responsible for checking discoveredSignals and inserting uid
+    // This function just publishes the MQTT discovery message
     
-    // Determine component type based on ElsterType
-    // Boolean types (et_bool, et_little_bool) → binary_sensor
-    // All other types → sensor
-    const char* component = "sensor";
-    if (ei->Type == et_bool || ei->Type == et_little_bool) {
-        component = "binary_sensor";
+    // Get friendly name: use ei->friendlyName or fallback to ei->Name
+    const char* friendlyName = (ei->hasMetadata && ei->friendlyName) ? ei->friendlyName : ei->Name;
+    
+    // Get metadata: use ei fields if available, otherwise fall back to type defaults
+    const char *component, *deviceClass, *unit, *stateClass, *icon;
+    const char *payloadOn = nullptr, *payloadOff = nullptr;
+    
+    if (ei->hasMetadata && ei->haComponent) {
+        // Use metadata from ElsterTable
+        component = ei->haComponent;
+        deviceClass = ei->haDeviceClass ? ei->haDeviceClass : "";
+        unit = ei->unit ? ei->unit : "";
+        stateClass = ei->stateClass ? ei->stateClass : "";
+        icon = ei->icon ? ei->icon : "";
+        payloadOn = ei->payloadOn;
+        payloadOff = ei->payloadOff;
+    } else {
+        // Fall back to type-based defaults
+        getTypeDefaults((ElsterType)ei->Type, component, deviceClass, unit, stateClass, icon);
+        // For binary sensors, set default payloads
+        if (strcmp(component, "binary_sensor") == 0) {
+            payloadOn = "on";
+            payloadOff = "off";
+        }
     }
     
     // Build discovery topic
@@ -1126,9 +973,6 @@ void publishMqttDiscovery(uint32_t can_id, const ElsterIndex *ei) {
     char stateTopic[128];
     snprintf(stateTopic, sizeof(stateTopic), "heatingpump/%s/%s/state", cm.Name, ei->Name);
     
-    // Generate friendly name
-    std::string friendlyName = getFriendlyName(ei->Name, cm.Name);
-    
     // Build JSON payload efficiently using ostringstream
     std::ostringstream payload;
     payload << "{\"name\":\"" << friendlyName << "\","
@@ -1137,20 +981,20 @@ void publishMqttDiscovery(uint32_t can_id, const ElsterIndex *ei) {
             << "\"availability_topic\":\"heatingpump/status\"";
     
     // For binary sensors, specify payload values
-    if (ei->Type == et_bool || ei->Type == et_little_bool) {
-        payload << ",\"payload_on\":\"on\","
-                << "\"payload_off\":\"off\"";
+    if (strcmp(component, "binary_sensor") == 0 && payloadOn && payloadOff) {
+        payload << ",\"payload_on\":\"" << payloadOn << "\","
+                << "\"payload_off\":\"" << payloadOff << "\"";
     }
     
-    // Add optional fields only if specified
-    if (config->deviceClass[0] != '\0') {
-        payload << ",\"device_class\":\"" << config->deviceClass << "\"";
+    // Add optional fields only if non-empty
+    if (deviceClass[0] != '\0') {
+        payload << ",\"device_class\":\"" << deviceClass << "\"";
     }
-    if (config->unit[0] != '\0') {
-        payload << ",\"unit_of_measurement\":\"" << config->unit << "\"";
+    if (unit[0] != '\0') {
+        payload << ",\"unit_of_measurement\":\"" << unit << "\"";
     }
-    // State class only for numeric sensors (not binary, text, enum, time, date, or ID types)
-    if (config->stateClass[0] != '\0') {
+    // State class only for numeric sensors
+    if (stateClass[0] != '\0') {
         bool isNumericType = (ei->Type == et_dec_val || 
                               ei->Type == et_cent_val || 
                               ei->Type == et_mil_val || 
@@ -1159,11 +1003,11 @@ void publishMqttDiscovery(uint32_t can_id, const ElsterIndex *ei) {
                               ei->Type == et_triple_val ||
                               ei->Type == et_little_endian);
         if (isNumericType) {
-            payload << ",\"state_class\":\"" << config->stateClass << "\"";
+            payload << ",\"state_class\":\"" << stateClass << "\"";
         }
     }
-    if (config->icon[0] != '\0') {
-        payload << ",\"icon\":\"" << config->icon << "\"";
+    if (icon[0] != '\0') {
+        payload << ",\"icon\":\"" << icon << "\"";
     }
     
     // Device info - create individual device per CAN member as sub-device
@@ -1194,7 +1038,7 @@ void publishMqttDiscovery(uint32_t can_id, const ElsterIndex *ei) {
     std::string payloadStr = payload.str();
     id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
     
-    ESP_LOGI("MQTT", "Discovery published for %s", friendlyName.c_str());
+    ESP_LOGI("MQTT", "Discovery published for %s", friendlyName);
 }
 
 // Republish all MQTT discoveries (for periodic refresh)
@@ -1243,14 +1087,12 @@ void republishAllDiscoveries() {
 }
 
 // Publish signal state to MQTT
-void publishMqttState(uint32_t can_id, const ElsterIndex *ei, const std::string &value) {
+void publishMqttState(const CanMember &cm, const ElsterIndex *ei, const std::string &value) {
     // Input validation
     if (!ei || !ei->Name || value.empty()) {
         ESP_LOGW("MQTT", "Invalid signal data, skipping state publish");
         return;
     }
-    
-    const CanMember &cm = lookupCanMember(can_id);
     
     // Build state topic with bounds checking
     char stateTopic[128];
@@ -1467,10 +1309,8 @@ constexpr uint32_t HASH_WAERMEERTRAG_HEIZ = hash("WAERMEERTRAG_HEIZ_SUM_MWH");
 
 
 
-void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &value)
+void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string &value)
 {
-    const CanMember &cm = lookupCanMember(can_id);
-    
     // Skip empty values
     if (value.empty()) {
         return;
@@ -1488,22 +1328,18 @@ void updateSensor(uint32_t can_id, const ElsterIndex *ei, const std::string &val
         }
     }
     
-    // Check if discovery is needed (fast check only - don't publish yet)
-    std::string uid = getOrCreateUID(can_id, ei->Name);
+    // Check if discovery is needed
+    std::string uid = getOrCreateUID(cm, ei->Name);
     bool needsDiscovery = (discoveredSignals.find(uid) == discoveredSignals.end());
     
     if (needsDiscovery) {
-        // Mark as discovered to avoid repeated checks
+        // Mark as discovered and publish discovery immediately
         discoveredSignals.insert(uid);
-        
-        // Schedule discovery publishing for next loop iteration (non-blocking)
-        // Discovery will be published via interval component or deferred call
-        // For now, publish immediately but this could be optimized further
-        publishMqttDiscovery(can_id, ei);
+        publishMqttDiscovery(cm, ei);
     }
     
-    // Publish state immediately (this is fast - just MQTT publish)
-    publishMqttState(can_id, ei, publishValue);
+    // Publish state
+    publishMqttState(cm, ei, publishValue);
     
     // Fast signal dispatch using compile-time hash (O(1) switch/jump table)
     const char* signalName = ei->Name;
@@ -1860,20 +1696,12 @@ void processSignalRequests() {
     }
 }
 
-void identifyCanMembers()
-{
-    ESP_LOGI("identifyCanMembers()", "Identifying CAN Members...");
-    readSignal(&CanMembers[cm_heizmodul], GetElsterIndex("GERAETE_ID"));
-
-    ESP_LOGI("identifyCanMembers()", "Identified CAN Members!");
-    return;
-}
-
 void processAndUpdate(uint32_t can_id, std::vector<uint8_t> msg)
 {
  
     std::string value;
-    const ElsterIndex *ei = processCanMessage(msg, can_id, value);
+    const CanMember *cm = nullptr;
+    const ElsterIndex *ei = processCanMessage(msg, can_id, value, &cm);
 
     // Skip permanently blacklisted signals
     if (isPermanentlyBlacklisted(ei->Name))
@@ -1881,7 +1709,7 @@ void processAndUpdate(uint32_t can_id, std::vector<uint8_t> msg)
         return; // Reject before lookup, parsing, formatting, logging
     }
 
-    updateSensor(can_id, ei, value);
+    updateSensor(*cm, ei, value);
     return;
 }
 

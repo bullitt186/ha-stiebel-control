@@ -19,9 +19,15 @@
 
 
 #include <string.h>
+#include <unordered_map>
+#include <string>
 #include "NUtils.h"
 #include "KElsterTable.h"
 #include "ElsterTable.h"
+
+// Lazy-initialized caches for O(1) lookups after first access
+static std::unordered_map<unsigned short, const ElsterIndex*> indexCache;
+static std::unordered_map<std::string, const ElsterIndex*> nameCache;
 
 
 void SetValueType(char * Val, unsigned char Type, unsigned short Value)
@@ -167,27 +173,54 @@ const char * ElsterTypeToName(unsigned Type)
   return ElsterTypeStr[et_default];
 }
 
-
 const ElsterIndex * GetElsterIndex(unsigned short Index)
 {
-    for (int i = 0; i <= (int) High(ElsterTable); i++) {
-      if (ElsterTable[i].Index == Index) {
-        return &ElsterTable[i];
-      }
+  // Check cache first - O(1) for subsequent lookups
+  auto it = indexCache.find(Index);
+  if (it != indexCache.end()) {
+    return it->second;
+  }
+
+  // Cache miss - do linear search O(n)
+  int i;
+  for (i = 0; i <= High(ElsterTable); i++) {
+    if (ElsterTable[i].Index == Index) {
+      const ElsterIndex* result = &ElsterTable[i];
+      indexCache[Index] = result;  // Cache for next time
+      return result;
     }
-    return &ElsterTable[0];
+  }
+
+  // Not found - cache default and return
+  indexCache[Index] = &ElsterTable[0];
+  return &ElsterTable[0];
 }
 
 const ElsterIndex * GetElsterIndex(const char* str)
 {
-    for (int i = 0; i <= (int) High(ElsterTable); i++) {
-      if (!strcmp(ElsterTable[i].Name, str)) {
-        return &ElsterTable[i];
-      }
-    }
-    return &ElsterTable[0];
-}
+  // Convert to std::string for cache key
+  std::string key(str);
+  
+  // Check cache first - O(1) for subsequent lookups
+  auto it = nameCache.find(key);
+  if (it != nameCache.end()) {
+    return it->second;
+  }
 
+  // Cache miss - do linear search O(n)
+  int i;
+  for (i = 0; i <= High(ElsterTable); i++) {
+    if (!strcmp(ElsterTable[i].Name, str)) {
+      const ElsterIndex* result = &ElsterTable[i];
+      nameCache[key] = result;  // Cache for next time
+      return result;
+    }
+  }
+
+  // Not found - cache default and return
+  nameCache[key] = &ElsterTable[0];
+  return &ElsterTable[0];
+}
 
 static bool Get_Time(const char * & str, int & hour, int & min)
 {

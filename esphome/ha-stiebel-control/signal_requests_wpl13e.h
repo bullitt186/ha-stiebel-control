@@ -31,7 +31,6 @@ static const SignalRequest signalRequests[] = {
     // ========================================================================
     // STATUS AND CONTROL SIGNALS
     // ========================================================================
-    {"WP_STATUS", FREQ_1MIN, cm_manager},
     {"EVU_SPERRE_AKTIV", FREQ_1MIN, cm_manager},
     {"ABTAUUNGAKTIV", FREQ_1MIN, cm_heizmodul},
     {"BETRIEBSART_WP", FREQ_10MIN, cm_manager},
@@ -149,55 +148,5 @@ static const SignalRequest signalRequests[] = {
 
 // Number of signals in the request table
 #define SIGNAL_REQUEST_COUNT (sizeof(signalRequests) / sizeof(SignalRequest))
-
-// ============================================================================
-// PERMANENT BLACKLIST
-// ============================================================================
-// Signals to NEVER process - they appear on CAN bus but are not needed
-// Format: Signal name only (NOT "MEMBER_SIGNAL" format)
-// The blacklist check will match against any CAN member broadcasting this signal
-static const char* PERMANENT_BLACKLIST[] = {
-    "ACCESS_EEPROM",
-    "ANFAHRENT",
-    "GERAETE_ID",
-    "GERAETEKONFIGURATION",
-    "HARDWARE_NUMMER",
-    "INDEX_NOT_FOUND",
-    "INITIALISIERUNG",
-    "PARAMETERSATZ",
-    "QUELLENPUMPEN_STATUS",
-    "ZWISCHENEINSPRITZUNG_ISTTEMP",
-    "BUSKONFIGURATION",
-    "BUSKONTROLLE",
-    "SOFTWARE_NUMMER",
-    "SOFTWARE_VERSION",
-    "SPEICHERBEDARF",
-    "FATAL_ERROR",
-    "FEHLER_PARAMETERSATZ_IWS",
-    "FEHLERMELDUNG",
-    "K_OS_RMX_RESERVE_INFO3",
-    "SCHALTFKT_IWS",
-    "SOLAR_KOLLEKTOR_3_I_ANTEIL",
-    "STUETZSTELLE_ND1",
-    "STUETZSTELLE_ND2",
-    "STUETZSTELLE_HD1",
-    "STUETZSTELLE_HD2",
-    // Runtime counters - update frequently during bursts, minimal value
-    "LZ_VERD_1_HEIZBETRIEB",
-    "LZ_VERD_2_HEIZBETRIEB",
-    "LZ_VERD_1_2_HEIZBETRIEB",
-    "LZ_VERD_1_WW_BETRIEB",
-    "LZ_VERD_2_WW_BETRIEB",
-    "LZ_VERD_1_2_WW_BETRIEB",
-    "LZ_VERD_1_KUEHLBETRIEB",
-    "LZ_VERD_2_KUEHLBETRIEB",
-    "LZ_VERD_1_2_KUEHLBETRIEB",
-    "LAUFZEIT_VERD_BEI_SPEICHERBEDARF",
-    // Additional low-value status signals
-    "SAMMEL_RELAISSTATUS",
-    "LUEFT_PASSIVKUEHLUNG_UEBER_FORTLUEFTER",
-    "TEMPORALE_LUEFTUNGSSTUFE_DAUER",
-    "TEILVORRANG_WW"
-};
 
 #endif // SIGNAL_REQUESTS_WPL13E_H
