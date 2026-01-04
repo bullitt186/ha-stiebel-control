@@ -426,7 +426,7 @@ void readSignal(const CanMember *cm, const ElsterIndex *ei)
     snprintf(logmsg, sizeof(logmsg), "READ \"%s\" (0x%04x) FROM %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x", ei->Name, ei->Index, cm->Name, cm->CanId, readId.first, readId.second, data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
     ESP_LOGI("readSignal()", "%s", logmsg);
 
-    id(my_mcp2515).send_data(CanMembers[cm_pc].CanId, use_extended_id, data);
+    id(my_can).send_data(CanMembers[cm_pc].CanId, use_extended_id, data);
 }
 
 void readSignal(const CanMember *cm, const char *elsterName)
@@ -471,7 +471,7 @@ void writeSignal(const CanMember *cm, const ElsterIndex *ei, const char *&str)
              data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
     ESP_LOGI("writeSignal()", "%s", logmsg);
 
-    id(my_mcp2515).send_data(CanMembers[cm_pc].CanId, use_extended_id, data);
+    id(my_can).send_data(CanMembers[cm_pc].CanId, use_extended_id, data);
 }
 
 void writeSignal(const CanMember *cm, const char *elsterName, const char *&str)

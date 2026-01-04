@@ -21,7 +21,7 @@ spi:
 #########################################
 canbus:
   - platform: mcp2515
-    id: my_mcp2515
+    id: my_can
     spi_id: McpSpi
     cs_pin: ${can_cs_pin}
     can_id: ${can_id_pc}
