@@ -3,17 +3,43 @@
 #  Uses MQTT auto-discovery for all 3800+ signals from Elster protocol
 #  Only defines 22 essential sensors for COP calculations and HA integration
 #
+#  BOARD SELECTION:
+#  Uncomment ONE of the board configurations below
+#
 
+# ============================================================================
+# ESP32-S3 with Built-in CAN (Waveshare ESP32-S3-RS485-CAN)
+# ============================================================================
 substitutions:
   device_name: heatingpump
   friendly_name: "Stiebel Eltron Wärmepumpe"
-  # CAN SPI pins for ESP32
-  can_clk_pin: GPIO18
-  can_mosi_pin: GPIO23
-  can_miso_pin: GPIO19
-  can_cs_pin: GPIO5
+  # CAN pins for ESP32-S3 built-in TWAI controller
+  can_tx_pin: GPIO15  # TXD2 on Waveshare board
+  can_rx_pin: GPIO16  # RXD2 on Waveshare board
   can_id_pc: "0x680"
 
 packages:
+  board: !include ha-stiebel-control/board_esp32s3.yaml
+  can: !include ha-stiebel-control/can_esp32.yaml
   base: !include ha-stiebel-control/common.yaml
   sensors: !include ha-stiebel-control/wpl13e.yaml
+
+# ============================================================================
+# ESP32-S2 with MCP2515 SPI CAN Transceiver (Legacy)
+# ============================================================================
+# Uncomment this section and comment out ESP32-S3 section above to use MCP2515
+# substitutions:
+#   device_name: heatingpump
+#   friendly_name: "Stiebel Eltron Wärmepumpe"
+#   # SPI pins for MCP2515 CAN controller
+#   can_clk_pin: GPIO18
+#   can_mosi_pin: GPIO23
+#   can_miso_pin: GPIO19
+#   can_cs_pin: GPIO5
+#   can_id_pc: "0x680"
+#
+# packages:
+#   board: !include ha-stiebel-control/board_esp32s2.yaml
+#   can: !include ha-stiebel-control/can_mcp2515.yaml
+#   base: !include ha-stiebel-control/common.yaml
+#   sensors: !include ha-stiebel-control/wpl13e.yaml

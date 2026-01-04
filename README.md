@@ -69,9 +69,32 @@ Home Assistant
 
 ## Hardware Requirements
 
-### ESP32 with CAN Interface
+### Supported Boards
 
-1. **ESP32 Development Board** (e.g., ESP32 DevKit V1)
+This project supports two hardware configurations:
+
+#### **Option 1: ESP32-S3 with Built-in CAN (Recommended)**
+
+**Advantages:**
+- ✅ No buffer overflows (256 RX queue vs 2 on MCP2515)
+- ✅ Faster processing (no SPI overhead)
+- ✅ Better timing accuracy (hardware CAN controller)
+- ✅ Single board solution
+
+**Hardware:**
+1. **Waveshare ESP32-S3-RS485-CAN Board** (or similar ESP32-S3 with CAN transceiver)
+2. **Connections**:
+   - CAN-H (TXD2/GPIO15) → Heat pump CAN-H
+   - CAN-L (RXD2/GPIO16) → Heat pump CAN-L
+   - GND → Heat pump GND
+   - Power: USB or 5V/3.3V input
+
+#### **Option 2: ESP32-S2 with MCP2515 (Legacy)**
+
+**Note:** May experience buffer overflows on high-traffic CAN buses.
+
+**Hardware:**
+1. **ESP32 Development Board** (ESP32-S2, ESP32 DevKit V1, etc.)
 2. **MCP2515 CAN Transceiver Module**
 3. **TJA1050/SN65HVD230 CAN Bus Transceiver** (often integrated on MCP2515 board)
 4. **Connections**:
@@ -87,55 +110,69 @@ Home Assistant
 
 ## Installation
 
-### 1. ESPHome Configuration
+### 1. Copy Project Files
 
-#### Option A: New Installation
+Copy the `esphome/` folder contents to your ESPHome config directory:
 
-```bash
-# In your ESPHome config directory
-git clone https://github.com/bullitt186/ha-stiebel-control.git
-cd ha-stiebel-control/esphome
+```
+/config/esphome/
+├── heatingpump.yaml
+└── ha-stiebel-control/
+    ├── ...
 ```
 
-Edit `heatingpump.yaml` and configure:
+### 2. Choose Your Board Type
+
+Edit `heatingpump.yaml` and select your hardware configuration:
+
+**For ESP32-S3 with built-in CAN:**
 ```yaml
+# ESP32-S3 section (uncommented)
 substitutions:
   device_name: heatingpump
   friendly_name: "Stiebel Eltron Wärmepumpe"
-  # Adjust GPIO pins to match your hardware
+  can_tx_pin: GPIO15  # TXD2 on Waveshare board
+  can_rx_pin: GPIO16  # RXD2 on Waveshare board
+  can_id_pc: "0x680"
+
+packages:
+  board: !include ha-stiebel-control/board_esp32s3.yaml
+  can: !include ha-stiebel-control/can_esp32.yaml
+  base: !include ha-stiebel-control/common.yaml
+  sensors: !include ha-stiebel-control/wpl13e.yaml
+```
+
+**For ESP32-S2 with MCP2515:**
+```yaml
+# ESP32-S2 section (uncomment this, comment out ESP32-S3)
+substitutions:
+  device_name: heatingpump
+  friendly_name: "Stiebel Eltron Wärmepumpe"
   can_clk_pin: GPIO18
   can_mosi_pin: GPIO23
   can_miso_pin: GPIO19
   can_cs_pin: GPIO5
   can_id_pc: "0x680"
+
+packages:
+  board: !include ha-stiebel-control/board_esp32s2.yaml
+  can: !include ha-stiebel-control/can_mcp2515.yaml
+  base: !include ha-stiebel-control/common.yaml
+  sensors: !include ha-stiebel-control/wpl13e.yaml
 ```
 
-Edit `ha-stiebel-control/common.yaml` WiFi credentials:
+### 3. Configure WiFi and MQTT
+
+Create a `secrets.yaml` file in your ESPHome directory and enter your credentials
 ```yaml
-wifi:
-  ssid: "YOUR_SSID"
-  password: "YOUR_PASSWORD"
+wifi_ssid: "YOUR_WIFI_SSID"
+wifi_password: "YOUR_WIFI_PASSWORD"
+mqtt_broker: "YOUR_MQTT_BROKER_IP"
+mqtt_username: "YOUR_MQTT_USER"
+mqtt_password: "YOUR_MQTT_PASSWORD"
 ```
 
-Configure MQTT broker:
-```yaml
-mqtt:
-  broker: "YOUR_MQTT_BROKER_IP"
-  username: "YOUR_MQTT_USERNAME"
-  password: "YOUR_MQTT_PASSWORD"
-```
-
-#### Option B: Copy Files to Existing ESPHome Installation
-
-Copy the `esphome/` folder contents to your ESPHome config directory:
-```
-/config/esphome/
-├── heatingpump.yaml
-└── ha-stiebel-control/
-    └── ...
-```
-
-### 2. Compile and Upload
+### 4. Compile and Upload
 
 ```bash
 esphome run esphome/heatingpump.yaml
@@ -143,7 +180,7 @@ esphome run esphome/heatingpump.yaml
 
 Or use the ESPHome dashboard to compile and upload.
 
-### 3. Home Assistant Integration
+### 5. Home Assistant Integration
 
 #### Add Package Configuration
 
@@ -164,7 +201,7 @@ Ensure the MQTT integration is set up in Home Assistant:
 2. Enter your MQTT broker details
 3. MQTT entities will auto-discover
 
-### 4. Verify Operation
+### 6. Verify Operation
 
 1. **Check ESPHome Logs**:
    ```bash

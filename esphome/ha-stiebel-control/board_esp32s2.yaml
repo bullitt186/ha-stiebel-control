@@ -1,0 +1,9 @@
+#
+#  ESP32-S2 Board Configuration
+#  Generic ESP32-S2 Development Board
+#
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
