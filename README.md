@@ -20,17 +20,21 @@ Based on the Elster protocol implementation by [Jürg Müller](http://juerg5524.
 
 ```
 esphome/
-├── heatingpump.yaml              # Main device config (substitutions, includes)
-├── ha-stiebel-control/
-│   ├── common.yaml               # Base: CAN bus, MQTT, buttons, text sensors
-│   ├── wpl13e.yaml               # Device-specific sensors (template for other models)
-│   ├── ha-stiebel-control.h      # Main C++ logic: MQTT discovery, CAN write, calculators
-│   ├── signal_requests_wpl13e.h  # Polling schedule for signals
-│   ├── config.h                  # Blacklist configuration
-│   └── elster/                   # Elster protocol library
-│       ├── ElsterTable.h         # 3800+ signal definitions with metadata
-│       ├── KElsterTable.cpp/h    # Table lookup functions
-│       └── NUtils.cpp/h/NTypes.h # Utility functions
+├── heatingpump.yaml              # Main device config (board selection, substitutions, includes)
+└── ha-stiebel-control/
+    ├── board_esp32s3.yaml        # ESP32-S3 board config (16MB flash, OPI PSRAM)
+    ├── board_esp32s2.yaml        # ESP32-S2/generic ESP32 board config
+    ├── can_esp32.yaml            # Built-in TWAI CAN config (256 RX/64 TX buffers)
+    ├── can_mcp2515.yaml          # MCP2515 SPI CAN config (legacy)
+    ├── common.yaml               # Board-agnostic: WiFi, MQTT, API, OTA, buttons
+    ├── wpl13e.yaml               # Device-specific sensors (template for other models)
+    ├── ha-stiebel-control.h      # Main C++ logic: MQTT discovery, CAN write, calculators
+    ├── signal_requests_wpl13e.h  # Polling schedule for signals
+    ├── config.h                  # Blacklist configuration
+    └── elster/                   # Elster protocol library
+        ├── ElsterTable.h         # 3800+ signal definitions with metadata
+        ├── KElsterTable.cpp/h    # Table lookup functions
+        └── NUtils.cpp/h/NTypes.h # Utility functions
 
 packages/
 └── ha_stiebel_control.yaml       # Home Assistant helpers (input_datetime)
@@ -41,7 +45,7 @@ packages/
 ```
 Heat Pump CAN Bus (Elster Protocol)
          ↓
-ESP32 + MCP2515 Transceiver
+ESP32-S3 (Built-in TWAI) or ESP32-S2 + MCP2515
          ↓
 ESPHome (ha-stiebel-control.h)
     - Reads CAN frames
@@ -83,6 +87,8 @@ This project supports two hardware configurations:
 
 **Hardware:**
 1. **Waveshare ESP32-S3-RS485-CAN Board** (or similar ESP32-S3 with CAN transceiver)
+   - **Specifications**: 16MB Flash, OPI PSRAM
+   - **Configuration**: Automatically configured for optimal performance
 2. **Connections**:
    - CAN-H (TXD2/GPIO15) → Heat pump CAN-H
    - CAN-L (RXD2/GPIO16) → Heat pump CAN-L
@@ -118,7 +124,22 @@ Copy the `esphome/` folder contents to your ESPHome config directory:
 /config/esphome/
 ├── heatingpump.yaml
 └── ha-stiebel-control/
-    ├── ...
+    ├── board_esp32s3.yaml
+    ├── board_esp32s2.yaml
+    ├── can_esp32.yaml
+    ├── can_mcp2515.yaml
+    ├── common.yaml
+    ├── wpl13e.yaml
+    ├── ha-stiebel-control.h
+    ├── signal_requests_wpl13e.h
+    ├── config.h
+    └── elster/
+        ├── ElsterTable.h
+        ├── KElsterTable.cpp
+        ├── KElsterTable.h
+        ├── NTypes.h
+        ├── NUtils.cpp
+        └── NUtils.h
 ```
 
 ### 2. Choose Your Board Type
@@ -342,10 +363,19 @@ static const CanMember CanMembers[] = {
 
 ### No CAN Messages Received
 
+**For MCP2515 (ESP32-S2):**
 - Check SPI wiring (CLK, MOSI, MISO, CS pins)
+- Verify MCP2515 power (3.3V or 5V depending on module)
+
+**For ESP32-S3 Built-in CAN:**
+- Verify GPIO15 (TX) and GPIO16 (RX) connections
+- Check CAN transceiver power
+
+**Common to both:**
 - Verify CAN-H and CAN-L connections to heat pump
 - Check ESPHome logs for `[canbus] Setup CAN...`
 - Verify heat pump CAN bus is active (should be always on)
+- Check CAN bus termination (120Ω resistors at both ends)
 
 ### Entities Not Appearing in Home Assistant
 
@@ -412,7 +442,12 @@ mosquitto_pub -h BROKER -u USER -P PASS -t "heatingpump/command/programmschalter
 
 ## Project Structure Details
 
-- **common.yaml**: Core ESPHome config, WiFi, MQTT, API, CAN bus, buttons, text sensors
+- **heatingpump.yaml**: Main entry point with board selection (comment/uncomment blocks)
+- **board_esp32s3.yaml**: ESP32-S3 configuration (16MB flash, OPI PSRAM, 80MHz)
+- **board_esp32s2.yaml**: ESP32-S2/generic ESP32 configuration
+- **can_esp32.yaml**: Built-in TWAI CAN controller (256 RX queue, 64 TX queue)
+- **can_mcp2515.yaml**: MCP2515 SPI-based CAN controller
+- **common.yaml**: Board-agnostic core (WiFi, MQTT, API, OTA, buttons, text sensors)
 - **wpl13e.yaml**: Device-specific template sensors (22 essential sensors)
 - **ha-stiebel-control.h**: Main C++ implementation (MQTT discovery, calculated sensors, CAN write)
 - **signal_requests_wpl13e.h**: Polling schedule (defines which signals to read and how often)
