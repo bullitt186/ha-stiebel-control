@@ -1,0 +1,214 @@
+# ============================================================================
+# SG Ready Automation Example
+# ============================================================================
+# This automation maps your E3DC PV system's SG Ready state to the heat pump
+# controller. Copy this to your Home Assistant automations.yaml or include
+# this package in your configuration.
+#
+# Prerequisites:
+# - sensor.s10x_sg_ready_numeric exists and provides values 1-4
+# - ESPHome heat pump controller with SG Ready support is running
+# - MQTT integration is configured
+#
+# The automation will automatically control the heat pump based on PV surplus:
+# - State 1: Grid lock - heat pump in standby
+# - State 2: Normal operation - automatic mode
+# - State 3: Surplus available - DHW boost (can add temperature increase)
+# - State 4: High surplus - maximum DHW heating (can set max temperature)
+# ============================================================================
+
+automation:
+  # ============================================================================
+  # Main SG Ready State Sync - Maps E3DC state to Heat Pump
+  # ============================================================================
+  - id: sg_ready_state_sync
+    alias: "Wärmepumpe: SG Ready State Sync"
+    description: "Synchronisiert E3DC SG Ready Zustand mit Wärmepumpe"
+    mode: restart  # Restart if triggered again before completion
+    
+    trigger:
+      # Trigger when E3DC SG Ready state changes
+      - platform: state
+        entity_id: sensor.s10x_sg_ready_numeric
+        
+      # Also trigger on Home Assistant startup to ensure sync
+      - platform: homeassistant
+        event: start
+    
+    condition:
+      # Only run if E3DC sensor has a valid value (1-4)
+      - condition: template
+        value_template: >
+          {{ states('sensor.s10x_sg_ready_numeric') | int(0) in [1, 2, 3, 4] }}
+    
+    action:
+      - service: select.select_option
+        target:
+          entity_id: select.manager_sg_ready_zustand
+        data:
+          option: >
+            {% set state = states('sensor.s10x_sg_ready_numeric') | int %}
+            {% if state == 1 %}1 - EVU Sperre
+            {% elif state == 2 %}2 - Normal
+            {% elif state == 3 %}3 - Empfohlen
+            {% elif state == 4 %}4 - Zwang
+            {% else %}2 - Normal{% endif %}
+      
+      - service: system_log.write
+        data:
+          message: >
+            SG Ready: E3DC state {{ states('sensor.s10x_sg_ready_numeric') }}
+            → Heat pump {{ states('select.manager_sg_ready_zustand') }}
+          level: info
+
+  # ============================================================================
+  # Optional: Temperature Boost for State 3 (Recommended)
+  # ============================================================================
+  # When in State 3, increase DHW setpoint by 3°C to store surplus energy
+  # Uncomment and adjust to your needs
+  # ============================================================================
+  
+  # - id: sg_ready_state3_dhw_boost
+  #   alias: "Wärmepumpe: SG Ready State 3 - DHW Boost +3°C"
+  #   description: "Erhöht Warmwasser-Solltemperatur bei PV-Überschuss"
+  #   mode: single
+  #   
+  #   trigger:
+  #     - platform: state
+  #       entity_id: select.manager_sg_ready_zustand
+  #       to: "3 - Empfohlen"
+  #   
+  #   variables:
+  #     # Your normal DHW comfort temperature
+  #     normal_temp: 50
+  #     # Boost amount in °C
+  #     boost: 3
+  #   
+  #   action:
+  #     # Set boosted temperature
+  #     - service: mqtt.publish
+  #       data:
+  #         topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP/set
+  #         payload: "{{ normal_temp + boost }}"
+  #     
+  #     - service: system_log.write
+  #       data:
+  #         message: "SG Ready State 3: Boosting DHW to {{ normal_temp + boost }}°C"
+  #         level: info
+
+  # ============================================================================
+  # Optional: Restore Normal Temperature when leaving State 3
+  # ============================================================================
+  
+  # - id: sg_ready_state3_dhw_restore
+  #   alias: "Wärmepumpe: SG Ready State 3 verlassen - DHW Normal"
+  #   description: "Stellt normale Warmwasser-Solltemperatur wieder her"
+  #   mode: single
+  #   
+  #   trigger:
+  #     - platform: state
+  #       entity_id: select.manager_sg_ready_zustand
+  #       from: "3 - Empfohlen"
+  #   
+  #   variables:
+  #     normal_temp: 50
+  #   
+  #   action:
+  #     - service: mqtt.publish
+  #       data:
+  #         topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP/set
+  #         payload: "{{ normal_temp }}"
+  #     
+  #     - service: system_log.write
+  #       data:
+  #         message: "SG Ready: Restoring normal DHW temperature {{ normal_temp }}°C"
+  #         level: info
+
+  # ============================================================================
+  # Optional: Maximum Temperature for State 4 (Forced)
+  # ============================================================================
+  
+  # - id: sg_ready_state4_dhw_max
+  #   alias: "Wärmepumpe: SG Ready State 4 - DHW Maximum"
+  #   description: "Setzt maximale Warmwasser-Temperatur bei hohem PV-Überschuss"
+  #   mode: single
+  #   
+  #   trigger:
+  #     - platform: state
+  #       entity_id: select.manager_sg_ready_zustand
+  #       to: "4 - Zwang"
+  #   
+  #   variables:
+  #     max_temp: 55  # Maximum safe DHW temperature
+  #   
+  #   action:
+  #     - service: mqtt.publish
+  #       data:
+  #         topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP/set
+  #         payload: "{{ max_temp }}"
+  #     
+  #     - service: system_log.write
+  #       data:
+  #         message: "SG Ready State 4: Setting maximum DHW temperature {{ max_temp }}°C"
+  #         level: info
+
+  # ============================================================================
+  # Optional: Restore from State 4
+  # ============================================================================
+  
+  # - id: sg_ready_state4_dhw_restore
+  #   alias: "Wärmepumpe: SG Ready State 4 verlassen - DHW Normal"
+  #   description: "Stellt normale Warmwasser-Solltemperatur wieder her"
+  #   mode: single
+  #   
+  #   trigger:
+  #     - platform: state
+  #       entity_id: select.manager_sg_ready_zustand
+  #       from: "4 - Zwang"
+  #   
+  #   variables:
+  #     normal_temp: 50
+  #   
+  #   action:
+  #     - service: mqtt.publish
+  #       data:
+  #         topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP/set
+  #         payload: "{{ normal_temp }}"
+
+# ============================================================================
+# Input Helpers (optional - for manual testing)
+# ============================================================================
+# Uncomment to create manual controls for testing SG Ready states
+# ============================================================================
+
+# input_select:
+#   sg_ready_manual_override:
+#     name: "SG Ready Manuell"
+#     icon: mdi:solar-power
+#     options:
+#       - "Automatik (aus E3DC)"
+#       - "1 - EVU Sperre"
+#       - "2 - Normal"
+#       - "3 - Empfohlen"
+#       - "4 - Zwang"
+#     initial: "Automatik (aus E3DC)"
+
+# ============================================================================
+# Manual Override Automation (optional)
+# ============================================================================
+
+# automation:
+#   - id: sg_ready_manual_override
+#     alias: "Wärmepumpe: SG Ready Manuell"
+#     trigger:
+#       - platform: state
+#         entity_id: input_select.sg_ready_manual_override
+#     condition:
+#       - condition: template
+#         value_template: "{{ trigger.to_state.state != 'Automatik (aus E3DC)' }}"
+#     action:
+#       - service: select.select_option
+#         target:
+#           entity_id: select.manager_sg_ready_zustand
+#         data:
+#           option: "{{ trigger.to_state.state }}"

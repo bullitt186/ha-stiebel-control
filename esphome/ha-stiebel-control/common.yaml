@@ -158,6 +158,75 @@ mqtt:
             writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", value);
             // Read back to update state
             readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
+    
+    # SG Ready state control
+    - topic: heatingpump/MANAGER/SG_READY_STATE/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received SG_READY_STATE command: %s", x.c_str());
+            // Ensure discovery is published
+            publishWritableSelectDiscovery(writableSelects[1]);
+            
+            // Parse the state from the string (format: "1 - EVU Sperre", "2 - Normal", etc.)
+            int state = 0;
+            if (x.find("1 - ") == 0) state = 1;
+            else if (x.find("2 - ") == 0) state = 2;
+            else if (x.find("3 - ") == 0) state = 3;
+            else if (x.find("4 - ") == 0) state = 4;
+            
+            if (state >= 1 && state <= 4) {
+                applySgReadyState(state);
+            } else {
+                ESP_LOGW("MQTT_CMD", "Invalid SG Ready state received: %s", x.c_str());
+            }
+    
+    # SG Ready boost temperature for State 3
+    - topic: heatingpump/MANAGER/SG_READY_BOOST_STATE3/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received SG_READY_BOOST_STATE3 command: %s", x.c_str());
+            // Ensure discovery is published
+            publishWritableNumberDiscovery(writableNumbers[2]);
+            // Parse and store the boost value
+            char* endPtr;
+            float boost = strtof(x.c_str(), &endPtr);
+            if (endPtr != x.c_str() && *endPtr == '\0' && boost >= 0.0 && boost <= 10.0) {
+                sgReadyBoostState3 = boost;
+                ESP_LOGI("SG_READY", "State 3 boost set to %.1f°C", boost);
+                // Publish state back
+                char stateTopic[128];
+                snprintf(stateTopic, sizeof(stateTopic), "heatingpump/MANAGER/SG_READY_BOOST_STATE3/state");
+                char valueStr[16];
+                snprintf(valueStr, sizeof(valueStr), "%.1f", boost);
+                id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
+            } else {
+                ESP_LOGW("MQTT_CMD", "Invalid boost value: %s", x.c_str());
+            }
+    
+    # SG Ready boost temperature for State 4
+    - topic: heatingpump/MANAGER/SG_READY_BOOST_STATE4/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received SG_READY_BOOST_STATE4 command: %s", x.c_str());
+            // Ensure discovery is published
+            publishWritableNumberDiscovery(writableNumbers[3]);
+            // Parse and store the boost value
+            char* endPtr;
+            float boost = strtof(x.c_str(), &endPtr);
+            if (endPtr != x.c_str() && *endPtr == '\0' && boost >= 0.0 && boost <= 15.0) {
+                sgReadyBoostState4 = boost;
+                ESP_LOGI("SG_READY", "State 4 boost set to %.1f°C", boost);
+                // Publish state back
+                char stateTopic[128];
+                snprintf(stateTopic, sizeof(stateTopic), "heatingpump/MANAGER/SG_READY_BOOST_STATE4/state");
+                char valueStr[16];
+                snprintf(valueStr, sizeof(valueStr), "%.1f", boost);
+                id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
+            } else {
+                ESP_LOGW("MQTT_CMD", "Invalid boost value: %s", x.c_str());
+            }
+
+
 
 #########################################
 #                                       #

@@ -187,10 +187,21 @@ static const char* programmschalterOptions[] = {
     "Warmwasser"       // Hot water only
 };
 
+// SG Ready state options (Smart Grid Ready)
+static const char* sgReadyOptions[] = {
+    "1 - EVU Sperre",       // State 1: Grid lock - minimize consumption
+    "2 - Normal",           // State 2: Normal operation
+    "3 - Empfohlen",        // State 3: Recommended - use surplus energy
+    "4 - Zwang"             // State 4: Forced operation - maximum usage
+};
+
 static const WritableSelectConfig writableSelects[] = {
     // Heat pump operating mode
     {"PROGRAMMSCHALTER", "Programmschalter", 
-     cm_manager, programmschalterOptions, 6, "mdi:dip-switch"}
+     cm_manager, programmschalterOptions, 6, "mdi:dip-switch"},
+    // SG Ready control (not a real CAN signal, handled internally)
+    {"SG_READY_STATE", "SG Ready Zustand", 
+     cm_manager, sgReadyOptions, 4, "mdi:solar-power"}
 };
 
 static const size_t WRITABLE_SELECT_COUNT = sizeof(writableSelects) / sizeof(WritableSelectConfig);
@@ -200,6 +211,13 @@ static const size_t WRITABLE_SELECT_COUNT = sizeof(writableSelects) / sizeof(Wri
 // ============================================================================
 // RUNTIME STATE TRACKING
 // ============================================================================
+
+// SG Ready state tracking
+static int currentSgReadyState = 2; // Default to normal operation (state 2)
+static bool sgReadyActive = false;  // Track if SG Ready is currently controlling the heat pump
+static float sgReadyBoostState3 = 3.0; // Default boost for state 3 in °C
+static float sgReadyBoostState4 = 5.0; // Default boost for state 4 in °C
+static float originalDhwTemp = 0.0; // Store original DHW temperature before boost
 
 // Track which signals have been discovered
 static std::set<std::string> discoveredSignals;
@@ -474,7 +492,7 @@ void writeSignal(const CanMember *cm, const ElsterIndex *ei, const char *&str)
     id(my_can).send_data(CanMembers[cm_pc].CanId, use_extended_id, data);
 }
 
-void writeSignal(const CanMember *cm, const char *elsterName, const char *&str)
+void writeSignal(const CanMember *cm, const char *elsterName, const char *str)
 {
     writeSignal(cm, GetElsterIndex(elsterName), str);
     return;
@@ -1265,6 +1283,108 @@ void updateCOPCalculations() {
 // Validation removed for simplification - all values are published as-is
 // Invalid values like -255, -32768, etc. will be visible in Home Assistant
 // Users can filter these in HA automations/dashboards if needed
+
+// ============================================================================
+// SG READY CONTROL LOGIC
+// ============================================================================
+
+void applySgReadyState(int state) {
+    ESP_LOGI("SG_READY", "Applying SG Ready state %d", state);
+    
+    currentSgReadyState = state;
+    
+    // Publish current state to MQTT
+    char stateTopic[128];
+    snprintf(stateTopic, sizeof(stateTopic), "heatingpump/MANAGER/SG_READY_STATE/state");
+    const char* stateStr = sgReadyOptions[state - 1]; // state is 1-based, array is 0-based
+    id(mqtt_client).publish(stateTopic, stateStr, strlen(stateStr), 0, true);
+    
+    switch (state) {
+        case 1: // EVU Sperre - minimize consumption
+            ESP_LOGI("SG_READY", "State 1: EVU Lock - Setting to Bereitschaft (standby)");
+            // Restore original temperature if we had boosted it
+            if (sgReadyActive && originalDhwTemp > 0) {
+                char tempStr[16];
+                snprintf(tempStr, sizeof(tempStr), "%.1f", originalDhwTemp);
+                writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP", tempStr);
+                readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP");
+                ESP_LOGI("SG_READY", "Restored DHW temperature to %.1f°C", originalDhwTemp);
+                originalDhwTemp = 0.0;
+            }
+            sgReadyActive = true;
+            // Set to standby mode - heat pump only runs if necessary
+            writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", "Bereitschaft");
+            readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
+            break;
+            
+        case 2: // Normal operation - restore original settings
+            ESP_LOGI("SG_READY", "State 2: Normal operation - Restoring to Automatik");
+            if (sgReadyActive) {
+                // Restore original temperature if we had boosted it
+                if (originalDhwTemp > 0) {
+                    char tempStr[16];
+                    snprintf(tempStr, sizeof(tempStr), "%.1f", originalDhwTemp);
+                    writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP", tempStr);
+                    readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP");
+                    ESP_LOGI("SG_READY", "Restored DHW temperature to %.1f°C", originalDhwTemp);
+                    originalDhwTemp = 0.0;
+                }
+                // Restore to automatic mode
+                writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", "Automatik");
+                readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
+                sgReadyActive = false;
+            }
+            break;
+            
+        case 3: { // Recommended - use surplus energy via comfort mode + boost
+            ESP_LOGI("SG_READY", "State 3: Recommended - Tagbetrieb + %.1f°C boost", sgReadyBoostState3);
+            
+            // Read current DHW temperature to backup (only first time)
+            if (!sgReadyActive || originalDhwTemp == 0.0) {
+                readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP");
+                // Note: We'll get the value via CAN response, store it in updateSensor
+                // For now, we'll apply boost relative to current setting
+            }
+            sgReadyActive = true;
+            
+            // Switch to comfort/day mode (continuous heating without schedule)
+            writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", "Tagbetrieb");
+            readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
+            
+            // Apply temperature boost if configured
+            if (sgReadyBoostState3 > 0.1) {
+                // We need to read current temp, add boost, and write it back
+                // This will be handled by a helper function or HA automation
+                ESP_LOGI("SG_READY", "Temperature boost of %.1f°C should be applied via automation", sgReadyBoostState3);
+            }
+            break;
+        }
+            
+        case 4: { // Forced operation - maximum comfort + maximum boost
+            ESP_LOGI("SG_READY", "State 4: Forced operation - Tagbetrieb + %.1f°C boost", sgReadyBoostState4);
+            
+            // Read current DHW temperature to backup (only first time)
+            if (!sgReadyActive || originalDhwTemp == 0.0) {
+                readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP");
+            }
+            sgReadyActive = true;
+            
+            // Switch to comfort/day mode for maximum energy usage
+            writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", "Tagbetrieb");
+            readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
+            
+            // Apply maximum temperature boost if configured
+            if (sgReadyBoostState4 > 0.1) {
+                ESP_LOGI("SG_READY", "Temperature boost of %.1f°C should be applied via automation", sgReadyBoostState4);
+            }
+            break;
+        }
+            
+        default:
+            ESP_LOGW("SG_READY", "Invalid SG Ready state: %d", state);
+            break;
+    }
+}
 
 // ============================================================================
 // COMPILE-TIME STRING HASHING FOR FAST SIGNAL DISPATCH

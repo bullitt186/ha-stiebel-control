@@ -9,6 +9,7 @@ Based on the Elster protocol implementation by [Jürg Müller](http://juerg5524.
 - **Automatic MQTT Discovery**: All 3800+ Elster protocol signals automatically discovered in Home Assistant
 - **Frequency-Based Polling**: Intelligent signal request scheduling (1min/10min/30min intervals)
 - **Writable Controls**: Direct CAN bus write support for temperature setpoints and operating modes
+- **SG Ready Support**: Smart Grid Ready integration for PV surplus utilization ([Documentation](SG_READY.md))
 - **Calculated Sensors**: Automatic computation of COP, Delta-T, compressor status, and betriebsart
 - **Minimal Configuration**: Only 22 essential sensors defined, rest auto-discovered
 - **Button-Based Datetime Control**: Set heat pump time/date via Home Assistant helpers
@@ -268,6 +269,26 @@ To change values:
 - Use Home Assistant UI
 - Call service via automation
 - Publish to MQTT command topic
+
+### SG Ready (Smart Grid Ready) PV Integration
+
+**NEW**: Intelligent PV surplus utilization using the SG Ready standard.
+
+Control your heat pump based on solar energy availability with 4 operating states:
+- **State 1**: Grid lock - standby mode
+- **State 2**: Normal operation  
+- **State 3**: PV surplus available - boost DHW heating
+- **State 4**: High PV surplus - maximum DHW heating
+
+**Documentation**: See [SG_READY.md](SG_READY.md) for complete guide (quick start, configuration, automations, troubleshooting)
+
+**Features**:
+- ✅ ESPHome-native control (fast, reliable)
+- ✅ Dropdown select in Home Assistant (`select.manager_sg_ready_zustand`)
+- ✅ Compatible with any PV system (E3DC, SolarEdge, Fronius, etc.)
+- ✅ Manual override capability for testing
+- ✅ Optional temperature boost automations
+- ✅ Replaces hardware EVU lock (e.g., Shelly relays)
 
 ### Setting Heat Pump Date/Time
 
