@@ -101,6 +101,16 @@ mqtt:
         publishAllWritableSelectDiscoveries();
         // Datetime control now handled by Home Assistant input_datetime helpers
         ESP_LOGI("MQTT_CONN", "Discovery publication complete");
+        
+        // Publish initial states for SG Ready controls
+        ESP_LOGI("MQTT_CONN", "Publishing initial SG Ready states...");
+        // Publish default SG Ready state (2 - Normal)
+        const char* sgStateStr = sgReadyOptions[1]; // Index 1 = "2 - Normal"
+        id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_STATE/state", sgStateStr, strlen(sgStateStr), 0, true);
+        // Publish default boost values
+        id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_BOOST_STATE3/state", "3.0", 3, 0, true);
+        id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_BOOST_STATE4/state", "5.0", 3, 0, true);
+        ESP_LOGI("MQTT_CONN", "Initial SG Ready states published");
   on_disconnect:
     - logger.log:
         level: WARN

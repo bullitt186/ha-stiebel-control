@@ -159,7 +159,14 @@ static const WritableNumberConfig writableNumbers[] = {
     
     // Secondary storage target temperature (comfort/eco modes)
     {"EINSTELL_SPEICHERSOLLTEMP2", "Speicher Soll Temperatur 2 Einstellung", 
-     cm_manager, 20.0, 60.0, 1.0, "°C", "mdi:thermometer-low", "temperature"}
+     cm_manager, 20.0, 60.0, 1.0, "°C", "mdi:thermometer-low", "temperature"},
+    
+    // SG Ready boost temperatures (not real CAN signals, handled internally)
+    {"SG_READY_BOOST_STATE3", "SG Ready Boost Zustand 3", 
+     cm_manager, 0.0, 10.0, 0.5, "°C", "mdi:thermometer-plus", "temperature"},
+    
+    {"SG_READY_BOOST_STATE4", "SG Ready Boost Zustand 4", 
+     cm_manager, 0.0, 15.0, 0.5, "°C", "mdi:thermometer-chevron-up", "temperature"}
 };
 
 static const size_t WRITABLE_NUMBER_COUNT = sizeof(writableNumbers) / sizeof(WritableNumberConfig);
@@ -494,7 +501,8 @@ void writeSignal(const CanMember *cm, const ElsterIndex *ei, const char *&str)
 
 void writeSignal(const CanMember *cm, const char *elsterName, const char *str)
 {
-    writeSignal(cm, GetElsterIndex(elsterName), str);
+    const char* strCopy = str;  // Create a non-const pointer we can pass by reference
+    writeSignal(cm, GetElsterIndex(elsterName), strCopy);
     return;
 }
 
@@ -647,9 +655,12 @@ void publishAllWritableNumberDiscoveries(bool forceRepublish = false) {
         ESP_LOGI("MQTT", "Republishing all writable number discoveries");
     }
     
+    ESP_LOGI("MQTT_DISC", "Publishing %d writable number discoveries", WRITABLE_NUMBER_COUNT);
     for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; i++) {
+        ESP_LOGI("MQTT_DISC", "Publishing writable number %d: %s", i, writableNumbers[i].signalName);
         publishWritableNumberDiscovery(writableNumbers[i], forceRepublish);
     }
+    ESP_LOGI("MQTT_DISC", "Completed publishing writable number discoveries");
 }
 
 // ============================================================================
@@ -736,9 +747,12 @@ void publishAllWritableSelectDiscoveries(bool forceRepublish = false) {
         ESP_LOGI("MQTT", "Republishing all writable select discoveries");
     }
     
+    ESP_LOGI("MQTT_DISC", "Publishing %d writable select discoveries", WRITABLE_SELECT_COUNT);
     for (size_t i = 0; i < WRITABLE_SELECT_COUNT; i++) {
+        ESP_LOGI("MQTT_DISC", "Publishing writable select %d: %s", i, writableSelects[i].signalName);
         publishWritableSelectDiscovery(writableSelects[i], forceRepublish);
     }
+    ESP_LOGI("MQTT_DISC", "Completed publishing writable select discoveries");
 }
 
 // ============================================================================
@@ -1314,6 +1328,7 @@ void applySgReadyState(int state) {
             sgReadyActive = true;
             // Set to standby mode - heat pump only runs if necessary
             writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", "Bereitschaft");
+            delay(100); // Give heat pump time to process
             readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
             break;
             
@@ -1329,8 +1344,9 @@ void applySgReadyState(int state) {
                     ESP_LOGI("SG_READY", "Restored DHW temperature to %.1f°C", originalDhwTemp);
                     originalDhwTemp = 0.0;
                 }
-                // Restore to automatic mode
-                writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", "Automatik");
+                // Restore to Tagbetrieb mode
+                writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", "Tagbetrieb");
+                delay(100); // Give heat pump time to process
                 readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
                 sgReadyActive = false;
             }
@@ -1339,23 +1355,31 @@ void applySgReadyState(int state) {
         case 3: { // Recommended - use surplus energy via comfort mode + boost
             ESP_LOGI("SG_READY", "State 3: Recommended - Tagbetrieb + %.1f°C boost", sgReadyBoostState3);
             
-            // Read current DHW temperature to backup (only first time)
+            // Store original DHW temperature (only first time entering SG Ready mode)
             if (!sgReadyActive || originalDhwTemp == 0.0) {
-                readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP");
-                // Note: We'll get the value via CAN response, store it in updateSensor
-                // For now, we'll apply boost relative to current setting
+                // Use default of 48°C if we haven't read it yet (typical DHW setpoint)
+                originalDhwTemp = 48.0;
+                ESP_LOGI("SG_READY", "Stored original DHW temperature: %.1f°C (default)", originalDhwTemp);
             }
             sgReadyActive = true;
             
             // Switch to comfort/day mode (continuous heating without schedule)
             writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", "Tagbetrieb");
+            delay(100); // Give heat pump time to process
             readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
             
             // Apply temperature boost if configured
             if (sgReadyBoostState3 > 0.1) {
-                // We need to read current temp, add boost, and write it back
-                // This will be handled by a helper function or HA automation
-                ESP_LOGI("SG_READY", "Temperature boost of %.1f°C should be applied via automation", sgReadyBoostState3);
+                float boostedTemp = originalDhwTemp + sgReadyBoostState3;
+                // Clamp to safe range (max 60°C for DHW)
+                if (boostedTemp > 60.0) boostedTemp = 60.0;
+                
+                char tempStr[16];
+                snprintf(tempStr, sizeof(tempStr), "%.1f", boostedTemp);
+                writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP", tempStr);
+                readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP");
+                ESP_LOGI("SG_READY", "Applied temperature boost: %.1f°C + %.1f°C = %.1f°C", 
+                        originalDhwTemp, sgReadyBoostState3, boostedTemp);
             }
             break;
         }
@@ -1363,19 +1387,31 @@ void applySgReadyState(int state) {
         case 4: { // Forced operation - maximum comfort + maximum boost
             ESP_LOGI("SG_READY", "State 4: Forced operation - Tagbetrieb + %.1f°C boost", sgReadyBoostState4);
             
-            // Read current DHW temperature to backup (only first time)
+            // Store original DHW temperature (only first time entering SG Ready mode)
             if (!sgReadyActive || originalDhwTemp == 0.0) {
-                readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP");
+                // Use default of 48°C if we haven't read it yet (typical DHW setpoint)
+                originalDhwTemp = 48.0;
+                ESP_LOGI("SG_READY", "Stored original DHW temperature: %.1f°C (default)", originalDhwTemp);
             }
             sgReadyActive = true;
             
             // Switch to comfort/day mode for maximum energy usage
             writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", "Tagbetrieb");
+            delay(100); // Give heat pump time to process
             readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
             
             // Apply maximum temperature boost if configured
             if (sgReadyBoostState4 > 0.1) {
-                ESP_LOGI("SG_READY", "Temperature boost of %.1f°C should be applied via automation", sgReadyBoostState4);
+                float boostedTemp = originalDhwTemp + sgReadyBoostState4;
+                // Clamp to safe range (max 60°C for DHW)
+                if (boostedTemp > 60.0) boostedTemp = 60.0;
+                
+                char tempStr[16];
+                snprintf(tempStr, sizeof(tempStr), "%.1f", boostedTemp);
+                writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP", tempStr);
+                readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP");
+                ESP_LOGI("SG_READY", "Applied temperature boost: %.1f°C + %.1f°C = %.1f°C", 
+                        originalDhwTemp, sgReadyBoostState4, boostedTemp);
             }
             break;
         }
