@@ -222,8 +222,8 @@ static const size_t WRITABLE_SELECT_COUNT = sizeof(writableSelects) / sizeof(Wri
 // SG Ready state tracking
 static int currentSgReadyState = 2; // Default to normal operation (state 2)
 static bool sgReadyActive = false;  // Track if SG Ready is currently controlling the heat pump
-static float sgReadyBoostState3 = 3.0; // Default boost for state 3 in °C
-static float sgReadyBoostState4 = 5.0; // Default boost for state 4 in °C
+static float sgReadyBoostState3 = 5.0; // Default boost for state 3 in °C
+static float sgReadyBoostState4 = 8.0; // Default boost for state 4 in °C
 static float originalDhwTemp = 0.0; // Store original DHW temperature before boost
 
 // Track which signals have been discovered
@@ -627,19 +627,29 @@ void publishWritableNumberDiscovery(const WritableNumberConfig& config, bool for
             << "\"device_class\":\"" << config.deviceClass << "\","
             << "\"icon\":\"" << config.icon << "\",";
     
-    // Add device info - use same device ID format as sensors (uppercase member name)
-    char canMemberDeviceId[64];
-    snprintf(canMemberDeviceId, sizeof(canMemberDeviceId), "stiebel_%s", cm->Name);
+    // Check if this is an SG Ready control - assign to main device
+    bool isSgReady = (strncmp(config.signalName, "SG_READY_", 9) == 0);
     
-    const char* canMemberFriendlyName = cm->Name;
-    if (strcmp(cm->Name, "KESSEL") == 0) canMemberFriendlyName = "Kessel";
-    else if (strcmp(cm->Name, "MANAGER") == 0) canMemberFriendlyName = "Manager";
-    else if (strcmp(cm->Name, "HEIZMODUL") == 0) canMemberFriendlyName = "Heizmodul";
-    
-    payload << "\"device\":{\"identifiers\":[\"" << canMemberDeviceId << "\"],"
-            << "\"name\":\"" << canMemberFriendlyName << "\","
-            << "\"via_device\":\"stiebel_eltron_wpl13e\","
-            << "\"manufacturer\":\"Stiebel Eltron\"}}";
+    if (isSgReady) {
+        // SG Ready controls go to main device
+        payload << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
+                << "\"name\":\"Stiebel Eltron Wärmepumpe\","
+                << "\"manufacturer\":\"Stiebel Eltron\"}}";
+    } else {
+        // Regular controls go to their respective CAN member device
+        char canMemberDeviceId[64];
+        snprintf(canMemberDeviceId, sizeof(canMemberDeviceId), "stiebel_%s", cm->Name);
+        
+        const char* canMemberFriendlyName = cm->Name;
+        if (strcmp(cm->Name, "KESSEL") == 0) canMemberFriendlyName = "Kessel";
+        else if (strcmp(cm->Name, "MANAGER") == 0) canMemberFriendlyName = "Manager";
+        else if (strcmp(cm->Name, "HEIZMODUL") == 0) canMemberFriendlyName = "Heizmodul";
+        
+        payload << "\"device\":{\"identifiers\":[\"" << canMemberDeviceId << "\"],"
+                << "\"name\":\"" << canMemberFriendlyName << "\","
+                << "\"via_device\":\"stiebel_eltron_wpl13e\","
+                << "\"manufacturer\":\"Stiebel Eltron\"}}";
+    }
     
     // Publish discovery message
     std::string payloadStr = payload.str();
@@ -716,19 +726,29 @@ void publishWritableSelectDiscovery(const WritableSelectConfig& config, bool for
         payload << "\"icon\":\"" << config.icon << "\",";
     }
     
-    // Add device info - use same device ID format as sensors (uppercase member name)
-    char canMemberDeviceId[64];
-    snprintf(canMemberDeviceId, sizeof(canMemberDeviceId), "stiebel_%s", cm->Name);
+    // Check if this is an SG Ready control - assign to main device
+    bool isSgReady = (strncmp(config.signalName, "SG_READY_", 9) == 0);
     
-    const char* canMemberFriendlyName = cm->Name;
-    if (strcmp(cm->Name, "KESSEL") == 0) canMemberFriendlyName = "Kessel";
-    else if (strcmp(cm->Name, "MANAGER") == 0) canMemberFriendlyName = "Manager";
-    else if (strcmp(cm->Name, "HEIZMODUL") == 0) canMemberFriendlyName = "Heizmodul";
-    
-    payload << "\"device\":{\"identifiers\":[\"" << canMemberDeviceId << "\"],"
-            << "\"name\":\"" << canMemberFriendlyName << "\","
-            << "\"via_device\":\"stiebel_eltron_wpl13e\","
-            << "\"manufacturer\":\"Stiebel Eltron\"}}";
+    if (isSgReady) {
+        // SG Ready controls go to main device
+        payload << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
+                << "\"name\":\"Stiebel Eltron Wärmepumpe\","
+                << "\"manufacturer\":\"Stiebel Eltron\"}}";
+    } else {
+        // Regular controls go to their respective CAN member device
+        char canMemberDeviceId[64];
+        snprintf(canMemberDeviceId, sizeof(canMemberDeviceId), "stiebel_%s", cm->Name);
+        
+        const char* canMemberFriendlyName = cm->Name;
+        if (strcmp(cm->Name, "KESSEL") == 0) canMemberFriendlyName = "Kessel";
+        else if (strcmp(cm->Name, "MANAGER") == 0) canMemberFriendlyName = "Manager";
+        else if (strcmp(cm->Name, "HEIZMODUL") == 0) canMemberFriendlyName = "Heizmodul";
+        
+        payload << "\"device\":{\"identifiers\":[\"" << canMemberDeviceId << "\"],"
+                << "\"name\":\"" << canMemberFriendlyName << "\","
+                << "\"via_device\":\"stiebel_eltron_wpl13e\","
+                << "\"manufacturer\":\"Stiebel Eltron\"}}";
+    }
     
     // Publish discovery message
     std::string payloadStr = payload.str();

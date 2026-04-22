@@ -107,9 +107,22 @@ mqtt:
         // Publish default SG Ready state (2 - Normal)
         const char* sgStateStr = sgReadyOptions[1]; // Index 1 = "2 - Normal"
         id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_STATE/state", sgStateStr, strlen(sgStateStr), 0, true);
-        // Publish default boost values
-        id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_BOOST_STATE3/state", "3.0", 3, 0, true);
-        id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_BOOST_STATE4/state", "5.0", 3, 0, true);
+        // Publish current boost values (reflect actual in-memory values, not hardcoded defaults)
+        char boost3Str[16], boost4Str[16];
+        snprintf(boost3Str, sizeof(boost3Str), "%.1f", sgReadyBoostState3);
+        snprintf(boost4Str, sizeof(boost4Str), "%.1f", sgReadyBoostState4);
+        id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_BOOST_STATE3/state", boost3Str, strlen(boost3Str), 0, true);
+        id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_BOOST_STATE4/state", boost4Str, strlen(boost4Str), 0, true);
+        // Update sensors with initial values
+        id(sg_ready_boost_state3_sensor).publish_state(sgReadyBoostState3);
+        id(sg_ready_boost_state4_sensor).publish_state(sgReadyBoostState4);
+        id(SG_READY_CURRENT_STATE).publish_state(
+          currentSgReadyState == 0 ? "Deaktiviert" :
+          currentSgReadyState == 1 ? "1 - EVU Sperre" :
+          currentSgReadyState == 2 ? "2 - Normal" :
+          currentSgReadyState == 3 ? "3 - Empfohlen" :
+          currentSgReadyState == 4 ? "4 - Zwang" : "Unbekannt"
+        );
         ESP_LOGI("MQTT_CONN", "Initial SG Ready states published");
   on_disconnect:
     - logger.log:
@@ -209,6 +222,8 @@ mqtt:
                 char valueStr[16];
                 snprintf(valueStr, sizeof(valueStr), "%.1f", boost);
                 id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
+                // Update sensor
+                id(sg_ready_boost_state3_sensor).publish_state(boost);
             } else {
                 ESP_LOGW("MQTT_CMD", "Invalid boost value: %s", x.c_str());
             }
@@ -232,6 +247,8 @@ mqtt:
                 char valueStr[16];
                 snprintf(valueStr, sizeof(valueStr), "%.1f", boost);
                 id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
+                // Update sensor
+                id(sg_ready_boost_state4_sensor).publish_state(boost);
             } else {
                 ESP_LOGW("MQTT_CMD", "Invalid boost value: %s", x.c_str());
             }
@@ -290,6 +307,26 @@ text_sensor:
   #   BERECHNETE TEXT SENSORS             #
   #                                       #
   #########################################
+  - platform: template
+    name: "SG Ready Aktueller Zustand"
+    id: SG_READY_CURRENT_STATE
+    icon: "mdi:solar-power"
+    update_interval: 5s
+    lambda: |-
+      if (currentSgReadyState == 0) {
+        return std::string("Deaktiviert");
+      } else if (currentSgReadyState == 1) {
+        return std::string("1 - EVU Sperre");
+      } else if (currentSgReadyState == 2) {
+        return std::string("2 - Normal");
+      } else if (currentSgReadyState == 3) {
+        return std::string("3 - Empfohlen");
+      } else if (currentSgReadyState == 4) {
+        return std::string("4 - Zwang");
+      } else {
+        return std::string("Unbekannt");
+      }
+
   - platform: template
     name: "DATUM"
     id: DATUM
@@ -361,7 +398,38 @@ wifi:
 
 captive_portal:
 
+#########################################
+#                                       #
+#   SENSOR                              #
+#                                       #
+#########################################
 sensor:
+  # SG Ready boost temperature sensors
+  - platform: template
+    name: "SG Ready Boost State 3"
+    id: sg_ready_boost_state3_sensor
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    icon: "mdi:thermometer-plus"
+    update_interval: 30s
+    lambda: |-
+      return sgReadyBoostState3;
+
+  - platform: template
+    name: "SG Ready Boost State 4"
+    id: sg_ready_boost_state4_sensor
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    icon: "mdi:thermometer-plus"
+    update_interval: 30s
+    lambda: |-
+      return sgReadyBoostState4;
+
+  # WiFi and system sensors
   - platform: wifi_signal
     name: "WiFi Signal dBm"
     icon: "mdi:wifi"
