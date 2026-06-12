@@ -1332,8 +1332,8 @@ public:
 
     void writeCanSignal(const char* signalName, const char* value) override {
         writeSignal(&CanMembers[cm_manager], signalName, value);
-        readSignal(&CanMembers[cm_manager], signalName);
         delay(100);
+        readSignal(&CanMembers[cm_manager], signalName);
     }
 
     void publishMqtt(const char* topic, const char* value) override {
