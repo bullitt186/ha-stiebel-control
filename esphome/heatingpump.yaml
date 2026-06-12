@@ -13,6 +13,7 @@
 substitutions:
   device_name: heatingpump
   friendly_name: "Stiebel Eltron Wärmepumpe"
+  device_model: "wpl13e"          # used in HA device identifier (stiebel_eltron_<model>)
   # CAN pins for ESP32-S3 built-in TWAI controller
   can_tx_pin: GPIO15  # TXD2 on Waveshare board
   can_rx_pin: GPIO16  # RXD2 on Waveshare board
@@ -31,6 +32,7 @@ packages:
 # substitutions:
 #   device_name: heatingpump
 #   friendly_name: "Stiebel Eltron Wärmepumpe"
+#   device_model: "wpl13e"
 #   # SPI pins for MCP2515 CAN controller
 #   can_clk_pin: GPIO18
 #   can_mosi_pin: GPIO23

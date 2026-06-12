@@ -1,0 +1,14 @@
+#
+#  WPF10 / WPF10M Heat Pump — Model Package (Ground-Source)
+#
+#  Community-contributed model based on PR #13 and issue #20.
+#  Signals may need adjustment for your specific installation.
+#
+#  Usage in heatingpump.yaml:
+#
+#    substitutions:
+#      device_model: "wpf10"
+#      device_model_flag: "WPF10"
+#    packages:
+#      sensors: !include ha-stiebel-control/wpf10.yaml
+#

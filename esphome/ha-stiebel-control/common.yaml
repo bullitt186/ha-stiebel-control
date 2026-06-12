@@ -19,6 +19,9 @@
 esphome:
   name: heatingpump
   friendly_name: "Heating Pump CAN Interface"
+  project:
+    name: "bullitt186.ha-stiebel-control"
+    version: "2.0.0"
   on_boot:
     priority: 600
     then:
@@ -34,10 +37,14 @@ esphome:
     - ha-stiebel-control/elster/NTypes.h
     - ha-stiebel-control/config.h
     - ha-stiebel-control/ha-stiebel-control.h
-    - ha-stiebel-control/signal_requests_wpl13e.h
+    - ha-stiebel-control/signal_requests_base.h
+    # model-specific signal_requests_*.h is declared by each model yaml package
+  platformio_options:
+    build_flags:
+      - "-DHA_DEVICE_MODEL='\"${device_model}\"'"
 
 
-  
+
 
 
 #########################################
@@ -465,3 +472,138 @@ sensor:
       if (dBm < MIN_DBM) dBm = MIN_DBM;
       if (dBm > MAX_DBM) dBm = MAX_DBM;
       return ((dBm - MIN_DBM) / (MAX_DBM - MIN_DBM)) * 100;
+
+  # -----------------------------------------------------------------------
+  # COP energy accumulator sensors (universal — present on all Elster models)
+  # -----------------------------------------------------------------------
+  - platform: template
+    name: "EL_AUFNAHMELEISTUNG_HEIZ_SUM"
+    id: EL_AUFNAHMELEISTUNG_HEIZ_SUM
+    internal: true
+    unit_of_measurement: MWh
+    device_class: energy
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  - platform: template
+    name: "EL_AUFNAHMELEISTUNG_WW_SUM"
+    id: EL_AUFNAHMELEISTUNG_WW_SUM
+    internal: true
+    unit_of_measurement: MWh
+    device_class: energy
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  - platform: template
+    name: "WAERMEERTRAG_2WE_HEIZ_SUM"
+    id: WAERMEERTRAG_2WE_HEIZ_SUM
+    internal: true
+    unit_of_measurement: MWh
+    device_class: energy
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  - platform: template
+    name: "WAERMEERTRAG_2WE_WW_SUM"
+    id: WAERMEERTRAG_2WE_WW_SUM
+    internal: true
+    unit_of_measurement: MWh
+    device_class: energy
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  - platform: template
+    name: "WAERMEERTRAG_HEIZ_SUM"
+    id: WAERMEERTRAG_HEIZ_SUM
+    internal: true
+    unit_of_measurement: MWh
+    device_class: energy
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  - platform: template
+    name: "WAERMEERTRAG_WW_SUM"
+    id: WAERMEERTRAG_WW_SUM
+    internal: true
+    unit_of_measurement: MWh
+    device_class: energy
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  # DHW and heating temperature sensors
+  - platform: template
+    name: "EINSTELL_SPEICHERSOLLTEMP"
+    id: EINSTELL_SPEICHERSOLLTEMP
+    internal: true
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+
+  - platform: template
+    name: "EINSTELL_SPEICHERSOLLTEMP2"
+    id: EINSTELL_SPEICHERSOLLTEMP2
+    internal: true
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+
+  - platform: template
+    name: "SPEICHERISTTEMP"
+    id: SPEICHERISTTEMP
+    internal: true
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    filters:
+      - offset: 3.9
+
+  - platform: template
+    name: "SPEICHERSOLLTEMP"
+    id: SPEICHERSOLLTEMP
+    internal: true
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+
+  # COP output sensors
+  - platform: template
+    name: "COP_WW"
+    id: COP_WW
+    internal: true
+    device_class: "power_factor"
+    accuracy_decimals: 2
+
+  - platform: template
+    name: "COP_HEIZ"
+    id: COP_HEIZ
+    internal: true
+    device_class: "power_factor"
+    accuracy_decimals: 2
+
+  - platform: template
+    name: "COP_GESAMT"
+    id: COP_GESAMT
+    internal: true
+    device_class: "power_factor"
+    accuracy_decimals: 2
+
+  # Operating mode and season sensors — used to trigger CAN reads
+  - platform: template
+    name: "PROGRAMMSCHALTER"
+    id: PROGRAMMSCHALTER
+    internal: true
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
+      return {};
+
+  - platform: template
+    name: "SOMMERBETRIEB"
+    id: SOMMERBETRIEB
+    internal: true
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "SOMMERBETRIEB");
+      return {};
+
+  - platform: template
+    name: "WW_ECO"
+    id: WW_ECO
+    internal: true
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "WW_ECO");
+      return {};

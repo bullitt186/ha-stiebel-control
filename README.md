@@ -117,7 +117,129 @@ This project supports two hardware configurations:
 
 ## Installation
 
-### 1. Copy Project Files
+### Path A — Git clone (recommended for contributors and power users)
+
+**1. Clone the repository**
+
+```bash
+git clone https://github.com/bullitt186/ha-stiebel-control.git
+cd ha-stiebel-control
+```
+
+**2. Configure your secrets**
+
+Copy the example secrets file and fill in your credentials:
+
+```bash
+cp esphome/secrets.yaml.example esphome/secrets.yaml
+# Edit esphome/secrets.yaml with your WiFi, MQTT, and OTA credentials
+```
+
+**3. Configure your board and heat pump model**
+
+Edit `esphome/heatingpump.yaml` and set your substitutions:
+
+```yaml
+substitutions:
+  device_name: heatingpump
+  friendly_name: "Stiebel Eltron Wärmepumpe"
+  device_model: "wpl13e"   # your heat pump model — see Supported Models below
+  can_tx_pin: GPIO15        # adjust for your board
+  can_rx_pin: GPIO16
+  can_id_pc: "0x680"
+
+packages:
+  board:   !include ha-stiebel-control/board_esp32s3.yaml   # or board_esp32s2.yaml
+  can:     !include ha-stiebel-control/can_esp32.yaml        # or can_mcp2515.yaml
+  base:    !include ha-stiebel-control/common.yaml
+  sensors: !include ha-stiebel-control/wpl13e.yaml           # your model yaml
+```
+
+For ESP32-S2 / MCP2515, uncomment the alternative block at the bottom of `heatingpump.yaml`.
+
+**4. Compile and flash**
+
+```bash
+make compile          # verify both board variants compile
+make upload           # compile + OTA flash (device must be on the network)
+```
+
+Or use the ESPHome dashboard in Home Assistant.
+
+---
+
+### Path B — Remote packages (no git clone needed)
+
+Create a minimal `heatingpump.yaml` in your ESPHome config folder referencing this repo
+at a pinned release tag:
+
+```yaml
+substitutions:
+  device_name: heatingpump
+  friendly_name: "Stiebel Eltron Wärmepumpe"
+  device_model: "wpl13e"
+  can_tx_pin: GPIO15
+  can_rx_pin: GPIO16
+  can_id_pc: "0x680"
+
+packages:
+  board:   github://bullitt186/ha-stiebel-control/esphome/ha-stiebel-control/board_esp32s3.yaml@v2.0.0
+  can:     github://bullitt186/ha-stiebel-control/esphome/ha-stiebel-control/can_esp32.yaml@v2.0.0
+  base:    github://bullitt186/ha-stiebel-control/esphome/ha-stiebel-control/common.yaml@v2.0.0
+  sensors: github://bullitt186/ha-stiebel-control/esphome/ha-stiebel-control/wpl13e.yaml@v2.0.0
+```
+
+ESPHome downloads and caches the files automatically. To upgrade, change `@v2.0.0` to the new tag.
+
+Create a local `secrets.yaml` in your ESPHome folder with your credentials (see `esphome/secrets.yaml.example`).
+
+---
+
+### Home Assistant Integration
+
+Copy `packages/ha_stiebel_control.yaml` to your HA `/config/packages/` folder and enable packages:
+
+```yaml
+# /config/configuration.yaml
+homeassistant:
+  packages: !include_dir_named packages
+```
+
+Restart Home Assistant. Entities appear automatically via MQTT discovery.
+
+---
+
+## Updating
+
+### Git clone users
+
+```bash
+git pull
+make check    # verify both board variants compile with the new code
+make upload   # OTA flash to your device
+```
+
+Your `esphome/secrets.yaml` and any local customisations to `heatingpump.yaml` are
+**not tracked by git** and will not be overwritten.
+
+### Remote package users
+
+Change the `@vX.Y.Z` tag in your local `heatingpump.yaml` to the new release version and recompile.
+
+---
+
+## Supported Models
+
+| Model file | Heat pump | Status |
+|------------|-----------|--------|
+| `wpl13e.yaml` | WPL 13 E (air-source, 3 circuits) | ✅ Verified |
+| `wpf10.yaml` | WPF 10 / WPF 10M (ground-source) | ⚠️ Community testing — signals may need adjustment |
+
+To add a new model, see [Contributing a new heat pump model](#contributing-a-new-heat-pump-model) below.
+
+---
+
+### Old installation method
 
 Copy the `esphome/` folder contents to your ESPHome config directory:
 
@@ -478,14 +600,82 @@ mosquitto_pub -h BROKER -u USER -P PASS -t "heatingpump/command/programmschalter
 
 ## Contributing
 
-Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
+Pull requests are welcome! For major changes, please open an issue first.
 
-Areas for contribution:
-- Support for additional heat pump models
+### Contributing a new heat pump model
+
+Adding support for a new heat pump model requires two files:
+
+**1. Signal request table** — `esphome/ha-stiebel-control/signal_requests_yourmodel.h`
+
+```cpp
+#ifndef SIGNAL_REQUESTS_YOURMODEL_H
+#define SIGNAL_REQUESTS_YOURMODEL_H
+
+#include "config.h"
+#include "signal_requests_base.h"   // universal signals (date, EVU, COP counters)
+
+const SignalRequest signalRequests[] = {
+    SIGNAL_REQUESTS_BASE   // always include this first
+
+    // Add your model-specific signals here.
+    // Format: {"SIGNAL_NAME", FREQUENCY, CAN_MEMBER}
+    // Find signal names in esphome/ha-stiebel-control/elster/ElsterTable.h
+    // Use cm_other if you're unsure which CAN member responds.
+    {"AUSSENTEMP",           FREQ_30S,   cm_other},   // cm_other queries all members
+    {"SPEICHERISTTEMP",      FREQ_30S,   cm_kessel},
+    {"RUECKLAUFISTTEMP",     FREQ_30S,   cm_manager},
+    // ...
+};
+
+const size_t SIGNAL_REQUEST_COUNT_VALUE = sizeof(signalRequests) / sizeof(SignalRequest);
+
+#endif
+```
+
+**2. Model YAML package** — `esphome/ha-stiebel-control/yourmodel.yaml`
+
+```yaml
+esphome:
+  includes:
+    - ha-stiebel-control/signal_requests_yourmodel.h
+# Add sensors here only if they are truly unique to your model.
+# Generic sensors (COP, DHW, operating mode) are already in common.yaml.
+```
+
+**3. Use in `heatingpump.yaml`**
+
+```yaml
+substitutions:
+  device_model: "yourmodel"
+packages:
+  sensors: !include ha-stiebel-control/yourmodel.yaml
+```
+
+**4. Test and submit**
+
+```bash
+make config    # YAML must parse cleanly
+make compile   # must compile without errors
+```
+
+Submit a PR with:
+- Your `signal_requests_yourmodel.h` and `yourmodel.yaml`
+- ESPHome logs showing signals responding from your heat pump
+- A note marking any signals as "unverified" if you couldn't confirm them
+
+**Tips for finding signals:**
+- Search `ElsterTable.h` by German name (e.g. "AUSSEN" for outside temperature)
+- Use `cm_other` first — it queries all three CAN members (KESSEL, MANAGER, HEIZMODUL);
+  the responding one will appear automatically in HA
+- Signals that don't respond are silently ignored — no harm done
+
+### Other contributions
+
 - Dashboard examples
 - Energy monitoring integrations
 - Documentation improvements
-- Signal metadata enhancements
+- Signal metadata enhancements (friendly names, units, device classes in `ElsterTable.h`)
 
 ## Credits
 

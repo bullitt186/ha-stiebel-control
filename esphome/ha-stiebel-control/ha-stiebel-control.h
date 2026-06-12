@@ -282,8 +282,12 @@ typedef struct {
     CanMemberType member;        // Use cm_other for "all members"
 } SignalRequest;
 
-// Include device-specific signal request table (must come AFTER SignalRequest is defined)
-#include "signal_requests_wpl13e.h"
+// Forward declarations for the model-specific signal request table.
+// The actual definition comes from signal_requests_*.h, included by the
+// model's YAML package (e.g. wpl13e.yaml via esphome: includes:).
+extern const SignalRequest signalRequests[];
+extern const size_t SIGNAL_REQUEST_COUNT_VALUE;
+#define SIGNAL_REQUEST_COUNT SIGNAL_REQUEST_COUNT_VALUE
 
 // Runtime state for signal request manager
 static bool requestManagerStarted = false;
@@ -1069,7 +1073,7 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
     
     // Device info - create individual device per CAN member as sub-device
     // Main device ID for the heat pump
-    const char* mainDeviceId = "stiebel_eltron_wpl13e";
+    const char* mainDeviceId = "stiebel_eltron_" HA_DEVICE_MODEL;
     
     // Create unique device ID for this CAN member
     char canMemberDeviceId[64];
