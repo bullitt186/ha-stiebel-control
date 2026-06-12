@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile-s3:
+    name: Compile ESP32-S3
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ESPHome
+        run: pip install esphome==2026.5.3
+
+      - name: Use CI secrets
+        run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
+
+      - name: Compile (ESP32-S3)
+        run: esphome compile esphome/ci_heatingpump_s3.yaml
+
+  compile-s2:
+    name: Compile ESP32-S2
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ESPHome
+        run: pip install esphome==2026.5.3
+
+      - name: Use CI secrets
+        run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
+
+      - name: Compile (ESP32-S2)
+        run: esphome compile esphome/ci_heatingpump_s2.yaml
+
+  validate-yaml:
+    name: Validate YAML
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Validate YAML files
+        run: |
+          yamllint -d '{extends: relaxed, rules: {line-length: {max: 120}}}' \
+            esphome/ha-stiebel-control/*.yaml \
+            packages/*.yaml

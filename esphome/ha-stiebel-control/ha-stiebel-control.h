@@ -162,11 +162,15 @@ static const WritableNumberConfig writableNumbers[] = {
      cm_manager, 20.0, 60.0, 1.0, "°C", "mdi:thermometer-low", "temperature"},
     
     // SG Ready boost temperatures (not real CAN signals, handled internally)
-    {"SG_READY_BOOST_STATE3", "SG Ready Boost Zustand 3", 
+    {"SG_READY_BOOST_STATE3", "SG Ready Boost Zustand 3",
      cm_manager, 0.0, 10.0, 0.5, "°C", "mdi:thermometer-plus", "temperature"},
-    
-    {"SG_READY_BOOST_STATE4", "SG Ready Boost Zustand 4", 
-     cm_manager, 0.0, 15.0, 0.5, "°C", "mdi:thermometer-chevron-up", "temperature"}
+
+    {"SG_READY_BOOST_STATE4", "SG Ready Boost Zustand 4",
+     cm_manager, 0.0, 15.0, 0.5, "°C", "mdi:thermometer-chevron-up", "temperature"},
+
+    // Room temperature setpoint for heating circuit 1 (writable for SG-Ready heating boost)
+    {"RAUMSOLLTEMP_I", "Raum Soll Temperatur I Einstellung",
+     cm_manager, 10.0, 30.0, 0.5, "°C", "mdi:home-thermometer", "temperature"}
 };
 
 static const size_t WRITABLE_NUMBER_COUNT = sizeof(writableNumbers) / sizeof(WritableNumberConfig);
@@ -224,7 +228,8 @@ static int currentSgReadyState = 2; // Default to normal operation (state 2)
 static bool sgReadyActive = false;  // Track if SG Ready is currently controlling the heat pump
 static float sgReadyBoostState3 = 5.0; // Default boost for state 3 in °C
 static float sgReadyBoostState4 = 8.0; // Default boost for state 4 in °C
-static float originalDhwTemp = 0.0; // Store original DHW temperature before boost
+static float originalDhwTemp = 0.0;  // Store original DHW temperature before boost
+static float originalRoomTemp = 0.0; // Store original room temperature before heating boost
 
 // Track which signals have been discovered
 static std::set<std::string> discoveredSignals;
@@ -1319,6 +1324,46 @@ void updateCOPCalculations() {
 // Users can filter these in HA automations/dashboards if needed
 
 // ============================================================================
+// NVS PERSISTENCE FOR BOOST STATE
+// ============================================================================
+
+static ESPPreferenceObject nvsPrefDhwTemp;
+static ESPPreferenceObject nvsPrefRoomTemp;
+static ESPPreferenceObject nvsPrefSgReadyActive;
+
+void initBoostStatePrefs() {
+    nvsPrefDhwTemp       = global_preferences->make_preference<float>(0xB007BA5E, true);
+    nvsPrefRoomTemp      = global_preferences->make_preference<float>(0xB007BA5F, true);
+    nvsPrefSgReadyActive = global_preferences->make_preference<bool> (0xB007BA60, true);
+    ESP_LOGI("NVS", "Boost state preferences initialized");
+}
+
+void saveBoostState() {
+    nvsPrefDhwTemp.save(&originalDhwTemp);
+    nvsPrefRoomTemp.save(&originalRoomTemp);
+    nvsPrefSgReadyActive.save(&sgReadyActive);
+    ESP_LOGD("NVS", "Saved boost state: DHW=%.1f°C, Room=%.1f°C, active=%d",
+             originalDhwTemp, originalRoomTemp, (int)sgReadyActive);
+}
+
+void loadBoostState() {
+    float dhwTemp = 0.0f, roomTemp = 0.0f;
+    bool active = false;
+    nvsPrefDhwTemp.load(&dhwTemp);
+    nvsPrefRoomTemp.load(&roomTemp);
+    bool activeLoaded = nvsPrefSgReadyActive.load(&active);
+
+    if (activeLoaded && active) {
+        originalDhwTemp  = (dhwTemp  > 0.0f) ? dhwTemp  : 48.0f;
+        originalRoomTemp = (roomTemp > 0.0f) ? roomTemp : 20.0f;
+        sgReadyActive = true;
+        ESP_LOGI("NVS", "Restored boost state: DHW=%.1f°C, Room=%.1f°C", originalDhwTemp, originalRoomTemp);
+    } else {
+        ESP_LOGI("NVS", "No active boost state in NVS");
+    }
+}
+
+// ============================================================================
 // SG READY CONTROL LOGIC
 // ============================================================================
 
@@ -1336,7 +1381,7 @@ void applySgReadyState(int state) {
     switch (state) {
         case 1: // EVU Sperre - minimize consumption
             ESP_LOGI("SG_READY", "State 1: EVU Lock - Setting to Bereitschaft (standby)");
-            // Restore original temperature if we had boosted it
+            // Restore original DHW temperature if we had boosted it
             if (sgReadyActive && originalDhwTemp > 0) {
                 char tempStr[16];
                 snprintf(tempStr, sizeof(tempStr), "%.1f", originalDhwTemp);
@@ -1345,7 +1390,17 @@ void applySgReadyState(int state) {
                 ESP_LOGI("SG_READY", "Restored DHW temperature to %.1f°C", originalDhwTemp);
                 originalDhwTemp = 0.0;
             }
+            // Restore original room temperature if we had boosted it
+            if (sgReadyActive && originalRoomTemp > 0) {
+                char roomTempStr[16];
+                snprintf(roomTempStr, sizeof(roomTempStr), "%.1f", originalRoomTemp);
+                writeSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I", roomTempStr);
+                readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I");
+                ESP_LOGI("SG_READY", "Restored room temperature to %.1f°C", originalRoomTemp);
+                originalRoomTemp = 0.0;
+            }
             sgReadyActive = true;
+            saveBoostState();
             // Set to standby mode - heat pump only runs if necessary
             writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", "Bereitschaft");
             delay(100); // Give heat pump time to process
@@ -1355,7 +1410,7 @@ void applySgReadyState(int state) {
         case 2: // Normal operation - restore original settings
             ESP_LOGI("SG_READY", "State 2: Normal operation - Restoring to Automatik");
             if (sgReadyActive) {
-                // Restore original temperature if we had boosted it
+                // Restore original DHW temperature if we had boosted it
                 if (originalDhwTemp > 0) {
                     char tempStr[16];
                     snprintf(tempStr, sizeof(tempStr), "%.1f", originalDhwTemp);
@@ -1364,74 +1419,114 @@ void applySgReadyState(int state) {
                     ESP_LOGI("SG_READY", "Restored DHW temperature to %.1f°C", originalDhwTemp);
                     originalDhwTemp = 0.0;
                 }
+                // Restore original room temperature if we had boosted it
+                if (originalRoomTemp > 0) {
+                    char roomTempStr[16];
+                    snprintf(roomTempStr, sizeof(roomTempStr), "%.1f", originalRoomTemp);
+                    writeSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I", roomTempStr);
+                    readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I");
+                    ESP_LOGI("SG_READY", "Restored room temperature to %.1f°C", originalRoomTemp);
+                    originalRoomTemp = 0.0;
+                }
                 // Restore to Tagbetrieb mode
                 writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", "Tagbetrieb");
                 delay(100); // Give heat pump time to process
                 readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
                 sgReadyActive = false;
+                saveBoostState();
             }
             break;
-            
+
         case 3: { // Recommended - use surplus energy via comfort mode + boost
-            ESP_LOGI("SG_READY", "State 3: Recommended - Tagbetrieb + %.1f°C boost", sgReadyBoostState3);
-            
+            ESP_LOGI("SG_READY", "State 3: Recommended - Tagbetrieb + %.1f°C DHW boost + 1.0°C room boost", sgReadyBoostState3);
+
             // Store original DHW temperature (only first time entering SG Ready mode)
             if (!sgReadyActive || originalDhwTemp == 0.0) {
-                // Use default of 48°C if we haven't read it yet (typical DHW setpoint)
-                originalDhwTemp = 48.0;
+                originalDhwTemp = 48.0; // Default DHW setpoint
                 ESP_LOGI("SG_READY", "Stored original DHW temperature: %.1f°C (default)", originalDhwTemp);
             }
+            // Store original room temperature (only first time)
+            if (!sgReadyActive || originalRoomTemp == 0.0) {
+                originalRoomTemp = 20.0; // Default room setpoint
+                ESP_LOGI("SG_READY", "Stored original room temperature: %.1f°C (default)", originalRoomTemp);
+            }
             sgReadyActive = true;
-            
+            saveBoostState();
+
             // Switch to comfort/day mode (continuous heating without schedule)
             writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", "Tagbetrieb");
-            delay(100); // Give heat pump time to process
+            delay(100);
             readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
-            
-            // Apply temperature boost if configured
+
+            // Apply DHW temperature boost
             if (sgReadyBoostState3 > 0.1) {
                 float boostedTemp = originalDhwTemp + sgReadyBoostState3;
-                // Clamp to safe range (max 60°C for DHW)
                 if (boostedTemp > 60.0) boostedTemp = 60.0;
-                
                 char tempStr[16];
                 snprintf(tempStr, sizeof(tempStr), "%.1f", boostedTemp);
                 writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP", tempStr);
                 readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP");
-                ESP_LOGI("SG_READY", "Applied temperature boost: %.1f°C + %.1f°C = %.1f°C", 
+                ESP_LOGI("SG_READY", "Applied DHW boost: %.1f + %.1f = %.1f°C",
                         originalDhwTemp, sgReadyBoostState3, boostedTemp);
+            }
+
+            // Apply heating circuit boost (+1°C for moderate surplus)
+            {
+                float boostedRoomTemp = originalRoomTemp + 1.0f;
+                if (boostedRoomTemp > 25.0f) boostedRoomTemp = 25.0f;
+                char roomTempStr[16];
+                snprintf(roomTempStr, sizeof(roomTempStr), "%.1f", boostedRoomTemp);
+                writeSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I", roomTempStr);
+                readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I");
+                ESP_LOGI("SG_READY", "Applied room boost: %.1f + 1.0 = %.1f°C",
+                        originalRoomTemp, boostedRoomTemp);
             }
             break;
         }
             
         case 4: { // Forced operation - maximum comfort + maximum boost
-            ESP_LOGI("SG_READY", "State 4: Forced operation - Tagbetrieb + %.1f°C boost", sgReadyBoostState4);
-            
+            ESP_LOGI("SG_READY", "State 4: Forced operation - Tagbetrieb + %.1f°C DHW boost + 2.0°C room boost", sgReadyBoostState4);
+
             // Store original DHW temperature (only first time entering SG Ready mode)
             if (!sgReadyActive || originalDhwTemp == 0.0) {
-                // Use default of 48°C if we haven't read it yet (typical DHW setpoint)
-                originalDhwTemp = 48.0;
+                originalDhwTemp = 48.0; // Default DHW setpoint
                 ESP_LOGI("SG_READY", "Stored original DHW temperature: %.1f°C (default)", originalDhwTemp);
             }
+            // Store original room temperature (only first time)
+            if (!sgReadyActive || originalRoomTemp == 0.0) {
+                originalRoomTemp = 20.0; // Default room setpoint
+                ESP_LOGI("SG_READY", "Stored original room temperature: %.1f°C (default)", originalRoomTemp);
+            }
             sgReadyActive = true;
-            
+            saveBoostState();
+
             // Switch to comfort/day mode for maximum energy usage
             writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", "Tagbetrieb");
-            delay(100); // Give heat pump time to process
+            delay(100);
             readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
-            
-            // Apply maximum temperature boost if configured
+
+            // Apply maximum DHW temperature boost if configured
             if (sgReadyBoostState4 > 0.1) {
                 float boostedTemp = originalDhwTemp + sgReadyBoostState4;
-                // Clamp to safe range (max 60°C for DHW)
                 if (boostedTemp > 60.0) boostedTemp = 60.0;
-                
                 char tempStr[16];
                 snprintf(tempStr, sizeof(tempStr), "%.1f", boostedTemp);
                 writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP", tempStr);
                 readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP");
-                ESP_LOGI("SG_READY", "Applied temperature boost: %.1f°C + %.1f°C = %.1f°C", 
+                ESP_LOGI("SG_READY", "Applied DHW boost: %.1f + %.1f = %.1f°C",
                         originalDhwTemp, sgReadyBoostState4, boostedTemp);
+            }
+
+            // Apply heating circuit boost (+2°C for maximum surplus)
+            {
+                float boostedRoomTemp = originalRoomTemp + 2.0f;
+                if (boostedRoomTemp > 25.0f) boostedRoomTemp = 25.0f;
+                char roomTempStr[16];
+                snprintf(roomTempStr, sizeof(roomTempStr), "%.1f", boostedRoomTemp);
+                writeSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I", roomTempStr);
+                readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I");
+                ESP_LOGI("SG_READY", "Applied room boost: %.1f + 2.0 = %.1f°C",
+                        originalRoomTemp, boostedRoomTemp);
             }
             break;
         }

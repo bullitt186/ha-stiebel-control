@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(esphome compile *)",
+      "Bash(esphome logs *)",
+      "Bash(esphome run *)",
+      "Bash(esphome config *)",
+      "Bash(esphome version)",
+      "Bash(make *)",
+      "Bash(git log *)",
+      "Bash(git diff *)",
+      "Bash(git status)"
+    ]
+  }
+}

@@ -1,0 +1,77 @@
+name: Bug Report
+description: Report a problem with ha-stiebel-control
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill out as much detail as possible.
+
+  - type: dropdown
+    id: board
+    attributes:
+      label: Hardware / Board
+      options:
+        - ESP32-S3 with built-in TWAI CAN (Waveshare)
+        - ESP32-S2 with MCP2515 SPI CAN (legacy)
+        - Other (describe below)
+    validations:
+      required: true
+
+  - type: input
+    id: heat_pump_model
+    attributes:
+      label: Heat Pump Model
+      placeholder: "e.g. WPL 13 E, WPL 25 AC, WPMW II"
+    validations:
+      required: true
+
+  - type: input
+    id: esphome_version
+    attributes:
+      label: ESPHome Version
+      placeholder: "e.g. 2026.5.3  (run: esphome version)"
+    validations:
+      required: true
+
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant Version
+      placeholder: "e.g. 2026.5.0"
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the Bug
+      description: A clear description of what is wrong.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: ESPHome Logs
+      description: Paste relevant log output (run `esphome logs heatingpump.yaml`). Remove any sensitive credentials.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant Config Snippet
+      description: Paste the relevant section of your `heatingpump.yaml` or sensor definition, if applicable.
+      render: yaml
+    validations:
+      required: false

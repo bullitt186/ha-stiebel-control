@@ -1,0 +1,16 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.pxd$
+      - id: end-of-file-fixer
+        exclude: \.pxd$
+      - id: check-yaml
+        exclude: ^packages/  # HA package YAML uses custom tags
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+      - id: check-added-large-files
+        args: ['--maxkb=2048']
+        # Prevents accidentally committing compiled .bin firmware files

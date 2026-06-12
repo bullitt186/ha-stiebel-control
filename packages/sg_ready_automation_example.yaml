@@ -10,11 +10,15 @@
 # - ESPHome heat pump controller with SG Ready support is running
 # - MQTT integration is configured
 #
-# The automation will automatically control the heat pump based on PV surplus:
-# - State 1: Grid lock - heat pump in standby
-# - State 2: Normal operation - automatic mode
-# - State 3: Surplus available - DHW boost (can add temperature increase)
-# - State 4: High surplus - maximum DHW heating (can set max temperature)
+# The ESPHome controller automatically handles:
+# - State 1: EVU Lock → Bereitschaft mode + restore normal DHW temp
+# - State 2: Normal → Automatik mode + restore normal DHW temp
+# - State 3: Recommended → Tagbetrieb mode + DHW boost (configurable via number.manager_sg_ready_boost_state3, default +3.0°C)
+# - State 4: Forced → Tagbetrieb mode + DHW boost (configurable via number.manager_sg_ready_boost_state4, default +5.0°C)
+#
+# Temperature boost is handled internally - no separate automations needed!
+# Adjust boost amounts via: number.manager_sg_ready_boost_state3 (0-10°C)
+#                           number.manager_sg_ready_boost_state4 (0-15°C)
 # ============================================================================
 
 automation:
@@ -59,121 +63,82 @@ automation:
           message: >
             SG Ready: E3DC state {{ states('sensor.s10x_sg_ready_numeric') }}
             → Heat pump {{ states('select.manager_sg_ready_zustand') }}
+            (Temperature boost handled automatically by ESPHome)
           level: info
 
   # ============================================================================
-  # Optional: Temperature Boost for State 3 (Recommended)
+  # Optional: Adjust Temperature Boost Amounts
   # ============================================================================
-  # When in State 3, increase DHW setpoint by 3°C to store surplus energy
-  # Uncomment and adjust to your needs
+  # You can configure the boost amounts for states 3 and 4 via number entities.
+  # These are configured once and persist until changed.
   # ============================================================================
   
-  # - id: sg_ready_state3_dhw_boost
-  #   alias: "Wärmepumpe: SG Ready State 3 - DHW Boost +3°C"
-  #   description: "Erhöht Warmwasser-Solltemperatur bei PV-Überschuss"
-  #   mode: single
-  #   
+  # Example: Set custom boost for State 3 (0-10°C range, 0.5°C steps)
+  # - id: sg_ready_configure_state3_boost
+  #   alias: "Wärmepumpe: SG Ready State 3 Boost konfigurieren"
   #   trigger:
-  #     - platform: state
-  #       entity_id: select.manager_sg_ready_zustand
-  #       to: "3 - Empfohlen"
-  #   
-  #   variables:
-  #     # Your normal DHW comfort temperature
-  #     normal_temp: 50
-  #     # Boost amount in °C
-  #     boost: 3
-  #   
+  #     - platform: homeassistant
+  #       event: start
   #   action:
-  #     # Set boosted temperature
-  #     - service: mqtt.publish
+  #     - service: number.set_value
+  #       target:
+  #         entity_id: number.manager_sg_ready_boost_state3
   #       data:
-  #         topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP/set
-  #         payload: "{{ normal_temp + boost }}"
-  #     
-  #     - service: system_log.write
-  #       data:
-  #         message: "SG Ready State 3: Boosting DHW to {{ normal_temp + boost }}°C"
-  #         level: info
+  #         value: 3.5  # Your preferred boost in °C
 
-  # ============================================================================
-  # Optional: Restore Normal Temperature when leaving State 3
-  # ============================================================================
-  
-  # - id: sg_ready_state3_dhw_restore
-  #   alias: "Wärmepumpe: SG Ready State 3 verlassen - DHW Normal"
-  #   description: "Stellt normale Warmwasser-Solltemperatur wieder her"
-  #   mode: single
-  #   
+  # Example: Set custom boost for State 4 (0-15°C range, 0.5°C steps)
+  # - id: sg_ready_configure_state4_boost
+  #   alias: "Wärmepumpe: SG Ready State 4 Boost konfigurieren"
   #   trigger:
-  #     - platform: state
-  #       entity_id: select.manager_sg_ready_zustand
-  #       from: "3 - Empfohlen"
-  #   
-  #   variables:
-  #     normal_temp: 50
-  #   
+  #     - platform: homeassistant
+  #       event: start
   #   action:
-  #     - service: mqtt.publish
+  #     - service: number.set_value
+  #       target:
+  #         entity_id: number.manager_sg_ready_boost_state4
   #       data:
-  #         topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP/set
-  #         payload: "{{ normal_temp }}"
-  #     
-  #     - service: system_log.write
-  #       data:
-  #         message: "SG Ready: Restoring normal DHW temperature {{ normal_temp }}°C"
-  #         level: info
+  #         value: 7.0  # Your preferred boost in °C
 
-  # ============================================================================
-  # Optional: Maximum Temperature for State 4 (Forced)
-  # ============================================================================
-  
-  # - id: sg_ready_state4_dhw_max
-  #   alias: "Wärmepumpe: SG Ready State 4 - DHW Maximum"
-  #   description: "Setzt maximale Warmwasser-Temperatur bei hohem PV-Überschuss"
-  #   mode: single
-  #   
-  #   trigger:
-  #     - platform: state
-  #       entity_id: select.manager_sg_ready_zustand
-  #       to: "4 - Zwang"
-  #   
-  #   variables:
-  #     max_temp: 55  # Maximum safe DHW temperature
-  #   
-  #   action:
-  #     - service: mqtt.publish
-  #       data:
-  #         topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP/set
-  #         payload: "{{ max_temp }}"
-  #     
-  #     - service: system_log.write
-  #       data:
-  #         message: "SG Ready State 4: Setting maximum DHW temperature {{ max_temp }}°C"
-  #         level: info
 
-  # ============================================================================
-  # Optional: Restore from State 4
-  # ============================================================================
-  
-  # - id: sg_ready_state4_dhw_restore
-  #   alias: "Wärmepumpe: SG Ready State 4 verlassen - DHW Normal"
-  #   description: "Stellt normale Warmwasser-Solltemperatur wieder her"
-  #   mode: single
-  #   
-  #   trigger:
-  #     - platform: state
-  #       entity_id: select.manager_sg_ready_zustand
-  #       from: "4 - Zwang"
-  #   
-  #   variables:
-  #     normal_temp: 50
-  #   
-  #   action:
-  #     - service: mqtt.publish
-  #       data:
-  #         topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP/set
-  #         payload: "{{ normal_temp }}"
+# ============================================================================
+# Available Entities for SG Ready Control
+# ============================================================================
+# 
+# select.manager_sg_ready_zustand
+#   Options: "1 - EVU Sperre", "2 - Normal", "3 - Empfohlen", "4 - Zwang"
+#   Controls the SG Ready state which automatically manages:
+#   - Operating mode (PROGRAMMSCHALTER)
+#   - DHW temperature boost/restore
+#
+# sensor.heatingpump_sg_ready_aktueller_zustand (text sensor)
+#   Read-only sensor showing currently active SG Ready state
+#   Values: "Deaktiviert", "1 - EVU Sperre", "2 - Normal", "3 - Empfohlen", "4 - Zwang"
+#   Useful for automations and dashboard displays
+#
+# number.manager_sg_ready_boost_state3
+#   Range: 0-10°C, Step: 0.5°C, Default: 3.0°C
+#   Temperature boost applied when in State 3 (Recommended)
+#   Example: If normal DHW is 48°C and boost is 3.0°C → 51°C in State 3
+#
+# sensor.heatingpump_sg_ready_boost_state_3 (temperature sensor)
+#   Read-only sensor showing current boost setting for State 3
+#
+# number.manager_sg_ready_boost_state4
+#   Range: 0-15°C, Step: 0.5°C, Default: 5.0°C
+#   Temperature boost applied when in State 4 (Forced)
+#   Example: If normal DHW is 48°C and boost is 5.0°C → 53°C in State 4
+#
+# sensor.heatingpump_sg_ready_boost_state_4 (temperature sensor)
+#   Read-only sensor showing current boost setting for State 4
+#
+# sensor.manager_programmschalter
+#   Read-only sensor showing current operating mode
+#   Values: "Bereitschaft", "Automatik", "Tagbetrieb", "Absenkbetrieb", "Warmwasser"
+#
+# sensor.manager_einstell_speichersolltemp / number.manager_einstell_speichersolltemp
+#   Current DHW setpoint (read from sensor, write via number)
+#   ESPHome automatically adjusts this based on SG Ready state and boost settings
+# ============================================================================
 
 # ============================================================================
 # Input Helpers (optional - for manual testing)

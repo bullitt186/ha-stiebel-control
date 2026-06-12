@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Home Assistant Community Forum
+    url: https://community.home-assistant.io
+    about: Questions about Home Assistant integrations and automations
+  - name: ESPHome Documentation
+    url: https://esphome.io
+    about: ESPHome platform documentation

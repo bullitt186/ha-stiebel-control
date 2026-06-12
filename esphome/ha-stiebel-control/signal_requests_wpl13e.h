@@ -139,6 +139,19 @@ static const SignalRequest signalRequests[] = {
     // {"LZ_VERD_1_WW_BETRIEB", FREQ_10MIN, cm_manager},
     
     // ========================================================================
+    // PROBE SIGNALS - HEATING CURVE AND SETTINGS (10 MINUTE INTERVAL)
+    // These signals may or may not be supported by this specific heat pump.
+    // If the device responds, they will appear in MQTT and Home Assistant.
+    // ========================================================================
+    {"HEIZKURVE", FREQ_10MIN, cm_manager},
+    {"HEIZKURVE", FREQ_10MIN, cm_kessel},
+    {"WW_HYSTERSE", FREQ_10MIN, cm_manager},   // Note: typo in ElsterTable - "HYSTERSE" not "HYSTERESE"
+    {"WW_HYSTERSE", FREQ_10MIN, cm_kessel},
+    {"ANTILEGIONELLEN", FREQ_10MIN, cm_manager},
+    {"ANTILEGIONELLEN_ZEITPUNKT", FREQ_10MIN, cm_manager},
+    {"GEBAEUDEART", FREQ_10MIN, cm_manager},
+
+    // ========================================================================
     // DEVICE INFORMATION (60 MINUTE INTERVAL)
     // ========================================================================
    //  {"SOFTWARE_NUMMER", FREQ_60MIN, cm_other},

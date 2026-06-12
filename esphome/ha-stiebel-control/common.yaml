@@ -19,6 +19,12 @@
 esphome:
   name: heatingpump
   friendly_name: "Heating Pump CAN Interface"
+  on_boot:
+    priority: 600
+    then:
+      - lambda: |-
+          initBoostStatePrefs();
+          loadBoostState();
   includes:
     - ha-stiebel-control/elster/ElsterTable.h
     - ha-stiebel-control/elster/KElsterTable.h
@@ -252,6 +258,16 @@ mqtt:
             } else {
                 ESP_LOGW("MQTT_CMD", "Invalid boost value: %s", x.c_str());
             }
+
+    # Room temperature setpoint for heating circuit 1
+    - topic: heatingpump/MANAGER/RAUMSOLLTEMP_I/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received RAUMSOLLTEMP_I command: %s", x.c_str());
+            publishWritableNumberDiscovery(writableNumbers[4]);
+            const char* value = x.c_str();
+            writeSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I", value);
+            readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I");
 
 
 
