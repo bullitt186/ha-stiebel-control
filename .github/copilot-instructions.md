@@ -443,3 +443,15 @@ automatically.
 3. Commit: `git commit -m "release: vX.Y.Z"`
 4. Tag: `git tag vX.Y.Z && git push origin main --tags`
 5. CI runs compile + release pipeline and creates the GitHub Release
+
+### After OTA flash — mandatory
+
+After every `make upload` to the production device, always run:
+```bash
+make smoke-test
+```
+This verifies all required signals (common + model-specific) appear within 120s.
+Exit 0 = pass. Exit 1 = regression — investigate before declaring success.
+
+Model smoke files: `tests/models/_common_smoke.json` (all models) +
+`tests/models/<device_model>_smoke.json` (model-specific).

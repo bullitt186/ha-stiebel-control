@@ -412,7 +412,7 @@ button:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-  #use_address: waermepumpe.iot.stahmer.lan
+  use_address: 192.168.30.107  # production device IP for OTA
   fast_connect: true
   power_save_mode: none
   reboot_timeout: 5min

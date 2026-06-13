@@ -1,0 +1,22 @@
+{
+  "description": "Topics required on all Stiebel Eltron / Elster heat pump models. Loaded by every smoke test regardless of model.",
+  "required_topics": [
+    "heatingpump/status",
+    "heatingpump/calculated/date/state",
+    "heatingpump/calculated/time/state",
+    "heatingpump/calculated/betriebsart/state",
+    "heatingpump/calculated/compressor_active/state",
+    "heatingpump/calculated/cop_gesamt/state",
+    "heatingpump/calculated/cop_heiz/state",
+    "heatingpump/calculated/cop_ww/state",
+    "heatingpump/MANAGER/EVU_SPERRE_AKTIV/state",
+    "heatingpump/MANAGER/PROGRAMMSCHALTER/state",
+    "heatingpump/MANAGER/SG_READY_STATE/state",
+    "heatingpump/MANAGER/WW_ECO/state",
+    "heatingpump/HEIZMODUL/VERDICHTER/state",
+    "heatingpump/HEIZMODUL/EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH/state",
+    "heatingpump/HEIZMODUL/EL_AUFNAHMELEISTUNG_WW_SUM_MWH/state",
+    "heatingpump/HEIZMODUL/WAERMEERTRAG_HEIZ_SUM_MWH/state",
+    "heatingpump/HEIZMODUL/WAERMEERTRAG_WW_SUM_MWH/state"
+  ]
+}

@@ -1,4 +1,10 @@
-.PHONY: compile compile-s2 check logs upload config test test-all clean-tests
+.PHONY: compile compile-s2 check logs upload config test test-all clean-tests smoke-test capture-baseline
+
+# Extract model and MQTT credentials from local config files
+DEVICE_MODEL ?= $(shell grep 'device_model:' esphome/heatingpump.yaml | grep -v '^\s*\#' | head -1 | sed 's/.*"\(.*\)".*/\1/')
+MQTT_BROKER  ?= $(shell grep 'mqtt_broker:' esphome/secrets.yaml | sed 's/mqtt_broker:[[:space:]]*//' | tr -d '"')
+MQTT_USER    ?= $(shell grep 'mqtt_username:' esphome/secrets.yaml | sed 's/mqtt_username:[[:space:]]*//' | tr -d '"')
+MQTT_PASS    ?= $(shell grep 'mqtt_password:' esphome/secrets.yaml | sed 's/mqtt_password:[[:space:]]*//' | tr -d '"')
 
 CXX      ?= g++
 CXXFLAGS  = -std=c++17 -Wall -Wextra \
@@ -37,9 +43,9 @@ check: test compile compile-s2
 logs:
 	cd esphome && esphome logs heatingpump.yaml
 
-# Compile and OTA-flash to connected device
+# Compile and OTA-flash to production device (192.168.30.107)
 upload:
-	cd esphome && esphome run heatingpump.yaml
+	cd esphome && esphome run heatingpump.yaml --device 192.168.30.107 --no-logs
 
 # Dump merged YAML for debugging package includes
 config:
@@ -71,3 +77,24 @@ $(TEST_BIN): $(TEST_SRCS) $(TEST_EXTRA_OBJS) $(ELSTER_OBJS) esphome/ha-stiebel-c
 
 clean-tests:
 	rm -f $(TEST_BIN) $(TEST_EXTRA_OBJS) $(ELSTER_OBJS)
+
+# ── MQTT smoke test ───────────────────────────────────────────────────────────
+
+# Run MQTT regression test against live device (120s observation window)
+smoke-test:
+	python3 tests/test_mqtt_smoke.py \
+	  --broker "$(MQTT_BROKER)" \
+	  --user "$(MQTT_USER)" \
+	  --password "$(MQTT_PASS)" \
+	  --model "$(DEVICE_MODEL)" \
+	  --window 120
+
+# Capture a new baseline for the current model (300s window, overwrites model file)
+capture-baseline:
+	python3 tests/test_mqtt_smoke.py \
+	  --broker "$(MQTT_BROKER)" \
+	  --user "$(MQTT_USER)" \
+	  --password "$(MQTT_PASS)" \
+	  --model "$(DEVICE_MODEL)" \
+	  --window 300 \
+	  --capture-baseline
