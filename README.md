@@ -59,15 +59,23 @@ this prevents buffer overflows on the heat pump's busy CAN bus.
 
 ### Heat Pump Connection
 
-Connect to the service port on your heat pump:
+> ⚠️ **The pinout below is for the WPL 13 E** (and similar WPL/WPF series with the
+> standard Stiebel Eltron service connector). **Other models may use a completely
+> different connector and pinout.** Always consult your specific heat pump's manual
+> before making any connections — incorrect wiring can damage the heat pump or the ESP32.
+> Manuals for supported models are in the `manuals/` folder.
 
-| Pin | Signal |
-|-----|--------|
+On the WPL 13 E the CAN bus is accessible on the internal service connector:
+
+| Pin on service connector | Signal |
+|--------------------------|--------|
 | 3 | CAN-H |
 | 5 | CAN-L |
 | 7 | GND |
 
-Exact pinout varies — consult your heat pump manual (`manuals/` folder for supported models).
+Connect CAN-H and CAN-L to the corresponding terminals on your CAN transceiver board.
+The bus runs at 20 kbps with no termination resistor needed at the ESP32 end (the heat
+pump provides its own termination).
 
 ---
 
