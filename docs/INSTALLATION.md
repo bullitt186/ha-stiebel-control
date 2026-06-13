@@ -51,8 +51,8 @@ substitutions:
   device_name: heatingpump
   friendly_name: "Stiebel Eltron Wärmepumpe"
   device_model: "wpl13e"          # your heat pump model — see Supported Models in README
-  can_tx_pin: GPIOxx               # ⚠️ BOARD-SPECIFIC — check your board's schematic
-  can_rx_pin: GPIOxx               # ⚠️ BOARD-SPECIFIC — check your board's schematic
+  can_tx_pin: YOUR_CAN_TX          # board-specific — see pin note below
+  can_rx_pin: YOUR_CAN_RX          # board-specific — see pin note below
   can_id_pc: "0x680"
 
 packages:
@@ -62,12 +62,16 @@ packages:
   sensors: !include ha-stiebel-control/wpl13e.yaml
 ```
 
-> **Important — pin numbers are board-specific.** The file already contains correct
-> values for the Waveshare ESP32-S3-RS485-CAN board. If you use a different board,
-> look up the CAN transceiver connections in your board's schematic and change
-> `can_tx_pin` / `can_rx_pin` accordingly before flashing.
+> **Pin numbers are board-specific — always verify against your board's schematic.**
+> The `heatingpump.yaml` shipped in this repo already has correct values for the
+> **Waveshare ESP32-S3-RS485-CAN** board: `can_tx_pin: GPIO15`, `can_rx_pin: GPIO16`.
+> For any other board, update these values before flashing.
 
-For ESP32-S2 + MCP2515, comment out the S3 block and uncomment the S2 block at the bottom of the file. The SPI pin defaults are also board-specific — verify before use.
+For ESP32-S2 + MCP2515, comment out the S3 block and uncomment the S2 block at the bottom
+of the file. The SPI pins (`can_clk_pin`, `can_mosi_pin`, `can_miso_pin`, `can_cs_pin`) are
+also board-specific. The repo ships with values typical for a generic ESP32 DevKit with a
+standard MCP2515 breakout module (CLK: GPIO18, MOSI: GPIO23, MISO: GPIO19, CS: GPIO5) —
+verify these against your specific board before flashing.
 
 ### 4. Compile and flash
 
@@ -113,8 +117,8 @@ substitutions:
   device_name: heatingpump
   friendly_name: "Stiebel Eltron Wärmepumpe"
   device_model: "wpl13e"
-  can_tx_pin: GPIOxx   # ⚠️ replace with your board's CAN TX pin
-  can_rx_pin: GPIOxx   # ⚠️ replace with your board's CAN RX pin
+  can_tx_pin: YOUR_CAN_TX   # board-specific: Waveshare ESP32-S3-RS485-CAN → GPIO15
+  can_rx_pin: YOUR_CAN_RX   # board-specific: Waveshare ESP32-S3-RS485-CAN → GPIO16
   can_id_pc: "0x680"
 
 packages:

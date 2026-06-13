@@ -32,17 +32,24 @@ The key must match what HA's ESPHome integration has stored for this device. If 
 | `device_name` | ESPHome device hostname | `heatingpump` |
 | `friendly_name` | Display name in HA | `"Stiebel Eltron Wärmepumpe"` |
 | `device_model` | Heat pump model — selects signal table and HA device identifier | `"wpl13e"` |
-| `can_tx_pin` | CAN TX GPIO (ESP32-S3 built-in TWAI) | board-specific — check schematic |
-| `can_rx_pin` | CAN RX GPIO (ESP32-S3 built-in TWAI) | board-specific — check schematic |
+| `can_tx_pin` | CAN TX GPIO (ESP32-S3 built-in TWAI) | board-specific — see note below |
+| `can_rx_pin` | CAN RX GPIO (ESP32-S3 built-in TWAI) | board-specific — see note below |
 | `can_id_pc` | CAN bus ID for the ESP32 (PC role) | `"0x680"` |
-| `can_clk_pin` | SPI CLK (MCP2515 only) | board-specific |
-| `can_mosi_pin` | SPI MOSI (MCP2515 only) | board-specific |
-| `can_miso_pin` | SPI MISO (MCP2515 only) | board-specific |
-| `can_cs_pin` | SPI CS (MCP2515 only) | board-specific |
+| `can_clk_pin` | SPI CLK (MCP2515 only) | board-specific — see note below |
+| `can_mosi_pin` | SPI MOSI (MCP2515 only) | board-specific — see note below |
+| `can_miso_pin` | SPI MISO (MCP2515 only) | board-specific — see note below |
+| `can_cs_pin` | SPI CS (MCP2515 only) | board-specific — see note below |
 
-> **Pin assignments are board-specific.** Always consult your board's schematic before
-> wiring. The `heatingpump.yaml` in this repo ships with values for the
-> **Waveshare ESP32-S3-RS485-CAN board** — they will be wrong for other boards.
+> **Pin assignments are board-specific.** Always verify against your board's schematic
+> before wiring. Known working values for common boards:
+>
+> **Waveshare ESP32-S3-RS485-CAN** (recommended board):
+> `can_tx_pin: GPIO15`, `can_rx_pin: GPIO16`
+>
+> **Generic ESP32 DevKit + MCP2515 module:**
+> `can_clk_pin: GPIO18`, `can_mosi_pin: GPIO23`, `can_miso_pin: GPIO19`, `can_cs_pin: GPIO5`
+>
+> These are the values shipped in `heatingpump.yaml`. Other boards may use different pins.
 
 ---
 

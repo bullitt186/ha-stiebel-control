@@ -49,9 +49,10 @@ For full step-by-step instructions (including remote package installation withou
 | ESP32-S3 | Waveshare ESP32-S3-RS485-CAN (or similar) | Built-in TWAI | ✅ Yes |
 | ESP32-S2 / ESP32 | Any ESP32 dev board | MCP2515 via SPI | Legacy |
 
-> **Pin assignment depends on your specific board.** The Waveshare ESP32-S3-RS485-CAN uses
-> GPIO15/GPIO16 for CAN TX/RX; other boards differ. Check your board's schematic and set
-> `can_tx_pin` / `can_rx_pin` in `heatingpump.yaml` accordingly.
+> **Pin assignment is board-specific — always verify against your board's schematic.**
+> The Waveshare ESP32-S3-RS485-CAN uses GPIO15 (CAN TX) and GPIO16 (CAN RX);
+> a generic ESP32 DevKit + MCP2515 typically uses GPIO18/23/19/5 for SPI.
+> Set the correct pins in `heatingpump.yaml` before flashing.
 
 The ESP32-S3 built-in CAN controller has a 256-entry receive queue vs. 2 on MCP2515 —
 this prevents buffer overflows on the heat pump's busy CAN bus.
@@ -155,8 +156,8 @@ See [SG_READY.md](SG_READY.md) for full documentation, dashboard examples, and a
 
 ### No CAN messages received
 
-- **ESP32-S3**: verify the CAN TX/RX pins set in `heatingpump.yaml` (`can_tx_pin`/`can_rx_pin`) match your board's CAN transceiver pins — check your board's schematic
-- **MCP2515**: verify the SPI pins (`can_clk_pin`, `can_mosi_pin`, `can_miso_pin`, `can_cs_pin`) match your board's wiring
+- **ESP32-S3**: verify `can_tx_pin` / `can_rx_pin` in `heatingpump.yaml` match your board's CAN transceiver connections (Waveshare ESP32-S3-RS485-CAN: GPIO15/GPIO16 — other boards differ, check schematic)
+- **MCP2515**: verify the SPI pins (`can_clk_pin`, `can_mosi_pin`, `can_miso_pin`, `can_cs_pin`) match your board's wiring (generic DevKit: GPIO18/23/19/5 — check your board's schematic)
 - Check CAN-H/CAN-L polarity — swap if no messages appear
 - Verify CAN bus termination (120Ω at each end of the bus)
 - Check `make logs` for `[canbus] Setup CAN...`
