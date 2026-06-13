@@ -24,6 +24,7 @@
 #include "ElsterTable.h"
 #include "KElsterTable.h"
 #include "config.h"
+#include "sg_ready_controller.h"
 #include <sstream>
 #include <iomanip>
 #include <set>
@@ -223,13 +224,9 @@ static const size_t WRITABLE_SELECT_COUNT = sizeof(writableSelects) / sizeof(Wri
 // RUNTIME STATE TRACKING
 // ============================================================================
 
-// SG Ready state tracking
-static int currentSgReadyState = 2; // Default to normal operation (state 2)
-static bool sgReadyActive = false;  // Track if SG Ready is currently controlling the heat pump
-static float sgReadyBoostState3 = 5.0; // Default boost for state 3 in °C
-static float sgReadyBoostState4 = 8.0; // Default boost for state 4 in °C
-static float originalDhwTemp = 0.0;  // Store original DHW temperature before boost
-static float originalRoomTemp = 0.0; // Store original room temperature before heating boost
+// SG Ready: legacy globals kept for YAML sensor lambdas that read currentSgReadyState
+// The controller is the authoritative source; these are updated via sgReadyStateInt().
+static int currentSgReadyState = 2;
 
 // Track which signals have been discovered
 static std::set<std::string> discoveredSignals;
@@ -282,8 +279,12 @@ typedef struct {
     CanMemberType member;        // Use cm_other for "all members"
 } SignalRequest;
 
-// Include device-specific signal request table (must come AFTER SignalRequest is defined)
-#include "signal_requests_wpl13e.h"
+// Forward declarations for the model-specific signal request table.
+// The actual definition comes from signal_requests_*.h, included by the
+// model's YAML package (e.g. wpl13e.yaml via esphome: includes:).
+extern const SignalRequest signalRequests[];
+extern const size_t SIGNAL_REQUEST_COUNT_VALUE;
+#define SIGNAL_REQUEST_COUNT SIGNAL_REQUEST_COUNT_VALUE
 
 // Runtime state for signal request manager
 static bool requestManagerStarted = false;
@@ -1069,7 +1070,7 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
     
     // Device info - create individual device per CAN member as sub-device
     // Main device ID for the heat pump
-    const char* mainDeviceId = "stiebel_eltron_wpl13e";
+    const char* mainDeviceId = "stiebel_eltron_" HA_DEVICE_MODEL;
     
     // Create unique device ID for this CAN member
     char canMemberDeviceId[64];
@@ -1324,218 +1325,78 @@ void updateCOPCalculations() {
 // Users can filter these in HA automations/dashboards if needed
 
 // ============================================================================
-// NVS PERSISTENCE FOR BOOST STATE
+// ESPHOME IO ADAPTER FOR SG READY CONTROLLER
 // ============================================================================
 
-static ESPPreferenceObject nvsPrefDhwTemp;
-static ESPPreferenceObject nvsPrefRoomTemp;
-static ESPPreferenceObject nvsPrefSgReadyActive;
+class EspHomeSgReadyIO : public ISgReadyIO {
+public:
+    static ESPPreferenceObject nvsDhw;
+    static ESPPreferenceObject nvsRoom;
+    static ESPPreferenceObject nvsActive;
 
+    void writeCanSignal(const char* signalName, const char* value) override {
+        writeSignal(&CanMembers[cm_manager], signalName, value);
+        delay(100);
+        readSignal(&CanMembers[cm_manager], signalName);
+    }
+
+    void publishMqtt(const char* topic, const char* value) override {
+        id(mqtt_client).publish(topic, value, strlen(value), 0, true);
+    }
+
+    void saveBoostState(float dhw, float room, bool active) override {
+        nvsDhw.save(&dhw);
+        nvsRoom.save(&room);
+        nvsActive.save(&active);
+        ESP_LOGD("NVS", "Saved boost state: DHW=%.1f, Room=%.1f, active=%d",
+                 dhw, room, (int)active);
+    }
+
+    bool loadBoostState(float& dhw, float& room, bool& active) override {
+        bool ok = nvsActive.load(&active);
+        nvsDhw.load(&dhw);
+        nvsRoom.load(&room);
+        return ok;
+    }
+};
+
+ESPPreferenceObject EspHomeSgReadyIO::nvsDhw;
+ESPPreferenceObject EspHomeSgReadyIO::nvsRoom;
+ESPPreferenceObject EspHomeSgReadyIO::nvsActive;
+
+static EspHomeSgReadyIO sgReadyIO;
+static SgReadyController sgReadyController(sgReadyIO);
+
+// Called from on_boot lambda in common.yaml
 void initBoostStatePrefs() {
-    nvsPrefDhwTemp       = global_preferences->make_preference<float>(0xB007BA5E, true);
-    nvsPrefRoomTemp      = global_preferences->make_preference<float>(0xB007BA5F, true);
-    nvsPrefSgReadyActive = global_preferences->make_preference<bool> (0xB007BA60, true);
+    EspHomeSgReadyIO::nvsDhw    = global_preferences->make_preference<float>(0xB007BA5E, true);
+    EspHomeSgReadyIO::nvsRoom   = global_preferences->make_preference<float>(0xB007BA5F, true);
+    EspHomeSgReadyIO::nvsActive = global_preferences->make_preference<bool> (0xB007BA60, true);
     ESP_LOGI("NVS", "Boost state preferences initialized");
 }
 
-void saveBoostState() {
-    nvsPrefDhwTemp.save(&originalDhwTemp);
-    nvsPrefRoomTemp.save(&originalRoomTemp);
-    nvsPrefSgReadyActive.save(&sgReadyActive);
-    ESP_LOGD("NVS", "Saved boost state: DHW=%.1f°C, Room=%.1f°C, active=%d",
-             originalDhwTemp, originalRoomTemp, (int)sgReadyActive);
-}
-
+// Called from on_boot lambda in common.yaml
 void loadBoostState() {
-    float dhwTemp = 0.0f, roomTemp = 0.0f;
-    bool active = false;
-    nvsPrefDhwTemp.load(&dhwTemp);
-    nvsPrefRoomTemp.load(&roomTemp);
-    bool activeLoaded = nvsPrefSgReadyActive.load(&active);
-
-    if (activeLoaded && active) {
-        originalDhwTemp  = (dhwTemp  > 0.0f) ? dhwTemp  : 48.0f;
-        originalRoomTemp = (roomTemp > 0.0f) ? roomTemp : 20.0f;
-        sgReadyActive = true;
-        ESP_LOGI("NVS", "Restored boost state: DHW=%.1f°C, Room=%.1f°C", originalDhwTemp, originalRoomTemp);
-    } else {
-        ESP_LOGI("NVS", "No active boost state in NVS");
-    }
+    sgReadyController.loadFromNvs();
+    currentSgReadyState = sgReadyController.currentState();
+    ESP_LOGI("NVS", "Boost state loaded, active=%d", (int)sgReadyController.isActive());
 }
 
-// ============================================================================
-// SG READY CONTROL LOGIC
-// ============================================================================
-
+// Called from MQTT on_message lambda in common.yaml
 void applySgReadyState(int state) {
     ESP_LOGI("SG_READY", "Applying SG Ready state %d", state);
-    
-    currentSgReadyState = state;
-    
-    // Publish current state to MQTT
-    char stateTopic[128];
-    snprintf(stateTopic, sizeof(stateTopic), "heatingpump/MANAGER/SG_READY_STATE/state");
-    const char* stateStr = sgReadyOptions[state - 1]; // state is 1-based, array is 0-based
-    id(mqtt_client).publish(stateTopic, stateStr, strlen(stateStr), 0, true);
-    
-    switch (state) {
-        case 1: // EVU Sperre - minimize consumption
-            ESP_LOGI("SG_READY", "State 1: EVU Lock - Setting to Bereitschaft (standby)");
-            // Restore original DHW temperature if we had boosted it
-            if (sgReadyActive && originalDhwTemp > 0) {
-                char tempStr[16];
-                snprintf(tempStr, sizeof(tempStr), "%.1f", originalDhwTemp);
-                writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP", tempStr);
-                readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP");
-                ESP_LOGI("SG_READY", "Restored DHW temperature to %.1f°C", originalDhwTemp);
-                originalDhwTemp = 0.0;
-            }
-            // Restore original room temperature if we had boosted it
-            if (sgReadyActive && originalRoomTemp > 0) {
-                char roomTempStr[16];
-                snprintf(roomTempStr, sizeof(roomTempStr), "%.1f", originalRoomTemp);
-                writeSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I", roomTempStr);
-                readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I");
-                ESP_LOGI("SG_READY", "Restored room temperature to %.1f°C", originalRoomTemp);
-                originalRoomTemp = 0.0;
-            }
-            sgReadyActive = true;
-            saveBoostState();
-            // Set to standby mode - heat pump only runs if necessary
-            writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", "Bereitschaft");
-            delay(100); // Give heat pump time to process
-            readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
-            break;
-            
-        case 2: // Normal operation - restore original settings
-            ESP_LOGI("SG_READY", "State 2: Normal operation - Restoring to Automatik");
-            if (sgReadyActive) {
-                // Restore original DHW temperature if we had boosted it
-                if (originalDhwTemp > 0) {
-                    char tempStr[16];
-                    snprintf(tempStr, sizeof(tempStr), "%.1f", originalDhwTemp);
-                    writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP", tempStr);
-                    readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP");
-                    ESP_LOGI("SG_READY", "Restored DHW temperature to %.1f°C", originalDhwTemp);
-                    originalDhwTemp = 0.0;
-                }
-                // Restore original room temperature if we had boosted it
-                if (originalRoomTemp > 0) {
-                    char roomTempStr[16];
-                    snprintf(roomTempStr, sizeof(roomTempStr), "%.1f", originalRoomTemp);
-                    writeSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I", roomTempStr);
-                    readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I");
-                    ESP_LOGI("SG_READY", "Restored room temperature to %.1f°C", originalRoomTemp);
-                    originalRoomTemp = 0.0;
-                }
-                // Restore to Tagbetrieb mode
-                writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", "Tagbetrieb");
-                delay(100); // Give heat pump time to process
-                readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
-                sgReadyActive = false;
-                saveBoostState();
-            }
-            break;
-
-        case 3: { // Recommended - use surplus energy via comfort mode + boost
-            ESP_LOGI("SG_READY", "State 3: Recommended - Tagbetrieb + %.1f°C DHW boost + 1.0°C room boost", sgReadyBoostState3);
-
-            // Store original DHW temperature (only first time entering SG Ready mode)
-            if (!sgReadyActive || originalDhwTemp == 0.0) {
-                originalDhwTemp = 48.0; // Default DHW setpoint
-                ESP_LOGI("SG_READY", "Stored original DHW temperature: %.1f°C (default)", originalDhwTemp);
-            }
-            // Store original room temperature (only first time)
-            if (!sgReadyActive || originalRoomTemp == 0.0) {
-                originalRoomTemp = 20.0; // Default room setpoint
-                ESP_LOGI("SG_READY", "Stored original room temperature: %.1f°C (default)", originalRoomTemp);
-            }
-            sgReadyActive = true;
-            saveBoostState();
-
-            // Switch to comfort/day mode (continuous heating without schedule)
-            writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", "Tagbetrieb");
-            delay(100);
-            readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
-
-            // Apply DHW temperature boost
-            if (sgReadyBoostState3 > 0.1) {
-                float boostedTemp = originalDhwTemp + sgReadyBoostState3;
-                if (boostedTemp > 60.0) boostedTemp = 60.0;
-                char tempStr[16];
-                snprintf(tempStr, sizeof(tempStr), "%.1f", boostedTemp);
-                writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP", tempStr);
-                readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP");
-                ESP_LOGI("SG_READY", "Applied DHW boost: %.1f + %.1f = %.1f°C",
-                        originalDhwTemp, sgReadyBoostState3, boostedTemp);
-            }
-
-            // Apply heating circuit boost (+1°C for moderate surplus)
-            {
-                float boostedRoomTemp = originalRoomTemp + 1.0f;
-                if (boostedRoomTemp > 25.0f) boostedRoomTemp = 25.0f;
-                char roomTempStr[16];
-                snprintf(roomTempStr, sizeof(roomTempStr), "%.1f", boostedRoomTemp);
-                writeSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I", roomTempStr);
-                readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I");
-                ESP_LOGI("SG_READY", "Applied room boost: %.1f + 1.0 = %.1f°C",
-                        originalRoomTemp, boostedRoomTemp);
-            }
-            break;
-        }
-            
-        case 4: { // Forced operation - maximum comfort + maximum boost
-            ESP_LOGI("SG_READY", "State 4: Forced operation - Tagbetrieb + %.1f°C DHW boost + 2.0°C room boost", sgReadyBoostState4);
-
-            // Store original DHW temperature (only first time entering SG Ready mode)
-            if (!sgReadyActive || originalDhwTemp == 0.0) {
-                originalDhwTemp = 48.0; // Default DHW setpoint
-                ESP_LOGI("SG_READY", "Stored original DHW temperature: %.1f°C (default)", originalDhwTemp);
-            }
-            // Store original room temperature (only first time)
-            if (!sgReadyActive || originalRoomTemp == 0.0) {
-                originalRoomTemp = 20.0; // Default room setpoint
-                ESP_LOGI("SG_READY", "Stored original room temperature: %.1f°C (default)", originalRoomTemp);
-            }
-            sgReadyActive = true;
-            saveBoostState();
-
-            // Switch to comfort/day mode for maximum energy usage
-            writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", "Tagbetrieb");
-            delay(100);
-            readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
-
-            // Apply maximum DHW temperature boost if configured
-            if (sgReadyBoostState4 > 0.1) {
-                float boostedTemp = originalDhwTemp + sgReadyBoostState4;
-                if (boostedTemp > 60.0) boostedTemp = 60.0;
-                char tempStr[16];
-                snprintf(tempStr, sizeof(tempStr), "%.1f", boostedTemp);
-                writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP", tempStr);
-                readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP");
-                ESP_LOGI("SG_READY", "Applied DHW boost: %.1f + %.1f = %.1f°C",
-                        originalDhwTemp, sgReadyBoostState4, boostedTemp);
-            }
-
-            // Apply heating circuit boost (+2°C for maximum surplus)
-            {
-                float boostedRoomTemp = originalRoomTemp + 2.0f;
-                if (boostedRoomTemp > 25.0f) boostedRoomTemp = 25.0f;
-                char roomTempStr[16];
-                snprintf(roomTempStr, sizeof(roomTempStr), "%.1f", boostedRoomTemp);
-                writeSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I", roomTempStr);
-                readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I");
-                ESP_LOGI("SG_READY", "Applied room boost: %.1f + 2.0 = %.1f°C",
-                        originalRoomTemp, boostedRoomTemp);
-            }
-            break;
-        }
-            
-        default:
-            ESP_LOGW("SG_READY", "Invalid SG Ready state: %d", state);
-            break;
+    if (sgReadyController.applyState(state)) {
+        currentSgReadyState = sgReadyController.currentState();
+    } else {
+        ESP_LOGW("SG_READY", "Invalid SG Ready state: %d", state);
     }
 }
+
+// Accessor helpers used by YAML sensor lambdas and MQTT on_connect block
+inline float sgReadyBoostState3Value() { return sgReadyController.boostState3(); }
+inline float sgReadyBoostState4Value() { return sgReadyController.boostState4(); }
+inline void  setSgReadyBoost3(float v) { sgReadyController.setBoostState3(v); }
+inline void  setSgReadyBoost4(float v) { sgReadyController.setBoostState4(v); }
 
 // ============================================================================
 // COMPILE-TIME STRING HASHING FOR FAST SIGNAL DISPATCH

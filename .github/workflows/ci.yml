@@ -11,6 +11,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  unit-tests:
+    name: Unit Tests (native host)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build and run tests
+        run: make test
+
+      - name: Verify test count (regression guard)
+        run: |
+          COUNT=$(./tests/run_tests --reporter compact 2>&1 | grep -c "passed")
+          echo "Test assertions passing: $COUNT"
+
   compile-s3:
     name: Compile ESP32-S3
     runs-on: ubuntu-latest
@@ -48,6 +62,78 @@ jobs:
 
       - name: Compile (ESP32-S2)
         run: esphome compile esphome/ci_heatingpump_s2.yaml
+
+  release:
+    name: GitHub Release
+    needs: [compile-s3, compile-s2]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ESPHome
+        run: pip install esphome==2026.5.3
+
+      - name: Use CI secrets
+        run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
+
+      - name: Compile S3 firmware
+        run: |
+          esphome compile esphome/ci_heatingpump_s3.yaml
+          cp esphome/.esphome/build/heatingpump/.pioenvs/heatingpump/firmware.ota.bin \
+             firmware-s3.bin
+
+      - name: Compile S2 firmware
+        run: |
+          esphome compile esphome/ci_heatingpump_s2.yaml
+          cp esphome/.esphome/build/heatingpump/.pioenvs/heatingpump/firmware.ota.bin \
+             firmware-s2.bin
+
+      - name: Generate manifest.json
+        run: |
+          MD5_S3=$(md5sum firmware-s3.bin | cut -d' ' -f1)
+          MD5_S2=$(md5sum firmware-s2.bin | cut -d' ' -f1)
+          VERSION=${GITHUB_REF_NAME#v}
+          BASE="https://github.com/bullitt186/ha-stiebel-control/releases/download/${GITHUB_REF_NAME}"
+          cat > manifest.json << EOF
+          {
+            "name": "ha-stiebel-control",
+            "version": "${VERSION}",
+            "builds": [
+              {
+                "chipFamily": "ESP32-S3",
+                "ota": {
+                  "path": "${BASE}/firmware-s3.bin",
+                  "md5": "${MD5_S3}",
+                  "summary": "NOTE: CI binaries use placeholder credentials. Compile your own firmware with your secrets.",
+                  "release_url": "https://github.com/bullitt186/ha-stiebel-control/releases/tag/${GITHUB_REF_NAME}"
+                }
+              },
+              {
+                "chipFamily": "ESP32",
+                "ota": {
+                  "path": "${BASE}/firmware-s2.bin",
+                  "md5": "${MD5_S2}",
+                  "summary": "NOTE: CI binaries use placeholder credentials. Compile your own firmware with your secrets.",
+                  "release_url": "https://github.com/bullitt186/ha-stiebel-control/releases/tag/${GITHUB_REF_NAME}"
+                }
+              }
+            ]
+          }
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: firmware-s3.bin,firmware-s2.bin,manifest.json
+          body_path: CHANGELOG.md
+          fail_on_unmatched_files: true
 
   validate-yaml:
     name: Validate YAML

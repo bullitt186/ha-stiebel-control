@@ -364,3 +364,94 @@ To support additional heat pump models:
 - **Always** check signal exists in ElsterTable.h before adding sensors
 - **Archive folder**: Contains old code versions - reference only, not part of active codebase
 - **Substitutions**: Currently not used but prepared via `${}` syntax for future device variants
+
+---
+
+## Multi-Model Architecture (v2.0+)
+
+### How model files work
+
+The signal request table is split into two layers:
+
+1. **`signal_requests_base.h`** — `SIGNAL_REQUESTS_BASE` macro with universal Elster signals
+   (date/time, EVU lock, operating mode, energy counters). All models include this.
+
+2. **`signal_requests_<model>.h`** — model-specific file that starts with `SIGNAL_REQUESTS_BASE`
+   and appends model-specific signals. Defines `signalRequests[]` and `SIGNAL_REQUEST_COUNT_VALUE`.
+
+3. **`<model>.yaml`** — thin ESPHome package that declares its model `.h` in `esphome: includes:`.
+   Generic sensors (COP, DHW, operating mode) live in `common.yaml`, not here.
+
+4. **`ha-stiebel-control.h`** — forward-declares `signalRequests[]` and `SIGNAL_REQUEST_COUNT_VALUE`
+   so functions can reference them before the model include is processed.
+
+### Adding a new heat pump model
+
+1. Create `esphome/ha-stiebel-control/signal_requests_yourmodel.h`:
+```cpp
+#ifndef SIGNAL_REQUESTS_YOURMODEL_H
+#define SIGNAL_REQUESTS_YOURMODEL_H
+
+#include "config.h"
+#include "signal_requests_base.h"
+
+const SignalRequest signalRequests[] = {
+    SIGNAL_REQUESTS_BASE   // universal signals
+
+    // Your model-specific signals here
+    {"YOUR_SIGNAL", FREQ_30S, cm_manager},
+};
+
+const size_t SIGNAL_REQUEST_COUNT_VALUE = sizeof(signalRequests) / sizeof(SignalRequest);
+
+#endif
+```
+
+2. Create `esphome/ha-stiebel-control/yourmodel.yaml`:
+```yaml
+esphome:
+  includes:
+    - ha-stiebel-control/signal_requests_yourmodel.h
+```
+
+3. Use it in `heatingpump.yaml`:
+```yaml
+substitutions:
+  device_model: "yourmodel"   # used in HA device identifier
+packages:
+  sensors: !include ha-stiebel-control/yourmodel.yaml
+```
+
+4. Verify: `make config` (YAML parses) then `make compile` (C++ compiles)
+
+### Device identifier
+
+`device_model` substitution controls the HA device identifier: `stiebel_eltron_<device_model>`.
+Set it in `heatingpump.yaml`. The `HA_DEVICE_MODEL` C++ string define is injected via
+`platformio_options: build_flags:` in `common.yaml`.
+
+### Version bumping
+
+The project version lives in `common.yaml` under `esphome: project: version:`.
+Bump it there before tagging a release. Tag format: `vX.Y.Z` — CI creates a GitHub Release
+automatically.
+
+### Releasing
+
+1. Update version in `common.yaml` (`esphome: project: version: "X.Y.Z"`)
+2. Update `CHANGELOG.md` with the new version section
+3. Commit: `git commit -m "release: vX.Y.Z"`
+4. Tag: `git tag vX.Y.Z && git push origin main --tags`
+5. CI runs compile + release pipeline and creates the GitHub Release
+
+### After OTA flash — mandatory
+
+After every `make upload` to the production device, always run:
+```bash
+make smoke-test
+```
+This verifies all required signals (common + model-specific) appear within 120s.
+Exit 0 = pass. Exit 1 = regression — investigate before declaring success.
+
+Model smoke files: `tests/models/_common_smoke.json` (all models) +
+`tests/models/<device_model>_smoke.json` (model-specific).

@@ -1,503 +1,222 @@
 # ha-stiebel-control
 
-ESPHome/Home Assistant integration for monitoring and controlling Stiebel Eltron heat pumps via CAN bus interface. Features automatic MQTT discovery for 3800+ signals, writable controls, and intelligent sensor management.
+ESPHome firmware for monitoring and controlling Stiebel Eltron heat pumps via CAN bus.
+Connects an ESP32 to the heat pump's internal Elster CAN bus and automatically publishes
+3800+ signals to Home Assistant via MQTT discovery — no manual entity configuration needed.
 
-Based on the Elster protocol implementation by [Jürg Müller](http://juerg5524.ch/list_data.php) and community work by [roberreiters](https://community.home-assistant.io/t/configured-my-esphome-with-mcp2515-can-bus-for-stiebel-eltron-heating-pump/366053).
+Based on the Elster protocol by [Jürg Müller](http://juerg5524.ch/list_data.php) and
+community work by [roberreiters](https://community.home-assistant.io/t/configured-my-esphome-with-mcp2515-can-bus-for-stiebel-eltron-heating-pump/366053).
 
-## Features
+---
 
-- **Automatic MQTT Discovery**: All 3800+ Elster protocol signals automatically discovered in Home Assistant
-- **Frequency-Based Polling**: Intelligent signal request scheduling (1min/10min/30min intervals)
-- **Writable Controls**: Direct CAN bus write support for temperature setpoints and operating modes
-- **SG Ready Support**: Smart Grid Ready integration for PV surplus utilization ([Documentation](SG_READY.md))
-- **Calculated Sensors**: Automatic computation of COP, Delta-T, compressor status, and betriebsart
-- **Minimal Configuration**: Only 22 essential sensors defined, rest auto-discovered
-- **Button-Based Datetime Control**: Set heat pump time/date via Home Assistant helpers
-- **Multi-Device Architecture**: Separate CAN member devices (Manager, Kessel, Heizmodul)
+## Table of Contents
 
-## Architecture
+- [Quick Start](#quick-start)
+- [Supported Hardware](#supported-hardware)
+- [Supported Models](#supported-models)
+- [Installation](#installation)
+- [Updating](#updating)
+- [Features](#features)
+- [SG Ready — PV Integration](#sg-ready--pv-integration)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [Credits & License](#credits--license)
 
-### Core Components
+---
 
-```
-esphome/
-├── heatingpump.yaml              # Main device config (board selection, substitutions, includes)
-└── ha-stiebel-control/
-    ├── board_esp32s3.yaml        # ESP32-S3 board config (16MB flash, OPI PSRAM)
-    ├── board_esp32s2.yaml        # ESP32-S2/generic ESP32 board config
-    ├── can_esp32.yaml            # Built-in TWAI CAN config (256 RX/64 TX buffers)
-    ├── can_mcp2515.yaml          # MCP2515 SPI CAN config (legacy)
-    ├── common.yaml               # Board-agnostic: WiFi, MQTT, API, OTA, buttons
-    ├── wpl13e.yaml               # Device-specific sensors (template for other models)
-    ├── ha-stiebel-control.h      # Main C++ logic: MQTT discovery, CAN write, calculators
-    ├── signal_requests_wpl13e.h  # Polling schedule for signals
-    ├── config.h                  # Blacklist configuration
-    └── elster/                   # Elster protocol library
-        ├── ElsterTable.h         # 3800+ signal definitions with metadata
-        ├── KElsterTable.cpp/h    # Table lookup functions
-        └── NUtils.cpp/h/NTypes.h # Utility functions
-
-packages/
-└── ha_stiebel_control.yaml       # Home Assistant helpers (input_datetime)
-```
-
-### Data Flow
-
-```
-Heat Pump CAN Bus (Elster Protocol)
-         ↓
-ESP32-S3 (Built-in TWAI) or ESP32-S2 + MCP2515
-         ↓
-ESPHome (ha-stiebel-control.h)
-    - Reads CAN frames
-    - Parses Elster signals
-    - Publishes MQTT discovery
-    - Publishes state updates
-         ↓
-MQTT Broker
-         ↓
-Home Assistant
-    - Auto-creates entities
-    - Updates states
-    - Provides UI controls
-```
-
-### CAN Bus Architecture
-
-- **ESP32 acts as**: `PC` (0x680) on CAN bus
-- **CAN Members**:
-  - `KESSEL` (0x180): Boiler/storage tank
-  - `MANAGER` (0x480): Main controller
-  - `HEIZMODUL` (0x500): Heat pump module
-- **Communication**: Universal frame handler processes all CAN IDs with mask 0
-- **Protocol**: Elster index-based read/write operations
-
-## Hardware Requirements
-
-### Supported Boards
-
-This project supports two hardware configurations:
-
-#### **Option 1: ESP32-S3 with Built-in CAN (Recommended)**
-
-**Advantages:**
-- ✅ No buffer overflows (256 RX queue vs 2 on MCP2515)
-- ✅ Faster processing (no SPI overhead)
-- ✅ Better timing accuracy (hardware CAN controller)
-- ✅ Single board solution
-
-**Hardware:**
-1. **Waveshare ESP32-S3-RS485-CAN Board** (or similar ESP32-S3 with CAN transceiver)
-   - **Specifications**: 16MB Flash, OPI PSRAM
-   - **Configuration**: Automatically configured for optimal performance
-2. **Connections**:
-   - CAN-H (TXD2/GPIO15) → Heat pump CAN-H
-   - CAN-L (RXD2/GPIO16) → Heat pump CAN-L
-   - GND → Heat pump GND
-   - Power: USB or 5V/3.3V input
-
-#### **Option 2: ESP32-S2 with MCP2515 (Legacy)**
-
-**Note:** May experience buffer overflows on high-traffic CAN buses.
-
-**Hardware:**
-1. **ESP32 Development Board** (ESP32-S2, ESP32 DevKit V1, etc.)
-2. **MCP2515 CAN Transceiver Module**
-3. **TJA1050/SN65HVD230 CAN Bus Transceiver** (often integrated on MCP2515 board)
-4. **Connections**:
-   - SPI: CLK (GPIO18), MOSI (GPIO23), MISO (GPIO19), CS (GPIO5)
-   - CAN: H and L to heat pump CAN bus
-   - Power: 5V or 3.3V depending on module
-
-### Heat Pump Connection
-
-- Connect to the service port on your Stiebel Eltron heat pump
-- Typical CAN pinout: Pin 3 (CAN-H), Pin 5 (CAN-L), Pin 7 (GND)
-- **Check your heat pump manual** for exact pinout
-
-## Installation
-
-### 1. Copy Project Files
-
-Copy the `esphome/` folder contents to your ESPHome config directory:
-
-```
-/config/esphome/
-├── heatingpump.yaml
-└── ha-stiebel-control/
-    ├── board_esp32s3.yaml
-    ├── board_esp32s2.yaml
-    ├── can_esp32.yaml
-    ├── can_mcp2515.yaml
-    ├── common.yaml
-    ├── wpl13e.yaml
-    ├── ha-stiebel-control.h
-    ├── signal_requests_wpl13e.h
-    ├── config.h
-    └── elster/
-        ├── ElsterTable.h
-        ├── KElsterTable.cpp
-        ├── KElsterTable.h
-        ├── NTypes.h
-        ├── NUtils.cpp
-        └── NUtils.h
-```
-
-### 2. Choose Your Board Type
-
-Edit `heatingpump.yaml` and select your hardware configuration:
-
-**For ESP32-S3 with built-in CAN:**
-```yaml
-# ESP32-S3 section (uncommented)
-substitutions:
-  device_name: heatingpump
-  friendly_name: "Stiebel Eltron Wärmepumpe"
-  can_tx_pin: GPIO15  # TXD2 on Waveshare board
-  can_rx_pin: GPIO16  # RXD2 on Waveshare board
-  can_id_pc: "0x680"
-
-packages:
-  board: !include ha-stiebel-control/board_esp32s3.yaml
-  can: !include ha-stiebel-control/can_esp32.yaml
-  base: !include ha-stiebel-control/common.yaml
-  sensors: !include ha-stiebel-control/wpl13e.yaml
-```
-
-**For ESP32-S2 with MCP2515:**
-```yaml
-# ESP32-S2 section (uncomment this, comment out ESP32-S3)
-substitutions:
-  device_name: heatingpump
-  friendly_name: "Stiebel Eltron Wärmepumpe"
-  can_clk_pin: GPIO18
-  can_mosi_pin: GPIO23
-  can_miso_pin: GPIO19
-  can_cs_pin: GPIO5
-  can_id_pc: "0x680"
-
-packages:
-  board: !include ha-stiebel-control/board_esp32s2.yaml
-  can: !include ha-stiebel-control/can_mcp2515.yaml
-  base: !include ha-stiebel-control/common.yaml
-  sensors: !include ha-stiebel-control/wpl13e.yaml
-```
-
-### 3. Configure WiFi and MQTT
-
-Create a `secrets.yaml` file in your ESPHome directory and enter your credentials
-```yaml
-wifi_ssid: "YOUR_WIFI_SSID"
-wifi_password: "YOUR_WIFI_PASSWORD"
-mqtt_broker: "YOUR_MQTT_BROKER_IP"
-mqtt_username: "YOUR_MQTT_USER"
-mqtt_password: "YOUR_MQTT_PASSWORD"
-```
-
-### 4. Compile and Upload
+## Quick Start
 
 ```bash
+git clone https://github.com/bullitt186/ha-stiebel-control.git
+cd ha-stiebel-control
+cp esphome/secrets.yaml.example esphome/secrets.yaml
+# fill in your WiFi, MQTT, and API credentials in secrets.yaml
 esphome run esphome/heatingpump.yaml
 ```
 
-Or use the ESPHome dashboard to compile and upload.
+HA entities appear automatically via MQTT discovery within 60 seconds of the device coming online.
 
-### 5. Home Assistant Integration
+For full step-by-step instructions (including remote package installation without git) see [docs/INSTALLATION.md](docs/INSTALLATION.md).
 
-#### Add Package Configuration
+---
 
-Copy `packages/ha_stiebel_control.yaml` to your Home Assistant `/config/packages/` folder.
+## Supported Hardware
 
-Enable packages in `/config/configuration.yaml`:
-```yaml
-homeassistant:
-  packages: !include_dir_named packages
+### Boards
+
+| Option | Board | CAN interface | Recommended |
+|--------|-------|---------------|-------------|
+| ESP32-S3 | Waveshare ESP32-S3-RS485-CAN (or similar) | Built-in TWAI | ✅ Yes |
+| ESP32-S2 / ESP32 | Any ESP32 dev board | MCP2515 via SPI | Legacy |
+
+> **Pin assignment is board-specific — always verify against your board's schematic.**
+> The Waveshare ESP32-S3-RS485-CAN uses GPIO15 (CAN TX) and GPIO16 (CAN RX);
+> a generic ESP32 DevKit + MCP2515 typically uses GPIO18/23/19/5 for SPI.
+> Set the correct pins in `heatingpump.yaml` before flashing.
+
+The ESP32-S3 built-in CAN controller has a 256-entry receive queue vs. 2 on MCP2515 —
+this prevents buffer overflows on the heat pump's busy CAN bus.
+
+### Heat Pump Connection
+
+Connect to the service port on your heat pump:
+
+| Pin | Signal |
+|-----|--------|
+| 3 | CAN-H |
+| 5 | CAN-L |
+| 7 | GND |
+
+Exact pinout varies — consult your heat pump manual (`manuals/` folder for supported models).
+
+---
+
+## Supported Models
+
+| Model file | Heat pump | Status |
+|------------|-----------|--------|
+| `wpl13e.yaml` | WPL 13 E (air-source, 3 heating circuits) | ✅ Verified |
+| `wpf10.yaml` | WPF 10 / WPF 10M (ground-source) | ⚠️ Community — signals may need adjustment |
+
+To add support for your heat pump, see [Contributing](#contributing) below.
+
+---
+
+## Installation
+
+Two paths are supported:
+
+**Path A — Git clone** (recommended for contributors and advanced users):
+full control, `make` targets, local signal customisation.
+
+**Path B — Remote packages** (ESPHome addon users):
+no git required, minimal local config file, automatic package download from GitHub.
+
+Both paths are documented step-by-step in [docs/INSTALLATION.md](docs/INSTALLATION.md),
+including secrets configuration, board selection, and Home Assistant setup.
+
+---
+
+## Updating
+
+### Git clone
+
+```bash
+git pull
+make check    # compile both board variants
+make upload   # OTA flash to device
+make smoke-test  # verify all required signals still appear
 ```
 
-Restart Home Assistant.
+Your `esphome/secrets.yaml` and local changes to `heatingpump.yaml` are gitignored —
+they will not be overwritten.
 
-#### Configure MQTT Integration
+### Remote packages
 
-Ensure the MQTT integration is set up in Home Assistant:
-1. Settings → Devices & Services → Add Integration → MQTT
-2. Enter your MQTT broker details
-3. MQTT entities will auto-discover
+Change the `@vX.Y.Z` tag in your local `heatingpump.yaml` to the new release and recompile.
 
-### 6. Verify Operation
+---
 
-1. **Check ESPHome Logs**:
-   ```bash
-   esphome logs esphome/heatingpump.yaml
-   ```
-   Look for:
-   - `[MQTT_CONN] Connected to MQTT broker`
-   - `[processCanMessage] MANAGER (0x480): ...`
-   - `[MQTT] Discovery published for ...`
+## Features
 
-2. **Check Home Assistant**:
-   - Go to Settings → Devices & Services → MQTT
-   - Look for "Manager", "Kessel", "Heizmodul" devices
-   - Entities should appear automatically
+- **Automatic MQTT discovery** — 3800+ Elster signals appear in HA without manual configuration
+- **Multi-model architecture** — swap heat pump models by changing one line in `heatingpump.yaml`
+- **SG Ready** — 4-state PV surplus control with automatic temperature boost ([docs](SG_READY.md))
+- **Writable controls** — temperature setpoints and operating mode via HA entities or MQTT
+- **Calculated sensors** — COP (hot water / heating / total), Delta-T, compressor status
+- **Date/time sync** — set heat pump clock from HA via buttons
+- **Frequency-based polling** — configurable per-signal intervals (10s–60min)
+- **Native test suite** — 138 Catch2 unit tests covering core logic, no hardware needed
+- **MQTT regression tests** — `make smoke-test` verifies required signals after each OTA flash
 
-3. **Check MQTT Topics** (optional):
-   ```bash
-   mosquitto_sub -h YOUR_BROKER -u USER -P PASS -t "homeassistant/+/heatingpump/#" -v
-   ```
+For entity IDs, MQTT topics, and configuration options see [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+For architecture and internals see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-## Usage
+---
 
-### Monitoring
+## SG Ready — PV Integration
 
-All sensors are automatically discovered and categorized by CAN member:
+Automatically adjusts heat pump operation based on PV surplus:
 
-- **Manager Device**: Control signals, operating mode, status
-- **Kessel Device**: Storage tank temperatures, target temps
-- **Heizmodul Device**: Heat pump module temperatures, compressor status
+| State | Trigger | Action |
+|-------|---------|--------|
+| 1 — EVU Sperre | Grid peak / no PV | Standby (Bereitschaft) |
+| 2 — Normal | Standard | Comfort mode (Tagbetrieb) |
+| 3 — Empfohlen | 1–2 kW surplus | Tagbetrieb + DHW boost + room +1°C |
+| 4 — Zwang | >2 kW surplus | Tagbetrieb + larger DHW boost + room +2°C |
 
-Sensors update based on polling frequency (1min, 10min, or 30min intervals).
+Works with any PV inverter that exposes an SG Ready state (E3DC, SolarEdge, Fronius, etc.).
+No extra hardware required — replaces hardware EVU lock relays.
 
-### Writable Controls
+See [SG_READY.md](SG_READY.md) for full documentation, dashboard examples, and automation templates.
 
-Automatically discovered MQTT entities:
-
-1. **Speicher Soll Temperatur** (Storage Target Temp 1): `number.speicher_soll_temperatur`
-2. **Speicher Soll Temperatur 2** (Storage Target Temp 2): `number.speicher_soll_temperatur_2`
-3. **Programmschalter** (Operating Mode): `select.programmschalter`
-   - Options: Notbetrieb, Bereitschaft, Automatik, Tagbetrieb, Absenkbetrieb, Warmwasser
-
-To change values:
-- Use Home Assistant UI
-- Call service via automation
-- Publish to MQTT command topic
-
-### SG Ready (Smart Grid Ready) PV Integration
-
-**NEW**: Intelligent PV surplus utilization using the SG Ready standard.
-
-Control your heat pump based on solar energy availability with 4 operating states:
-- **State 1**: Grid lock - standby mode
-- **State 2**: Normal operation  
-- **State 3**: PV surplus available - boost DHW heating
-- **State 4**: High PV surplus - maximum DHW heating
-
-**Documentation**: See [SG_READY.md](SG_READY.md) for complete guide (quick start, configuration, automations, troubleshooting)
-
-**Features**:
-- ✅ ESPHome-native control (fast, reliable)
-- ✅ Dropdown select in Home Assistant (`select.manager_sg_ready_zustand`)
-- ✅ Compatible with any PV system (E3DC, SolarEdge, Fronius, etc.)
-- ✅ Manual override capability for testing
-- ✅ Optional temperature boost automations
-- ✅ Replaces hardware EVU lock (e.g., Shelly relays)
-
-### Setting Heat Pump Date/Time
-
-1. Go to Home Assistant → Settings → Devices & Services → Helpers
-2. Find `input_datetime.heatingpump_time` and `input_datetime.heatingpump_date`
-3. Set desired time/date
-4. Go to your heat pump device
-5. Press "Update Uhrzeit" or "Update Datum" button
-
-### Calculated Sensors
-
-Auto-published to `heatingpump/calculated/` topics:
-
-- **Date**: `YYYY-MM-DD` from JAHR, MONAT, TAG signals
-- **Time**: `HH:MM:SS` from STUNDE, MINUTE, SEKUNDE signals
-- **Betriebsart**: "Sommer" or "Winter" derived from SOMMERBETRIEB
-- **Delta T Continuous**: Flow - Return temperature (always)
-- **Delta T Running**: Flow - Return temperature (only when compressor active)
-- **Compressor Active**: Binary sensor (on when VERDICHTER > 2)
-- **COP WW**: Coefficient of Performance for hot water
-- **COP Heizung**: Coefficient of Performance for heating
-- **COP Gesamt**: Overall coefficient of performance
-
-## Customization
-
-### Supporting Different Heat Pump Models
-
-To add support for your specific model:
-
-1. Copy `esphome/ha-stiebel-control/wpl13e.yaml` to `esphome/ha-stiebel-control/your_model.yaml`
-2. Edit `esphome/heatingpump.yaml`:
-   ```yaml
-   packages:
-     base: !include ha-stiebel-control/common.yaml
-     sensors: !include ha-stiebel-control/your_model.yaml
-   ```
-3. Consult PDF manuals in `manuals/` folder for signal meanings
-4. Find signal names in `esphome/ha-stiebel-control/elster/ElsterTable.h`
-5. Add template sensors following the pattern:
-   ```yaml
-   - platform: template
-     name: "SIGNAL_NAME"
-     id: SIGNAL_NAME
-     unit_of_measurement: "°C"
-     device_class: "temperature"
-     state_class: "measurement"
-     accuracy_decimals: 1
-     update_interval: 1min
-     lambda: |-
-       readSignal(&CanMembers[cm_manager], "SIGNAL_NAME");
-       return {};
-   ```
-
-### Adjusting Polling Frequencies
-
-Edit `esphome/ha-stiebel-control/signal_requests_wpl13e.h`:
-
-```cpp
-static const SignalRequest signalRequests[] = {
-    {"YOUR_SIGNAL", FREQ_1MIN, cm_manager},   // Poll every 1 minute
-    {"OTHER_SIGNAL", FREQ_10MIN, cm_kessel},  // Poll every 10 minutes
-    {"RARE_SIGNAL", FREQ_30MIN, cm_heizmodul} // Poll every 30 minutes
-};
-```
-
-### Blacklisting Unwanted Signals
-
-Edit `esphome/ha-stiebel-control/config.h`:
-
-```cpp
-static const char* BLACKLISTED_SIGNALS[] = {
-    "UNWANTED_SIGNAL",
-    "ANOTHER_SIGNAL"
-};
-```
-
-Or set `isBlacklisted` flag in `ElsterTable.h` entry.
-
-### CAN Member IDs
-
-If your heat pump uses different CAN IDs, edit `esphome/ha-stiebel-control/ha-stiebel-control.h`:
-
-```cpp
-static const CanMember CanMembers[] = {
-    {"PC",        0x680, {0x00, 0x00}, {0x00, 0x00}, {0xE2, 0x00}},
-    {"KESSEL",    0x180, {0x31, 0x00}, {0x30, 0x00}, {0x00, 0x00}},
-    {"MANAGER",   0x480, {0x91, 0x00}, {0x90, 0x00}, {0x00, 0x00}},
-    {"HEIZMODUL", 0x500, {0xA1, 0x00}, {0xA0, 0x00}, {0x00, 0x00}}
-};
-```
+---
 
 ## Troubleshooting
 
-### No CAN Messages Received
+### No CAN messages received
 
-**For MCP2515 (ESP32-S2):**
-- Check SPI wiring (CLK, MOSI, MISO, CS pins)
-- Verify MCP2515 power (3.3V or 5V depending on module)
+- **ESP32-S3**: verify `can_tx_pin` / `can_rx_pin` in `heatingpump.yaml` match your board's CAN transceiver connections (Waveshare ESP32-S3-RS485-CAN: GPIO15/GPIO16 — other boards differ, check schematic)
+- **MCP2515**: verify the SPI pins (`can_clk_pin`, `can_mosi_pin`, `can_miso_pin`, `can_cs_pin`) match your board's wiring (generic DevKit: GPIO18/23/19/5 — check your board's schematic)
+- Check CAN-H/CAN-L polarity — swap if no messages appear
+- Verify CAN bus termination (120Ω at each end of the bus)
+- Check `make logs` for `[canbus] Setup CAN...`
 
-**For ESP32-S3 Built-in CAN:**
-- Verify GPIO15 (TX) and GPIO16 (RX) connections
-- Check CAN transceiver power
+### Entities not appearing in Home Assistant
 
-**Common to both:**
-- Verify CAN-H and CAN-L connections to heat pump
-- Check ESPHome logs for `[canbus] Setup CAN...`
-- Verify heat pump CAN bus is active (should be always on)
-- Check CAN bus termination (120Ω resistors at both ends)
+- Confirm MQTT broker is connected: `heatingpump/status` should be `online`
+- Enable MQTT discovery in HA: Settings → Devices & Services → MQTT → configure
+- Wait up to 30 seconds after boot for discovery messages
+- Trigger manual republish: publish an empty message to `heatingpump/republish_discoveries`
 
-### Entities Not Appearing in Home Assistant
+### Native API entities unavailable (WiFi signal, SG Ready sensors)
 
-- Verify MQTT broker connection
-- Check MQTT discovery topics: `homeassistant/+/heatingpump/#`
-- Ensure HA MQTT integration discovery is enabled
-- Wait 15 minutes for auto-republish or manually trigger:
-  ```bash
-  mosquitto_pub -h BROKER -u USER -P PASS -t "heatingpump/republish_discoveries" -m ""
-  ```
+These entities use the ESPHome native API (not MQTT). If they show `unavailable`:
+1. Verify `api_encryption_key` in `secrets.yaml` matches what HA has stored for this device
+2. Reload the ESPHome config entry: Settings → Devices & Services → ESPHome → reload
 
-### Wrong Values or "Unavailable"
+### Wrong values or "Unknown"
 
-- Some signals may not be supported by your heat pump model
-- Check signal polling frequency (may need to wait for next poll)
-- Verify signal name exists in `ElsterTable.h`
-- Check logs for parse errors or invalid values
+- Some signals are not supported by all heat pump models — check your model's signal table
+- Binary sensors showing "Unknown": add `payloadOn`/`payloadOff` to the signal's entry in `ElsterTable.h`
+- Check `heatingpump/debug` MQTT topic for parse errors
 
-### Binary Sensor Shows "Unknown"
-
-- Verify `payloadOn` and `payloadOff` are set in ElsterTable.h:
-  ```cpp
-  { "SIGNAL_NAME", 0x0074, et_bool, "Name", "binary_sensor", "lock", "", "", "mdi:icon", "on", "off", false, true }
-  ```
-
-### Datetime Controls Not Working
-
-- Verify `input_datetime` helpers exist in HA
-- Check text_sensor entity IDs in `common.yaml` match helper names
-- Press buttons after setting helpers (changes don't auto-sync)
-
-## Advanced Configuration
-
-### MQTT Topics Structure
-
-- **Discovery**: `homeassistant/{component}/heatingpump/{unique_id}/config`
-- **State**: `heatingpump/{CAN_MEMBER}/{SIGNAL_NAME}/state`
-- **Command**: `heatingpump/command/{signal_name}/set`
-- **Availability**: `heatingpump/status`
-
-### Understanding Signal Types
-
-From `ElsterTable.h`:
-- `et_dec_val`: Decimal value (0.1 precision)
-- `et_cent_val`: Centesimal value (0.01 precision)
-- `et_mil_val`: Millisimal value (0.001 precision)
-- `et_bool`: Boolean (true/false → on/off)
-- `et_little_bool`: Inverted boolean
-- `et_byte`: Single byte value
-- `et_double_val`: Two-byte value
-- `et_triple_val`: Three-byte value
-
-### Manual MQTT Control
-
-Write temperature setpoint:
-```bash
-mosquitto_pub -h BROKER -u USER -P PASS -t "heatingpump/command/speichersolltemp/set" -m "55"
-```
-
-Change operating mode:
-```bash
-mosquitto_pub -h BROKER -u USER -P PASS -t "heatingpump/command/programmschalter/set" -m "Automatik"
-```
-
-## Project Structure Details
-
-- **heatingpump.yaml**: Main entry point with board selection (comment/uncomment blocks)
-- **board_esp32s3.yaml**: ESP32-S3 configuration (16MB flash, OPI PSRAM, 80MHz)
-- **board_esp32s2.yaml**: ESP32-S2/generic ESP32 configuration
-- **can_esp32.yaml**: Built-in TWAI CAN controller (256 RX queue, 64 TX queue)
-- **can_mcp2515.yaml**: MCP2515 SPI-based CAN controller
-- **common.yaml**: Board-agnostic core (WiFi, MQTT, API, OTA, buttons, text sensors)
-- **wpl13e.yaml**: Device-specific template sensors (22 essential sensors)
-- **ha-stiebel-control.h**: Main C++ implementation (MQTT discovery, calculated sensors, CAN write)
-- **signal_requests_wpl13e.h**: Polling schedule (defines which signals to read and how often)
-- **config.h**: Blacklist configuration
-- **ElsterTable.h**: 3800+ signal definitions with Home Assistant metadata
-- **KElsterTable.cpp/h**: Helper functions for table lookups and value conversions
+---
 
 ## Contributing
 
-Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
+### Adding a new heat pump model
 
-Areas for contribution:
-- Support for additional heat pump models
+See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for the complete step-by-step guide.
+
+In brief:
+1. Create `signal_requests_yourmodel.h` using `SIGNAL_REQUESTS_BASE` + your model's signals
+2. Create `yourmodel.yaml` (3 lines — just the `esphome: includes:` block)
+3. Add a dispatcher entry in `signal_requests_model.h`
+4. Create `tests/models/yourmodel_smoke.json` with verified required topics
+5. Submit a PR with logs showing signals responding on your hardware
+
+### Agentic development (Claude Code / Copilot)
+
+This repo has a fully configured agentic harness. See [docs/AGENTIC_DEVELOPMENT.md](docs/AGENTIC_DEVELOPMENT.md) for setup and workflows.
+
+### Other contributions
+
+- Signal metadata (friendly names, units, icons) in `ElsterTable.h`
 - Dashboard examples
-- Energy monitoring integrations
 - Documentation improvements
-- Signal metadata enhancements
 
-## Credits
+---
 
-- **Jürg Müller**: Original Elster protocol implementation and signal table
-- **roberreiters**: Home Assistant community ESPHome CAN bus setup
-- **Bastian Stahmer**: Original ha-stiebel-control implementation
-- **ESPHome & Home Assistant Communities**: Continuous support and inspiration
+## Credits & License
 
-## License
+- **Jürg Müller** — original Elster protocol implementation and signal table
+- **roberreiters** — ESPHome CAN bus setup for Stiebel Eltron
+- **Bastian Stahmer** — ha-stiebel-control implementation
+- **Community contributors** — model support, testing, documentation
 
 [GPLv3](https://www.gnu.org/licenses/gpl-3.0.en.html)
 
-## Disclaimer
-
-This project is not affiliated with or endorsed by Stiebel Eltron. Use at your own risk. Modifying your heat pump settings via CAN bus may void your warranty. Always consult your heat pump manual and follow local regulations.
+> This project is not affiliated with or endorsed by Stiebel Eltron GmbH & Co. KG.
+> Modifying heat pump settings via CAN bus may void your warranty. Always consult your
+> heat pump manual and follow local regulations. Use at your own risk.

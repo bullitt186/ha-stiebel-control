@@ -1,0 +1,7 @@
+{
+  "description": "Required topics for WPF10/WPF10M (ground-source heat pump). Stub — populate after verifying on hardware. See tests/models/wpl13e_smoke.json for the expected format.",
+  "required_topics": [
+    "heatingpump/HEIZMODUL/WPVORLAUFIST/state",
+    "heatingpump/KESSEL/SPEICHERISTTEMP/state"
+  ]
+}

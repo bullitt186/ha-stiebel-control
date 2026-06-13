@@ -19,6 +19,9 @@
 esphome:
   name: heatingpump
   friendly_name: "Heating Pump CAN Interface"
+  project:
+    name: "bullitt186.ha-stiebel-control"
+    version: "2.0.0"
   on_boot:
     priority: 600
     then:
@@ -33,11 +36,16 @@ esphome:
     - ha-stiebel-control/elster/NUtils.cpp
     - ha-stiebel-control/elster/NTypes.h
     - ha-stiebel-control/config.h
+    - ha-stiebel-control/sg_ready_controller.h
     - ha-stiebel-control/ha-stiebel-control.h
-    - ha-stiebel-control/signal_requests_wpl13e.h
+    - ha-stiebel-control/signal_requests_base.h
+    # model-specific signal_requests_*.h is declared by each model yaml package
+  platformio_options:
+    build_flags:
+      - "-DHA_DEVICE_MODEL='\"${device_model}\"'"
 
 
-  
+
 
 
 #########################################
@@ -57,6 +65,8 @@ logger:
 #########################################
 api:
   reboot_timeout: 15min
+  encryption:
+    key: !secret api_encryption_key
 
 ota:
   platform: esphome
@@ -115,13 +125,13 @@ mqtt:
         id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_STATE/state", sgStateStr, strlen(sgStateStr), 0, true);
         // Publish current boost values (reflect actual in-memory values, not hardcoded defaults)
         char boost3Str[16], boost4Str[16];
-        snprintf(boost3Str, sizeof(boost3Str), "%.1f", sgReadyBoostState3);
-        snprintf(boost4Str, sizeof(boost4Str), "%.1f", sgReadyBoostState4);
+        snprintf(boost3Str, sizeof(boost3Str), "%.1f", sgReadyBoostState3Value());
+        snprintf(boost4Str, sizeof(boost4Str), "%.1f", sgReadyBoostState4Value());
         id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_BOOST_STATE3/state", boost3Str, strlen(boost3Str), 0, true);
         id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_BOOST_STATE4/state", boost4Str, strlen(boost4Str), 0, true);
         // Update sensors with initial values
-        id(sg_ready_boost_state3_sensor).publish_state(sgReadyBoostState3);
-        id(sg_ready_boost_state4_sensor).publish_state(sgReadyBoostState4);
+        id(sg_ready_boost_state3_sensor).publish_state(sgReadyBoostState3Value());
+        id(sg_ready_boost_state4_sensor).publish_state(sgReadyBoostState4Value());
         id(SG_READY_CURRENT_STATE).publish_state(
           currentSgReadyState == 0 ? "Deaktiviert" :
           currentSgReadyState == 1 ? "1 - EVU Sperre" :
@@ -220,16 +230,16 @@ mqtt:
             char* endPtr;
             float boost = strtof(x.c_str(), &endPtr);
             if (endPtr != x.c_str() && *endPtr == '\0' && boost >= 0.0 && boost <= 10.0) {
-                sgReadyBoostState3 = boost;
+                setSgReadyBoost3(boost);
                 ESP_LOGI("SG_READY", "State 3 boost set to %.1f°C", boost);
                 // Publish state back
                 char stateTopic[128];
                 snprintf(stateTopic, sizeof(stateTopic), "heatingpump/MANAGER/SG_READY_BOOST_STATE3/state");
                 char valueStr[16];
-                snprintf(valueStr, sizeof(valueStr), "%.1f", boost);
+                snprintf(valueStr, sizeof(valueStr), "%.1f", sgReadyBoostState3Value());
                 id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
                 // Update sensor
-                id(sg_ready_boost_state3_sensor).publish_state(boost);
+                id(sg_ready_boost_state3_sensor).publish_state(sgReadyBoostState3Value());
             } else {
                 ESP_LOGW("MQTT_CMD", "Invalid boost value: %s", x.c_str());
             }
@@ -245,16 +255,16 @@ mqtt:
             char* endPtr;
             float boost = strtof(x.c_str(), &endPtr);
             if (endPtr != x.c_str() && *endPtr == '\0' && boost >= 0.0 && boost <= 15.0) {
-                sgReadyBoostState4 = boost;
+                setSgReadyBoost4(boost);
                 ESP_LOGI("SG_READY", "State 4 boost set to %.1f°C", boost);
                 // Publish state back
                 char stateTopic[128];
                 snprintf(stateTopic, sizeof(stateTopic), "heatingpump/MANAGER/SG_READY_BOOST_STATE4/state");
                 char valueStr[16];
-                snprintf(valueStr, sizeof(valueStr), "%.1f", boost);
+                snprintf(valueStr, sizeof(valueStr), "%.1f", sgReadyBoostState4Value());
                 id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
                 // Update sensor
-                id(sg_ready_boost_state4_sensor).publish_state(boost);
+                id(sg_ready_boost_state4_sensor).publish_state(sgReadyBoostState4Value());
             } else {
                 ESP_LOGW("MQTT_CMD", "Invalid boost value: %s", x.c_str());
             }
@@ -404,7 +414,7 @@ button:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-  #use_address: waermepumpe.iot.stahmer.lan
+  use_address: 192.168.30.107  # production device IP for OTA
   fast_connect: true
   power_save_mode: none
   reboot_timeout: 5min
@@ -431,7 +441,7 @@ sensor:
     icon: "mdi:thermometer-plus"
     update_interval: 30s
     lambda: |-
-      return sgReadyBoostState3;
+      return sgReadyBoostState3Value();
 
   - platform: template
     name: "SG Ready Boost State 4"
@@ -443,7 +453,7 @@ sensor:
     icon: "mdi:thermometer-plus"
     update_interval: 30s
     lambda: |-
-      return sgReadyBoostState4;
+      return sgReadyBoostState4Value();
 
   # WiFi and system sensors
   - platform: wifi_signal
@@ -465,3 +475,138 @@ sensor:
       if (dBm < MIN_DBM) dBm = MIN_DBM;
       if (dBm > MAX_DBM) dBm = MAX_DBM;
       return ((dBm - MIN_DBM) / (MAX_DBM - MIN_DBM)) * 100;
+
+  # -----------------------------------------------------------------------
+  # COP energy accumulator sensors (universal — present on all Elster models)
+  # -----------------------------------------------------------------------
+  - platform: template
+    name: "EL_AUFNAHMELEISTUNG_HEIZ_SUM"
+    id: EL_AUFNAHMELEISTUNG_HEIZ_SUM
+    internal: true
+    unit_of_measurement: MWh
+    device_class: energy
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  - platform: template
+    name: "EL_AUFNAHMELEISTUNG_WW_SUM"
+    id: EL_AUFNAHMELEISTUNG_WW_SUM
+    internal: true
+    unit_of_measurement: MWh
+    device_class: energy
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  - platform: template
+    name: "WAERMEERTRAG_2WE_HEIZ_SUM"
+    id: WAERMEERTRAG_2WE_HEIZ_SUM
+    internal: true
+    unit_of_measurement: MWh
+    device_class: energy
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  - platform: template
+    name: "WAERMEERTRAG_2WE_WW_SUM"
+    id: WAERMEERTRAG_2WE_WW_SUM
+    internal: true
+    unit_of_measurement: MWh
+    device_class: energy
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  - platform: template
+    name: "WAERMEERTRAG_HEIZ_SUM"
+    id: WAERMEERTRAG_HEIZ_SUM
+    internal: true
+    unit_of_measurement: MWh
+    device_class: energy
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  - platform: template
+    name: "WAERMEERTRAG_WW_SUM"
+    id: WAERMEERTRAG_WW_SUM
+    internal: true
+    unit_of_measurement: MWh
+    device_class: energy
+    accuracy_decimals: 3
+    state_class: "total_increasing"
+
+  # DHW and heating temperature sensors
+  - platform: template
+    name: "EINSTELL_SPEICHERSOLLTEMP"
+    id: EINSTELL_SPEICHERSOLLTEMP
+    internal: true
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+
+  - platform: template
+    name: "EINSTELL_SPEICHERSOLLTEMP2"
+    id: EINSTELL_SPEICHERSOLLTEMP2
+    internal: true
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+
+  - platform: template
+    name: "SPEICHERISTTEMP"
+    id: SPEICHERISTTEMP
+    internal: true
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    filters:
+      - offset: 3.9
+
+  - platform: template
+    name: "SPEICHERSOLLTEMP"
+    id: SPEICHERSOLLTEMP
+    internal: true
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+
+  # COP output sensors
+  - platform: template
+    name: "COP_WW"
+    id: COP_WW
+    internal: true
+    device_class: "power_factor"
+    accuracy_decimals: 2
+
+  - platform: template
+    name: "COP_HEIZ"
+    id: COP_HEIZ
+    internal: true
+    device_class: "power_factor"
+    accuracy_decimals: 2
+
+  - platform: template
+    name: "COP_GESAMT"
+    id: COP_GESAMT
+    internal: true
+    device_class: "power_factor"
+    accuracy_decimals: 2
+
+  # Operating mode and season sensors — used to trigger CAN reads
+  - platform: template
+    name: "PROGRAMMSCHALTER"
+    id: PROGRAMMSCHALTER
+    internal: true
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
+      return {};
+
+  - platform: template
+    name: "SOMMERBETRIEB"
+    id: SOMMERBETRIEB
+    internal: true
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "SOMMERBETRIEB");
+      return {};
+
+  - platform: template
+    name: "WW_ECO"
+    id: WW_ECO
+    internal: true
+    lambda: |-
+      readSignal(&CanMembers[cm_manager], "WW_ECO");
+      return {};

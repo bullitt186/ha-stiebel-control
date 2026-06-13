@@ -3,6 +3,7 @@
 substitutions:
   device_name: heatingpump
   friendly_name: "Stiebel Eltron Wärmepumpe"
+  device_model: "wpl13e"
   can_clk_pin: GPIO18
   can_mosi_pin: GPIO23
   can_miso_pin: GPIO19
