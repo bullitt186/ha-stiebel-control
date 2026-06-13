@@ -14,7 +14,7 @@
 #include "config.h"
 #include "signal_requests_base.h"
 
-const SignalRequest signalRequests[] = {
+extern const SignalRequest signalRequests[] = {
     SIGNAL_REQUESTS_BASE   // date/time, EVU lock, operating mode, energy counters
 
     // ========================================================================
@@ -56,6 +56,6 @@ const SignalRequest signalRequests[] = {
     {"GEBAEUDEART",                FREQ_10MIN, cm_manager},
 };
 
-const size_t SIGNAL_REQUEST_COUNT_VALUE = sizeof(signalRequests) / sizeof(SignalRequest);
+extern const size_t SIGNAL_REQUEST_COUNT_VALUE = sizeof(signalRequests) / sizeof(SignalRequest);
 
 #endif // SIGNAL_REQUESTS_WPL13E_H

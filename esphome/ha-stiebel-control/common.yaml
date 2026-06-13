@@ -36,6 +36,7 @@ esphome:
     - ha-stiebel-control/elster/NUtils.cpp
     - ha-stiebel-control/elster/NTypes.h
     - ha-stiebel-control/config.h
+    - ha-stiebel-control/sg_ready_controller.h
     - ha-stiebel-control/ha-stiebel-control.h
     - ha-stiebel-control/signal_requests_base.h
     # model-specific signal_requests_*.h is declared by each model yaml package
@@ -127,8 +128,8 @@ mqtt:
         id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_BOOST_STATE3/state", boost3Str, strlen(boost3Str), 0, true);
         id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_BOOST_STATE4/state", boost4Str, strlen(boost4Str), 0, true);
         // Update sensors with initial values
-        id(sg_ready_boost_state3_sensor).publish_state(sgReadyBoostState3);
-        id(sg_ready_boost_state4_sensor).publish_state(sgReadyBoostState4);
+        id(sg_ready_boost_state3_sensor).publish_state(sgReadyBoostState3Value());
+        id(sg_ready_boost_state4_sensor).publish_state(sgReadyBoostState4Value());
         id(SG_READY_CURRENT_STATE).publish_state(
           currentSgReadyState == 0 ? "Deaktiviert" :
           currentSgReadyState == 1 ? "1 - EVU Sperre" :

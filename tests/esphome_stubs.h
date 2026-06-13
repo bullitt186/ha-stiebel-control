@@ -12,6 +12,12 @@
 #include <cstdint>
 #include <vector>
 
+// ── Device model default (normally injected via platformio build_flags) ──────
+#ifndef HA_DEVICE_MODEL
+#define HA_DEVICE_MODEL "test_model"
+#endif
+
+
 // ── Logging ──────────────────────────────────────────────────────────────────
 // Swallow all ESP_LOGx calls so functions that log remain compilable.
 #define ESP_LOGI(tag, fmt, ...) ((void)0)
