@@ -84,57 +84,19 @@ jobs:
       - name: Use CI secrets
         run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
 
-      - name: Compile S3 firmware
-        run: |
-          esphome compile esphome/ci_heatingpump_s3.yaml
-          cp esphome/.esphome/build/heatingpump/.pioenvs/heatingpump/firmware.ota.bin \
-             firmware-s3.bin
+      - name: Verify S3 firmware compiles
+        run: esphome compile esphome/ci_heatingpump_s3.yaml
 
-      - name: Compile S2 firmware
-        run: |
-          esphome compile esphome/ci_heatingpump_s2.yaml
-          cp esphome/.esphome/build/heatingpump/.pioenvs/heatingpump/firmware.ota.bin \
-             firmware-s2.bin
-
-      - name: Generate manifest.json
-        run: |
-          MD5_S3=$(md5sum firmware-s3.bin | cut -d' ' -f1)
-          MD5_S2=$(md5sum firmware-s2.bin | cut -d' ' -f1)
-          VERSION=${GITHUB_REF_NAME#v}
-          BASE="https://github.com/bullitt186/ha-stiebel-control/releases/download/${GITHUB_REF_NAME}"
-          cat > manifest.json << EOF
-          {
-            "name": "ha-stiebel-control",
-            "version": "${VERSION}",
-            "builds": [
-              {
-                "chipFamily": "ESP32-S3",
-                "ota": {
-                  "path": "${BASE}/firmware-s3.bin",
-                  "md5": "${MD5_S3}",
-                  "summary": "NOTE: CI binaries use placeholder credentials. Compile your own firmware with your secrets.",
-                  "release_url": "https://github.com/bullitt186/ha-stiebel-control/releases/tag/${GITHUB_REF_NAME}"
-                }
-              },
-              {
-                "chipFamily": "ESP32",
-                "ota": {
-                  "path": "${BASE}/firmware-s2.bin",
-                  "md5": "${MD5_S2}",
-                  "summary": "NOTE: CI binaries use placeholder credentials. Compile your own firmware with your secrets.",
-                  "release_url": "https://github.com/bullitt186/ha-stiebel-control/releases/tag/${GITHUB_REF_NAME}"
-                }
-              }
-            ]
-          }
-          EOF
+      - name: Verify S2 firmware compiles
+        run: esphome compile esphome/ci_heatingpump_s2.yaml
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: firmware-s3.bin,firmware-s2.bin,manifest.json
           body_path: CHANGELOG.md
-          fail_on_unmatched_files: true
+          # No firmware binaries attached — they are compiled with placeholder credentials
+          # and would be unusable and potentially dangerous for end users.
+          # Users must compile their own firmware with their own secrets.yaml.
 
   validate-yaml:
     name: Validate YAML
