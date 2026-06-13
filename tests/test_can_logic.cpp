@@ -2,10 +2,13 @@
  * Tests for pure CAN/signal functions in ha-stiebel-control.h.
  * ESPHome symbols are provided by esphome_stubs.h — do NOT define HA_DUMMY_BUILD,
  * as that guard excludes all function implementations in ha-stiebel-control.h.
+ *
+ * Catch2 must be included BEFORE esphome_stubs.h: the stubs define id(x) as a macro
+ * which collides with std::locale::id in gcc-13's STL headers pulled in by Catch2.
  */
-#include "esphome_stubs.h"
-
 #include "catch2/catch_amalgamated.hpp"
+
+#include "esphome_stubs.h"
 
 // ha-stiebel-control.h pulls in all elster headers and signal_requests_wpl13e.h
 // via its own includes. The elster .cpp files are compiled as separate objects.

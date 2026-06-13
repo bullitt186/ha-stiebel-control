@@ -45,9 +45,6 @@ esphome:
       - "-DHA_DEVICE_MODEL='\"${device_model}\"'"
 
 
-
-
-
 #########################################
 #                                       #
 #   LOGGER                              #
@@ -105,7 +102,7 @@ mqtt:
   # Disable reboot on MQTT disconnect - will keep trying to reconnect indefinitely
   reboot_timeout: 0s
   on_connect:
-    - logger.log: 
+    - logger.log:
         level: INFO
         format: "Connected to MQTT broker"
         tag: "MQTT_CONN"
@@ -117,7 +114,7 @@ mqtt:
         publishAllWritableSelectDiscoveries();
         // Datetime control now handled by Home Assistant input_datetime helpers
         ESP_LOGI("MQTT_CONN", "Discovery publication complete");
-        
+
         // Publish initial states for SG Ready controls
         ESP_LOGI("MQTT_CONN", "Publishing initial SG Ready states...");
         // Publish default SG Ready state (2 - Normal)
@@ -148,7 +145,7 @@ mqtt:
     - topic: heatingpump/reconnect
       then:
         - logger.log: "Manual reconnect triggered"
-    
+
     # Force republish all discoveries (including writable entities)
     - topic: heatingpump/republish_discoveries
       then:
@@ -159,7 +156,7 @@ mqtt:
             publishAllWritableSelectDiscoveries(true);
             publishAllCalculatedSensorDiscoveries(true);
             ESP_LOGI("MQTT_CMD", "All discoveries republished");
-    
+
     # Temperature setpoint controls
     - topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP/set
       then:
@@ -172,7 +169,7 @@ mqtt:
             writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP", value);
             // Read back to update state
             readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP");
-    
+
     - topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP2/set
       then:
         - lambda: |-
@@ -184,7 +181,7 @@ mqtt:
             writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP2", value);
             // Read back to update state
             readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP2");
-    
+
     # Operating mode control
     - topic: heatingpump/MANAGER/PROGRAMMSCHALTER/set
       then:
@@ -197,7 +194,7 @@ mqtt:
             writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", value);
             // Read back to update state
             readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
-    
+
     # SG Ready state control
     - topic: heatingpump/MANAGER/SG_READY_STATE/set
       then:
@@ -205,20 +202,20 @@ mqtt:
             ESP_LOGI("MQTT_CMD", "Received SG_READY_STATE command: %s", x.c_str());
             // Ensure discovery is published
             publishWritableSelectDiscovery(writableSelects[1]);
-            
+
             // Parse the state from the string (format: "1 - EVU Sperre", "2 - Normal", etc.)
             int state = 0;
             if (x.find("1 - ") == 0) state = 1;
             else if (x.find("2 - ") == 0) state = 2;
             else if (x.find("3 - ") == 0) state = 3;
             else if (x.find("4 - ") == 0) state = 4;
-            
+
             if (state >= 1 && state <= 4) {
                 applySgReadyState(state);
             } else {
                 ESP_LOGW("MQTT_CMD", "Invalid SG Ready state received: %s", x.c_str());
             }
-    
+
     # SG Ready boost temperature for State 3
     - topic: heatingpump/MANAGER/SG_READY_BOOST_STATE3/set
       then:
@@ -243,7 +240,7 @@ mqtt:
             } else {
                 ESP_LOGW("MQTT_CMD", "Invalid boost value: %s", x.c_str());
             }
-    
+
     # SG Ready boost temperature for State 4
     - topic: heatingpump/MANAGER/SG_READY_BOOST_STATE4/set
       then:
@@ -280,7 +277,6 @@ mqtt:
             readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I");
 
 
-
 #########################################
 #                                       #
 #   INTERVAL TIMER                      #
@@ -292,13 +288,13 @@ interval:
     then:
       - lambda: |-
           processSignalRequests();
-  
+
   # Process calculated sensor updates (runs every second)
   - interval: 1s
     then:
       - lambda: |-
           processCalculatedSensors();
-  
+
   # Republish MQTT discovery every 15 minutes for reliability
   - interval: 15min
     then:
@@ -306,7 +302,7 @@ interval:
           republishAllDiscoveries();
           publishAllWritableNumberDiscoveries(true);
           publishAllWritableSelectDiscoveries(true);
-  
+
 #########################################
 #                                       #
 #   TEXT SENSOREN                       #

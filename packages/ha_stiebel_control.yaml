@@ -6,7 +6,7 @@ input_datetime:
     has_date: false
     has_time: true
     icon: "mdi:clock-outline"
-    
+
   heatingpump_date:
     name: "Wärmepumpe Datum"
     has_date: true

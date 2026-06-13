@@ -10,7 +10,7 @@ esp32:
     type: arduino
   variant: esp32s3
   flash_size: 16MB
-  
+
 psram:
   mode: octal
   speed: 80MHz

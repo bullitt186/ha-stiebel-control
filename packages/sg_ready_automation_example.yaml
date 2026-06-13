@@ -29,22 +29,22 @@ automation:
     alias: "Wärmepumpe: SG Ready State Sync"
     description: "Synchronisiert E3DC SG Ready Zustand mit Wärmepumpe"
     mode: restart  # Restart if triggered again before completion
-    
+
     trigger:
       # Trigger when E3DC SG Ready state changes
       - platform: state
         entity_id: sensor.s10x_sg_ready_numeric
-        
+
       # Also trigger on Home Assistant startup to ensure sync
       - platform: homeassistant
         event: start
-    
+
     condition:
       # Only run if E3DC sensor has a valid value (1-4)
       - condition: template
         value_template: >
           {{ states('sensor.s10x_sg_ready_numeric') | int(0) in [1, 2, 3, 4] }}
-    
+
     action:
       - service: select.select_option
         target:
@@ -57,7 +57,7 @@ automation:
             {% elif state == 3 %}3 - Empfohlen
             {% elif state == 4 %}4 - Zwang
             {% else %}2 - Normal{% endif %}
-      
+
       - service: system_log.write
         data:
           message: >
@@ -72,7 +72,7 @@ automation:
   # You can configure the boost amounts for states 3 and 4 via number entities.
   # These are configured once and persist until changed.
   # ============================================================================
-  
+
   # Example: Set custom boost for State 3 (0-10°C range, 0.5°C steps)
   # - id: sg_ready_configure_state3_boost
   #   alias: "Wärmepumpe: SG Ready State 3 Boost konfigurieren"
@@ -103,7 +103,7 @@ automation:
 # ============================================================================
 # Available Entities for SG Ready Control
 # ============================================================================
-# 
+#
 # select.manager_sg_ready_zustand
 #   Options: "1 - EVU Sperre", "2 - Normal", "3 - Empfohlen", "4 - Zwang"
 #   Controls the SG Ready state which automatically manages:
