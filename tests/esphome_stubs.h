@@ -10,6 +10,7 @@
 #pragma once
 #include <cstdio>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 // ── Device model default (normally injected via platformio build_flags) ──────
