@@ -25,7 +25,8 @@ After every `make upload`, run these steps in order:
 
 1. Watch `heatingpump/status` go `offline` → `online` (within ~60s):
    ```bash
-   mosquitto_sub -h 192.168.30.10 -u iotuser -P $(grep mqtt_password esphome/secrets.yaml | awk '{print $2}') \
+   mosquitto_sub -h 192.168.30.10 -u iotuser \
+     --pw "$(grep mqtt_password esphome/secrets.yaml | sed 's/mqtt_password: *//')" \
      -t "heatingpump/status" -v
    ```
 2. Run the MQTT smoke test — **must pass before considering the flash successful**:

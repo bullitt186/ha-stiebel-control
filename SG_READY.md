@@ -1,294 +1,169 @@
-# SG Ready Integration für ha-stiebel-control
+# SG Ready — PV Surplus Integration
 
-ESPHome-native Smart Grid Ready (SG Ready) Steuerung für Stiebel Eltron Wärmepumpen mit PV-Überschussnutzung.
+ESPHome-native Smart Grid Ready (SG Ready) control for Stiebel Eltron heat pumps.
+Automatically adjusts heat pump operation based on PV surplus availability.
 
-## 🚀 Schnellstart (5 Minuten)
+---
 
-### 1. Firmware flashen
+## What is SG Ready?
+
+SG Ready is a standard for smart heat pump control with 4 operating states:
+
+| State | Name | Typical PV situation | Heat pump action |
+|-------|------|---------------------|-----------------|
+| **1** | EVU Sperre | Grid demand / no PV | **Bereitschaft** — standby only |
+| **2** | Normal | Standard operation | **Tagbetrieb** — comfort mode |
+| **3** | Empfohlen | 1–2 kW surplus available | **Tagbetrieb** + DHW boost + room boost (+1°C) |
+| **4** | Zwang | >2 kW surplus available | **Tagbetrieb** + larger DHW boost + room boost (+2°C) |
+
+> **Important:** States 3 and 4 use `Tagbetrieb` (continuous comfort mode, ignores schedule)
+> rather than `Warmwasser` — this keeps space heating active alongside DHW heating.
+
+---
+
+## Quick Start (5 minutes)
+
+### 1. Flash the firmware
+
+The SG Ready feature is built into the standard firmware. Just flash as normal:
 
 ```bash
-cd esphome/ha-stiebel-control
-esphome run wpl13e.yaml
+make upload
+make smoke-test
 ```
 
-### 2. Neue Entities in Home Assistant prüfen
+### 2. Verify new entities in HA
 
-Nach dem Flash erscheinen automatisch:
-- **Select**: `select.manager_sg_ready_zustand`
-- **Numbers**: `number.manager_sg_ready_boost_state_3` und `number.manager_sg_ready_boost_state_4`
+After flashing, these entities appear automatically:
 
-### 3. Automation erstellen
+- **Select**: `select.manager_sg_ready_zustand` — control SG Ready state
+- **Number**: `number.manager_sg_ready_boost_zustand_3` — DHW boost for state 3 (default 5°C)
+- **Number**: `number.manager_sg_ready_boost_zustand_4` — DHW boost for state 4 (default 8°C)
+- **Sensor**: `sensor.heatingpump_sg_ready_aktueller_zustand` — read-only current state
+- **Sensor**: `sensor.heatingpump_sg_ready_boost_state_3` / `_4` — read-only boost values
+
+### 3. Create a HA automation
+
+Map your PV system's SG Ready state to the heat pump. Example for E3DC:
 
 ```yaml
 automation:
-  - alias: SG Ready Sync
+  - alias: "Heat pump: SG Ready sync"
     trigger:
       - platform: state
         entity_id: sensor.s10x_sg_ready_numeric
+      - platform: homeassistant
+        event: start
+    condition:
+      - condition: template
+        value_template: >
+          {{ states('sensor.s10x_sg_ready_numeric') | int(0) in [1,2,3,4] }}
     action:
       - service: select.select_option
         target:
           entity_id: select.manager_sg_ready_zustand
         data:
           option: >
-            {% set s = states('sensor.s10x_sg_ready_numeric')|int(2) %}
-            {{ ['1 - EVU Sperre','2 - Normal','3 - Empfohlen','4 - Zwang'][s-1] if s in [1,2,3,4] else '2 - Normal' }}
+            {% set s = states('sensor.s10x_sg_ready_numeric') | int %}
+            {% if s == 1 %}1 - EVU Sperre
+            {% elif s == 2 %}2 - Normal
+            {% elif s == 3 %}3 - Empfohlen
+            {% elif s == 4 %}4 - Zwang
+            {% else %}2 - Normal{% endif %}
 ```
 
----
-
-## 📖 Was ist SG Ready?
-
-SG Ready ist ein Standard für intelligente Wärmepumpen-Steuerung im Smart Grid mit 4 Betriebszuständen:
-
-| Zustand | Name | PV-Situation | Wärmepumpen-Reaktion |
-|---------|------|--------------|---------------------|
-| **1** | EVU Sperre | Netzbezug / Keine PV | **Bereitschaft** - Nur Notbetrieb |
-| **2** | Normal | Normalbetrieb | **Automatik** - Programmierter Zeitplan |
-| **3** | Empfohlen | 1-2 kW Überschuss | **Tagbetrieb** - Komfortmodus + Temp-Boost |
-| **4** | Zwang | >2 kW Überschuss | **Tagbetrieb** - Komfortmodus + Max-Boost |
-
-### Betriebsarten-Erklärung
-
-- **Bereitschaft**: Standby, nur bei Bedarf
-- **Automatik**: Folgt programmiertem Zeitplan (Tag-/Nachtabsenkung)
-- **Tagbetrieb**: Dauerhaft Komfortmodus ohne Zeitplan (höherer Energieverbrauch)
-
-**Wichtig**: Zustand 3 & 4 verwenden `Tagbetrieb` statt `Warmwasser`, damit die Raumheizung aktiv bleibt!
+A ready-to-use example is in [`packages/sg_ready_automation_example.yaml`](packages/sg_ready_automation_example.yaml).
 
 ---
 
-## ⚙️ Implementierung
+## How the Temperature Boost Works
 
-### ESPHome Komponenten
+The boost is applied **automatically by the firmware** — no extra HA automation needed.
 
-**Select Dropdown**: `select.manager_sg_ready_zustand`
-- Optionen: `1 - EVU Sperre`, `2 - Normal`, `3 - Empfohlen`, `4 - Zwang`
-- MQTT Topics:
-  - Command: `heatingpump/MANAGER/SG_READY_STATE/set`
-  - State: `heatingpump/MANAGER/SG_READY_STATE/state`
+When state 3 is activated:
+1. Current DHW setpoint baseline is recorded (default: 48°C if not previously set)
+2. `PROGRAMMSCHALTER` → `Tagbetrieb`
+3. DHW setpoint → baseline + `boost_state3` (e.g. 48 + 5 = 53°C, capped at 60°C)
+4. Room setpoint → baseline + 1°C (capped at 25°C)
 
-**Temperature Boost Numbers**:
-- `number.manager_sg_ready_boost_state_3` (0-10°C, Standard: 3°C)
-- `number.manager_sg_ready_boost_state_4` (0-15°C, Standard: 5°C)
+When returning to state 2 (Normal):
+1. `PROGRAMMSCHALTER` → `Tagbetrieb`
+2. DHW setpoint → restored to baseline
+3. Room setpoint → restored to baseline
 
-### Automatische Steuerung
+State 1 (EVU Sperre):
+1. Temperatures restored to baseline
+2. `PROGRAMMSCHALTER` → `Bereitschaft`
 
-Bei Zustandsänderung:
-1. ESPHome empfängt MQTT-Befehl
-2. `applySgReadyState()` wird aufgerufen
-3. PROGRAMMSCHALTER wird via CAN gesetzt:
-   - Zustand 1 → Bereitschaft
-   - Zustand 2 → Automatik
-   - Zustand 3 → Tagbetrieb
-   - Zustand 4 → Tagbetrieb
+Boost amounts are configurable via `number.manager_sg_ready_boost_zustand_3` and `_4`.
+Values persist across firmware restarts (stored in ESP32 flash via NVS).
 
-### Temperatur-Boost (optional)
+### Recommended boost values
 
-Die Boost-Werte werden in ESPHome gespeichert, aber **nicht automatisch angewendet**. Sie können in Home Assistant Automationen verwendet werden:
+| Season | State 3 | State 4 | Notes |
+|--------|---------|---------|-------|
+| Winter | 3–5°C | 6–8°C | DHW more important; heating runs anyway |
+| Summer | 5–8°C | 8–12°C | DHW only mode; more boost headroom |
 
-```yaml
-# DHW Boost bei State 3
-- alias: SG Ready State 3 DHW Boost
-  trigger:
-    - platform: state
-      entity_id: select.manager_sg_ready_zustand
-      to: "3 - Empfohlen"
-  variables:
-    current_temp: "{{ states('sensor.manager_einstell_speichersolltemp') | float(50) }}"
-    boost: "{{ states('number.manager_sg_ready_boost_state_3') | float(3) }}"
-  action:
-    - service: mqtt.publish
-      data:
-        topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP/set
-        payload: "{{ current_temp + boost }}"
-
-# Restore bei Verlassen von State 3
-- alias: SG Ready State 3 Restore
-  trigger:
-    - platform: state
-      entity_id: select.manager_sg_ready_zustand
-      from: "3 - Empfohlen"
-      to: ["1 - EVU Sperre", "2 - Normal"]
-  variables:
-    current_temp: "{{ states('sensor.manager_einstell_speichersolltemp') | float(50) }}"
-    boost: "{{ states('number.manager_sg_ready_boost_state_3') | float(3) }}"
-  action:
-    - service: mqtt.publish
-      data:
-        topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP/set
-        payload: "{{ current_temp - boost }}"
-```
-
-Analog für State 4 mit `number.manager_sg_ready_boost_state_4`.
+Maximum DHW temperature is typically 55–60°C per manufacturer — check your manual.
 
 ---
 
-## 🏗️ System-Architektur
+## System Architecture
 
 ```
 ┌─────────────────────────┐
-│   E3DC PV System        │
-│   sensor.s10x_sg_ready  │ (1-4)
-└───────────┬─────────────┘
-            │
-            ▼
+│   PV System (e.g. E3DC) │
+│   sensor.sg_ready_state │  (1–4)
+└──────────────┬──────────┘
+               │ HA Automation
+               ▼
 ┌─────────────────────────┐
 │  Home Assistant         │
-│  Automation             │
-└───────────┬─────────────┘
-            │ MQTT
-            ▼
+│  select.manager_sg_...  │
+└──────────────┬──────────┘
+               │ MQTT heatingpump/MANAGER/SG_READY_STATE/set
+               ▼
 ┌─────────────────────────┐
 │  ESPHome ESP32          │
-│  select.sg_ready_...    │
-│  applySgReadyState()    │
-└───────────┬─────────────┘
-            │ CAN Bus
-            ▼
+│  SgReadyController      │  ← applies boost, persists state
+└──────────────┬──────────┘
+               │ CAN Bus
+               ▼
 ┌─────────────────────────┐
-│  Stiebel Eltron WP      │
+│  Stiebel Eltron         │
 │  PROGRAMMSCHALTER       │
+│  EINSTELL_SPEICHER...   │
 └─────────────────────────┘
 ```
 
-**Datenfluss**:
-1. E3DC erkennt PV-Überschuss → `sensor.s10x_sg_ready_numeric` = 3
-2. HA Automation triggert → `select.manager_sg_ready_zustand` = "3 - Empfohlen"
-3. ESPHome empfängt via MQTT → `applySgReadyState(3)`
-4. CAN Command → `PROGRAMMSCHALTER = "Tagbetrieb"`
-5. Wärmepumpe wechselt in Komfortmodus
-
 ---
 
-## 📊 Dashboard
+## Dashboard
 
 ```yaml
 type: entities
 title: SG Ready Status
 entities:
-  - entity: sensor.s10x_sg_ready_numeric
-    name: E3DC Zustand
   - entity: select.manager_sg_ready_zustand
-    name: WP SG Ready
-  - entity: sensor.manager_programmschalter
-    name: Betriebsart
-  - entity: number.manager_sg_ready_boost_state_3
-    name: Boost State 3
-  - entity: number.manager_sg_ready_boost_state_4
-    name: Boost State 4
-  - entity: sensor.manager_einstell_speichersolltemp
-    name: WW Soll
-  - entity: sensor.kessel_speicheristtemp
-    name: WW Ist
-```
-
-```yaml
-type: history-graph
-title: SG Ready Verlauf
-entities:
-  - sensor.s10x_sg_ready_numeric
-  - sensor.manager_programmschalter
-hours_to_show: 24
+    name: SG Ready State
+  - entity: sensor.heatingpump_sg_ready_aktueller_zustand
+    name: Current State (read-only)
+  - entity: select.manager_programmschalter
+    name: Operating Mode
+  - entity: number.manager_sg_ready_boost_zustand_3
+    name: Boost State 3 (°C)
+  - entity: number.manager_sg_ready_boost_zustand_4
+    name: Boost State 4 (°C)
+  - entity: number.manager_speicher_soll_temperatur_einstellung
+    name: DHW Setpoint
 ```
 
 ---
 
-## 🔧 Konfiguration
+## Optimisation Tips
 
-### Boost-Werte anpassen
-
-**Via UI**: Einfach die Number-Slider verstellen
-
-**Via Automation**:
-```yaml
-- service: number.set_value
-  target:
-    entity_id: number.manager_sg_ready_boost_state_3
-  data:
-    value: 4  # 4°C Boost in State 3
-```
-
-### Empfohlene Boost-Werte
-
-| Jahreszeit | State 3 | State 4 | Begründung |
-|------------|---------|---------|------------|
-| Winter | 2-3°C | 4-5°C | WW wichtiger, Heizung läuft sowieso |
-| Sommer | 4-5°C | 7-10°C | Nur WW, mehr Boost möglich |
-
-**Maximale WW-Temperatur beachten**: Meist 55-60°C laut Hersteller
-
-### Manueller Override
-
-Für Tests oder manuelle Steuerung:
-
-```yaml
-input_select:
-  sg_ready_override:
-    name: SG Ready Manuell
-    options:
-      - Auto (aus E3DC)
-      - "1 - EVU Sperre"
-      - "2 - Normal"
-      - "3 - Empfohlen"
-      - "4 - Zwang"
-    initial: Auto (aus E3DC)
-
-automation:
-  - alias: SG Ready Manual Override
-    trigger:
-      - platform: state
-        entity_id: input_select.sg_ready_override
-    condition:
-      - "{{ trigger.to_state.state != 'Auto (aus E3DC)' }}"
-    action:
-      - service: select.select_option
-        target:
-          entity_id: select.manager_sg_ready_zustand
-        data:
-          option: "{{ trigger.to_state.state }}"
-```
-
----
-
-## 🐛 Troubleshooting
-
-### Select erscheint nicht in HA
-
-1. **MQTT Explorer prüfen**: Topic `homeassistant/select/heatingpump/stiebel_manager_sg_ready_state/config` vorhanden?
-2. **ESPHome Logs**: `Discovery published for writable select: SG Ready Zustand`
-3. **HA MQTT neu laden**: Settings → Integrations → MQTT → Reload
-
-### Wärmepumpe reagiert nicht
-
-1. **Logs prüfen**:
-   ```
-   [SG_READY] Applying SG Ready state 3
-   [SG_READY] State 3: Recommended - Tagbetrieb
-   ```
-2. **Sensor prüfen**: `sensor.manager_programmschalter` ändert sich?
-3. **CAN Errors**: ESPHome Logs auf Write-Errors prüfen
-
-### E3DC Sensor fehlt
-
-- E3DC Integration in HA prüfen
-- Alternative: `input_select` für manuelle Tests
-
-### Falsche Betriebsart
-
-Prüfe ob `sensor.s10x_sg_ready_numeric` wirklich Werte 1-4 liefert:
-```yaml
-{% set s = states('sensor.s10x_sg_ready_numeric') %}
-{{ s }} - Typ: {{ s | int }}
-```
-
----
-
-## 💡 Optimierung
-
-### Zeitliche Beschränkungen
-
-Nur tagsüber State 3/4 zulassen:
+### Restrict to daytime only
 
 ```yaml
 condition:
@@ -297,103 +172,68 @@ condition:
     before: "20:00:00"
 ```
 
-### Temperatur-Grenzen
-
-Nur boosten wenn WW nicht schon heiß genug:
+### Avoid boosting when already hot
 
 ```yaml
 condition:
   - condition: numeric_state
-    entity_id: sensor.kessel_speicheristtemp
-    below: 50  # Nur unter 50°C boosten
+    entity_id: sensor.kessel_speicher_ist_temperatur
+    below: 50
 ```
 
-### State 4 Timeout
-
-Verhindere zu lange Laufzeiten:
+### State 4 timeout (prevent excessive runtime)
 
 ```yaml
-- alias: SG Ready State 4 Timeout
+- alias: "Heat pump: SG Ready state 4 timeout"
   trigger:
     - platform: state
       entity_id: select.manager_sg_ready_zustand
       to: "4 - Zwang"
-      for: "01:00:00"  # Nach 1h
+      for: "01:00:00"
   action:
     - service: select.select_option
+      target:
+        entity_id: select.manager_sg_ready_zustand
       data:
         option: "2 - Normal"
 ```
 
-### Statistiken
+---
 
-```yaml
-sensor:
-  - platform: history_stats
-    name: SG Ready State 3 Heute
-    entity_id: select.manager_sg_ready_zustand
-    state: "3 - Empfohlen"
-    type: time
-    start: "{{ now().replace(hour=0, minute=0, second=0) }}"
-    end: "{{ now() }}"
-```
+## Hardware Simplification
+
+If you previously used a Shelly relay or other hardware for EVU lock:
+
+State 1 (`EVU Sperre`) now sends `Bereitschaft` directly via CAN — **the hardware relay
+is no longer needed**. Remove it for a simpler, faster, more reliable setup.
 
 ---
 
-## 🗑️ Hardware Vereinfachung
+## Troubleshooting
 
-**Shelly EVU-Sperre kann entfernt werden!**
+### Select doesn't appear in HA
 
-Die bisherige Hardware-Lösung (Shelly Relais am EVU-Eingang) wird nicht mehr benötigt:
-- ✅ State 1 schaltet direkt via CAN in Bereitschaft
-- ✅ Schneller (keine Netzwerk-Verzögerung)
-- ✅ Zuverlässiger
-- ✅ Ein Gerät weniger
+1. Check MQTT: `homeassistant/select/heatingpump/stiebel_manager_sg_ready_state/config` should be retained
+2. Check firmware logs for: `Discovery published for writable select: SG Ready Zustand`
+3. Reload MQTT: Settings → Integrations → MQTT → Reload
 
----
+### Heat pump doesn't change mode
 
-## 📚 Hintergrund & Referenzen
+1. Check logs: `[SG_READY] Applying SG Ready state 3`
+2. Verify `select.manager_programmschalter` changes in HA
+3. Check for CAN write errors in `heatingpump/debug`
 
-### SG Ready Standard
-- [BWP SG Ready Info](https://www.waermepumpe.de/normen-technik/sg-ready/)
-- [E3DC Dokumentation](https://wohnen-mit-energie.de/data/documents/SG-Ready-Dokumentation_V1.70_2022-02-08-wme.pdf)
+### Boost not applied
 
-### Betriebsarten Details
-
-**Automatik vs. Tagbetrieb**:
-- **Automatik**: Zeitgesteuert, Tag-/Nachtabsenkung, energieeffizient
-- **Tagbetrieb**: Dauerhaft Komfort-Temperatur, kein Zeitplan, höherer Verbrauch
-
-**Warum nicht "Warmwasser"?**:
-- Warmwasser-Modus deaktiviert die Raumheizung komplett
-- Nur für reinen WW-Betrieb (z.B. Sommer)
-- Für SG Ready ungeeignet, da Heizung ausfällt
-
-### Implementierung
-
-- **Code**: `esphome/ha-stiebel-control/ha-stiebel-control.h`
-- **Config**: `esphome/ha-stiebel-control/common.yaml`
-- **Beispiele**: `packages/sg_ready_automation_example.yaml`
+The boost is applied automatically. If temperatures don't change:
+1. Check the boost number entity shows a non-zero value
+2. Wait 30–60 seconds for the heat pump's anti-cycling protection
+3. Check logs: `[SG_READY] Applied DHW boost: 48.0 + 5.0 = 53.0°C`
 
 ---
 
-## ✅ Erfolgsindikatoren
+## References
 
-Die Integration funktioniert, wenn:
-
-1. ✅ E3DC zeigt PV-Überschuss → SG Ready State wechselt zu 3/4
-2. ✅ Wärmepumpe wechselt zu Tagbetrieb
-3. ✅ WW-Temperatur steigt (bei Boost-Automation)
-4. ✅ PV-Überschuss wird genutzt statt eingespeist
-5. ✅ Logs zeigen saubere State-Transitions
-
-**Typischer Ablauf**:
-- E3DC Surplus-Detection: sofort
-- HA Automation: 1-2 Sekunden
-- ESPHome MQTT: <1 Sekunde
-- CAN Befehl: 2-5 Sekunden
-- Verdichter-Start: 30-60 Sekunden (Anti-Takt-Sperre)
-
----
-
-**Viel Erfolg bei der Optimierung deiner PV-Eigenverbrauchsquote!** ☀️🔥💧
+- [SG Ready standard (BWP)](https://www.waermepumpe.de/normen-technik/sg-ready/)
+- Automation example: [`packages/sg_ready_automation_example.yaml`](packages/sg_ready_automation_example.yaml)
+- Implementation: `esphome/ha-stiebel-control/sg_ready_controller.h`
