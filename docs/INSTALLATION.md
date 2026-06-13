@@ -50,9 +50,9 @@ Open `esphome/heatingpump.yaml`. The ESP32-S3 block is active by default. Adjust
 substitutions:
   device_name: heatingpump
   friendly_name: "Stiebel Eltron Wärmepumpe"
-  device_model: "wpl13e"          # your heat pump model
-  can_tx_pin: GPIO15               # CAN TX pin on your board
-  can_rx_pin: GPIO16               # CAN RX pin on your board
+  device_model: "wpl13e"          # your heat pump model — see Supported Models in README
+  can_tx_pin: GPIOxx               # ⚠️ BOARD-SPECIFIC — check your board's schematic
+  can_rx_pin: GPIOxx               # ⚠️ BOARD-SPECIFIC — check your board's schematic
   can_id_pc: "0x680"
 
 packages:
@@ -62,7 +62,12 @@ packages:
   sensors: !include ha-stiebel-control/wpl13e.yaml
 ```
 
-For ESP32-S2 + MCP2515, comment out the S3 block and uncomment the S2 block at the bottom of the file.
+> **Important — pin numbers are board-specific.** The file already contains correct
+> values for the Waveshare ESP32-S3-RS485-CAN board. If you use a different board,
+> look up the CAN transceiver connections in your board's schematic and change
+> `can_tx_pin` / `can_rx_pin` accordingly before flashing.
+
+For ESP32-S2 + MCP2515, comment out the S3 block and uncomment the S2 block at the bottom of the file. The SPI pin defaults are also board-specific — verify before use.
 
 ### 4. Compile and flash
 
@@ -108,8 +113,8 @@ substitutions:
   device_name: heatingpump
   friendly_name: "Stiebel Eltron Wärmepumpe"
   device_model: "wpl13e"
-  can_tx_pin: GPIO15
-  can_rx_pin: GPIO16
+  can_tx_pin: GPIOxx   # ⚠️ replace with your board's CAN TX pin
+  can_rx_pin: GPIOxx   # ⚠️ replace with your board's CAN RX pin
   can_id_pc: "0x680"
 
 packages:

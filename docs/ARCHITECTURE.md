@@ -66,8 +66,8 @@ ha-stiebel-control/
 Heat Pump CAN Bus (Elster Protocol, 20kbps)
          │
          ▼
-ESP32-S3 (TWAI controller, GPIO15/16)
- or ESP32-S2 + MCP2515 (SPI, GPIO18/19/23/5)
+ESP32-S3 (built-in TWAI controller, board-specific CAN TX/RX pins)
+ or ESP32-S2 + MCP2515 (SPI, board-specific pins)
          │
          ▼
 ESPHome firmware (ha-stiebel-control.h)

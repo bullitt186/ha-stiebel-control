@@ -32,13 +32,17 @@ The key must match what HA's ESPHome integration has stored for this device. If 
 | `device_name` | ESPHome device hostname | `heatingpump` |
 | `friendly_name` | Display name in HA | `"Stiebel Eltron Wärmepumpe"` |
 | `device_model` | Heat pump model — selects signal table and HA device identifier | `"wpl13e"` |
-| `can_tx_pin` | CAN TX GPIO (ESP32-S3 only) | `GPIO15` |
-| `can_rx_pin` | CAN RX GPIO (ESP32-S3 only) | `GPIO16` |
+| `can_tx_pin` | CAN TX GPIO (ESP32-S3 built-in TWAI) | board-specific — check schematic |
+| `can_rx_pin` | CAN RX GPIO (ESP32-S3 built-in TWAI) | board-specific — check schematic |
 | `can_id_pc` | CAN bus ID for the ESP32 (PC role) | `"0x680"` |
-| `can_clk_pin` | SPI CLK (MCP2515 only) | `GPIO18` |
-| `can_mosi_pin` | SPI MOSI (MCP2515 only) | `GPIO23` |
-| `can_miso_pin` | SPI MISO (MCP2515 only) | `GPIO19` |
-| `can_cs_pin` | SPI CS (MCP2515 only) | `GPIO5` |
+| `can_clk_pin` | SPI CLK (MCP2515 only) | board-specific |
+| `can_mosi_pin` | SPI MOSI (MCP2515 only) | board-specific |
+| `can_miso_pin` | SPI MISO (MCP2515 only) | board-specific |
+| `can_cs_pin` | SPI CS (MCP2515 only) | board-specific |
+
+> **Pin assignments are board-specific.** Always consult your board's schematic before
+> wiring. The `heatingpump.yaml` in this repo ships with values for the
+> **Waveshare ESP32-S3-RS485-CAN board** — they will be wrong for other boards.
 
 ---
 
