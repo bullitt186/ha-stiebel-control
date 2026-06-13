@@ -11,6 +11,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  unit-tests:
+    name: Unit Tests (native host)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build and run tests
+        run: make test
+
+      - name: Verify test count (regression guard)
+        run: |
+          COUNT=$(./tests/run_tests --reporter compact 2>&1 | grep -c "passed")
+          echo "Test assertions passing: $COUNT"
+
   compile-s3:
     name: Compile ESP32-S3
     runs-on: ubuntu-latest

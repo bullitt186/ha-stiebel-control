@@ -122,8 +122,8 @@ mqtt:
         id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_STATE/state", sgStateStr, strlen(sgStateStr), 0, true);
         // Publish current boost values (reflect actual in-memory values, not hardcoded defaults)
         char boost3Str[16], boost4Str[16];
-        snprintf(boost3Str, sizeof(boost3Str), "%.1f", sgReadyBoostState3);
-        snprintf(boost4Str, sizeof(boost4Str), "%.1f", sgReadyBoostState4);
+        snprintf(boost3Str, sizeof(boost3Str), "%.1f", sgReadyBoostState3Value());
+        snprintf(boost4Str, sizeof(boost4Str), "%.1f", sgReadyBoostState4Value());
         id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_BOOST_STATE3/state", boost3Str, strlen(boost3Str), 0, true);
         id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_BOOST_STATE4/state", boost4Str, strlen(boost4Str), 0, true);
         // Update sensors with initial values
@@ -227,16 +227,16 @@ mqtt:
             char* endPtr;
             float boost = strtof(x.c_str(), &endPtr);
             if (endPtr != x.c_str() && *endPtr == '\0' && boost >= 0.0 && boost <= 10.0) {
-                sgReadyBoostState3 = boost;
+                setSgReadyBoost3(boost);
                 ESP_LOGI("SG_READY", "State 3 boost set to %.1f°C", boost);
                 // Publish state back
                 char stateTopic[128];
                 snprintf(stateTopic, sizeof(stateTopic), "heatingpump/MANAGER/SG_READY_BOOST_STATE3/state");
                 char valueStr[16];
-                snprintf(valueStr, sizeof(valueStr), "%.1f", boost);
+                snprintf(valueStr, sizeof(valueStr), "%.1f", sgReadyBoostState3Value());
                 id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
                 // Update sensor
-                id(sg_ready_boost_state3_sensor).publish_state(boost);
+                id(sg_ready_boost_state3_sensor).publish_state(sgReadyBoostState3Value());
             } else {
                 ESP_LOGW("MQTT_CMD", "Invalid boost value: %s", x.c_str());
             }
@@ -252,16 +252,16 @@ mqtt:
             char* endPtr;
             float boost = strtof(x.c_str(), &endPtr);
             if (endPtr != x.c_str() && *endPtr == '\0' && boost >= 0.0 && boost <= 15.0) {
-                sgReadyBoostState4 = boost;
+                setSgReadyBoost4(boost);
                 ESP_LOGI("SG_READY", "State 4 boost set to %.1f°C", boost);
                 // Publish state back
                 char stateTopic[128];
                 snprintf(stateTopic, sizeof(stateTopic), "heatingpump/MANAGER/SG_READY_BOOST_STATE4/state");
                 char valueStr[16];
-                snprintf(valueStr, sizeof(valueStr), "%.1f", boost);
+                snprintf(valueStr, sizeof(valueStr), "%.1f", sgReadyBoostState4Value());
                 id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
                 // Update sensor
-                id(sg_ready_boost_state4_sensor).publish_state(boost);
+                id(sg_ready_boost_state4_sensor).publish_state(sgReadyBoostState4Value());
             } else {
                 ESP_LOGW("MQTT_CMD", "Invalid boost value: %s", x.c_str());
             }
@@ -438,7 +438,7 @@ sensor:
     icon: "mdi:thermometer-plus"
     update_interval: 30s
     lambda: |-
-      return sgReadyBoostState3;
+      return sgReadyBoostState3Value();
 
   - platform: template
     name: "SG Ready Boost State 4"
@@ -450,7 +450,7 @@ sensor:
     icon: "mdi:thermometer-plus"
     update_interval: 30s
     lambda: |-
-      return sgReadyBoostState4;
+      return sgReadyBoostState4Value();
 
   # WiFi and system sensors
   - platform: wifi_signal
