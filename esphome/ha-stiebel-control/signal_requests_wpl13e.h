@@ -57,6 +57,7 @@ extern const SignalRequest signalRequests[] = {
 
     // ========================================================================
     // COMPRESSOR RUNTIME COUNTERS (Laufzeit Verdichter)
+    // Poll both HEIZMODUL and MANAGER — which one has valid data is model-dependent
     // ========================================================================
     {"LZ_VERD_1_HEIZBETRIEB",    FREQ_10MIN, cm_heizmodul},
     {"LZ_VERD_2_HEIZBETRIEB",    FREQ_10MIN, cm_heizmodul},
@@ -64,6 +65,12 @@ extern const SignalRequest signalRequests[] = {
     {"LZ_VERD_1_KUEHLBETRIEB",   FREQ_10MIN, cm_heizmodul},
     {"LZ_VERD_2_KUEHLBETRIEB",   FREQ_10MIN, cm_heizmodul},
     {"LZ_VERD_1_2_KUEHLBETRIEB", FREQ_10MIN, cm_heizmodul},
+    {"LZ_VERD_1_HEIZBETRIEB",    FREQ_10MIN, cm_manager},
+    {"LZ_VERD_2_HEIZBETRIEB",    FREQ_10MIN, cm_manager},
+    {"LZ_VERD_1_2_HEIZBETRIEB",  FREQ_10MIN, cm_manager},
+    {"LZ_VERD_1_KUEHLBETRIEB",   FREQ_10MIN, cm_manager},
+    {"LZ_VERD_2_KUEHLBETRIEB",   FREQ_10MIN, cm_manager},
+    {"LZ_VERD_1_2_KUEHLBETRIEB", FREQ_10MIN, cm_manager},
 };
 
 extern const size_t SIGNAL_REQUEST_COUNT_VALUE = sizeof(signalRequests) / sizeof(SignalRequest);
