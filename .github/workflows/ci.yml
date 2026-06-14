@@ -90,10 +90,23 @@ jobs:
       - name: Verify S2 firmware compiles
         run: esphome compile esphome/ci_heatingpump_s2.yaml
 
+      - name: Extract release notes
+        run: |
+          python3 - <<'EOF'
+          import re, sys
+          text = open("CHANGELOG.md").read()
+          # Extract content between first ## heading and the next ## heading
+          m = re.search(r'(## \[.*?\].*?)(?=\n## \[|\Z)', text, re.DOTALL)
+          if not m:
+              print("Could not extract release notes", file=sys.stderr)
+              sys.exit(1)
+          open("release_notes.md", "w").write(m.group(1).strip())
+          EOF
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          body_path: CHANGELOG.md
+          body_path: release_notes.md
           # No firmware binaries attached — they are compiled with placeholder credentials
           # and would be unusable and potentially dangerous for end users.
           # Users must compile their own firmware with their own secrets.yaml.
