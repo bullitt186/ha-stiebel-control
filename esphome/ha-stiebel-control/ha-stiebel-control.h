@@ -25,6 +25,7 @@
 #include "KElsterTable.h"
 #include "config.h"
 #include "sg_ready_controller.h"
+#include <driver/twai.h>
 #include <sstream>
 #include <iomanip>
 #include <set>
@@ -134,8 +135,7 @@ static const CalculatedSensorConfig calculatedSensors[] = {
     {"stiebel_calculated_compressor_active", "WP Verdichter aktiv", "heatingpump/calculated/compressor_active/state",
      "binary_sensor", "running", "", "", "mdi:engine", "on", "off"},
 
-#ifdef USE_ESP32_VARIANT_ESP32S3
-    // CAN bus diagnostic sensors (ESP32-S3 / TWAI only)
+    // CAN bus diagnostic sensors (TWAI / ESP32-S3; silently inactive on MCP2515 builds)
     {"stiebel_calculated_can_tec",        "CAN TX Fehlerzähler",  "heatingpump/calculated/can_tec/state",
      "sensor", "", "", "measurement", "mdi:alert-network", "", ""},
     {"stiebel_calculated_can_rec",        "CAN RX Fehlerzähler",  "heatingpump/calculated/can_rec/state",
@@ -144,7 +144,6 @@ static const CalculatedSensorConfig calculatedSensors[] = {
      "sensor", "", "", "total_increasing", "mdi:network-off", "", ""},
     {"stiebel_calculated_can_state",      "CAN Bus Zustand",       "heatingpump/calculated/can_state/state",
      "sensor", "", "", "", "mdi:can", "", ""},
-#endif
 };
 
 static const size_t CALCULATED_SENSOR_COUNT = sizeof(calculatedSensors) / sizeof(CalculatedSensorConfig);
@@ -285,9 +284,7 @@ static unsigned long nextDeltaTUpdate = 0;
 static unsigned long nextCompressorUpdate = 0;
 static unsigned long nextDateTimeUpdate = 0;
 static unsigned long nextBetriebsartUpdate = 0;
-#ifdef USE_ESP32_VARIANT_ESP32S3
 static unsigned long nextCanDiagUpdate = 0;
-#endif
 
 // UID cache to avoid repeated string operations on every signal update
 static std::unordered_map<std::string, std::string> uidCache;
@@ -1630,9 +1627,6 @@ unsigned long getRandomInRange(unsigned long min, unsigned long max) {
     return min + (esp_random() % range);
 }
 
-#ifdef USE_ESP32_VARIANT_ESP32S3
-#include <driver/twai.h>
-
 void publishCanDiagnostics() {
     twai_status_info_t status;
     if (twai_get_status_info(&status) != ESP_OK) return;
@@ -1665,7 +1659,6 @@ void publishCanDiagnostics() {
     id(mqtt_client).publish("heatingpump/calculated/can_state/state",
                             stateStr, strlen(stateStr), 0, true);
 }
-#endif
 
 // Process calculated sensor updates with frequency-based scheduling
 // This function should be called regularly from the main loop
@@ -1694,11 +1687,9 @@ void processCalculatedSensors() {
         unsigned long betriebsart_interval = CALC_BETRIEBSART_FREQUENCY * 1000UL;
         nextBetriebsartUpdate = now + getRandomInRange(0, betriebsart_interval + 1);
 
-#ifdef USE_ESP32_VARIANT_ESP32S3
         // CAN diagnostics (30s frequency)
         unsigned long can_diag_interval = CALC_CAN_DIAG_FREQUENCY * 1000UL;
         nextCanDiagUpdate = now + getRandomInRange(0, can_diag_interval + 1);
-#endif
 
         initialized = true;
         ESP_LOGI("CALC_SCHED", "Calculated sensor scheduler initialized");
@@ -1733,13 +1724,11 @@ void processCalculatedSensors() {
         nextBetriebsartUpdate = now + (CALC_BETRIEBSART_FREQUENCY * 1000UL) + getRandomInRange(0, 1000);
     }
 
-#ifdef USE_ESP32_VARIANT_ESP32S3
     // Check and publish CAN diagnostic sensors
     if (now >= nextCanDiagUpdate) {
         publishCanDiagnostics();
         nextCanDiagUpdate = now + (CALC_CAN_DIAG_FREQUENCY * 1000UL) + getRandomInRange(0, 1000);
     }
-#endif
 }
 
 // Timeout tracking removed for simplification
