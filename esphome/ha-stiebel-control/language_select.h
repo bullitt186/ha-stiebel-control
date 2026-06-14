@@ -17,6 +17,11 @@
 
 #pragma once
 
+// Sentinel: lang_en.h checks for this before applying overrides, so it is
+// safe to list it in esphome: includes: (ESPHome auto-includes all listed files,
+// but the overrides only activate when language_select.h sets this flag first).
+#define LANGUAGE_SELECT_ACTIVE
+
 #if defined(HA_LANGUAGE_EN)
   #include "lang_en.h"
 #else

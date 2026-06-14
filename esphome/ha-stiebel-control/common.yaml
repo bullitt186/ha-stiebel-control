@@ -37,6 +37,8 @@ esphome:
     - ha-stiebel-control/elster/NTypes.h
     - ha-stiebel-control/config.h
     - ha-stiebel-control/language_select.h
+    - ha-stiebel-control/lang_base.h
+    - ha-stiebel-control/lang_en.h
     - ha-stiebel-control/sg_ready_controller.h
     - ha-stiebel-control/ha-stiebel-control.h
     - ha-stiebel-control/signal_requests_base.h

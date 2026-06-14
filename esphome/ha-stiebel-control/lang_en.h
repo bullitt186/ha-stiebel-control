@@ -6,10 +6,17 @@
  * German default — this is intentional and safe.
  *
  * To add a translation: #undef LNAME_FOO, then #define LNAME_FOO "English"
+ *
+ * NOTE: This file is listed in esphome: includes: so ESPHome copies it to src/.
+ * The overrides below are guarded by LANGUAGE_SELECT_ACTIVE so they are only
+ * applied when language_select.h explicitly includes this file — not when
+ * ESPHome auto-includes it directly from main.cpp.
  */
 
 #pragma once
 #include "lang_base.h"
+
+#if defined(LANGUAGE_SELECT_ACTIVE)
 
 // ============================================================================
 // ElsterTable signal friendly names
@@ -264,3 +271,4 @@
 #define LNAME_COP_HEIZ                         "COP Heating"
 #undef  LNAME_COP_GESAMT
 #define LNAME_COP_GESAMT                       "COP Total"
+#endif // LANGUAGE_SELECT_ACTIVE
