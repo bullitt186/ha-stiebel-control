@@ -125,6 +125,95 @@ Include:
 
 ---
 
+---
+
+## Adding a New Display Language
+
+Entity names in Home Assistant are compile-time translated via `LNAME_*` macros. German is the
+built-in default. English is already provided. Adding a third language (e.g. French) takes
+three steps and touches no existing files.
+
+### How the i18n system works
+
+```
+lang_base.h          — ~114 LNAME_* macros, all German (single source of truth)
+lang_en.h            — includes lang_base.h, then #undef/#define only the English overrides
+language_select.h    — dispatch: #ifdef HA_LANGUAGE_EN → lang_en.h, else → lang_base.h
+```
+
+Only one language file is compiled into firmware. The unused language adds zero flash overhead.
+Signal protocol identifiers (e.g. `"Tagbetrieb"` written to CAN) are **not** translated —
+they are part of the Elster protocol and must stay German.
+
+### Step 1 — Create `lang_XX.h`
+
+Create `esphome/ha-stiebel-control/lang_XX.h` (replace `XX` with your ISO language code):
+
+```cpp
+/*
+ * lang_XX.h — <Language> display name overrides
+ *
+ * Include lang_base.h first (German defaults), then override only
+ * the macros you have translated. Untranslated entries keep German.
+ */
+#pragma once
+#include "lang_base.h"
+
+#undef  LNAME_AUSSENTEMP
+#define LNAME_AUSSENTEMP          "Température extérieure"   // example (French)
+
+// Continue overriding macros as needed.
+// See lang_base.h for the full list of LNAME_* macros.
+// See lang_en.h for a complete translation as reference.
+```
+
+You do not need to translate every macro — any untranslated `LNAME_*` keeps its German default
+from `lang_base.h`.
+
+### Step 2 — Register the language in `language_select.h`
+
+Add one `#elif` branch:
+
+```cpp
+#if defined(HA_LANGUAGE_EN)
+  #include "lang_en.h"
+#elif defined(HA_LANGUAGE_XX)      // ← add this
+  #include "lang_XX.h"             // ← and this
+#else
+  #include "lang_base.h"
+#endif
+```
+
+### Step 3 — Test
+
+```bash
+# In esphome/heatingpump.yaml, set:
+#   language: "XX"
+make compile            # must compile without errors
+make upload             # flash to device
+make smoke-test         # must pass
+```
+
+Spot-check a discovery payload to confirm names are correct:
+
+```bash
+mosquitto_sub -h <broker> -u <user> --pw <pass> \
+  -t "homeassistant/sensor/heatingpump/stiebel_kessel_aussentemp/config" \
+  -v -W 5 -C 1 | python3 -c "
+import sys,json
+for line in sys.stdin:
+    _,_,p=line.strip().partition(' ')
+    try: print(json.loads(p)['name'])
+    except: pass"
+```
+
+### Step 4 — Submit a PR
+
+Include `lang_XX.h` and the `language_select.h` update. Mention which signals you have
+translated and which intentionally keep the German default.
+
+---
+
 ## Other Contributions
 
 - **Signal metadata** — add `friendlyName`, `unit`, `deviceClass`, `icon` to entries in `ElsterTable.h`

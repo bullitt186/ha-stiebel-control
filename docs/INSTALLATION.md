@@ -51,6 +51,7 @@ substitutions:
   device_name: heatingpump
   friendly_name: "Stiebel Eltron Wärmepumpe"
   device_model: "wpl13e"          # your heat pump model — see Supported Models in README
+  language: "DE"                  # display language for HA entity names: DE (default) or EN
   can_tx_pin: YOUR_CAN_TX          # board-specific — see pin note below
   can_rx_pin: YOUR_CAN_RX          # board-specific — see pin note below
   can_id_pc: "0x680"
@@ -61,6 +62,8 @@ packages:
   base:    !include ha-stiebel-control/common.yaml
   sensors: !include ha-stiebel-control/wpl13e.yaml
 ```
+
+> **Language:** German is the default. Change `language: "DE"` to `language: "EN"` if you prefer English entity names in Home Assistant. The language is baked into the firmware at compile time — recompile and re-flash after changing it.
 
 > **Pin numbers are board-specific — always verify against your board's schematic.**
 > The `heatingpump.yaml` shipped in this repo already has correct values for the
@@ -117,6 +120,7 @@ substitutions:
   device_name: heatingpump
   friendly_name: "Stiebel Eltron Wärmepumpe"
   device_model: "wpl13e"
+  language: "DE"            # DE (default) or EN
   can_tx_pin: YOUR_CAN_TX   # board-specific: Waveshare ESP32-S3-RS485-CAN → GPIO15
   can_rx_pin: YOUR_CAN_RX   # board-specific: Waveshare ESP32-S3-RS485-CAN → GPIO16
   can_id_pc: "0x680"
