@@ -14,6 +14,7 @@ substitutions:
   device_name: heatingpump
   friendly_name: "Stiebel Eltron Wärmepumpe"
   device_model: "wpl13e"          # used in HA device identifier (stiebel_eltron_<model>)
+  language: "DE"                  # display language for HA entity names: DE (default) or EN
   # CAN pins for ESP32-S3 built-in TWAI controller
   can_tx_pin: GPIO15  # TXD2 on Waveshare board
   can_rx_pin: GPIO16  # RXD2 on Waveshare board

@@ -24,6 +24,7 @@
 #include "ElsterTable.h"
 #include "KElsterTable.h"
 #include "config.h"
+#include "language_select.h"
 #include "sg_ready_controller.h"
 #include <driver/twai.h>
 #include <sstream>
@@ -114,37 +115,37 @@ struct CalculatedSensorConfig {
 
 static const CalculatedSensorConfig calculatedSensors[] = {
     // Date sensor
-    {"stiebel_calculated_date", "Datum", "heatingpump/calculated/date/state",
+    {"stiebel_calculated_date", LNAME_CALC_DATE, "heatingpump/calculated/date/state",
      "sensor", "", "", "", "mdi:calendar", "", "", "", true},
 
     // Time sensor
-    {"stiebel_calculated_time", "Uhrzeit", "heatingpump/calculated/time/state",
+    {"stiebel_calculated_time", LNAME_CALC_TIME, "heatingpump/calculated/time/state",
      "sensor", "", "", "", "mdi:clock", "", "", "", true},
 
     // Betriebsart sensor
-    {"stiebel_calculated_betriebsart", "Betriebsart", "heatingpump/calculated/betriebsart/state",
+    {"stiebel_calculated_betriebsart", LNAME_CALC_BETRIEBSART, "heatingpump/calculated/betriebsart/state",
      "sensor", "", "", "", "mdi:cog", "", "", "", true},
 
     // Delta T continuous
-    {"stiebel_calculated_delta_t_continuous", "Delta T WP (kontinuierlich)", "heatingpump/calculated/delta_t_continuous/state",
+    {"stiebel_calculated_delta_t_continuous", LNAME_CALC_DELTA_T_CONTINUOUS, "heatingpump/calculated/delta_t_continuous/state",
      "sensor", "temperature", "K", "measurement", "mdi:thermometer", "", "", "", true},
 
     // Delta T running (only when compressor active)
-    {"stiebel_calculated_delta_t_running", "Delta T WP (nur bei Verdichter an)", "heatingpump/calculated/delta_t_running/state",
+    {"stiebel_calculated_delta_t_running", LNAME_CALC_DELTA_T_RUNNING, "heatingpump/calculated/delta_t_running/state",
      "sensor", "temperature", "K", "measurement", "mdi:thermometer-chevron-up", "", "", "", true},
 
     // Compressor active binary sensor
-    {"stiebel_calculated_compressor_active", "WP Verdichter aktiv", "heatingpump/calculated/compressor_active/state",
+    {"stiebel_calculated_compressor_active", LNAME_CALC_COMPRESSOR_ACTIVE, "heatingpump/calculated/compressor_active/state",
      "binary_sensor", "running", "", "", "mdi:engine", "on", "off", "", true},
 
     // CAN bus diagnostic sensors (TWAI / ESP32-S3; silently inactive on MCP2515 builds)
-    {"stiebel_calculated_can_tec",        "CAN TX Fehlerzähler",  "heatingpump/calculated/can_tec/state",
+    {"stiebel_calculated_can_tec",        LNAME_CALC_CAN_TEC,        "heatingpump/calculated/can_tec/state",
      "sensor", "", "", "measurement", "mdi:alert-network", "", "", "diagnostic", false},
-    {"stiebel_calculated_can_rec",        "CAN RX Fehlerzähler",  "heatingpump/calculated/can_rec/state",
+    {"stiebel_calculated_can_rec",        LNAME_CALC_CAN_REC,        "heatingpump/calculated/can_rec/state",
      "sensor", "", "", "measurement", "mdi:alert-network-outline", "", "", "diagnostic", false},
-    {"stiebel_calculated_can_bus_errors", "CAN Bus Fehler",        "heatingpump/calculated/can_bus_errors/state",
+    {"stiebel_calculated_can_bus_errors", LNAME_CALC_CAN_BUS_ERRORS, "heatingpump/calculated/can_bus_errors/state",
      "sensor", "", "", "total_increasing", "mdi:network-off", "", "", "diagnostic", false},
-    {"stiebel_calculated_can_state",      "CAN Bus Zustand",       "heatingpump/calculated/can_state/state",
+    {"stiebel_calculated_can_state",      LNAME_CALC_CAN_STATE,      "heatingpump/calculated/can_state/state",
      "sensor", "", "", "", "mdi:can", "", "", "diagnostic", false},
 };
 
@@ -168,31 +169,31 @@ struct WritableNumberConfig {
 
 static const WritableNumberConfig writableNumbers[] = {
     // Primary storage target temperature
-    {"EINSTELL_SPEICHERSOLLTEMP", "Speicher Soll Temperatur Einstellung", 
+    {"EINSTELL_SPEICHERSOLLTEMP", LNAME_NUM_SPEICHERSOLLTEMP,
      cm_manager, 20.0, 60.0, 1.0, "°C", "mdi:thermometer-high", "temperature"},
-    
+
     // Secondary storage target temperature (comfort/eco modes)
-    {"EINSTELL_SPEICHERSOLLTEMP2", "Speicher Soll Temperatur 2 Einstellung", 
+    {"EINSTELL_SPEICHERSOLLTEMP2", LNAME_NUM_SPEICHERSOLLTEMP2,
      cm_manager, 20.0, 60.0, 1.0, "°C", "mdi:thermometer-low", "temperature"},
-    
+
     // SG Ready boost temperatures (not real CAN signals, handled internally)
-    {"SG_READY_BOOST_STATE3", "SG Ready Boost Zustand 3",
+    {"SG_READY_BOOST_STATE3", LNAME_NUM_SG_READY_BOOST3,
      cm_manager, 0.0, 10.0, 0.5, "°C", "mdi:thermometer-plus", "temperature"},
 
-    {"SG_READY_BOOST_STATE4", "SG Ready Boost Zustand 4",
+    {"SG_READY_BOOST_STATE4", LNAME_NUM_SG_READY_BOOST4,
      cm_manager, 0.0, 15.0, 0.5, "°C", "mdi:thermometer-chevron-up", "temperature"},
 
     // Room temperature setpoints for heating circuits 1–3 and night/reduced mode
-    {"RAUMSOLLTEMP_I", "Raum Soll Temperatur I Einstellung",
+    {"RAUMSOLLTEMP_I", LNAME_NUM_RAUMSOLLTEMP_I,
      cm_manager, 10.0, 30.0, 0.5, "°C", "mdi:home-thermometer", "temperature"},
 
-    {"RAUMSOLLTEMP_II", "Raum Soll Temperatur II Einstellung",
+    {"RAUMSOLLTEMP_II", LNAME_NUM_RAUMSOLLTEMP_II,
      cm_manager, 10.0, 30.0, 0.5, "°C", "mdi:home-thermometer", "temperature"},
 
-    {"RAUMSOLLTEMP_III", "Raum Soll Temperatur III Einstellung",
+    {"RAUMSOLLTEMP_III", LNAME_NUM_RAUMSOLLTEMP_III,
      cm_manager, 10.0, 30.0, 0.5, "°C", "mdi:home-thermometer", "temperature"},
 
-    {"RAUMSOLLTEMP_NACHT", "Raum Soll Temperatur Nacht Einstellung",
+    {"RAUMSOLLTEMP_NACHT", LNAME_NUM_RAUMSOLLTEMP_NACHT,
      cm_manager, 10.0, 30.0, 0.5, "°C", "mdi:home-thermometer-outline", "temperature"}
 };
 
@@ -213,28 +214,27 @@ struct WritableSelectConfig {
 
 // Operating mode options for PROGRAMMSCHALTER
 static const char* programmschalterOptions[] = {
-    "Notbetrieb",      // Emergency operation
-    "Bereitschaft",    // Standby
-    "Automatik",       // Automatic
-    "Tagbetrieb",      // Day operation
-    "Absenkbetrieb",   // Night/reduced operation
-    "Warmwasser"       // Hot water only
+    LNAME_OPT_NOTBETRIEB,
+    LNAME_OPT_BEREITSCHAFT,
+    LNAME_OPT_AUTOMATIK,
+    LNAME_OPT_TAGBETRIEB,
+    LNAME_OPT_ABSENKBETRIEB,
+    LNAME_OPT_WARMWASSER,
 };
 
 // SG Ready state options (Smart Grid Ready)
 static const char* sgReadyOptions[] = {
-    "1 - EVU Sperre",       // State 1: Grid lock - minimize consumption
-    "2 - Normal",           // State 2: Normal operation
-    "3 - Empfohlen",        // State 3: Recommended - use surplus energy
-    "4 - Zwang"             // State 4: Forced operation - maximum usage
+    LNAME_OPT_SG_EVU_SPERRE,
+    LNAME_OPT_SG_NORMAL,
+    LNAME_OPT_SG_EMPFOHLEN,
+    LNAME_OPT_SG_ZWANG,
 };
 
 static const WritableSelectConfig writableSelects[] = {
     // Heat pump operating mode
-    {"PROGRAMMSCHALTER", "Programmschalter", 
+    {"PROGRAMMSCHALTER", LNAME_SEL_PROGRAMMSCHALTER,
      cm_manager, programmschalterOptions, 6, "mdi:dip-switch"},
-    // SG Ready control (not a real CAN signal, handled internally)
-    {"SG_READY_STATE", "SG Ready Zustand", 
+    {"SG_READY_STATE", LNAME_SEL_SG_READY,
      cm_manager, sgReadyOptions, 4, "mdi:solar-power"}
 };
 
@@ -1212,7 +1212,7 @@ void publishCOPDiscovery() {
     {
         const char* discoveryTopic = "homeassistant/sensor/heatingpump/cop_ww/config";
         std::ostringstream payload;
-        payload << "{\"name\":\"COP Warmwasser\","
+        payload << "{\"name\":\"" LNAME_COP_WW "\","
                 << "\"unique_id\":\"stiebel_cop_ww\","
                 << "\"state_topic\":\"heatingpump/calculated/cop_ww/state\","
                 << "\"icon\":\"mdi:water-boiler\","
@@ -1228,7 +1228,7 @@ void publishCOPDiscovery() {
     {
         const char* discoveryTopic = "homeassistant/sensor/heatingpump/cop_heiz/config";
         std::ostringstream payload;
-        payload << "{\"name\":\"COP Heizung\","
+        payload << "{\"name\":\"" LNAME_COP_HEIZ "\","
                 << "\"unique_id\":\"stiebel_cop_heiz\","
                 << "\"state_topic\":\"heatingpump/calculated/cop_heiz/state\","
                 << "\"icon\":\"mdi:radiator\","
@@ -1244,7 +1244,7 @@ void publishCOPDiscovery() {
     {
         const char* discoveryTopic = "homeassistant/sensor/heatingpump/cop_gesamt/config";
         std::ostringstream payload;
-        payload << "{\"name\":\"COP Gesamt\","
+        payload << "{\"name\":\"" LNAME_COP_GESAMT "\","
                 << "\"unique_id\":\"stiebel_cop_gesamt\","
                 << "\"state_topic\":\"heatingpump/calculated/cop_gesamt/state\","
                 << "\"icon\":\"mdi:chart-line\","
