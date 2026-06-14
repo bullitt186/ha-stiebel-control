@@ -169,9 +169,18 @@ static const WritableNumberConfig writableNumbers[] = {
     {"SG_READY_BOOST_STATE4", "SG Ready Boost Zustand 4",
      cm_manager, 0.0, 15.0, 0.5, "°C", "mdi:thermometer-chevron-up", "temperature"},
 
-    // Room temperature setpoint for heating circuit 1 (writable for SG-Ready heating boost)
+    // Room temperature setpoints for heating circuits 1–3 and night/reduced mode
     {"RAUMSOLLTEMP_I", "Raum Soll Temperatur I Einstellung",
-     cm_manager, 10.0, 30.0, 0.5, "°C", "mdi:home-thermometer", "temperature"}
+     cm_manager, 10.0, 30.0, 0.5, "°C", "mdi:home-thermometer", "temperature"},
+
+    {"RAUMSOLLTEMP_II", "Raum Soll Temperatur II Einstellung",
+     cm_manager, 10.0, 30.0, 0.5, "°C", "mdi:home-thermometer", "temperature"},
+
+    {"RAUMSOLLTEMP_III", "Raum Soll Temperatur III Einstellung",
+     cm_manager, 10.0, 30.0, 0.5, "°C", "mdi:home-thermometer", "temperature"},
+
+    {"RAUMSOLLTEMP_NACHT", "Raum Soll Temperatur Nacht Einstellung",
+     cm_manager, 10.0, 30.0, 0.5, "°C", "mdi:home-thermometer-outline", "temperature"}
 };
 
 static const size_t WRITABLE_NUMBER_COUNT = sizeof(writableNumbers) / sizeof(WritableNumberConfig);

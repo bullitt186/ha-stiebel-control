@@ -64,6 +64,9 @@ These entities appear automatically in HA via MQTT discovery:
 | `number.manager_speicher_soll_temperatur_einstellung` | DHW target temperature | 20–60°C | 1°C |
 | `number.manager_speicher_soll_temperatur_2_einstellung` | DHW eco target temperature | 20–60°C | 1°C |
 | `number.manager_raum_soll_temperatur_i_einstellung` | Room setpoint circuit 1 | 10–30°C | 0.5°C |
+| `number.manager_raum_soll_temperatur_ii_einstellung` | Room setpoint circuit 2 | 10–30°C | 0.5°C |
+| `number.manager_raum_soll_temperatur_iii_einstellung` | Room setpoint circuit 3 | 10–30°C | 0.5°C |
+| `number.manager_raum_soll_temperatur_nacht_einstellung` | Room setpoint night/reduced | 10–30°C | 0.5°C |
 | `number.manager_sg_ready_boost_zustand_3` | SG Ready DHW boost for state 3 | 0–10°C | 0.5°C |
 | `number.manager_sg_ready_boost_zustand_4` | SG Ready DHW boost for state 4 | 0–15°C | 0.5°C |
 
