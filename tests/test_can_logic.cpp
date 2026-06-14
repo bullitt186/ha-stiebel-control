@@ -387,3 +387,671 @@ TEST_CASE("isPermanentlyBlacklisted: unknown signal returns true (INDEX_NOT_FOUN
     // Unknown name resolves to the INDEX_NOT_FOUND sentinel which has isBlacklisted=true
     CHECK(isPermanentlyBlacklisted("DOES_NOT_EXIST_XYZ"));
 }
+
+using Catch::Approx;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+static std::string mqttFindPayload(const std::string& topicSubstr) {
+    for (const auto& m : mqtt_client_instance().messages)
+        if (m.topic.find(topicSubstr) != std::string::npos)
+            return m.payload;
+    return "";
+}
+
+static bool mqttTopicPublished(const std::string& topicSubstr) {
+    return !mqttFindPayload(topicSubstr).empty();
+}
+
+static void resetDiscoveryState() {
+    discoveredSignals.clear();
+    discoveredCalculatedSensors.clear();
+    discoveredWritableNumbers.clear();
+    discoveredWritableSelects.clear();
+    mqtt_client_instance().clear();
+}
+
+// ============================================================================
+// publishMqttState
+// ============================================================================
+
+TEST_CASE("publishMqttState: publishes to correct topic", "[mqtt]") {
+    resetDiscoveryState();
+    const CanMember& mgr = CanMembers[cm_manager];
+    const ElsterIndex* ei = GetElsterIndex("AUSSENTEMP");
+    REQUIRE(ei != nullptr);
+    publishMqttState(mgr, ei, "21.5");
+    REQUIRE(mqttTopicPublished("heatingpump/MANAGER/AUSSENTEMP/state"));
+    CHECK(mqttFindPayload("AUSSENTEMP/state") == "21.5");
+}
+
+TEST_CASE("publishMqttState: skips empty value", "[mqtt]") {
+    resetDiscoveryState();
+    const CanMember& mgr = CanMembers[cm_manager];
+    const ElsterIndex* ei = GetElsterIndex("AUSSENTEMP");
+    publishMqttState(mgr, ei, "");
+    CHECK(!mqttTopicPublished("AUSSENTEMP/state"));
+}
+
+TEST_CASE("publishMqttState: topic uses CAN member name", "[mqtt]") {
+    resetDiscoveryState();
+    const CanMember& kessel = CanMembers[cm_kessel];
+    const ElsterIndex* ei = GetElsterIndex("SPEICHERISTTEMP");
+    REQUIRE(ei != nullptr);
+    publishMqttState(kessel, ei, "52.0");
+    REQUIRE(mqttTopicPublished("heatingpump/KESSEL/SPEICHERISTTEMP/state"));
+}
+
+// ============================================================================
+// publishMqttDiscovery
+// ============================================================================
+
+TEST_CASE("publishMqttDiscovery: sensor signal publishes to homeassistant/sensor", "[mqtt]") {
+    resetDiscoveryState();
+    const CanMember& mgr = CanMembers[cm_manager];
+    const ElsterIndex* ei = GetElsterIndex("AUSSENTEMP");
+    REQUIRE(ei != nullptr);
+    publishMqttDiscovery(mgr, ei);
+    CHECK(mqttTopicPublished("homeassistant/sensor/heatingpump/"));
+}
+
+TEST_CASE("publishMqttDiscovery: payload contains name, unique_id, state_topic", "[mqtt]") {
+    resetDiscoveryState();
+    const CanMember& mgr = CanMembers[cm_manager];
+    const ElsterIndex* ei = GetElsterIndex("AUSSENTEMP");
+    REQUIRE(ei != nullptr);
+    publishMqttDiscovery(mgr, ei);
+    std::string payload = mqttFindPayload("stiebel_manager_aussentemp");
+    CHECK(payload.find("\"name\"") != std::string::npos);
+    CHECK(payload.find("\"unique_id\"") != std::string::npos);
+    CHECK(payload.find("heatingpump/MANAGER/AUSSENTEMP/state") != std::string::npos);
+}
+
+TEST_CASE("publishMqttDiscovery: temperature signal has device_class temperature", "[mqtt]") {
+    resetDiscoveryState();
+    const CanMember& mgr = CanMembers[cm_manager];
+    const ElsterIndex* ei = GetElsterIndex("AUSSENTEMP");
+    REQUIRE(ei != nullptr);
+    publishMqttDiscovery(mgr, ei);
+    std::string payload = mqttFindPayload("stiebel_manager_aussentemp");
+    CHECK(payload.find("\"device_class\":\"temperature\"") != std::string::npos);
+    CHECK(payload.find("unit_of_measurement") != std::string::npos);
+}
+
+TEST_CASE("publishMqttDiscovery: binary sensor publishes to homeassistant/binary_sensor", "[mqtt]") {
+    resetDiscoveryState();
+    const CanMember& heizmodul = CanMembers[cm_heizmodul];
+    const ElsterIndex* ei = GetElsterIndex("ABTAUUNGAKTIV");
+    REQUIRE(ei != nullptr);
+    publishMqttDiscovery(heizmodul, ei);
+    CHECK(mqttTopicPublished("homeassistant/binary_sensor/heatingpump/"));
+}
+
+TEST_CASE("publishMqttDiscovery: binary sensor with explicit payloads includes payload_on/off", "[mqtt]") {
+    // EVU_SPERRE_AKTIV has explicit payloadOn/Off in ElsterTable
+    resetDiscoveryState();
+    const CanMember& mgr = CanMembers[cm_manager];
+    const ElsterIndex* ei = GetElsterIndex("EVU_SPERRE_AKTIV");
+    REQUIRE(ei != nullptr);
+    publishMqttDiscovery(mgr, ei);
+    std::string payload = mqttFindPayload("homeassistant/binary_sensor");
+    CHECK(payload.find("payload_on") != std::string::npos);
+    CHECK(payload.find("payload_off") != std::string::npos);
+}
+
+TEST_CASE("publishMqttDiscovery: binary sensor without explicit payloads omits payload fields", "[mqtt]") {
+    // ABTAUUNGAKTIV has NULL payloadOn/Off — no payload_on/off in discovery
+    resetDiscoveryState();
+    const CanMember& heizmodul = CanMembers[cm_heizmodul];
+    const ElsterIndex* ei = GetElsterIndex("ABTAUUNGAKTIV");
+    REQUIRE(ei != nullptr);
+    publishMqttDiscovery(heizmodul, ei);
+    std::string payload = mqttFindPayload("homeassistant/binary_sensor");
+    CHECK(payload.find("payload_on") == std::string::npos);
+}
+
+TEST_CASE("publishMqttDiscovery: payload contains availability_topic", "[mqtt]") {
+    resetDiscoveryState();
+    const CanMember& mgr = CanMembers[cm_manager];
+    const ElsterIndex* ei = GetElsterIndex("AUSSENTEMP");
+    REQUIRE(ei != nullptr);
+    publishMqttDiscovery(mgr, ei);
+    std::string payload = mqttFindPayload("stiebel_manager_aussentemp");
+    CHECK(payload.find("\"availability_topic\":\"heatingpump/status\"") != std::string::npos);
+}
+
+TEST_CASE("publishMqttDiscovery: payload contains via_device", "[mqtt]") {
+    resetDiscoveryState();
+    const CanMember& mgr = CanMembers[cm_manager];
+    const ElsterIndex* ei = GetElsterIndex("AUSSENTEMP");
+    REQUIRE(ei != nullptr);
+    publishMqttDiscovery(mgr, ei);
+    std::string payload = mqttFindPayload("stiebel_manager_aussentemp");
+    CHECK(payload.find("\"via_device\"") != std::string::npos);
+}
+
+TEST_CASE("publishMqttDiscovery: duration signal has device_class duration and unit h", "[mqtt]") {
+    resetDiscoveryState();
+    const CanMember& heizmodul = CanMembers[cm_heizmodul];
+    const ElsterIndex* ei = GetElsterIndex("LZ_VERD_2_HEIZBETRIEB");
+    REQUIRE(ei != nullptr);
+    publishMqttDiscovery(heizmodul, ei);
+    std::string payload = mqttFindPayload("lz_verd_2_heizbetrieb");
+    CHECK(payload.find("\"device_class\":\"duration\"") != std::string::npos);
+    CHECK(payload.find("\"unit_of_measurement\":\"h\"") != std::string::npos);
+    CHECK(payload.find("\"state_class\":\"total_increasing\"") != std::string::npos);
+}
+
+// ============================================================================
+// updateSensor
+// ============================================================================
+
+TEST_CASE("updateSensor: publishes discovery and state on first call", "[mqtt]") {
+    resetDiscoveryState();
+    const CanMember& mgr = CanMembers[cm_manager];
+    const ElsterIndex* ei = GetElsterIndex("RUECKLAUFISTTEMP");
+    REQUIRE(ei != nullptr);
+    updateSensor(mgr, ei, "30.5");
+    CHECK(mqttTopicPublished("homeassistant/sensor/heatingpump/"));
+    CHECK(mqttTopicPublished("heatingpump/MANAGER/RUECKLAUFISTTEMP/state"));
+    CHECK(mqttFindPayload("RUECKLAUFISTTEMP/state") == "30.5");
+}
+
+TEST_CASE("updateSensor: skips discovery on second call (cached)", "[mqtt]") {
+    resetDiscoveryState();
+    const CanMember& mgr = CanMembers[cm_manager];
+    const ElsterIndex* ei = GetElsterIndex("RUECKLAUFISTTEMP");
+    REQUIRE(ei != nullptr);
+    updateSensor(mgr, ei, "30.5");
+    mqtt_client_instance().clear();
+    updateSensor(mgr, ei, "31.0");
+    CHECK(mqtt_client_instance().messages.size() == 1);
+    CHECK(mqttFindPayload("RUECKLAUFISTTEMP/state") == "31.0");
+}
+
+TEST_CASE("updateSensor: EVU_SPERRE_AKTIV inverts on → off", "[mqtt]") {
+    resetDiscoveryState();
+    const CanMember& mgr = CanMembers[cm_manager];
+    const ElsterIndex* ei = GetElsterIndex("EVU_SPERRE_AKTIV");
+    REQUIRE(ei != nullptr);
+    updateSensor(mgr, ei, "on");
+    CHECK(mqttFindPayload("EVU_SPERRE_AKTIV/state") == "off");
+}
+
+TEST_CASE("updateSensor: EVU_SPERRE_AKTIV inverts off → on", "[mqtt]") {
+    resetDiscoveryState();
+    const CanMember& mgr = CanMembers[cm_manager];
+    const ElsterIndex* ei = GetElsterIndex("EVU_SPERRE_AKTIV");
+    REQUIRE(ei != nullptr);
+    updateSensor(mgr, ei, "off");
+    CHECK(mqttFindPayload("EVU_SPERRE_AKTIV/state") == "on");
+}
+
+TEST_CASE("updateSensor: skips empty value", "[mqtt]") {
+    resetDiscoveryState();
+    const CanMember& mgr = CanMembers[cm_manager];
+    const ElsterIndex* ei = GetElsterIndex("AUSSENTEMP");
+    REQUIRE(ei != nullptr);
+    updateSensor(mgr, ei, "");
+    CHECK(mqtt_client_instance().messages.empty());
+}
+
+TEST_CASE("updateSensor: JAHR value updates lastJahr global", "[mqtt]") {
+    resetDiscoveryState();
+    lastJahr = -1;
+    const CanMember& mgr = CanMembers[cm_manager];
+    const ElsterIndex* ei = GetElsterIndex("JAHR");
+    REQUIRE(ei != nullptr);
+    updateSensor(mgr, ei, "26");
+    CHECK(lastJahr == 26);
+}
+
+TEST_CASE("updateSensor: WPVORLAUFIST value updates lastWpVorlaufIst", "[mqtt]") {
+    resetDiscoveryState();
+    lastWpVorlaufIst = NAN;
+    const CanMember& heizmodul = CanMembers[cm_heizmodul];
+    const ElsterIndex* ei = GetElsterIndex("WPVORLAUFIST");
+    REQUIRE(ei != nullptr);
+    updateSensor(heizmodul, ei, "35.5");
+    CHECK(lastWpVorlaufIst == Approx(35.5f));
+}
+
+TEST_CASE("updateSensor: RUECKLAUFISTTEMP value updates lastRuecklaufIstTemp", "[mqtt]") {
+    resetDiscoveryState();
+    lastRuecklaufIstTemp = NAN;
+    const CanMember& mgr = CanMembers[cm_manager];
+    const ElsterIndex* ei = GetElsterIndex("RUECKLAUFISTTEMP");
+    REQUIRE(ei != nullptr);
+    updateSensor(mgr, ei, "28.3");
+    CHECK(lastRuecklaufIstTemp == Approx(28.3f));
+}
+
+TEST_CASE("updateSensor: VERDICHTER value updates lastVerdichterValue", "[mqtt]") {
+    resetDiscoveryState();
+    lastVerdichterValue = NAN;
+    const CanMember& heizmodul = CanMembers[cm_heizmodul];
+    const ElsterIndex* ei = GetElsterIndex("VERDICHTER");
+    REQUIRE(ei != nullptr);
+    updateSensor(heizmodul, ei, "50.0");
+    CHECK(lastVerdichterValue == Approx(50.0f));
+}
+
+// ============================================================================
+// publishDate
+// ============================================================================
+
+TEST_CASE("publishDate: formats date as YYYY-MM-DD", "[calc]") {
+    resetDiscoveryState();
+    lastJahr = 26; lastMonat = 6; lastTag = 14;
+    publishDate();
+    CHECK(mqttFindPayload("calculated/date/state") == "2026-06-14");
+}
+
+TEST_CASE("publishDate: zero-pads month and day", "[calc]") {
+    resetDiscoveryState();
+    lastJahr = 24; lastMonat = 1; lastTag = 5;
+    publishDate();
+    CHECK(mqttFindPayload("calculated/date/state") == "2024-01-05");
+}
+
+TEST_CASE("publishDate: skips when values uninitialized", "[calc]") {
+    resetDiscoveryState();
+    lastJahr = -1; lastMonat = -1; lastTag = -1;
+    publishDate();
+    CHECK(!mqttTopicPublished("calculated/date/state"));
+}
+
+TEST_CASE("publishDate: skips when month out of range", "[calc]") {
+    resetDiscoveryState();
+    lastJahr = 26; lastMonat = 13; lastTag = 1;
+    publishDate();
+    CHECK(!mqttTopicPublished("calculated/date/state"));
+}
+
+TEST_CASE("publishDate: skips when day out of range", "[calc]") {
+    resetDiscoveryState();
+    lastJahr = 26; lastMonat = 6; lastTag = 32;
+    publishDate();
+    CHECK(!mqttTopicPublished("calculated/date/state"));
+}
+
+// ============================================================================
+// publishTime
+// ============================================================================
+
+TEST_CASE("publishTime: formats time as HH:MM:SS", "[calc]") {
+    resetDiscoveryState();
+    lastStunde = 14; lastMinute = 5; lastSekunde = 9;
+    publishTime();
+    CHECK(mqttFindPayload("calculated/time/state") == "14:05:09");
+}
+
+TEST_CASE("publishTime: zero-pads all components", "[calc]") {
+    resetDiscoveryState();
+    lastStunde = 0; lastMinute = 0; lastSekunde = 0;
+    publishTime();
+    CHECK(mqttFindPayload("calculated/time/state") == "00:00:00");
+}
+
+TEST_CASE("publishTime: skips when values uninitialized", "[calc]") {
+    resetDiscoveryState();
+    lastStunde = -1; lastMinute = -1; lastSekunde = -1;
+    publishTime();
+    CHECK(!mqttTopicPublished("calculated/time/state"));
+}
+
+TEST_CASE("publishTime: skips when hour out of range", "[calc]") {
+    resetDiscoveryState();
+    lastStunde = 24; lastMinute = 0; lastSekunde = 0;
+    publishTime();
+    CHECK(!mqttTopicPublished("calculated/time/state"));
+}
+
+TEST_CASE("publishTime: skips when minute out of range", "[calc]") {
+    resetDiscoveryState();
+    lastStunde = 12; lastMinute = 60; lastSekunde = 0;
+    publishTime();
+    CHECK(!mqttTopicPublished("calculated/time/state"));
+}
+
+// ============================================================================
+// publishBetriebsart
+// ============================================================================
+
+TEST_CASE("publishBetriebsart: on → Sommerbetrieb", "[calc]") {
+    resetDiscoveryState();
+    publishBetriebsart("on");
+    CHECK(mqttFindPayload("calculated/betriebsart/state") == "Sommerbetrieb");
+}
+
+TEST_CASE("publishBetriebsart: off → Normalbetrieb", "[calc]") {
+    resetDiscoveryState();
+    publishBetriebsart("off");
+    CHECK(mqttFindPayload("calculated/betriebsart/state") == "Normalbetrieb");
+}
+
+// ============================================================================
+// publishDeltaTContinuous
+// ============================================================================
+
+TEST_CASE("publishDeltaTContinuous: publishes vorlauf minus ruecklauf", "[calc]") {
+    resetDiscoveryState();
+    lastWpVorlaufIst = 40.0f; lastRuecklaufIstTemp = 35.0f;
+    publishDeltaTContinuous();
+    CHECK(mqttFindPayload("delta_t_continuous/state") == "5.00");
+}
+
+TEST_CASE("publishDeltaTContinuous: negative delta published correctly", "[calc]") {
+    resetDiscoveryState();
+    lastWpVorlaufIst = 30.0f; lastRuecklaufIstTemp = 35.0f;
+    publishDeltaTContinuous();
+    CHECK(mqttFindPayload("delta_t_continuous/state") == "-5.00");
+}
+
+TEST_CASE("publishDeltaTContinuous: skips when vorlauf is NaN", "[calc]") {
+    resetDiscoveryState();
+    lastWpVorlaufIst = NAN; lastRuecklaufIstTemp = 35.0f;
+    publishDeltaTContinuous();
+    CHECK(!mqttTopicPublished("delta_t_continuous/state"));
+}
+
+TEST_CASE("publishDeltaTContinuous: skips when ruecklauf is NaN", "[calc]") {
+    resetDiscoveryState();
+    lastWpVorlaufIst = 40.0f; lastRuecklaufIstTemp = NAN;
+    publishDeltaTContinuous();
+    CHECK(!mqttTopicPublished("delta_t_continuous/state"));
+}
+
+TEST_CASE("publishDeltaTContinuous: skips on temperature below -50 threshold", "[calc]") {
+    resetDiscoveryState();
+    lastWpVorlaufIst = -60.0f; lastRuecklaufIstTemp = 35.0f;
+    publishDeltaTContinuous();
+    CHECK(!mqttTopicPublished("delta_t_continuous/state"));
+}
+
+// ============================================================================
+// publishDeltaTRunning
+// ============================================================================
+
+TEST_CASE("publishDeltaTRunning: publishes when compressor active (value > 2)", "[calc]") {
+    resetDiscoveryState();
+    lastVerdichterValue = 50.0f;
+    lastWpVorlaufIst = 42.0f; lastRuecklaufIstTemp = 37.0f;
+    publishDeltaTRunning();
+    CHECK(mqttFindPayload("delta_t_running/state") == "5.00");
+}
+
+TEST_CASE("publishDeltaTRunning: skips when compressor not running", "[calc]") {
+    resetDiscoveryState();
+    lastVerdichterValue = 0.0f;
+    lastWpVorlaufIst = 42.0f; lastRuecklaufIstTemp = 37.0f;
+    publishDeltaTRunning();
+    CHECK(!mqttTopicPublished("delta_t_running/state"));
+}
+
+TEST_CASE("publishDeltaTRunning: skips when compressor value is NaN", "[calc]") {
+    resetDiscoveryState();
+    lastVerdichterValue = NAN;
+    lastWpVorlaufIst = 42.0f; lastRuecklaufIstTemp = 37.0f;
+    publishDeltaTRunning();
+    CHECK(!mqttTopicPublished("delta_t_running/state"));
+}
+
+TEST_CASE("publishDeltaTRunning: skips when vorlauf NaN even with compressor running", "[calc]") {
+    resetDiscoveryState();
+    lastVerdichterValue = 50.0f;
+    lastWpVorlaufIst = NAN; lastRuecklaufIstTemp = 37.0f;
+    publishDeltaTRunning();
+    CHECK(!mqttTopicPublished("delta_t_running/state"));
+}
+
+// ============================================================================
+// publishCompressorActive
+// ============================================================================
+
+TEST_CASE("publishCompressorActive: value > 2 → on", "[calc]") {
+    resetDiscoveryState();
+    lastVerdichterValue = 50.0f;
+    publishCompressorActive();
+    CHECK(mqttFindPayload("compressor_active/state") == "on");
+}
+
+TEST_CASE("publishCompressorActive: value <= 2 → off", "[calc]") {
+    resetDiscoveryState();
+    lastVerdichterValue = 1.0f;
+    publishCompressorActive();
+    CHECK(mqttFindPayload("compressor_active/state") == "off");
+}
+
+TEST_CASE("publishCompressorActive: exactly 2.0 → off (threshold is > 2)", "[calc]") {
+    resetDiscoveryState();
+    lastVerdichterValue = 2.0f;
+    publishCompressorActive();
+    CHECK(mqttFindPayload("compressor_active/state") == "off");
+}
+
+TEST_CASE("publishCompressorActive: skips when NaN", "[calc]") {
+    resetDiscoveryState();
+    lastVerdichterValue = NAN;
+    publishCompressorActive();
+    CHECK(!mqttTopicPublished("compressor_active/state"));
+}
+
+// ============================================================================
+// publishCalculatedSensorDiscovery
+// ============================================================================
+
+TEST_CASE("publishCalculatedSensorDiscovery: publishes to correct topic", "[mqtt]") {
+    resetDiscoveryState();
+    CalculatedSensorConfig cfg{
+        "stiebel_test_calc", "Test Calc", "heatingpump/test/state",
+        "sensor", "temperature", "°C", "measurement", "mdi:thermometer", "", "", "", true
+    };
+    publishCalculatedSensorDiscovery(cfg, true);
+    CHECK(mqttTopicPublished("homeassistant/sensor/heatingpump/stiebel_test_calc/config"));
+}
+
+TEST_CASE("publishCalculatedSensorDiscovery: payload contains name and state_topic", "[mqtt]") {
+    resetDiscoveryState();
+    CalculatedSensorConfig cfg{
+        "stiebel_test_calc2", "My Calc", "heatingpump/test2/state",
+        "sensor", "", "", "", "mdi:gauge", "", "", "", true
+    };
+    publishCalculatedSensorDiscovery(cfg, true);
+    std::string payload = mqttFindPayload("stiebel_test_calc2");
+    CHECK(payload.find("\"name\":\"My Calc\"") != std::string::npos);
+    CHECK(payload.find("heatingpump/test2/state") != std::string::npos);
+}
+
+TEST_CASE("publishCalculatedSensorDiscovery: cached — second call skips publish", "[mqtt]") {
+    resetDiscoveryState();
+    CalculatedSensorConfig cfg{
+        "stiebel_cache_calc", "Cache Calc", "heatingpump/cache/state",
+        "sensor", "", "", "", "", "", "", "", true
+    };
+    publishCalculatedSensorDiscovery(cfg);
+    mqtt_client_instance().clear();
+    publishCalculatedSensorDiscovery(cfg);
+    CHECK(mqtt_client_instance().messages.empty());
+}
+
+TEST_CASE("publishCalculatedSensorDiscovery: forceRepublish bypasses cache", "[mqtt]") {
+    resetDiscoveryState();
+    CalculatedSensorConfig cfg{
+        "stiebel_force_calc", "Force Calc", "heatingpump/force/state",
+        "sensor", "", "", "", "", "", "", "", true
+    };
+    publishCalculatedSensorDiscovery(cfg);
+    mqtt_client_instance().clear();
+    publishCalculatedSensorDiscovery(cfg, true);
+    CHECK(!mqtt_client_instance().messages.empty());
+}
+
+TEST_CASE("publishCalculatedSensorDiscovery: diagnostic entity has entity_category and enabled_by_default=false", "[mqtt]") {
+    resetDiscoveryState();
+    CalculatedSensorConfig cfg{
+        "stiebel_diag_calc", "Diag Calc", "heatingpump/diag/state",
+        "sensor", "", "", "measurement", "mdi:alert", "", "", "diagnostic", false
+    };
+    publishCalculatedSensorDiscovery(cfg, true);
+    std::string payload = mqttFindPayload("stiebel_diag_calc");
+    CHECK(payload.find("\"entity_category\":\"diagnostic\"") != std::string::npos);
+    CHECK(payload.find("\"enabled_by_default\":false") != std::string::npos);
+}
+
+TEST_CASE("publishCalculatedSensorDiscovery: normal entity omits enabled_by_default", "[mqtt]") {
+    resetDiscoveryState();
+    CalculatedSensorConfig cfg{
+        "stiebel_normal_calc", "Normal Calc", "heatingpump/normal/state",
+        "sensor", "", "", "", "", "", "", "", true
+    };
+    publishCalculatedSensorDiscovery(cfg, true);
+    std::string payload = mqttFindPayload("stiebel_normal_calc");
+    CHECK(payload.find("enabled_by_default") == std::string::npos);
+}
+
+TEST_CASE("publishCalculatedSensorDiscovery: binary sensor includes payload_on/off", "[mqtt]") {
+    resetDiscoveryState();
+    CalculatedSensorConfig cfg{
+        "stiebel_bin_calc", "Bin Calc", "heatingpump/bin/state",
+        "binary_sensor", "running", "", "", "mdi:engine", "on", "off", "", true
+    };
+    publishCalculatedSensorDiscovery(cfg, true);
+    std::string payload = mqttFindPayload("stiebel_bin_calc");
+    CHECK(payload.find("\"payload_on\":\"on\"") != std::string::npos);
+    CHECK(payload.find("\"payload_off\":\"off\"") != std::string::npos);
+}
+
+// ============================================================================
+// publishWritableNumberDiscovery
+// ============================================================================
+
+TEST_CASE("publishWritableNumberDiscovery: publishes to homeassistant/number", "[mqtt]") {
+    resetDiscoveryState();
+    publishWritableNumberDiscovery(writableNumbers[0], true);
+    CHECK(mqttTopicPublished("homeassistant/number/heatingpump/"));
+}
+
+TEST_CASE("publishWritableNumberDiscovery: payload contains command_topic and state_topic", "[mqtt]") {
+    resetDiscoveryState();
+    publishWritableNumberDiscovery(writableNumbers[0], true);
+    std::string payload = mqttFindPayload("homeassistant/number/heatingpump/");
+    CHECK(payload.find("\"command_topic\"") != std::string::npos);
+    CHECK(payload.find("/set\"") != std::string::npos);
+    CHECK(payload.find("\"state_topic\"") != std::string::npos);
+}
+
+TEST_CASE("publishWritableNumberDiscovery: payload contains min, max, step", "[mqtt]") {
+    resetDiscoveryState();
+    publishWritableNumberDiscovery(writableNumbers[0], true);
+    std::string payload = mqttFindPayload("homeassistant/number/heatingpump/");
+    CHECK(payload.find("\"min\"") != std::string::npos);
+    CHECK(payload.find("\"max\"") != std::string::npos);
+    CHECK(payload.find("\"step\"") != std::string::npos);
+}
+
+TEST_CASE("publishWritableNumberDiscovery: SG_READY signal uses main device (no via_device)", "[mqtt]") {
+    resetDiscoveryState();
+    publishWritableNumberDiscovery(writableNumbers[2], true);  // SG_READY_BOOST_STATE3
+    std::string payload = mqttFindPayload("homeassistant/number/heatingpump/");
+    CHECK(payload.find("via_device") == std::string::npos);
+}
+
+TEST_CASE("publishWritableNumberDiscovery: regular signal uses sub-device with via_device", "[mqtt]") {
+    resetDiscoveryState();
+    publishWritableNumberDiscovery(writableNumbers[0], true);  // EINSTELL_SPEICHERSOLLTEMP
+    std::string payload = mqttFindPayload("homeassistant/number/heatingpump/");
+    CHECK(payload.find("\"via_device\"") != std::string::npos);
+}
+
+TEST_CASE("publishWritableNumberDiscovery: cached — second call skips publish", "[mqtt]") {
+    resetDiscoveryState();
+    publishWritableNumberDiscovery(writableNumbers[0]);
+    mqtt_client_instance().clear();
+    publishWritableNumberDiscovery(writableNumbers[0]);
+    CHECK(mqtt_client_instance().messages.empty());
+}
+
+// ============================================================================
+// publishWritableSelectDiscovery
+// ============================================================================
+
+TEST_CASE("publishWritableSelectDiscovery: publishes to homeassistant/select", "[mqtt]") {
+    resetDiscoveryState();
+    publishWritableSelectDiscovery(writableSelects[0], true);
+    CHECK(mqttTopicPublished("homeassistant/select/heatingpump/"));
+}
+
+TEST_CASE("publishWritableSelectDiscovery: payload contains options array", "[mqtt]") {
+    resetDiscoveryState();
+    publishWritableSelectDiscovery(writableSelects[0], true);
+    std::string payload = mqttFindPayload("homeassistant/select/heatingpump/");
+    CHECK(payload.find("\"options\"") != std::string::npos);
+}
+
+TEST_CASE("publishWritableSelectDiscovery: cached — second call skips publish", "[mqtt]") {
+    resetDiscoveryState();
+    publishWritableSelectDiscovery(writableSelects[0]);
+    mqtt_client_instance().clear();
+    publishWritableSelectDiscovery(writableSelects[0]);
+    CHECK(mqtt_client_instance().messages.empty());
+}
+
+// ============================================================================
+// i18n — LNAME_* macros resolve to non-empty strings
+// ============================================================================
+
+TEST_CASE("i18n: LNAME_AUSSENTEMP is non-empty", "[i18n]") {
+    CHECK(std::string(LNAME_AUSSENTEMP).length() > 0);
+}
+
+TEST_CASE("i18n: LNAME_CALC_DATE is non-empty", "[i18n]") {
+    CHECK(std::string(LNAME_CALC_DATE).length() > 0);
+}
+
+TEST_CASE("i18n: LNAME_OPT_TAGBETRIEB is non-empty", "[i18n]") {
+    CHECK(std::string(LNAME_OPT_TAGBETRIEB).length() > 0);
+}
+
+TEST_CASE("i18n: LNAME_SEL_PROGRAMMSCHALTER is non-empty", "[i18n]") {
+    CHECK(std::string(LNAME_SEL_PROGRAMMSCHALTER).length() > 0);
+}
+
+TEST_CASE("i18n: LNAME_COP_WW is non-empty", "[i18n]") {
+    CHECK(std::string(LNAME_COP_WW).length() > 0);
+}
+
+TEST_CASE("i18n: programmschalterOptions contains 6 non-empty entries", "[i18n]") {
+    for (size_t i = 0; i < 6; ++i)
+        CHECK(std::string(programmschalterOptions[i]).length() > 0);
+}
+
+TEST_CASE("i18n: sgReadyOptions contains 4 non-empty entries", "[i18n]") {
+    for (size_t i = 0; i < 4; ++i)
+        CHECK(std::string(sgReadyOptions[i]).length() > 0);
+}
+
+TEST_CASE("i18n: all calculatedSensors names are non-empty", "[i18n]") {
+    for (size_t i = 0; i < CALCULATED_SENSOR_COUNT; ++i)
+        CHECK(std::string(calculatedSensors[i].name).length() > 0);
+}
+
+TEST_CASE("i18n: all writableNumbers friendlyNames are non-empty", "[i18n]") {
+    for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; ++i)
+        CHECK(std::string(writableNumbers[i].friendlyName).length() > 0);
+}
+
+TEST_CASE("i18n: named ElsterTable signals have non-empty friendlyName via LNAME macro", "[i18n]") {
+    static const char* named[] = {
+        "AUSSENTEMP", "SPEICHERISTTEMP", "RUECKLAUFISTTEMP", "VERDICHTER",
+        "LZ_VERD_1_HEIZBETRIEB", "LZ_VERD_2_KUEHLBETRIEB", "ABTAUUNGAKTIV",
+        "EVU_SPERRE_AKTIV", "HEIZKURVE", "WW_ECO", "WW_HYSTERSE", "GEBAEUDEART",
+        "PROGRAMMSCHALTER", "SOMMERBETRIEB", "WP_STATUS",
+    };
+    for (const char* name : named) {
+        const ElsterIndex* ei = GetElsterIndex(name);
+        REQUIRE(ei != nullptr);
+        if (ei->hasMetadata && ei->friendlyName)
+            CHECK(std::string(ei->friendlyName).length() > 0);
+    }
+}
