@@ -5,6 +5,50 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ---
 
+## [2.1.0] — 2026-06-14
+
+### Added
+
+- **Multilingual entity names** — entity display names compile in German (default) or English.
+  Set `language: "EN"` in `heatingpump.yaml` substitutions. Zero flash overhead for the unused
+  language. Further languages can be added via `lang_XX.h` + one `#elif` in `language_select.h`.
+  See `docs/CONTRIBUTING.md` for a step-by-step guide.
+- **Writable room temperature setpoints** — `RAUMSOLLTEMP_II`, `RAUMSOLLTEMP_III`, and
+  `RAUMSOLLTEMP_NACHT` now appear as writable `number` entities in HA (10–30 °C, 0.5 °C step),
+  matching the existing `RAUMSOLLTEMP_I`. Closes #1.
+- **CAN bus diagnostic sensors** (ESP32-S3 only) — four new sensors (`CAN TX Fehlerzähler`,
+  `CAN RX Fehlerzähler`, `CAN Bus Fehler`, `CAN Bus Zustand`) published every 30 s using
+  `twai_get_status_info()`. Appear under the diagnostic category, disabled by default in HA.
+  Useful for debugging termination and ground issues without external tools. Closes #20.
+- **Compressor runtime sensors** — `LZ_VERD_*` signals (`Laufzeit Verdichter`) now appear in HA
+  with `device_class: duration`, `unit: h`, `state_class: total_increasing`. Polled every 10 min
+  from both HEIZMODUL and MANAGER. Closes #3.
+
+### Fixed
+
+- `et_mil_val` signals incorrectly published as `device_class: temperature` / `unit: °C` — now
+  correctly `device_class: duration` / `unit: h`. Resolves HA warning about missing unit.
+- `LZ_VERD_*` signals had `isBlacklisted = true` in `ElsterTable.h`, silently dropping all CAN
+  responses before MQTT publish.
+- All-caps entity names for `ANTILEGIONELLEN`, `ANTILEGIONELLEN_ZEITPUNKT`, `BRENNER`,
+  `GEBAEUDEART`, `HEIZKURVE`, `WW_ECO`, `WW_HYSTERSE` — now show proper display names.
+
+### Improved
+
+- **Test coverage** — 72 new unit test cases (392 assertions, up from 236). New coverage:
+  MQTT discovery payload structure, `updateSensor` caching and global state dispatch, all
+  calculated sensor publish functions, writable entity discovery, i18n macro resolution.
+- **Documentation** — `language` substitution in both installation paths, localization
+  contribution guide in `CONTRIBUTING.md`, updated entity reference tables in `CONFIGURATION.md`.
+
+### Upgrade Notes
+
+No breaking changes. Existing `heatingpump.yaml` files without a `language` substitution
+compile with the German default — behaviour is unchanged. The new `LZ_VERD_*` sensors will
+appear as new entities after flashing. CAN diagnostic sensors are disabled by default in HA.
+
+---
+
 ## [2.0.0] — 2026-06-13
 
 ### Architecture
