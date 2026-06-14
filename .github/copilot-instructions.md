@@ -430,6 +430,27 @@ packages:
 Set it in `heatingpump.yaml`. The `HA_DEVICE_MODEL` C++ string define is injected via
 `platformio_options: build_flags:` in `common.yaml`.
 
+### i18n — Display language
+
+Entity display names are compile-time translated via `LNAME_*` macros. The `language`
+substitution in `heatingpump.yaml` selects the language (`DE` default, `EN` available).
+The build flag `-DHA_LANGUAGE_${language}` is injected in `common.yaml`.
+
+**File layout** (`esphome/ha-stiebel-control/`):
+- `lang_base.h` — all `LNAME_*` macros with German strings (single source of truth)
+- `lang_en.h` — includes `lang_base.h`, then `#undef`/`#define` for English translations
+- `language_select.h` — dispatch: `#ifdef HA_LANGUAGE_EN` → `lang_en.h`, else `lang_base.h`
+
+**Rules:**
+- Only `language_select.h` goes in the `esphome: includes:` list — `lang_base.h` and
+  `lang_en.h` are copied transitively and must NOT be auto-included by ESPHome
+- Signal protocol names (`TEMP_AUSSEN`, option values like `"Tagbetrieb"` used in CAN writes) stay German regardless of language
+- Only signals with `hasMetadata=true` in `ElsterTable.h` have `LNAME_*` macros; unnamed signals fall back to the raw signal name
+
+**Adding a new language:**
+1. Create `lang_XX.h`: `#include "lang_base.h"`, then override desired macros
+2. Add `#elif defined(HA_LANGUAGE_XX) / #include "lang_XX.h"` in `language_select.h`
+
 ### Version bumping
 
 The project version lives in `common.yaml` under `esphome: project: version:`.

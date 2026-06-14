@@ -131,6 +131,7 @@ Change the `@vX.Y.Z` tag in your local `heatingpump.yaml` to the new release and
 - **Multi-model architecture** — swap heat pump models by changing one line in `heatingpump.yaml`
 - **SG Ready** — 4-state PV surplus control with automatic temperature boost ([docs](SG_READY.md))
 - **Writable controls** — DHW and room temperature setpoints (circuits I–III + night), operating mode, SG Ready state via HA entities or MQTT
+- **Multilingual** — entity display names in German (default) or English; set `language: "EN"` in `heatingpump.yaml`
 - **Calculated sensors** — COP (hot water / heating / total), Delta-T, compressor status
 - **Date/time sync** — set heat pump clock from HA via buttons
 - **Frequency-based polling** — configurable per-signal intervals (10s–60min)

@@ -32,6 +32,7 @@ The key must match what HA's ESPHome integration has stored for this device. If 
 | `device_name` | ESPHome device hostname | `heatingpump` |
 | `friendly_name` | Display name in HA | `"Stiebel Eltron Wärmepumpe"` |
 | `device_model` | Heat pump model — selects signal table and HA device identifier | `"wpl13e"` |
+| `language` | Display language for HA entity names: `DE` (German, default) or `EN` (English) | `"DE"` |
 | `can_tx_pin` | CAN TX GPIO (ESP32-S3 built-in TWAI) | board-specific — see note below |
 | `can_rx_pin` | CAN RX GPIO (ESP32-S3 built-in TWAI) | board-specific — see note below |
 | `can_id_pc` | CAN bus ID for the ESP32 (PC role) | `"0x680"` |
