@@ -70,6 +70,17 @@ These entities appear automatically in HA via MQTT discovery:
 | `number.manager_sg_ready_boost_zustand_3` | SG Ready DHW boost for state 3 | 0–10°C | 0.5°C |
 | `number.manager_sg_ready_boost_zustand_4` | SG Ready DHW boost for state 4 | 0–15°C | 0.5°C |
 
+### Compressor Runtime Counters (WPL13E, sensor entities)
+
+| Entity ID | Description | Unit |
+|-----------|-------------|------|
+| `sensor.heizmodul_lz_verd_1_heizbetrieb` | Compressor 1 heating runtime | h |
+| `sensor.heizmodul_lz_verd_2_heizbetrieb` | Compressor 2 heating runtime | h |
+| `sensor.heizmodul_lz_verd_1_2_heizbetrieb` | Compressor 1+2 heating runtime | h |
+| `sensor.heizmodul_lz_verd_1_kuehlbetrieb` | Compressor 1 cooling runtime | h |
+| `sensor.heizmodul_lz_verd_2_kuehlbetrieb` | Compressor 2 cooling runtime | h |
+| `sensor.heizmodul_lz_verd_1_2_kuehlbetrieb` | Compressor 1+2 cooling runtime | h |
+
 ### Mode Selects (select entities)
 
 | Entity ID | Options |

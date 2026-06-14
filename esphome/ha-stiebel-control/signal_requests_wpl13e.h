@@ -54,6 +54,16 @@ extern const SignalRequest signalRequests[] = {
     {"ANTILEGIONELLEN",            FREQ_10MIN, cm_manager},
     {"ANTILEGIONELLEN_ZEITPUNKT",  FREQ_10MIN, cm_manager},
     {"GEBAEUDEART",                FREQ_10MIN, cm_manager},
+
+    // ========================================================================
+    // COMPRESSOR RUNTIME COUNTERS (Laufzeit Verdichter)
+    // ========================================================================
+    {"LZ_VERD_1_HEIZBETRIEB",    FREQ_10MIN, cm_heizmodul},
+    {"LZ_VERD_2_HEIZBETRIEB",    FREQ_10MIN, cm_heizmodul},
+    {"LZ_VERD_1_2_HEIZBETRIEB",  FREQ_10MIN, cm_heizmodul},
+    {"LZ_VERD_1_KUEHLBETRIEB",   FREQ_10MIN, cm_heizmodul},
+    {"LZ_VERD_2_KUEHLBETRIEB",   FREQ_10MIN, cm_heizmodul},
+    {"LZ_VERD_1_2_KUEHLBETRIEB", FREQ_10MIN, cm_heizmodul},
 };
 
 extern const size_t SIGNAL_REQUEST_COUNT_VALUE = sizeof(signalRequests) / sizeof(SignalRequest);

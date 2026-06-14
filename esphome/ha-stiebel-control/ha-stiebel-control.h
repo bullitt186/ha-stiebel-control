@@ -352,8 +352,10 @@ inline void getTypeDefaults(ElsterType type, const char*& component, const char*
     switch(type) {
         case et_dec_val:
         case et_cent_val:
-        case et_mil_val:
             component = "sensor"; deviceClass = "temperature"; unit = "°C"; stateClass = "measurement"; icon = "mdi:thermometer";
+            break;
+        case et_mil_val:
+            component = "sensor"; deviceClass = "duration"; unit = "h"; stateClass = "total_increasing"; icon = "mdi:timer";
             break;
         case et_bool:
         case et_little_bool:
