@@ -108,42 +108,44 @@ struct CalculatedSensorConfig {
     const char* icon;              // MDI icon
     const char* payloadOn;         // For binary sensors (empty string if not applicable)
     const char* payloadOff;        // For binary sensors (empty string if not applicable)
+    const char* entityCategory;    // "diagnostic" | "config" | "" (empty = normal)
+    bool enabledByDefault;         // false = disabled in HA until user enables
 };
 
 static const CalculatedSensorConfig calculatedSensors[] = {
     // Date sensor
-    {"stiebel_calculated_date", "Datum", "heatingpump/calculated/date/state", 
-     "sensor", "", "", "", "mdi:calendar", "", ""},
-    
+    {"stiebel_calculated_date", "Datum", "heatingpump/calculated/date/state",
+     "sensor", "", "", "", "mdi:calendar", "", "", "", true},
+
     // Time sensor
-    {"stiebel_calculated_time", "Uhrzeit", "heatingpump/calculated/time/state", 
-     "sensor", "", "", "", "mdi:clock", "", ""},
-    
+    {"stiebel_calculated_time", "Uhrzeit", "heatingpump/calculated/time/state",
+     "sensor", "", "", "", "mdi:clock", "", "", "", true},
+
     // Betriebsart sensor
-    {"stiebel_calculated_betriebsart", "Betriebsart", "heatingpump/calculated/betriebsart/state", 
-     "sensor", "", "", "", "mdi:cog", "", ""},
-    
+    {"stiebel_calculated_betriebsart", "Betriebsart", "heatingpump/calculated/betriebsart/state",
+     "sensor", "", "", "", "mdi:cog", "", "", "", true},
+
     // Delta T continuous
-    {"stiebel_calculated_delta_t_continuous", "Delta T WP (kontinuierlich)", "heatingpump/calculated/delta_t_continuous/state", 
-     "sensor", "temperature", "K", "measurement", "mdi:thermometer", "", ""},
-    
+    {"stiebel_calculated_delta_t_continuous", "Delta T WP (kontinuierlich)", "heatingpump/calculated/delta_t_continuous/state",
+     "sensor", "temperature", "K", "measurement", "mdi:thermometer", "", "", "", true},
+
     // Delta T running (only when compressor active)
-    {"stiebel_calculated_delta_t_running", "Delta T WP (nur bei Verdichter an)", "heatingpump/calculated/delta_t_running/state", 
-     "sensor", "temperature", "K", "measurement", "mdi:thermometer-chevron-up", "", ""},
-    
+    {"stiebel_calculated_delta_t_running", "Delta T WP (nur bei Verdichter an)", "heatingpump/calculated/delta_t_running/state",
+     "sensor", "temperature", "K", "measurement", "mdi:thermometer-chevron-up", "", "", "", true},
+
     // Compressor active binary sensor
     {"stiebel_calculated_compressor_active", "WP Verdichter aktiv", "heatingpump/calculated/compressor_active/state",
-     "binary_sensor", "running", "", "", "mdi:engine", "on", "off"},
+     "binary_sensor", "running", "", "", "mdi:engine", "on", "off", "", true},
 
     // CAN bus diagnostic sensors (TWAI / ESP32-S3; silently inactive on MCP2515 builds)
     {"stiebel_calculated_can_tec",        "CAN TX Fehlerzähler",  "heatingpump/calculated/can_tec/state",
-     "sensor", "", "", "measurement", "mdi:alert-network", "", ""},
+     "sensor", "", "", "measurement", "mdi:alert-network", "", "", "diagnostic", false},
     {"stiebel_calculated_can_rec",        "CAN RX Fehlerzähler",  "heatingpump/calculated/can_rec/state",
-     "sensor", "", "", "measurement", "mdi:alert-network-outline", "", ""},
+     "sensor", "", "", "measurement", "mdi:alert-network-outline", "", "", "diagnostic", false},
     {"stiebel_calculated_can_bus_errors", "CAN Bus Fehler",        "heatingpump/calculated/can_bus_errors/state",
-     "sensor", "", "", "total_increasing", "mdi:network-off", "", ""},
+     "sensor", "", "", "total_increasing", "mdi:network-off", "", "", "diagnostic", false},
     {"stiebel_calculated_can_state",      "CAN Bus Zustand",       "heatingpump/calculated/can_state/state",
-     "sensor", "", "", "", "mdi:can", "", ""},
+     "sensor", "", "", "", "mdi:can", "", "", "diagnostic", false},
 };
 
 static const size_t CALCULATED_SENSOR_COUNT = sizeof(calculatedSensors) / sizeof(CalculatedSensorConfig);
@@ -581,7 +583,17 @@ void publishCalculatedSensorDiscovery(const CalculatedSensorConfig& config, bool
         payload << ",\"payload_on\":\"" << config.payloadOn << "\","
                 << "\"payload_off\":\"" << config.payloadOff << "\"";
     }
-    
+
+    // Add entity category if specified
+    if (config.entityCategory[0] != '\0') {
+        payload << ",\"entity_category\":\"" << config.entityCategory << "\"";
+    }
+
+    // Add enabled_by_default if false (true is HA default, no need to emit)
+    if (!config.enabledByDefault) {
+        payload << ",\"enabled_by_default\":false";
+    }
+
     // Add device info
     payload << ",\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
             << "\"name\":\"Stiebel Eltron Wärmepumpe\","
