@@ -51,6 +51,9 @@
 // Betriebsart sensor update frequency (based on SOMMERBETRIEB frequency)
 #define CALC_BETRIEBSART_FREQUENCY FREQ_1MIN
 
+// CAN diagnostic sensors update frequency (ESP32-S3 / TWAI only)
+#define CALC_CAN_DIAG_FREQUENCY FREQ_30S
+
 // ============================================================================
 // COP CALCULATION SETTINGS
 // ============================================================================

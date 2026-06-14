@@ -81,6 +81,19 @@ These entities appear automatically in HA via MQTT discovery:
 | `sensor.heizmodul_lz_verd_2_kuehlbetrieb` | Compressor 2 cooling runtime | h |
 | `sensor.heizmodul_lz_verd_1_2_kuehlbetrieb` | Compressor 1+2 cooling runtime | h |
 
+### CAN Bus Diagnostics (ESP32-S3 only, sensor entities)
+
+Available automatically on ESP32-S3 / TWAI builds. Not present on MCP2515 builds.
+
+| Entity ID | Description |
+|-----------|-------------|
+| `sensor.can_tx_fehlerzahler` | TX Error Counter (TEC) — rises on failed transmissions |
+| `sensor.can_rx_fehlerzahler` | RX Error Counter (REC) — rises on receive errors |
+| `sensor.can_bus_fehler` | Total bus error count (cumulative) |
+| `sensor.can_bus_zustand` | Bus state: Läuft / Gestoppt / Bus-Off / Erholung |
+
+TEC/REC above 96 indicates warning level; above 127 the controller enters bus-off.
+
 ### Mode Selects (select entities)
 
 | Entity ID | Options |
