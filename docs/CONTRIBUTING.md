@@ -58,21 +58,11 @@ esphome:
 # Generic sensors (COP, DHW temperatures, operating mode) are already in common.yaml.
 ```
 
-### Step 3 — Register the model in the dispatcher
-
-Edit `esphome/ha-stiebel-control/signal_requests_model.h` and add an `#elif` branch:
-
-```cpp
-#elif defined(HA_MODEL_YOURMODEL)
-#  include "signal_requests_yourmodel.h"
-```
-
-### Step 4 — Use your model in `heatingpump.yaml`
+### Step 3 — Use your model in `heatingpump.yaml`
 
 ```yaml
 substitutions:
   device_model: "yourmodel"
-  device_model_flag: "YOURMODEL"   # must match the HA_MODEL_* flag in the dispatcher
 
 packages:
   board:   !include ha-stiebel-control/board_esp32s3.yaml
@@ -81,7 +71,7 @@ packages:
   sensors: !include ha-stiebel-control/yourmodel.yaml
 ```
 
-### Step 5 — Create a smoke test manifest
+### Step 4 — Create a smoke test manifest
 
 Create `tests/models/yourmodel_smoke.json`:
 
@@ -97,7 +87,7 @@ Create `tests/models/yourmodel_smoke.json`:
 
 List only signals you have verified on real hardware. Mark unverified signals in a comment.
 
-### Step 6 — Test
+### Step 5 — Test
 
 ```bash
 make config    # YAML parses cleanly
@@ -105,11 +95,10 @@ make compile   # firmware compiles
 make smoke-test DEVICE_MODEL=yourmodel  # after flashing — MQTT regression
 ```
 
-### Step 7 — Submit a PR
+### Step 6 — Submit a PR
 
 Include:
 - `signal_requests_yourmodel.h` and `yourmodel.yaml`
-- The `signal_requests_model.h` dispatcher update
 - `tests/models/yourmodel_smoke.json`
 - ESPHome log snippet showing signals responding from your heat pump
 - Heat pump model/variant info in the PR description

@@ -8,7 +8,10 @@
 #
 #    substitutions:
 #      device_model: "wpf10"
-#      device_model_flag: "WPF10"
 #    packages:
 #      sensors: !include ha-stiebel-control/wpf10.yaml
 #
+
+esphome:
+  includes:
+    - ha-stiebel-control/signal_requests_wpf10.h
