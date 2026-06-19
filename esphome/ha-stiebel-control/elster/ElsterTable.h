@@ -3844,6 +3844,8 @@ static const ElsterIndex ElsterTable[] =
   { "LAUFZEIT_VD_KUEHLEN", 0x4efc, 0, "Laufzeit Verdichter Kühlen", "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL, false, true }, // WPL17-only, not defined for WPL23 in source project
   { "LAUFZEIT_VD_WW_WPL17", 0x4efd, 0, "Laufzeit Verdichter Warmwasser (WPL17)", "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL, false, true }, // WPL17 and WPL23 disagree on this index; see signal_requests_wpl23.h
   { "LAUFZEIT_VD_ABTAUEN_WPL17", 0x4f06, 0, "Laufzeit Verdichter Abtauen (WPL17)", "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL, false, true }, // WPL17 and WPL23 disagree on this index; see signal_requests_wpl23.h
+  { "LAUFZEIT_VD_HEIZEN_WPL23", 0x07fc, 0, "Laufzeit Verdichter Heizen (WPL23)", "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL, false, true },
+  { "LAUFZEIT_VD_WW_WPL23", 0x0802, 0, "Laufzeit Verdichter Warmwasser (WPL23)", "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL, false, true },
 };
 
 static const ErrorIndex ErrorList[] =
