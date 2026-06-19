@@ -1600,7 +1600,7 @@ static const ElsterIndex ElsterTable[] =
   { "TEST_OBJEKT_33", 0x0662, 0, "Test Objekt 33", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_34", 0x0663, 0, "Test Objekt 34", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_35", 0x0664, 0, "Test Objekt 35", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_36", 0x0665, 0, "Test Objekt 36", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "AUSLEGUNGSTEMPERATUR", 0x0665, et_dec_val, "Auslegungstemperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_37", 0x0666, 0, "Test Objekt 37", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_38", 0x0667, 0, "Test Objekt 38", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_39", 0x0668, 0, "Test Objekt 39", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
@@ -3793,6 +3793,42 @@ static const ElsterIndex ElsterTable[] =
   { "INFOBLOCK_4", 0xfe05, 0, "Infoblock 4", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "INFOBLOCK_5", 0xfe06, 0, "Infoblock 5", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "INFOBLOCK_6", 0xfe07, 0, "Infoblock 6", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  // --------------------------------------------------------------------
+  // WPL23 — signals ported from community project kr0ner/OneESP32ToRuleThemAll
+  // (originally in PR #28). NOT verified on real WPL23 hardware; several did
+  // not respond on a real WPL17 (#36). See signal_requests_wpl23.h.
+  // --------------------------------------------------------------------
+  { "ANTILEGIONELLENBEHANDLUNG", 0x4f28, 0, "Antilegionellenbehandlung", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "ECOTEMPERATUR", 0x4eb9, et_dec_val, "Ecotemperatur Heizkreis", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "EINGESCHALTETE_STUFEN", 0x4efa, 0, "Eingeschaltete Stufen", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "FROSTSCHUTZTEMPERATUR", 0x0a36, et_dec_val, "Frostschutztemperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "HEIZEN_EFFIZIENZ_JAHR", 0x501e, et_cent_val, "Heizeffizienz Jahr", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "HEIZEN_EFFIZIENZ_TAG", 0x501d, et_cent_val, "Heizeffizienz Tag", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "HEIZUNGSDRUCK", 0x4f46, et_cent_val, "Heizungsdruck", "sensor", "pressure", "bar", "measurement", "mdi:water-pressure", NULL, NULL, false, true },
+  { "ISTTEMPERATUR", 0x4eb4, et_dec_val, "Ist Temperatur Heizkreis", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "KOMFORTTEMPERATUR", 0x4eb8, et_dec_val, "Komforttemperatur Heizkreis", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "KUEHLEN_ISTTEMP", 0x4f44, et_dec_val, "Kühlen Ist Temperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "KUEHLEN_SOLLTEMP", 0x4f45, et_dec_val, "Kühlen Soll Temperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "LEISTUNG_QUELLENPUMPE", 0x4fa9, et_dec_val, "Leistung Quellenpumpe", "sensor", "", "%", "measurement", "mdi:water-percent", NULL, NULL, false, true },
+  { "QUELLENDRUCK_WPL", 0x4fa8, et_dec_val, "Quellendruck", "sensor", "pressure", "bar", "measurement", "mdi:water-pressure", NULL, NULL, false, true }, // suffixed: QUELLENDRUCK already used (0x0675) by WPC7
+  { "RAUMSOLLTEMP", 0x4ece, et_dec_val, "Raum Soll Temperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "RUECKLAUFISTTEMP_WP", 0x4f43, et_dec_val, "Rücklauf Ist Temperatur Wärmepumpe", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "RUECKLAUFTEMP_QUELLE", 0x4fa6, et_dec_val, "Rücklauftemperatur Quelle", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "SILENT_LEISTUNG", 0x4e9f, 0, "Silent Leistung", "sensor", "", "%", "measurement", NULL, NULL, NULL, false, true },
+  { "SILENT_LUEFTER", 0x4ea0, 0, "Silent Lüfter", "sensor", "", "%", "measurement", NULL, NULL, NULL, false, true },
+  { "SOLLTEMPERATUR", 0x4eb0, et_dec_val, "Soll Temperatur Heizkreis", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "STEIGUNG_HEIZKURVE", 0x4f2b, et_dec_val, "Steigung Heizkurve", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "VOLUMENSTROM_WPL", 0x4f47, et_cent_val, "Volumenstrom", "sensor", "", "l/min", "measurement", "mdi:flow", NULL, NULL, false, true }, // suffixed: VOLUMENSTROM already used (0x01da) by other models
+  { "VORLAUFISTTEMP_NHZ", 0x4f40, et_dec_val, "Vorlauf Ist Temperatur NHZ", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "VORLAUFISTTEMP_WP", 0x4f41, et_dec_val, "Vorlauf Ist Temperatur Wärmepumpe", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "VORLAUFTEMP_QUELLE", 0x4fa7, et_dec_val, "Vorlauftemperatur Quelle", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "WAERMEPUMPE_AUS", 0x4ea1, 0, "Wärmepumpe Aus", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "WARMWASSERBETRIEB", 0x4f24, 0, "Warmwasserbetrieb", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "WARMWASSERHYSTERESE", 0x4f25, et_dec_val, "Warmwasserhysterese", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "WW_ANFORDERUNG", 0x4eb2, 0, "Warmwasser Anforderung", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "WW_SOLLTEMPERATUR", 0x4ef9, et_dec_val, "Warmwasser Solltemperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "LAUFZEIT_VD_HEIZEN_WPL23", 0x07fc, 0, "Laufzeit Verdichter Heizen (WPL23)", "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL, false, true },
+  { "LAUFZEIT_VD_WW_WPL23", 0x0802, 0, "Laufzeit Verdichter Warmwasser (WPL23)", "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL, false, true },
   // --------------------------------------------------------------------
   // WPC7 / Stiebel WPC-07cool / Tecalor TTF07c — additional new signals
   // Ported from community project kr0ner/OneESP32ToRuleThemAll (CAN
