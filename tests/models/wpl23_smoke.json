@@ -1,0 +1,6 @@
+{
+  "description": "Required topics for WPL23. UNVERIFIED — ported from community project kr0ner/OneESP32ToRuleThemAll desk research, no physical hardware tested, and the model needs can_bit_rate: 50kbps to communicate at all. Stub — populate/correct after verifying on real hardware. See tests/models/wpl13e_smoke.json for the expected format.",
+  "required_topics": [
+    "heatingpump/KESSEL/AUSSENTEMP/state"
+  ]
+}
