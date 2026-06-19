@@ -15,7 +15,7 @@ canbus:
     rx_pin: ${can_rx_pin}
     can_id: ${can_id_pc}
     use_extended_id: false
-    bit_rate: 20kbps
+    bit_rate: ${can_bit_rate}
     # Increased buffer sizes to prevent overflows
     # ESP32-S3 has much larger buffers than MCP2515 (2 RX buffers)
     rx_queue_len: 256  # Default: 8, increased for high-traffic CAN bus

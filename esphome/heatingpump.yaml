@@ -19,6 +19,7 @@ substitutions:
   can_tx_pin: GPIO15  # TXD2 on Waveshare board
   can_rx_pin: GPIO16  # RXD2 on Waveshare board
   can_id_pc: "0x680"
+  can_bit_rate: 20kbps             # 20kbps (WPL13E, WPF10, WPC7); WPL17/WPL23 need 50kbps
 
 packages:
   board: !include ha-stiebel-control/board_esp32s3.yaml
@@ -40,6 +41,7 @@ packages:
 #   can_miso_pin: GPIO19
 #   can_cs_pin: GPIO5
 #   can_id_pc: "0x680"
+#   can_bit_rate: 20kbps
 #
 # packages:
 #   board: !include ha-stiebel-control/board_esp32s2.yaml
