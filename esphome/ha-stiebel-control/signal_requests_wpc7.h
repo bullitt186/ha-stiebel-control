@@ -64,6 +64,22 @@ extern const SignalRequest signalRequests[] = {
     {"BETRIEBS_STATUS_WPC7",       FREQ_30S,   cm_kessel},  // bitmask register, see header comment
     {"PROGRAMMSCHALTER",           FREQ_10MIN, cm_kessel},  // source project targets Kessel; base already queries cm_manager too
 
+    // ========================================================================
+    // Confirmed working on real WPC7 hardware — corroborated against
+    // EnderBow's tested fork (github.com/EnderBow/ha-stiebel-control-wpc7,
+    // referenced in PR #27 comments)
+    // ========================================================================
+    {"BETRIEBSART_WP",             FREQ_1MIN,  cm_manager},
+    {"RAUMSOLLTEMP_I",             FREQ_10MIN, cm_manager},
+    {"RAUMSOLLTEMP_II",            FREQ_10MIN, cm_manager},
+    {"RAUMSOLLTEMP_III",           FREQ_10MIN, cm_manager},
+    {"RAUMSOLLTEMP_NACHT",         FREQ_10MIN, cm_manager},
+    {"WW_ECO",                     FREQ_10MIN, cm_manager},
+    {"ANTILEGIONELLEN",            FREQ_10MIN, cm_manager},
+    {"QUELLENSOLLTEMPERATUR",      FREQ_10MIN, cm_manager},  // confirmed on manager; see also cm_kessel guess below
+    {"WPVORLAUFIST",               FREQ_30S,   cm_kessel},
+    {"WP_PUMPENSTATUS",            FREQ_30S,   cm_kessel},
+
     // Index matches an existing ElsterTable row but the source project
     // documents a different Type — reusing the existing row as-is (see
     // header comment). Values may be mis-scaled until verified.
