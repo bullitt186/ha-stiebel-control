@@ -595,14 +595,14 @@ void publishCalculatedSensorDiscovery(const CalculatedSensorConfig& config, bool
     }
 
     // Add device info
-    payload << ",\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
+    payload << ",\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL "\"],"
             << "\"name\":\"Stiebel Eltron Wärmepumpe\","
             << "\"manufacturer\":\"Stiebel Eltron\"}}";
-    
+
     // Publish discovery message
     std::string payloadStr = payload.str();
     id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
-    
+
     ESP_LOGI("MQTT", "Discovery published for calculated sensor: %s", config.name);
 }
 
@@ -673,29 +673,29 @@ void publishWritableNumberDiscovery(const WritableNumberConfig& config, bool for
     
     if (isSgReady) {
         // SG Ready controls go to main device
-        payload << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
+        payload << "\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL "\"],"
                 << "\"name\":\"Stiebel Eltron Wärmepumpe\","
                 << "\"manufacturer\":\"Stiebel Eltron\"}}";
     } else {
         // Regular controls go to their respective CAN member device
         char canMemberDeviceId[64];
         snprintf(canMemberDeviceId, sizeof(canMemberDeviceId), "stiebel_%s", cm->Name);
-        
+
         const char* canMemberFriendlyName = cm->Name;
         if (strcmp(cm->Name, "KESSEL") == 0) canMemberFriendlyName = "Kessel";
         else if (strcmp(cm->Name, "MANAGER") == 0) canMemberFriendlyName = "Manager";
         else if (strcmp(cm->Name, "HEIZMODUL") == 0) canMemberFriendlyName = "Heizmodul";
-        
+
         payload << "\"device\":{\"identifiers\":[\"" << canMemberDeviceId << "\"],"
                 << "\"name\":\"" << canMemberFriendlyName << "\","
-                << "\"via_device\":\"stiebel_eltron_wpl13e\","
+                << "\"via_device\":\"stiebel_eltron_" HA_DEVICE_MODEL "\","
                 << "\"manufacturer\":\"Stiebel Eltron\"}}";
     }
-    
+
     // Publish discovery message
     std::string payloadStr = payload.str();
     id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
-    
+
     ESP_LOGI("MQTT", "Discovery published for writable number: %s", config.friendlyName);
 }
 
@@ -772,29 +772,29 @@ void publishWritableSelectDiscovery(const WritableSelectConfig& config, bool for
     
     if (isSgReady) {
         // SG Ready controls go to main device
-        payload << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
+        payload << "\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL "\"],"
                 << "\"name\":\"Stiebel Eltron Wärmepumpe\","
                 << "\"manufacturer\":\"Stiebel Eltron\"}}";
     } else {
         // Regular controls go to their respective CAN member device
         char canMemberDeviceId[64];
         snprintf(canMemberDeviceId, sizeof(canMemberDeviceId), "stiebel_%s", cm->Name);
-        
+
         const char* canMemberFriendlyName = cm->Name;
         if (strcmp(cm->Name, "KESSEL") == 0) canMemberFriendlyName = "Kessel";
         else if (strcmp(cm->Name, "MANAGER") == 0) canMemberFriendlyName = "Manager";
         else if (strcmp(cm->Name, "HEIZMODUL") == 0) canMemberFriendlyName = "Heizmodul";
-        
+
         payload << "\"device\":{\"identifiers\":[\"" << canMemberDeviceId << "\"],"
                 << "\"name\":\"" << canMemberFriendlyName << "\","
-                << "\"via_device\":\"stiebel_eltron_wpl13e\","
+                << "\"via_device\":\"stiebel_eltron_" HA_DEVICE_MODEL "\","
                 << "\"manufacturer\":\"Stiebel Eltron\"}}";
     }
-    
+
     // Publish discovery message
     std::string payloadStr = payload.str();
     id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
-    
+
     // Mark as discovered
     discoveredWritableSelects.insert(uniqueIdStr);
     
@@ -1217,7 +1217,7 @@ void publishCOPDiscovery() {
                 << "\"state_topic\":\"heatingpump/calculated/cop_ww/state\","
                 << "\"icon\":\"mdi:water-boiler\","
                 << "\"state_class\":\"measurement\","
-                << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
+                << "\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL "\"],"
                 << "\"name\":\"Stiebel Eltron Wärmepumpe\","
                 << "\"manufacturer\":\"Stiebel Eltron\"}}";
         std::string payloadStr = payload.str();
@@ -1233,7 +1233,7 @@ void publishCOPDiscovery() {
                 << "\"state_topic\":\"heatingpump/calculated/cop_heiz/state\","
                 << "\"icon\":\"mdi:radiator\","
                 << "\"state_class\":\"measurement\","
-                << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
+                << "\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL "\"],"
                 << "\"name\":\"Stiebel Eltron Wärmepumpe\","
                 << "\"manufacturer\":\"Stiebel Eltron\"}}";
         std::string payloadStr = payload.str();
@@ -1249,7 +1249,7 @@ void publishCOPDiscovery() {
                 << "\"state_topic\":\"heatingpump/calculated/cop_gesamt/state\","
                 << "\"icon\":\"mdi:chart-line\","
                 << "\"state_class\":\"measurement\","
-                << "\"device\":{\"identifiers\":[\"stiebel_eltron_wpl13e\"],"
+                << "\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL "\"],"
                 << "\"name\":\"Stiebel Eltron Wärmepumpe\","
                 << "\"manufacturer\":\"Stiebel Eltron\"}}";
         std::string payloadStr = payload.str();
