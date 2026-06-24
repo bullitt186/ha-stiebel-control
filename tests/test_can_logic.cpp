@@ -1026,6 +1026,27 @@ TEST_CASE("i18n: programmschalterOptions contains 6 non-empty entries", "[i18n]"
         CHECK(std::string(programmschalterOptions[i]).length() > 0);
 }
 
+TEST_CASE("i18n: programmschalterOptions match BetriebsartList protocol strings", "[i18n]") {
+    // These must stay German regardless of display language — they round-trip
+    // through writeSignal()/TranslateString() as literal CAN-write values.
+    for (size_t i = 0; i < 6; ++i)
+        CHECK(std::string(programmschalterOptions[i]) == BetriebsartList[i].Name);
+}
+
+TEST_CASE("writeSignal: et_betriebsart with unrecognized string is not sent to CAN bus", "[can]") {
+    fake_can().sent.clear();
+    const char* value = "Bogus Value";
+    writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", value);
+    CHECK(fake_can().sent.empty());
+}
+
+TEST_CASE("writeSignal: et_betriebsart with valid German string is sent", "[can]") {
+    fake_can().sent.clear();
+    const char* value = "Automatik";
+    writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", value);
+    CHECK(fake_can().sent.size() == 1);
+}
+
 TEST_CASE("i18n: sgReadyOptions contains 4 non-empty entries", "[i18n]") {
     for (size_t i = 0; i < 4; ++i)
         CHECK(std::string(sgReadyOptions[i]).length() > 0);
