@@ -1598,8 +1598,8 @@ static const ElsterIndex ElsterTable[] =
   { "TEST_OBJEKT_33", 0x0662, 0, "Test Objekt 33", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_34", 0x0663, 0, "Test Objekt 34", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_35", 0x0664, 0, "Test Objekt 35", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_36", 0x0665, 0, "Test Objekt 36", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_37", 0x0666, 0, "Test Objekt 37", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "AUSLEGUNGSTEMPERATUR", 0x0665, et_dec_val, "Auslegungstemperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false }, // WPL17/23; was TEST_OBJEKT_36 — ported from OneESP32ToRuleThemAll, unverified
+  { "WAERMEBEDARF", 0x0666, et_dec_val, "Wärmebedarf", "sensor", "", "kW", "measurement", "mdi:fire", NULL, NULL, false, true }, // WPL17/23; was TEST_OBJEKT_37 — ported, unverified
   { "TEST_OBJEKT_38", 0x0667, 0, "Test Objekt 38", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_39", 0x0668, 0, "Test Objekt 39", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_40", 0x0669, 0, "Test Objekt 40", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
@@ -1622,9 +1622,9 @@ static const ElsterIndex ElsterTable[] =
   { "TEST_OBJEKT_57", 0x067a, 0, "Test Objekt 57", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_58", 0x067b, 0, "Test Objekt 58", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_59", 0x067c, 0, "Test Objekt 59", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_60", 0x067d, 0, "Test Objekt 60", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "STANDBY_PUMPENLEISTUNG", 0x067d, 0, "Standby Pumpenleistung", "sensor", "", "%", "measurement", "mdi:water-percent", NULL, NULL, false, true }, // WPL17/23; was TEST_OBJEKT_60 — ported, unverified
   { "TEST_OBJEKT_61", 0x067e, 0, "Test Objekt 61", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_62", 0x067f, 0, "Test Objekt 62", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "MAXIMALE_PUMPENLEISTUNG", 0x067f, 0, "Maximale Pumpenleistung", "sensor", "", "%", "measurement", "mdi:water-percent", NULL, NULL, false, true }, // WPL17/23; was TEST_OBJEKT_62 — ported, unverified
   { "TEST_OBJEKT_63", 0x0680, 0, "Test Objekt 63", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_64", 0x0681, 0, "Test Objekt 64", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_65", 0x0682, 0, "Test Objekt 65", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
@@ -1674,10 +1674,10 @@ static const ElsterIndex ElsterTable[] =
   { "TEST_OBJEKT_109", 0x06ae, 0, "Test Objekt 109", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_110", 0x06af, 0, "Test Objekt 110", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_111", 0x06b0, 0, "Test Objekt 111", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_112", 0x06b1, 0, "Test Objekt 112", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_113", 0x06b2, 0, "Test Objekt 113", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "SPANNUNG_INVERTER", 0x06b1, et_dec_val, "Spannung Inverter", "sensor", "voltage", "V", "measurement", NULL, NULL, NULL, false, true }, // WPL17/23; was TEST_OBJEKT_112 — ported, unverified
+  { "STROM_INVERTER", 0x06b2, et_dec_val, "Strom Inverter", "sensor", "current", "A", "measurement", NULL, NULL, NULL, false, true }, // WPL17/23; was TEST_OBJEKT_113 — ported, unverified
   { "TEST_OBJEKT_114", 0x06b3, 0, "Test Objekt 114", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_115", 0x06b4, 0, "Test Objekt 115", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "STROM_MOTOR", 0x06b4, et_dec_val, "Strom Motor", "sensor", "current", "A", "measurement", NULL, NULL, NULL, false, true }, // WPL17/23; was TEST_OBJEKT_115 — ported, unverified
   { "TEST_OBJEKT_116", 0x06b5, 0, "Test Objekt 116", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_117", 0x06b6, 0, "Test Objekt 117", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_118", 0x06b7, 0, "Test Objekt 118", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
@@ -1714,7 +1714,7 @@ static const ElsterIndex ElsterTable[] =
   { "TEST_OBJEKT_149", 0x06d6, 0, "Test Objekt 149", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_150", 0x06d7, 0, "Test Objekt 150", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_151", 0x06d8, 0, "Test Objekt 151", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_152", 0x06d9, 0, "Test Objekt 152", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "VERDICHTER_EINTRITTSTEMP", 0x06d9, et_dec_val, "Verdichter Eintrittstemperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false }, // WPL17/23; was TEST_OBJEKT_152 — ported, unverified
   { "TEST_OBJEKT_153", 0x06da, 0, "Test Objekt 153", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_154", 0x06db, 0, "Test Objekt 154", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_155", 0x06dc, 0, "Test Objekt 155", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
@@ -1732,8 +1732,8 @@ static const ElsterIndex ElsterTable[] =
   { "TEST_OBJEKT_167", 0x06e8, 0, "Test Objekt 167", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_168", 0x06e9, 0, "Test Objekt 168", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_169", 0x06ea, 0, "Test Objekt 169", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_170", 0x06eb, 0, "Test Objekt 170", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_171", 0x06ec, 0, "Test Objekt 171", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "ISTDREHZAHL_VERDICHTER", 0x06eb, 0, "Ist Drehzahl Verdichter", "sensor", "", "Hz", "measurement", "mdi:engine", NULL, NULL, false, true }, // WPL17/23; was TEST_OBJEKT_170 — ported, unverified
+  { "SOLLDREHZAHL_VERDICHTER", 0x06ec, 0, "Soll Drehzahl Verdichter", "sensor", "", "Hz", "measurement", "mdi:engine", NULL, NULL, false, true }, // WPL17/23; was TEST_OBJEKT_171 — ported, unverified
   { "TEST_OBJEKT_172", 0x06ed, 0, "Test Objekt 172", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_173", 0x06ee, 0, "Test Objekt 173", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_174", 0x06ef, 0, "Test Objekt 174", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
@@ -1758,7 +1758,7 @@ static const ElsterIndex ElsterTable[] =
   { "TEST_OBJEKT_193", 0x0702, 0, "Test Objekt 193", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_194", 0x0703, 0, "Test Objekt 194", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_195", 0x0704, 0, "Test Objekt 195", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_196", 0x0705, 0, "Test Objekt 196", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "LEISTUNG_WARMWASSERPUMPE_WPL", 0x0705, 0, "Leistung Warmwasserpumpe (WPL)", "sensor", "", "%", "measurement", "mdi:water-percent", NULL, NULL, false, true }, // WPL17/23; was TEST_OBJEKT_196 — ported, unverified. Suffixed: LEISTUNG_WARMWASSERPUMPE already used (0x070b) by WPC7.
   { "TEST_OBJEKT_197", 0x0706, 0, "Test Objekt 197", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_198", 0x0707, 0, "Test Objekt 198", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_199", 0x0708, 0, "Test Objekt 199", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
@@ -3791,6 +3791,59 @@ static const ElsterIndex ElsterTable[] =
   { "INFOBLOCK_4", 0xfe05, 0, "Infoblock 4", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "INFOBLOCK_5", 0xfe06, 0, "Infoblock 5", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "INFOBLOCK_6", 0xfe07, 0, "Infoblock 6", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+
+  // --------------------------------------------------------------------
+  // WPL17 / WPL23 — additional new signals (curated subset: monitoring,
+  // runtime counters, PID/EXV control, operating state — excludes raw
+  // relay outputs, stepper-motor phases, and X1 terminal config registers).
+  // Ported from community project kr0ner/OneESP32ToRuleThemAll (CAN
+  // register map; not yet verified on real WPL17/WPL23 hardware in this
+  // project). See signal_requests_wpl17.h / signal_requests_wpl23.h.
+  // --------------------------------------------------------------------
+  { "ISTTEMPERATUR", 0x4eb4, et_dec_val, "Ist Temperatur Heizkreis", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "SOLLTEMPERATUR", 0x4eb0, et_dec_val, "Soll Temperatur Heizkreis", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "KOMFORTTEMPERATUR", 0x4eb8, et_dec_val, "Komforttemperatur Heizkreis", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "ECOTEMPERATUR", 0x4eb9, et_dec_val, "Ecotemperatur Heizkreis", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "RAUMISTTEMP_WPL", 0x4ec7, et_dec_val, "Raum Ist Temperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false }, // suffixed: RAUMISTTEMP already used (0x0011) by other models
+  { "RAUMFEUCHTE_WPL", 0x4ec8, et_dec_val, "Raumfeuchte", "sensor", "humidity", "%", "measurement", "mdi:water-percent", NULL, NULL, false, true }, // suffixed: RAUMFEUCHTE already used (0x0075) by WPC7
+  { "BETRIEBS_STATUS_WPL", 0x4ecd, 0, "Betriebsstatus (WPL Bitmaske)", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false }, // suffixed: BETRIEBS_STATUS already used (0x0176) by other models
+  { "RAUMSOLLTEMP", 0x4ece, et_dec_val, "Raum Soll Temperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "STEIGUNG_HEIZKURVE", 0x4f2b, et_dec_val, "Steigung Heizkurve", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "VORLAUFISTTEMP_NHZ", 0x4f40, et_dec_val, "Vorlauf Ist Temperatur NHZ", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "VORLAUFISTTEMP_WP", 0x4f41, et_dec_val, "Vorlauf Ist Temperatur Wärmepumpe", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "RUECKLAUFISTTEMP_WP", 0x4f43, et_dec_val, "Rücklauf Ist Temperatur Wärmepumpe", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "KUEHLEN_ISTTEMP", 0x4f44, et_dec_val, "Kühlen Ist Temperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "KUEHLEN_SOLLTEMP", 0x4f45, et_dec_val, "Kühlen Soll Temperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "HEIZUNGSDRUCK", 0x4f46, et_cent_val, "Heizungsdruck", "sensor", "pressure", "bar", "measurement", "mdi:water-pressure", NULL, NULL, false, true },
+  { "VOLUMENSTROM_WPL", 0x4f47, et_cent_val, "Volumenstrom", "sensor", "", "l/min", "measurement", "mdi:flow", NULL, NULL, false, true }, // suffixed: VOLUMENSTROM already used (0x01da) by other models
+  { "RUECKLAUFTEMP_QUELLE", 0x4fa6, et_dec_val, "Rücklauftemperatur Quelle", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "VORLAUFTEMP_QUELLE", 0x4fa7, et_dec_val, "Vorlauftemperatur Quelle", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "QUELLENDRUCK_WPL", 0x4fa8, et_dec_val, "Quellendruck", "sensor", "pressure", "bar", "measurement", "mdi:water-pressure", NULL, NULL, false, true }, // suffixed: QUELLENDRUCK already used (0x0675) by WPC7
+  { "LEISTUNG_QUELLENPUMPE", 0x4fa9, et_dec_val, "Leistung Quellenpumpe", "sensor", "", "%", "measurement", "mdi:water-percent", NULL, NULL, false, true },
+  { "HEIZEN_EFFIZIENZ_TAG", 0x501d, et_cent_val, "Heizeffizienz Tag", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "HEIZEN_EFFIZIENZ_JAHR", 0x501e, et_cent_val, "Heizeffizienz Jahr", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "SOLLDREHZAHL_LUEFTER", 0xc281, 0, "Soll Drehzahl Lüfter", "sensor", "", "Hz", "measurement", "mdi:fan", NULL, NULL, false, true },
+  { "ISTDREHZAHL_LUEFTER", 0xc283, 0, "Ist Drehzahl Lüfter", "sensor", "", "Hz", "measurement", "mdi:fan", NULL, NULL, false, true },
+  { "OEFFNUNGSGRAD_BYPASSVENT", 0xc2c3, et_dec_val, "Öffnungsgrad Bypassventil", "sensor", "", "%", "measurement", NULL, NULL, NULL, false, true },
+  { "EINGESCHALTETE_STUFEN", 0x4efa, 0, "Eingeschaltete Stufen", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "SILENT_LEISTUNG", 0x4e9f, 0, "Silent Leistung", "sensor", "", "%", "measurement", NULL, NULL, NULL, false, true },
+  { "SILENT_LUEFTER", 0x4ea0, 0, "Silent Lüfter", "sensor", "", "%", "measurement", NULL, NULL, NULL, false, true },
+  { "WAERMEPUMPE_AUS", 0x4ea1, 0, "Wärmepumpe Aus", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "WARMWASSERBETRIEB", 0x4f24, 0, "Warmwasserbetrieb", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "ANTILEGIONELLENBEHANDLUNG", 0x4f28, 0, "Antilegionellenbehandlung", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "WW_ANFORDERUNG", 0x4eb2, 0, "Warmwasser Anforderung", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "FROSTSCHUTZTEMPERATUR", 0x0a36, et_dec_val, "Frostschutztemperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "WW_SOLLTEMPERATUR", 0x4ef9, et_dec_val, "Warmwasser Solltemperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "WARMWASSERHYSTERESE", 0x4f25, et_dec_val, "Warmwasserhysterese", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "VERFLUESSIGER_TEMP_WPL", 0x0a37, et_dec_val, "Verflüssigertemperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false }, // suffixed: VERFLUESSIGER_TEMP already used (0x059d) at a different index
+  { "OELSUMPFTEMP", 0x0a39, et_dec_val, "Ölsumpftemperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "SOMMERBETRIEB_WPL17", 0x4f1e, 0, "Sommerbetrieb (WPL17)", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false }, // suffixed: SOMMERBETRIEB already used (0xfdb4) at a different index
+  { "VERDICHTER_STARTS_K_WPL17", 0x4ef0, 0, "Verdichter Starts, skaliert (WPL17)", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false }, // WPL17 and WPL23 disagree on this index; see signal_requests_wpl23.h
+  { "VERDICHTER_STARTS_WPL17", 0x4ef1, 0, "Verdichter Starts (WPL17)", "sensor", "", "", "total_increasing", "mdi:counter", NULL, NULL, false, true }, // WPL17 and WPL23 disagree on this index; see signal_requests_wpl23.h
+  { "LAUFZEIT_VD_HEIZEN_WPL17", 0x4efb, 0, "Laufzeit Verdichter Heizen (WPL17)", "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL, false, true }, // WPL17 and WPL23 disagree on this index; see signal_requests_wpl23.h
+  { "LAUFZEIT_VD_KUEHLEN", 0x4efc, 0, "Laufzeit Verdichter Kühlen", "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL, false, true }, // WPL17-only, not defined for WPL23 in source project
+  { "LAUFZEIT_VD_WW_WPL17", 0x4efd, 0, "Laufzeit Verdichter Warmwasser (WPL17)", "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL, false, true }, // WPL17 and WPL23 disagree on this index; see signal_requests_wpl23.h
+  { "LAUFZEIT_VD_ABTAUEN_WPL17", 0x4f06, 0, "Laufzeit Verdichter Abtauen (WPL17)", "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL, false, true }, // WPL17 and WPL23 disagree on this index; see signal_requests_wpl23.h
 };
 
 static const ErrorIndex ErrorList[] =

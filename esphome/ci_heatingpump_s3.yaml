@@ -8,6 +8,7 @@ substitutions:
   can_tx_pin: GPIO15
   can_rx_pin: GPIO16
   can_id_pc: "0x680"
+  can_bit_rate: 20kbps
 
 packages:
   board: !include ha-stiebel-control/board_esp32s3.yaml

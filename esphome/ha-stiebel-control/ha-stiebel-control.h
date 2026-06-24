@@ -65,6 +65,13 @@ static const CanMember CanMembers[] =
         {"PC", 0x680},
         {"FREMDGERAET", 0x700},
         {"DCF_MODUL", 0x780},
+        // Model-specific Heizmodul/FET addresses that differ from the defaults
+        // HEIZMODUL (0x500). Ported from community project
+        // kr0ner/OneESP32ToRuleThemAll (CAN addresses verified there, not yet
+        // on real hardware in this project) — see signal_requests_wpl17.h /
+        // signal_requests_wpl23.h.
+        {"HEIZMODUL_WPL", 0x514},  // WPL17/WPL23 Heizmodul
+        {"FET", 0x402},            // WPL17/WPL23 room control unit (Fernbedieneinheit)
         {"OTHER", 0x000}};
 
 typedef enum
@@ -87,6 +94,8 @@ typedef enum
     cm_pc,
     cm_fremdgeraet,
     cm_dcf_modul,
+    cm_heizmodul_wpl,
+    cm_fet,
     cm_other
 } CanMemberType;
 
