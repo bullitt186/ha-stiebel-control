@@ -1647,6 +1647,19 @@ void publishCanDiagnostics() {
     twai_status_info_t status;
     if (twai_get_status_info(&status) != ESP_OK) return;
 
+    if (status.state == TWAI_STATE_BUS_OFF) {
+        ESP_LOGW("CAN_RECOVERY", "TWAI bus-off detected, initiating recovery");
+        twai_initiate_recovery();
+    } else if (status.state == TWAI_STATE_STOPPED) {
+        // twai_initiate_recovery() leaves the controller STOPPED once recovery
+        // completes (128 bus-free occurrences) — must explicitly restart.
+        // STOPPED here always means "post-recovery": the boot-time STOPPED
+        // window (before twai_start_v2() in setup_internal()) completes
+        // long before this 30s-cadence diagnostic loop ever runs.
+        ESP_LOGW("CAN_RECOVERY", "TWAI stopped after recovery, restarting");
+        twai_start();
+    }
+
     // Publish discovery (only once per UID — cached internally)
     publishCalculatedSensorDiscovery(calculatedSensors[6]);
     publishCalculatedSensorDiscovery(calculatedSensors[7]);
