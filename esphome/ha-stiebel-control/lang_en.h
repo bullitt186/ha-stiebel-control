@@ -241,18 +241,12 @@
 // ============================================================================
 // Select option strings
 // ============================================================================
-#undef  LNAME_OPT_NOTBETRIEB
-#define LNAME_OPT_NOTBETRIEB                   "Emergency"
-#undef  LNAME_OPT_BEREITSCHAFT
-#define LNAME_OPT_BEREITSCHAFT                 "Standby"
-#undef  LNAME_OPT_AUTOMATIK
-#define LNAME_OPT_AUTOMATIK                    "Automatic"
-#undef  LNAME_OPT_TAGBETRIEB
-#define LNAME_OPT_TAGBETRIEB                   "Day Mode"
-#undef  LNAME_OPT_ABSENKBETRIEB
-#define LNAME_OPT_ABSENKBETRIEB                "Night Mode"
-#undef  LNAME_OPT_WARMWASSER
-#define LNAME_OPT_WARMWASSER                   "Hot Water"
+// LNAME_OPT_NOTBETRIEB/BEREITSCHAFT/AUTOMATIK/TAGBETRIEB/ABSENKBETRIEB/
+// WARMWASSER are intentionally NOT overridden here. They double as the
+// literal CAN-write value for PROGRAMMSCHALTER (matched against the
+// German-only BetriebsartList in ElsterTable.h) and must stay German
+// regardless of display language, per the i18n rule in
+// .github/copilot-instructions.md.
 #undef  LNAME_OPT_SG_EVU_SPERRE
 #define LNAME_OPT_SG_EVU_SPERRE               "1 - Grid Lock"
 #undef  LNAME_OPT_SG_NORMAL

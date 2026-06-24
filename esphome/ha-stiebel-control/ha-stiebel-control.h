@@ -495,6 +495,10 @@ void writeSignal(const CanMember *cm, const ElsterIndex *ei, const char *&str)
 {
     bool use_extended_id = false;
     int writeValue = TranslateString(str, ei->Type);
+    if (writeValue == -1) {
+        ESP_LOGW("writeSignal()", "TranslateString failed for \"%s\" (input: \"%s\") — refusing to write", ei->Name, str);
+        return;
+    }
     uint8_t IndexByte1 = static_cast<uint8_t>(ei->Index >> 8);
     uint8_t IndexByte2 = static_cast<uint8_t>(ei->Index & 0xFF);
     std::vector<uint8_t> data;
