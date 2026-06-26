@@ -1612,9 +1612,9 @@ static const ElsterIndex ElsterTable[] =
   { "TEST_OBJEKT_47", 0x0670, 0, "Test Objekt 47", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_48", 0x0671, 0, "Test Objekt 48", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_49", 0x0672, 0, "Test Objekt 49", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_50", 0x0673, 0, "Test Objekt 50", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_51", 0x0674, 0, "Test Objekt 51", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_52", 0x0675, 0, "Test Objekt 52", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "VOLUMENSTROM_WPC7", 0x0673, et_cent_val, "Volumenstrom", "sensor", "", "l/min", "measurement", "mdi:flow", NULL, NULL, false, true }, // WPC7/TTF07c; was TEST_OBJEKT_50 — ported from OneESP32ToRuleThemAll, unverified
+  { "DRUCK_HEIZKREIS", 0x0674, et_cent_val, "Druck Heizkreis", "sensor", "pressure", "bar", "measurement", "mdi:water-pressure", NULL, NULL, false, true }, // WPC7/TTF07c; was TEST_OBJEKT_51 — ported, unverified
+  { "QUELLENDRUCK", 0x0675, et_cent_val, "Quellendruck", "sensor", "pressure", "bar", "measurement", "mdi:water-pressure", NULL, NULL, false, true }, // WPC7/TTF07c; was TEST_OBJEKT_52 — ported, unverified
   { "TEST_OBJEKT_53", 0x0676, 0, "Test Objekt 53", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_54", 0x0677, 0, "Test Objekt 54", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_55", 0x0678, 0, "Test Objekt 55", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
@@ -1658,7 +1658,7 @@ static const ElsterIndex ElsterTable[] =
   { "TEST_OBJEKT_93", 0x069e, 0, "Test Objekt 93", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_94", 0x069f, 0, "Test Objekt 94", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_95", 0x06a0, 0, "Test Objekt 95", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_96", 0x06a1, 0, "Test Objekt 96", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "VORLAUFISTTEMP_WPC7", 0x06a1, et_dec_val, "Vorlauf Ist Temperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false }, // WPC7/TTF07c; was TEST_OBJEKT_96 — ported from OneESP32ToRuleThemAll, unverified. Suffixed: VORLAUFISTTEMP already used (0x000f) by other models.
   { "TEST_OBJEKT_97", 0x06a2, 0, "Test Objekt 97", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_98", 0x06a3, 0, "Test Objekt 98", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_99", 0x06a4, 0, "Test Objekt 99", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
@@ -1667,7 +1667,7 @@ static const ElsterIndex ElsterTable[] =
   { "TEST_OBJEKT_102", 0x06a7, 0, "Test Objekt 102", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_103", 0x06a8, 0, "Test Objekt 103", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_104", 0x06a9, 0, "Test Objekt 104", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_105", 0x06aa, 0, "Test Objekt 105", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "KUEHLEN_EINGESCHALTET", 0x06aa, et_little_bool, "Kühlen Eingeschaltet", "binary_sensor", "", "", "", "mdi:snowflake", "on", "off", false, true }, // WPC7/TTF07c; was TEST_OBJEKT_105 — ported, unverified
   { "TEST_OBJEKT_106", 0x06ab, 0, "Test Objekt 106", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_107", 0x06ac, 0, "Test Objekt 107", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_108", 0x06ad, 0, "Test Objekt 108", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
@@ -1763,11 +1763,11 @@ static const ElsterIndex ElsterTable[] =
   { "TEST_OBJEKT_198", 0x0707, 0, "Test Objekt 198", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_199", 0x0708, 0, "Test Objekt 199", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_200", 0x0709, 0, "Test Objekt 200", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_201", 0x070a, 0, "Test Objekt 201", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_202", 0x070b, 0, "Test Objekt 202", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_203", 0x070c, 0, "Test Objekt 203", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "LEISTUNG_HEIZKREISPUMPE", 0x070a, et_byte, "Leistung Heizkreispumpe", "sensor", "", "%", "measurement", "mdi:water-percent", NULL, NULL, false, true }, // WPC7/TTF07c; was TEST_OBJEKT_201 — ported, unverified
+  { "LEISTUNG_WARMWASSERPUMPE", 0x070b, et_byte, "Leistung Warmwasserpumpe", "sensor", "", "%", "measurement", "mdi:water-percent", NULL, NULL, false, true }, // WPC7/TTF07c; was TEST_OBJEKT_202 — ported, unverified
+  { "LEISTUNG_SOLEPUMPE", 0x070c, et_byte, "Leistung Solepumpe", "sensor", "", "%", "measurement", "mdi:water-percent", NULL, NULL, false, true }, // WPC7/TTF07c; was TEST_OBJEKT_203 — ported, unverified
   { "TEST_OBJEKT_204", 0x070d, 0, "Test Objekt 204", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_205", 0x070e, 0, "Test Objekt 205", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "EINPHASIGER_BETRIEB", 0x070e, et_bool, "Einphasiger Betrieb", "binary_sensor", "", "", "", "mdi:flash", "on", "off", false, true }, // WPC7/TTF07c; was TEST_OBJEKT_205 — ported, unverified
   { "TEST_OBJEKT_206", 0x070f, 0, "Test Objekt 206", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_207", 0x0710, 0, "Test Objekt 207", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_208", 0x0711, 0, "Test Objekt 208", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
@@ -1781,8 +1781,8 @@ static const ElsterIndex ElsterTable[] =
   { "TEST_OBJEKT_216", 0x0719, 0, "Test Objekt 216", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_217", 0x071a, 0, "Test Objekt 217", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_218", 0x071b, 0, "Test Objekt 218", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_219", 0x071c, 0, "Test Objekt 219", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "TEST_OBJEKT_220", 0x071d, 0, "Test Objekt 220", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "VERDICHTER_STARTS_K", 0x071c, 0, "Verdichter Starts, skaliert", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false }, // WPC7/TTF07c; was TEST_OBJEKT_219 — ported, unverified
+  { "VERDICHTER_STARTS", 0x071d, 0, "Verdichter Starts", "sensor", "", "", "total_increasing", "mdi:counter", NULL, NULL, false, true }, // WPC7/TTF07c; was TEST_OBJEKT_220 — ported, unverified
   { "TEST_OBJEKT_221", 0x071e, 0, "Test Objekt 221", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_222", 0x071f, 0, "Test Objekt 222", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TEST_OBJEKT_223", 0x0720, 0, "Test Objekt 223", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
@@ -3791,6 +3791,17 @@ static const ElsterIndex ElsterTable[] =
   { "INFOBLOCK_4", 0xfe05, 0, "Infoblock 4", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "INFOBLOCK_5", 0xfe06, 0, "Infoblock 5", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "INFOBLOCK_6", 0xfe07, 0, "Infoblock 6", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  // --------------------------------------------------------------------
+  // WPC7 / Stiebel WPC-07cool / Tecalor TTF07c — additional new signals
+  // Ported from community project kr0ner/OneESP32ToRuleThemAll (CAN
+  // register map; not yet verified on real WPC7/TTF07c hardware in this
+  // project). See signal_requests_wpc7.h for usage.
+  // --------------------------------------------------------------------
+  { "RAUMFEUCHTE", 0x0075, et_dec_val, "Raumfeuchte", "sensor", "humidity", "%", "measurement", "mdi:water-percent", NULL, NULL, false, true },
+  { "WW_HYSTERESE", 0x0022, et_dec_val, "Warmwasser Hysterese", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "BETRIEBS_STATUS_WPC7", 0x0a20, 0, "Betriebsstatus (WPC7 Bitmaske)", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false }, // suffixed: BETRIEBS_STATUS already used (0x0176) by other models
+  { "REGLERDYNAMIK", 0xfdb0, et_little_endian, "Reglerdynamik", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "VERDICHTER_STILLSTAND", 0xfdb1, et_little_endian, "Verdichter Stillstandszeit", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
 };
 
 static const ErrorIndex ErrorList[] =
