@@ -23,3 +23,6 @@ inline esp_err_t twai_get_status_info(twai_status_info_t* info) {
     info->bus_error_count  = 0;
     return ESP_OK;
 }
+
+inline esp_err_t twai_initiate_recovery() { return ESP_OK; }
+inline esp_err_t twai_start() { return ESP_OK; }
