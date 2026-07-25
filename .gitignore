@@ -1,6 +1,5 @@
 # Ignore VS Code and ESPHome settings files, but not .claude/settings.json
 .vscode/settings.json
-esphome/ha-stiebel-control/config.h
 tests/run_tests
 .DS_Store
 .vscode
@@ -10,3 +9,4 @@ secrets.yaml
 # Added by cargo
 
 /target
+tests/*.o
