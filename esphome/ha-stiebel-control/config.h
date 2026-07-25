@@ -9,6 +9,21 @@
 #define CONFIG_H
 
 // ============================================================================
+// DEVICE MODEL
+// ============================================================================
+// The build injects the model unquoted (-DHA_DEVICE_MODEL=wpl13e). Quoting it
+// inside the build flag only works with the old PlatformIO build; the ESP-IDF /
+// ninja build used since ESPHome 2026.7 passes the flag through verbatim and
+// the shell quotes end up in the source ("missing terminating ' character").
+// So the flag stays quote-free and the string literal is made here.
+#ifndef HA_DEVICE_MODEL
+#define HA_DEVICE_MODEL unknown
+#endif
+#define HA_STRINGIFY_(x) #x
+#define HA_STRINGIFY(x) HA_STRINGIFY_(x)
+#define HA_DEVICE_MODEL_STR HA_STRINGIFY(HA_DEVICE_MODEL)
+
+// ============================================================================
 // REQUEST MANAGER SETTINGS
 // ============================================================================
 

@@ -14,8 +14,9 @@
 #include <vector>
 
 // ── Device model default (normally injected via platformio build_flags) ──────
+// Unquoted on purpose — config.h stringifies it (see HA_DEVICE_MODEL_STR).
 #ifndef HA_DEVICE_MODEL
-#define HA_DEVICE_MODEL "test_model"
+#define HA_DEVICE_MODEL test_model
 #endif
 
 

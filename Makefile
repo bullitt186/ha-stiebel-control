@@ -43,9 +43,9 @@ check: test compile compile-s2
 logs:
 	cd esphome && esphome logs heatingpump.yaml
 
-# Compile and OTA-flash to production device (192.168.30.107)
+# Compile and OTA-flash to production device (mDNS name — survives DHCP changes)
 upload:
-	cd esphome && esphome run heatingpump.yaml --device 192.168.30.107 --no-logs
+	cd esphome && esphome run heatingpump.yaml --device heatingpump.local --no-logs
 
 # Dump merged YAML for debugging package includes
 config:

@@ -12,7 +12,7 @@ Run these `make` targets from the repo root:
 | `make compile-s2` | Compile the ESP32-S2/MCP2515 variant |
 | `make check` | Compile both variants — full quality gate |
 | `make logs` | Stream live logs from connected device (ESP32-S3 config) |
-| `make upload` | Compile and OTA-flash to production device at 192.168.30.107 |
+| `make upload` | Compile and OTA-flash to production device (heatingpump.local) |
 | `make config` | Dump merged YAML (useful for debugging package includes) |
 | `make smoke-test` | MQTT regression test: verify all required signals appear within 120s |
 | `make capture-baseline` | Capture new MQTT baseline for current model (300s, overwrites model file) |

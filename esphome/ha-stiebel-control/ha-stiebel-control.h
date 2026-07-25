@@ -443,7 +443,7 @@ const ElsterIndex *processCanMessage(const std::vector<uint8_t> &msg, uint32_t c
         break;
     }
 
-    ESP_LOGI("processCanMessage()", "%s (0x%02x):\t%s:\t%s\t(%s)", cm.Name, cm.CanId, ei->Name, charValue, ElsterTypeStr[ei->Type]);
+    ESP_LOGI("processCanMessage()", "%s (0x%02x):\t%s:\t%s\t(%s)", cm.Name, (unsigned)cm.CanId, ei->Name, charValue, ElsterTypeStr[ei->Type]);
 
     signalValue = charValue;
     return ei;
@@ -479,7 +479,7 @@ void readSignal(const CanMember *cm, const ElsterIndex *ei)
     }
 
     char logmsg[120];
-    snprintf(logmsg, sizeof(logmsg), "READ \"%s\" (0x%04x) FROM %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x", ei->Name, ei->Index, cm->Name, cm->CanId, readId.first, readId.second, data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
+    snprintf(logmsg, sizeof(logmsg), "READ \"%s\" (0x%04x) FROM %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x", ei->Name, ei->Index, cm->Name, (unsigned)cm->CanId, readId.first, readId.second, data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
     ESP_LOGI("readSignal()", "%s", logmsg);
 
     id(my_can).send_data(CanMembers[cm_pc].CanId, use_extended_id, data);
@@ -527,7 +527,7 @@ void writeSignal(const CanMember *cm, const ElsterIndex *ei, const char *&str)
 
     char logmsg[120];
     snprintf(logmsg, sizeof(logmsg), "WRITE \"%s\" (0x%04x): \"%d\" TO: %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x",
-             ei->Name, ei->Index, writeValue, cm->Name, cm->CanId, writeId.first, writeId.second,
+             ei->Name, ei->Index, writeValue, cm->Name, (unsigned)cm->CanId, writeId.first, writeId.second,
              data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
     ESP_LOGI("writeSignal()", "%s", logmsg);
 
@@ -599,7 +599,7 @@ void publishCalculatedSensorDiscovery(const CalculatedSensorConfig& config, bool
     }
 
     // Add device info
-    payload << ",\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL "\"],"
+    payload << ",\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL_STR "\"],"
             << "\"name\":\"Stiebel Eltron Wärmepumpe\","
             << "\"manufacturer\":\"Stiebel Eltron\"}}";
 
@@ -677,7 +677,7 @@ void publishWritableNumberDiscovery(const WritableNumberConfig& config, bool for
     
     if (isSgReady) {
         // SG Ready controls go to main device
-        payload << "\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL "\"],"
+        payload << "\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL_STR "\"],"
                 << "\"name\":\"Stiebel Eltron Wärmepumpe\","
                 << "\"manufacturer\":\"Stiebel Eltron\"}}";
     } else {
@@ -692,7 +692,7 @@ void publishWritableNumberDiscovery(const WritableNumberConfig& config, bool for
 
         payload << "\"device\":{\"identifiers\":[\"" << canMemberDeviceId << "\"],"
                 << "\"name\":\"" << canMemberFriendlyName << "\","
-                << "\"via_device\":\"stiebel_eltron_" HA_DEVICE_MODEL "\","
+                << "\"via_device\":\"stiebel_eltron_" HA_DEVICE_MODEL_STR "\","
                 << "\"manufacturer\":\"Stiebel Eltron\"}}";
     }
 
@@ -776,7 +776,7 @@ void publishWritableSelectDiscovery(const WritableSelectConfig& config, bool for
     
     if (isSgReady) {
         // SG Ready controls go to main device
-        payload << "\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL "\"],"
+        payload << "\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL_STR "\"],"
                 << "\"name\":\"Stiebel Eltron Wärmepumpe\","
                 << "\"manufacturer\":\"Stiebel Eltron\"}}";
     } else {
@@ -791,7 +791,7 @@ void publishWritableSelectDiscovery(const WritableSelectConfig& config, bool for
 
         payload << "\"device\":{\"identifiers\":[\"" << canMemberDeviceId << "\"],"
                 << "\"name\":\"" << canMemberFriendlyName << "\","
-                << "\"via_device\":\"stiebel_eltron_" HA_DEVICE_MODEL "\","
+                << "\"via_device\":\"stiebel_eltron_" HA_DEVICE_MODEL_STR "\","
                 << "\"manufacturer\":\"Stiebel Eltron\"}}";
     }
 
@@ -1006,7 +1006,7 @@ void publishCompressorActive()
 inline std::string getOrCreateUID(const CanMember &cm, const char* signalName) {
     // Create cache key
     char cacheKey[256];
-    snprintf(cacheKey, sizeof(cacheKey), "%u:%s", cm.CanId, signalName);
+    snprintf(cacheKey, sizeof(cacheKey), "%u:%s", (unsigned)cm.CanId, signalName);
     
     // Check cache first
     auto it = uidCache.find(cacheKey);
@@ -1109,7 +1109,7 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
     
     // Device info - create individual device per CAN member as sub-device
     // Main device ID for the heat pump
-    const char* mainDeviceId = "stiebel_eltron_" HA_DEVICE_MODEL;
+    const char* mainDeviceId = "stiebel_eltron_" HA_DEVICE_MODEL_STR;
     
     // Create unique device ID for this CAN member
     char canMemberDeviceId[64];
@@ -1221,7 +1221,7 @@ void publishCOPDiscovery() {
                 << "\"state_topic\":\"heatingpump/calculated/cop_ww/state\","
                 << "\"icon\":\"mdi:water-boiler\","
                 << "\"state_class\":\"measurement\","
-                << "\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL "\"],"
+                << "\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL_STR "\"],"
                 << "\"name\":\"Stiebel Eltron Wärmepumpe\","
                 << "\"manufacturer\":\"Stiebel Eltron\"}}";
         std::string payloadStr = payload.str();
@@ -1237,7 +1237,7 @@ void publishCOPDiscovery() {
                 << "\"state_topic\":\"heatingpump/calculated/cop_heiz/state\","
                 << "\"icon\":\"mdi:radiator\","
                 << "\"state_class\":\"measurement\","
-                << "\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL "\"],"
+                << "\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL_STR "\"],"
                 << "\"name\":\"Stiebel Eltron Wärmepumpe\","
                 << "\"manufacturer\":\"Stiebel Eltron\"}}";
         std::string payloadStr = payload.str();
@@ -1253,7 +1253,7 @@ void publishCOPDiscovery() {
                 << "\"state_topic\":\"heatingpump/calculated/cop_gesamt/state\","
                 << "\"icon\":\"mdi:chart-line\","
                 << "\"state_class\":\"measurement\","
-                << "\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL "\"],"
+                << "\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL_STR "\"],"
                 << "\"name\":\"Stiebel Eltron Wärmepumpe\","
                 << "\"manufacturer\":\"Stiebel Eltron\"}}";
         std::string payloadStr = payload.str();

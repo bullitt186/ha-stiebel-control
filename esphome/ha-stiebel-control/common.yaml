@@ -21,7 +21,7 @@ esphome:
   friendly_name: "Heating Pump CAN Interface"
   project:
     name: "bullitt186.ha-stiebel-control"
-    version: "2.1.0"
+    version: "2.1.1"
   on_boot:
     priority: 600
     then:
@@ -45,7 +45,7 @@ esphome:
     # model-specific signal_requests_*.h is declared by each model yaml package
   platformio_options:
     build_flags:
-      - "-DHA_DEVICE_MODEL='\"${device_model}\"'"
+      - "-DHA_DEVICE_MODEL=${device_model}"
       - "-DHA_LANGUAGE_${language}"
 
 

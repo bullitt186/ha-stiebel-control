@@ -5,6 +5,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ---
 
+## [2.1.1] — 2026-07-25
+
+### Fixed
+
+- **Compile error with ESPHome 2026.7** — `-DHA_DEVICE_MODEL='"wpl13e"'` relied on PlatformIO's
+  shell-style quoting. The ESP-IDF/ninja build used since 2026.7 passes the flag through verbatim,
+  so the quotes ended up in the source (`error: missing terminating ' character`). The flag is now
+  quote-free and the string literal is built with `HA_DEVICE_MODEL_STR` in `config.h`. Closes #31.
+- **`-Wformat` warnings** — `CanId` (`uint32_t`) printed with `%x`/`%u` warned under the
+  ESP-IDF toolchain, where `uint32_t` is `long unsigned int`. Now cast explicitly.
+- Self-heal from TWAI bus-off instead of requiring a manual reset.
+- `PROGRAMMSCHALTER` option values are no longer translated (they are protocol values, not display
+  names), and garbage CAN writes are rejected.
+- Calculated/COP sensors and control sub-devices use the dynamic device id instead of a hard-coded
+  model.
+- `wpf10.yaml` was missing its `esphome: includes:` block.
+
 ## [2.1.0] — 2026-06-14
 
 ### Added
