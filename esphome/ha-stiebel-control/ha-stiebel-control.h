@@ -417,7 +417,7 @@ const ElsterIndex *processCanMessage(const std::vector<uint8_t> &msg, uint32_t c
     const ElsterIndex *ei;
     uint8_t byte1;
     uint8_t byte2;
-    char charValue[16];
+    char charValue[64];  // must fit longest decoded string (e.g. "Bereitschaftsbetrieb", "not used time domain")
 
     if (msg[2] == 0xfa)
     {
