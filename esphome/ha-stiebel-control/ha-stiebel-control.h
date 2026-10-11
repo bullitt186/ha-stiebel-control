@@ -403,14 +403,16 @@ inline void getTypeDefaults(ElsterType type, const char*& component, const char*
 
 const ElsterIndex *processCanMessage(const std::vector<uint8_t> &msg, uint32_t can_id, std::string &signalValue, const CanMember **outCanMember)
 {
+    // Always report the origin member, even for short/invalid frames, so the
+    // caller never dereferences a null pointer.
+    const CanMember &cm = lookupCanMember(can_id);
+    *outCanMember = &cm;
+
     // Return if the message is too small
     if (msg.size() < 7)
     {
         return &ElsterTable[0];
     }
-
-    const CanMember &cm = lookupCanMember(can_id);
-    *outCanMember = &cm;  // Return CanMember to caller
 
     const ElsterIndex *ei;
     uint8_t byte1;
@@ -1928,6 +1930,12 @@ void processSignalRequests() {
 
 void processAndUpdate(uint32_t can_id, std::vector<uint8_t> msg)
 {
+    // Ignore short/invalid frames (would decode to garbage)
+    if (msg.size() < 7)
+    {
+        return;
+    }
+
     std::string value;
     const CanMember *cm = nullptr;
     const ElsterIndex *ei = processCanMessage(msg, can_id, value, &cm);
