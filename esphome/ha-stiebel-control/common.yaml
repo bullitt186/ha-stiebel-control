@@ -308,6 +308,13 @@ mqtt:
             writeSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_NACHT", value);
             readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_NACHT");
 
+    # Set WPM date AND time in one go (notes: WPM clock drifts; sync periodically)
+    # Payload: "YYYY-MM-DD HH:MM:SS" (strictly validated, no partial writes)
+    - topic: heatingpump/DATETIME/set
+      then:
+        - lambda: |-
+            updateDateTime(x.c_str());
+
 
 #########################################
 #                                       #

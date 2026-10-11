@@ -2023,8 +2023,46 @@ void processAndUpdate(uint32_t can_id, const std::vector<uint8_t> &msg)
     return;
 }
 
+inline bool isDigitChar(char c) { return c >= '0' && c <= '9'; }
+
+// Strict format validation so updateTime/updateDate never do partial writes
+// (e.g. only "STUNDE" when the HA text sensor delivered a truncated payload).
+// Accepted: "HH:MM:SS" (8 chars) / "YYYY-MM-DD" (10 chars).
+inline bool isValidTimeString(const char* s)
+{
+    if (!s || strlen(s) != 8) return false;
+    if (s[2] != ':' || s[5] != ':') return false;
+    for (int i = 0; i < 8; i++) {
+        if (i == 2 || i == 5) continue;
+        if (!isDigitChar(s[i])) return false;
+    }
+    return (s[0]-'0')*10 + (s[1]-'0') < 24
+        && (s[3]-'0')*10 + (s[4]-'0') < 60
+        && (s[6]-'0')*10 + (s[7]-'0') < 60;
+}
+
+inline bool isValidDateString(const char* s)
+{
+    if (!s || strlen(s) != 10) return false;
+    if (s[4] != '-' || s[7] != '-') return false;
+    for (int i = 0; i < 10; i++) {
+        if (i == 4 || i == 7) continue;
+        if (!isDigitChar(s[i])) return false;
+    }
+    return true;
+}
+
+// Full "YYYY-MM-DD HH:MM:SS" write (from heatingpump/DATETIME/set): validates
+// first, then writes date + time through the existing strict setters.
+inline void updateDateTime(const char *dts);
+
 void updateTime(CanMember cm, const char *str_time)
 {
+    if (!isValidTimeString(str_time)) {
+        ESP_LOGW("SET_TIME", "Invalid time \"%s\" (expected \"HH:MM:SS\") — refusing (no partial writes)",
+                 str_time ? str_time : "(null)");
+        return;
+    }
     ESP_LOGI("WRITE UHRZEIT VIA BUTTON", "%s", str_time);
 
     char stunde[3];
@@ -2051,6 +2089,11 @@ void updateTime(CanMember cm, const char *str_time)
 
 void updateDate(CanMember cm, const char *str_date)
 {
+    if (!isValidDateString(str_date)) {
+        ESP_LOGW("SET_DATE", "Invalid date \"%s\" (expected \"YYYY-MM-DD\") — refusing (no partial writes)",
+                 str_date ? str_date : "(null)");
+        return;
+    }
     ESP_LOGI("WRITE DATUM VIA BUTTON", "%s", str_date);
     char year[3];
     char month[3];
@@ -2073,6 +2116,18 @@ void updateDate(CanMember cm, const char *str_date)
     readSignal(&cm, "MONAT");
     writeSignal(&cm, "TAG", cday);
     readSignal(&cm, "TAG");
+}
+
+inline void updateDateTime(const char *dts)
+{
+    if (!dts || strlen(dts) != 19 || dts[10] != ' ' || !isValidDateString(dts) || !isValidTimeString(dts + 11)) {
+        ESP_LOGW("SET_DATETIME", "Invalid timestamp \"%s\" (expected \"YYYY-MM-DD HH:MM:SS\") — refusing",
+                 dts ? dts : "(null)");
+        return;
+    }
+    ESP_LOGI("SET_DATETIME", "Setting WPM date/time to \"%s\"", dts);
+    updateDate(CanMembers[cm_manager], dts);
+    updateTime(CanMembers[cm_manager], dts + 11);
 }
 
 #endif // !defined(HA_DUMMY_BUILD)
