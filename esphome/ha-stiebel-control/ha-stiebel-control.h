@@ -1701,75 +1701,69 @@ void publishCombinedEnergySensors() {
     if (copEnergyValues.find("EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH") != copEnergyValues.end() &&
         copEnergyValues.find("EL_AUFNAHMELEISTUNG_WW_TAG_WH") != copEnergyValues.end()) {
 
-        static bool lastElPowerInit = false;
-        static float lastElPowerWh = 0.0f;
-        static float lastHeizTagWh = 0.0f;
-        static float lastWwTagWh = 0.0f;
-        static uint32_t lastElPowerMs = 0;
+        static bool init = false;
+        static float lastHeizWh = 0.0f, lastWwWh = 0.0f;
+        static float accHeizWh = 0.0f, accWwWh = 0.0f;
+        static uint32_t windowStartMs = 0;
+        static uint32_t lastStatusMs = 0;
         static const char* opState = "Aus";
-        static uint32_t opStateMs = 0;
 
-        float heizTagWh = copEnergyValues["EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH"];
-        float wwTagWh   = copEnergyValues["EL_AUFNAHMELEISTUNG_WW_TAG_WH"];
-        float wh = heizTagWh + wwTagWh;
+        float heizWh = copEnergyValues["EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH"];
+        float wwWh   = copEnergyValues["EL_AUFNAHMELEISTUNG_WW_TAG_WH"];
         uint32_t nowMs = millis();
 
-        if (lastElPowerInit) {
-            float dtSec = (nowMs - lastElPowerMs) / 1000.0f;
-            float dWh = wh - lastElPowerWh;
-            if (dtSec >= 20.0f && dtSec < 600.0f && dWh >= 0.0f) {
-                float leistungW = dWh / dtSec * 3600.0f;
-                char valueStr[32];
-                snprintf(valueStr, sizeof(valueStr), "%.0f", leistungW);
-                publishCalculatedSensorDiscovery(calculatedSensors[14], false);
-                id(mqtt_client).publish("heatingpump/calculated/el_leistung_w/state", valueStr, strlen(valueStr), 0, true);
-                ESP_LOGI("ENERGIE", "Aktuelle elektrische Leistung: %.0f W (dWh=%.3f in %.0fs)", leistungW, dWh, dtSec);
+        if (init) {
+            float dH = heizWh - lastHeizWh; if (dH > 0.0f) accHeizWh += dH;
+            float dW = wwWh   - lastWwWh;   if (dW > 0.0f) accWwWh   += dW;
+        } else {
+            windowStartMs = nowMs; lastStatusMs = nowMs;
+        }
+        lastHeizWh = heizWh; lastWwWh = wwWh; init = true;
+
+        // Verdichter: 0.8 = steht, 2.4 = laeuft (Heizmodul)
+        bool running = (lastVerdichterValue > 1.5f);
+
+        // Betriebsstatus live (alle 30 s): laeuft/steht aus dem Verdichter,
+        // Heizen/Warmwasser aus den Energie-Deltas der letzten Minuten.
+        if (nowMs - lastStatusMs >= 30000UL) {
+            const char* ns;
+            float sum = accHeizWh + accWwWh;
+            if (!running) {
+                ns = "Aus";
+            } else if (copEnergyValues.find("KUEHLZUSTAND") != copEnergyValues.end() &&
+                       copEnergyValues["KUEHLZUSTAND"] > 0.5f) {
+                ns = "Kuehlen";
+            } else if (sum > 0.0f && accWwWh > accHeizWh) {
+                ns = "Warmwasser";
+            } else if (sum > 0.0f) {
+                ns = "Heizen";
+            } else {
+                ns = (strcmp(opState, "Warmwasser") == 0) ? "Warmwasser" : "Heizen";
             }
-
-            // Betriebsstatus (min. 30 s Verweildauer, um Flackern zu vermeiden)
-            if (dtSec >= 20.0f && dtSec < 900.0f) {
-                float dHeiz = heizTagWh - lastHeizTagWh; if (dHeiz < 0.0f) dHeiz = 0.0f; // Tageszaehler-Reset
-                float dWw   = wwTagWh   - lastWwTagWh;   if (dWw   < 0.0f) dWw   = 0.0f;
-                float pHeiz = dHeiz / dtSec * 3600.0f;
-                float pWw   = dWw   / dtSec * 3600.0f;
-                float pTot  = pHeiz + pWw;
-
-                const char* ns;
-                if (pTot < 50.0f) {
-                    ns = "Aus";
-                } else if (copEnergyValues.find("KUEHLZUSTAND") != copEnergyValues.end() &&
-                           copEnergyValues["KUEHLZUSTAND"] > 0.5f) {
-                    ns = "Kuehlen";
-                } else if (pWw > pHeiz) {
-                    ns = "Warmwasser";
-                } else {
-                    ns = "Heizen";
-                }
-
-                if (strcmp(ns, opState) != 0 && (opStateMs == 0 || (nowMs - opStateMs) >= 30000UL)) {
-                    opState = ns;
-                    opStateMs = nowMs;
-                    ESP_LOGI("STATUS", "Betriebsstatus: %s (PHeiz=%.0f W, PWw=%.0f W)", opState, pHeiz, pWw);
-                }
-                publishCalculatedSensorDiscovery(calculatedSensors[15], false);
-                id(mqtt_client).publish("heatingpump/calculated/betriebsstatus/state", opState, strlen(opState), 0, true);
-
-                // Getrennte elektrische Leistung (W) je Betriebsart
-                char phStr[16], pwStr[16];
-                snprintf(phStr, sizeof(phStr), "%.0f", pHeiz);
-                snprintf(pwStr, sizeof(pwStr), "%.0f", pWw);
-                publishCalculatedSensorDiscovery(calculatedSensors[20], false);
-                id(mqtt_client).publish("heatingpump/calculated/el_leistung_heiz_w/state", phStr, strlen(phStr), 0, true);
-                publishCalculatedSensorDiscovery(calculatedSensors[21], false);
-                id(mqtt_client).publish("heatingpump/calculated/el_leistung_ww_w/state", pwStr, strlen(pwStr), 0, true);
-            }
+            opState = ns;
+            publishCalculatedSensorDiscovery(calculatedSensors[15], false);
+            id(mqtt_client).publish("heatingpump/calculated/betriebsstatus/state", opState, strlen(opState), 0, true);
+            lastStatusMs = nowMs;
         }
 
-        lastElPowerWh = wh;
-        lastHeizTagWh = heizTagWh;
-        lastWwTagWh = wwTagWh;
-        lastElPowerMs = nowMs;
-        lastElPowerInit = true;
+        // Leistung als 5-Minuten-Mittel (die TAG-Zaehler springen grob)
+        if (nowMs - windowStartMs >= 300000UL) {
+            float dtSec = (nowMs - windowStartMs) / 1000.0f;
+            float pHeiz = running ? accHeizWh / dtSec * 3600.0f : 0.0f;
+            float pWw   = running ? accWwWh   / dtSec * 3600.0f : 0.0f;
+            char v[16], ph[16], pw[16];
+            snprintf(v, sizeof(v), "%.0f", pHeiz + pWw);
+            snprintf(ph, sizeof(ph), "%.0f", pHeiz);
+            snprintf(pw, sizeof(pw), "%.0f", pWw);
+            publishCalculatedSensorDiscovery(calculatedSensors[14], false);
+            id(mqtt_client).publish("heatingpump/calculated/el_leistung_w/state", v, strlen(v), 0, true);
+            publishCalculatedSensorDiscovery(calculatedSensors[20], false);
+            id(mqtt_client).publish("heatingpump/calculated/el_leistung_heiz_w/state", ph, strlen(ph), 0, true);
+            publishCalculatedSensorDiscovery(calculatedSensors[21], false);
+            id(mqtt_client).publish("heatingpump/calculated/el_leistung_ww_w/state", pw, strlen(pw), 0, true);
+            ESP_LOGI("ENERGIE", "Leistung: %.0f W (Heiz %.0f, WW %.0f) in %.0fs", pHeiz + pWw, pHeiz, pWw, dtSec);
+            accHeizWh = 0.0f; accWwWh = 0.0f; windowStartMs = nowMs;
+        }
     }
 
     // === TAGES-ENERGIEWERTE: kWh-Anteil + Wh/1000 (Wh-Aufloesung) ===
