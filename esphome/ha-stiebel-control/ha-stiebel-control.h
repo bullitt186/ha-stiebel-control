@@ -2120,14 +2120,36 @@ void updateDate(CanMember cm, const char *str_date)
 
 inline void updateDateTime(const char *dts)
 {
-    if (!dts || strlen(dts) != 19 || dts[10] != ' ' || !isValidDateString(dts) || !isValidTimeString(dts + 11)) {
-        ESP_LOGW("SET_DATETIME", "Invalid timestamp \"%s\" (expected \"YYYY-MM-DD HH:MM:SS\") — refusing",
-                 dts ? dts : "(null)");
+    if (!dts || !*dts) {
+        ESP_LOGW("SET_DATETIME", "Empty timestamp payload — refusing");
         return;
     }
-    ESP_LOGI("SET_DATETIME", "Setting WPM date/time to \"%s\"", dts);
-    updateDate(CanMembers[cm_manager], dts);
-    updateTime(CanMembers[cm_manager], dts + 11);
+
+    // Trim surrounding whitespace — MQTT clients may append CR/LF or send tabs,
+    // and copy/paste can inject non-breaking spaces (U+00A0).
+    const char *p = dts;
+    while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+    size_t n = strlen(p);
+    while (n > 0 && (p[n-1] == ' ' || p[n-1] == '\t' || p[n-1] == '\r' || p[n-1] == '\n')) n--;
+    char buf[32];
+    if (n >= sizeof(buf)) n = sizeof(buf) - 1;
+    memcpy(buf, p, n);
+    buf[n] = '\0';
+
+    if (n != 19 || buf[10] != ' ' || !isValidDateString(buf) || !isValidTimeString(buf + 11)) {
+        // Diagnostic: hex dump first 32 bytes so invisible characters are visible
+        char hex[65];
+        const size_t hn = (n > 32) ? 32 : n;
+        for (size_t i = 0; i < hn; i++)
+            snprintf(hex + i * 2, 3, "%02x", (unsigned char)buf[i]);
+        hex[hn * 2] = '\0';
+        ESP_LOGW("SET_DATETIME", "Invalid timestamp \"%s\" (len=%zu, hex=%s, expected \"YYYY-MM-DD HH:MM:SS\") — refusing",
+                 buf, n, hex);
+        return;
+    }
+    ESP_LOGI("SET_DATETIME", "Setting WPM date/time to \"%s\"", buf);
+    updateDate(CanMembers[cm_manager], buf);
+    updateTime(CanMembers[cm_manager], buf + 11);
 }
 
 #endif // !defined(HA_DUMMY_BUILD)
