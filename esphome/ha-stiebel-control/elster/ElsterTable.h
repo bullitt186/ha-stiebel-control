@@ -156,6 +156,8 @@ static const ElsterIndex ElsterTable[] =
   { "SPEICHERISTTEMP", 0x000e, et_dec_val, LNAME_SPEICHERISTTEMP, "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL, false, true },
   { "VORLAUFISTTEMP", 0x000f, et_dec_val, LNAME_VORLAUFISTTEMP, "sensor", "temperature", "°C", "measurement", "mdi:thermometer-lines", NULL, NULL, false, true },
   { "RAUMISTTEMP", 0x0011, et_dec_val, "Raum Ist Temperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "RAUMISTTEMP", 0x4ec7, et_dec_val, "Raum Ist Temperatur", "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL, false, true },
+  { "FEUCHTE", 0x4ec8, et_dec_val, "Feuchte", "sensor", "humidity", "%", "measurement", "mdi:water-percent", NULL, NULL, false, true },
   { "VERSTELLTE_RAUMSOLLTEMP", 0x0012, et_dec_val, "Verstellte Raum Soll Temperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "EINSTELL_SPEICHERSOLLTEMP", 0x0013, et_dec_val, LNAME_EINSTELL_SPEICHERSOLLTEMP, "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL, false, true },
   { "VERDAMPFERTEMP", 0x0014, et_byte, LNAME_VERDAMPFERTEMP, "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL, false, true },
@@ -3713,7 +3715,7 @@ static const ElsterIndex ElsterTable[] =
   { "WP_STATUS", 0xfdae, et_little_endian, LNAME_WP_STATUS, "sensor", "", "", "", "mdi:heat-pump", NULL, NULL, false, true },
   { "DAUERLAUF_PUFFERLADEPUMPE", 0xfdaf, et_little_endian, "Dauerlauf Pufferladepumpe", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "PUMPENZYKLEN", 0xfdb2, et_little_endian, "Pumpenzyklen", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "SOMMERBETRIEB", 0xfdb4, et_bool, LNAME_SOMMERBETRIEB, "binary_sensor", "", "", "", "mdi:weather-sunny", NULL, NULL, false, true },
+  { "SOMMERBETRIEB", 0xfdb4, et_little_bool, LNAME_SOMMERBETRIEB, "binary_sensor", "", "", "", "mdi:weather-sunny", NULL, NULL, false, true },
   { "SOLARBETRIEB", 0xfdb7, et_little_endian, "Solarbetrieb", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "AUTOMATIK_WARMWASSER", 0xfdb9, et_little_bool, "Automatik Warmwasser", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "ZWEITER_WE_STATUS", 0xfdba, 0, "Zweiter WE Status", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
@@ -3821,6 +3823,19 @@ static const ErrorIndex ErrorList[] =
   { 0x0021, "KEINE LEISTUNG"}
 };
 
+#ifdef HA_MODEL_wpl10ac
+// WPL 10 AC + WPM3 operating mode names
+static const ErrorIndex BetriebsartList[] =
+{
+  { 0x0000, "Notbetrieb" },
+  { 0x0100, "Bereitschaftsbetrieb" },
+  { 0x0200, "Programmierbetrieb" },
+  { 0x0300, "Komfortbetrieb" },
+  { 0x0400, "Eco-Modus" },
+  { 0x0500, "Warmwasser" }
+};
+#else
+// Older WPM2 naming (WPL 13 E etc.)
 static const ErrorIndex BetriebsartList[] =
 {
   { 0x0000, "Notbetrieb" },
@@ -3830,6 +3845,7 @@ static const ErrorIndex BetriebsartList[] =
   { 0x0400, "Absenkbetrieb" },
   { 0x0500, "Warmwasser" }
 };
+#endif
 
 #endif
 

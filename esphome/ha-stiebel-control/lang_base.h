@@ -137,10 +137,18 @@
 // Select option strings (programmschalterOptions[], sgReadyOptions[])
 // ============================================================================
 #define LNAME_OPT_NOTBETRIEB                   "Notbetrieb"
+#ifdef HA_MODEL_wpl10ac
+// WPL 10 AC + WPM3 operating mode names (differ from the old WPM2 naming)
+#define LNAME_OPT_BEREITSCHAFT                 "Bereitschaftsbetrieb"
+#define LNAME_OPT_AUTOMATIK                    "Programmierbetrieb"
+#define LNAME_OPT_TAGBETRIEB                   "Komfortbetrieb"
+#define LNAME_OPT_ABSENKBETRIEB                "Eco-Modus"
+#else
 #define LNAME_OPT_BEREITSCHAFT                 "Bereitschaft"
 #define LNAME_OPT_AUTOMATIK                    "Automatik"
 #define LNAME_OPT_TAGBETRIEB                   "Tagbetrieb"
 #define LNAME_OPT_ABSENKBETRIEB                "Absenkbetrieb"
+#endif
 #define LNAME_OPT_WARMWASSER                   "Warmwasser"
 #define LNAME_OPT_SG_EVU_SPERRE               "1 - EVU Sperre"
 #define LNAME_OPT_SG_NORMAL                    "2 - Normal"

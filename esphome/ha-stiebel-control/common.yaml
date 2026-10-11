@@ -46,6 +46,7 @@ esphome:
   platformio_options:
     build_flags:
       - "-DHA_DEVICE_MODEL=${device_model}"
+      - "-DHA_MODEL_${device_model}"
       - "-DHA_LANGUAGE_${language}"
 
 

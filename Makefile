@@ -5,6 +5,8 @@ DEVICE_MODEL ?= $(shell grep 'device_model:' esphome/heatingpump.yaml | grep -v 
 MQTT_BROKER  ?= $(shell grep 'mqtt_broker:' esphome/secrets.yaml | sed 's/mqtt_broker:[[:space:]]*//' | tr -d '"')
 MQTT_USER    ?= $(shell grep 'mqtt_username:' esphome/secrets.yaml | sed 's/mqtt_username:[[:space:]]*//' | tr -d '"')
 MQTT_PASS    ?= $(shell grep 'mqtt_password:' esphome/secrets.yaml | sed 's/mqtt_password:[[:space:]]*//' | tr -d '"')
+# OTA target: static IP from common.yaml wifi.use_address (mDNS does not work reliably in WSL)
+OTA_ADDR     ?= $(shell grep 'use_address:' esphome/ha-stiebel-control/common.yaml | head -1 | awk '{print $$2}')
 
 CXX      ?= g++
 CXXFLAGS  = -std=c++17 -Wall -Wextra \
@@ -43,9 +45,9 @@ check: test compile compile-s2
 logs:
 	cd esphome && esphome logs heatingpump.yaml
 
-# Compile and OTA-flash to production device (mDNS name — survives DHCP changes)
+# Compile and OTA-flash to production device (uses static IP from common.yaml — mDNS is unreliable in WSL)
 upload:
-	cd esphome && esphome run heatingpump.yaml --device heatingpump.local --no-logs
+	cd esphome && esphome run heatingpump.yaml --device $(OTA_ADDR) --no-logs
 
 # Dump merged YAML for debugging package includes
 config:

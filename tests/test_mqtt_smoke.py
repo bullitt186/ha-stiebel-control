@@ -39,6 +39,14 @@ MODELS_DIR = Path(__file__).parent / "models"
 COMMON_FILE = MODELS_DIR / "_common_smoke.json"
 
 
+def create_client():
+    """Create a paho-mqtt client compatible with both 1.x and 2.x."""
+    try:
+        return mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    except AttributeError:
+        return mqtt.Client()
+
+
 def load_required_topics(model: str) -> tuple[list[str], list[str]]:
     """Return (common_topics, model_topics). Raises if files not found."""
     if not COMMON_FILE.exists():
@@ -81,7 +89,7 @@ def run_test(args) -> int:
             payload = "<binary>"
         observed[msg.topic] = payload
 
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)  # type: ignore[attr-defined]
+    client = create_client()
     client.on_connect = on_connect
     client.on_message = on_message
     if args.user:
@@ -152,7 +160,7 @@ def run_capture(args) -> int:
             payload = "<binary>"
         observed[msg.topic] = payload
 
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)  # type: ignore[attr-defined]
+    client = create_client()
     client.on_connect = on_connect
     client.on_message = on_message
     if args.user:

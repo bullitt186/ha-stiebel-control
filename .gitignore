@@ -1,9 +1,12 @@
 # Ignore VS Code and ESPHome settings files, but not .claude/settings.json
 .vscode/settings.json
 tests/run_tests
+tests/*.o
+tests/*.obj
 .DS_Store
 .vscode
 secrets.yaml
+config/
 /venv
 
 # Added by cargo

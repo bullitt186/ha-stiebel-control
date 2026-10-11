@@ -1,0 +1,18 @@
+{
+  "description": "Required topics for WPL 10 AC (air-source, WPM3). Verified on hardware 2026-10-04. Requires the WPM3 display / CAN B connection at 50 kbps; DHW/boiler and room values are only exposed there. Boiler reads use the normal ComfortSoft sender (0x680). Room actual temp + humidity (0x4ec7/0x4ec8) are broadcast passively by the room sensor node (0x401).",
+  "required_topics": [
+    "heatingpump/KESSEL/SPEICHERISTTEMP/state",
+    "heatingpump/KESSEL/SPEICHERSOLLTEMP/state",
+    "heatingpump/KESSEL/AUSSENTEMP/state",
+    "heatingpump/KESSEL/KESSELSOLLTEMP/state",
+    "heatingpump/KESSEL/HILFSKESSELSOLL/state",
+    "heatingpump/KESSEL/RAUMSOLLTEMP_I/state",
+    "heatingpump/KESSEL/RAUMSOLLTEMP_NACHT/state",
+    "heatingpump/MANAGER/RAUMSOLLTEMP_I/state",
+    "heatingpump/MANAGER/RAUMSOLLTEMP_NACHT/state",
+    "heatingpump/RAUMFERNFUEHLER_2/RAUMISTTEMP/state",
+    "heatingpump/RAUMFERNFUEHLER_2/FEUCHTE/state",
+    "heatingpump/HEIZMODUL/VERDAMPFERTEMP/state",
+    "heatingpump/HEIZMODUL/ABTAUUNGAKTIV/state"
+  ]
+}

@@ -1,0 +1,18 @@
+#
+#  WPL 10 AC Heat Pump — Model Package (Air-Source)
+#
+#  Ported from the wpl10-esphome project (github.com/nuukee/wpl10-esphome).
+#  The Elster register set is identical to the shared ElsterTable.h; only the
+#  signal request table differs (verified CAN-member ownership on the WPL 10 AC).
+#
+#  Usage in heatingpump.yaml:
+#
+#    substitutions:
+#      device_model: "wpl10ac"
+#    packages:
+#      sensors: !include ha-stiebel-control/wpl10ac.yaml
+#
+
+esphome:
+  includes:
+    - ha-stiebel-control/signal_requests_wpl10ac.h

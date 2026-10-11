@@ -12,6 +12,14 @@
 #include <string>
 #include <cstring>
 
+// Operating mode written by SG Ready when boosting back to normal operation.
+// The WPM3 (WPL 10 AC) calls this mode "Komfortbetrieb", older WPM2 "Tagbetrieb".
+#ifdef HA_MODEL_wpl10ac
+#define SG_READY_NORMAL_MODE "Komfortbetrieb"
+#else
+#define SG_READY_NORMAL_MODE "Tagbetrieb"
+#endif
+
 // ============================================================================
 // IO INTERFACE — injected in production, stubbed in tests
 // ============================================================================
@@ -203,7 +211,7 @@ private:
         if (state_.active) {
             restoreDhw();
             restoreRoom();
-            io_.writeCanSignal("PROGRAMMSCHALTER", "Tagbetrieb");
+            io_.writeCanSignal("PROGRAMMSCHALTER", SG_READY_NORMAL_MODE);
             state_.active = false;
             persistState();
         }
@@ -214,7 +222,7 @@ private:
         state_.active = true;
         persistState();
 
-        io_.writeCanSignal("PROGRAMMSCHALTER", "Tagbetrieb");
+        io_.writeCanSignal("PROGRAMMSCHALTER", SG_READY_NORMAL_MODE);
 
         if (config_.boostState3 > 0.1f) {
             float boosted = state_.originalDhwTemp + config_.boostState3;
@@ -236,7 +244,7 @@ private:
         state_.active = true;
         persistState();
 
-        io_.writeCanSignal("PROGRAMMSCHALTER", "Tagbetrieb");
+        io_.writeCanSignal("PROGRAMMSCHALTER", SG_READY_NORMAL_MODE);
 
         if (config_.boostState4 > 0.1f) {
             float boosted = state_.originalDhwTemp + config_.boostState4;

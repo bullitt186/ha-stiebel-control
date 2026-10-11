@@ -83,6 +83,7 @@ pump provides its own termination).
 
 | Model file | Heat pump | Status |
 |------------|-----------|--------|
+| `wpl10ac.yaml` | WPL 10 AC (air-source, WPM3) | ✅ Verified — requires tapping the WPM3's **CAN B** connection at **50 kbps** (DHW/boiler temperature and setpoints are only exposed there) |
 | `wpl13e.yaml` | WPL 13 E (air-source, 3 heating circuits) | ✅ Verified |
 | `wpf10.yaml` | WPF 10 / WPF 10M (ground-source) | ⚠️ Community — signals may need adjustment |
 

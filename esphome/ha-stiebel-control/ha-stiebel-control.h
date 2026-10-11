@@ -55,11 +55,11 @@ static const CanMember CanMembers[] =
         {"BEDIENMODUL_3", 0x302},
         {"BEDIENMODUL_4", 0x303},
         {"RAUMFERNFUEHLER", 0x400},
+        {"RAUMFERNFUEHLER_2", 0x401},
         {"MANAGER", 0x480},
         {"HEIZMODUL", 0x500},
         {"BUSKOPPLER", 0x580},
         {"MISCHERMODUL_1", 0x600},
-        {"MISCHERMODUL_2", 0x601},
         {"MISCHERMODUL_3", 0x602},
         {"MISCHERMODUL_4", 0x603},
         {"PC", 0x680},
@@ -77,11 +77,11 @@ typedef enum
     cm_bedienmodul_3,
     cm_bedienmodul_4,
     cm_raumfernfuehler,
+    cm_raumfernfuehler_2,
     cm_manager,
     cm_heizmodul,
     cm_buskoppler,
     cm_mischermodul_1,
-    cm_mischermodul_2,
     cm_mischermodul_3,
     cm_mischermodul_4,
     cm_pc,
@@ -443,7 +443,8 @@ const ElsterIndex *processCanMessage(const std::vector<uint8_t> &msg, uint32_t c
         break;
     }
 
-    ESP_LOGI("processCanMessage()", "%s (0x%02x):\t%s:\t%s\t(%s)", cm.Name, (unsigned)cm.CanId, ei->Name, charValue, ElsterTypeStr[ei->Type]);
+    uint16_t rawIdx = (msg[2] == 0xfa) ? (uint16_t)(msg[4] + (msg[3] << 8)) : (uint16_t)msg[2];
+    ESP_LOGI("processCanMessage()", "%s (0x%02x):\t%s:\t%s\t(idx=0x%04x, %s)", cm.Name, (unsigned)can_id, ei->Name, charValue, (unsigned)rawIdx, ElsterTypeStr[ei->Type]);
 
     signalValue = charValue;
     return ei;
@@ -478,7 +479,7 @@ void readSignal(const CanMember *cm, const ElsterIndex *ei)
                 0x00};
     }
 
-    char logmsg[120];
+    char logmsg[160];
     snprintf(logmsg, sizeof(logmsg), "READ \"%s\" (0x%04x) FROM %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x", ei->Name, ei->Index, cm->Name, (unsigned)cm->CanId, readId.first, readId.second, data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
     ESP_LOGI("readSignal()", "%s", logmsg);
 
@@ -869,8 +870,10 @@ void publishTime()
     // Publish discovery (only once - cached)
     publishCalculatedSensorDiscovery(calculatedSensors[1]);
     
-    // Validate that all values have been received
-    if (lastStunde < 0 || lastMinute < 0 || lastSekunde < 0) {
+    // Validate that the essential values have been received.
+    // Some models (e.g. WPL 10 AC / WPM3) do not provide SEKUNDE, so treat it
+    // as optional and fall back to 0 rather than refusing to publish.
+    if (lastStunde < 0 || lastMinute < 0) {
         ESP_LOGW("CALC", "Cannot publish time: sensors not initialized (Stunde=%d, Minute=%d, Sekunde=%d)", 
                  lastStunde, lastMinute, lastSekunde);
         return;
@@ -878,7 +881,7 @@ void publishTime()
     
     int istunde = lastStunde;
     int iminute = lastMinute;
-    int isekunde = lastSekunde;
+    int isekunde = (lastSekunde < 0) ? 0 : lastSekunde;
     
     // Log raw values for debugging
     // ESP_LOGD("CALC", "Time values: Stunde=%d, Minute=%d, Sekunde=%d", istunde, iminute, isekunde);
@@ -1925,10 +1928,17 @@ void processSignalRequests() {
 
 void processAndUpdate(uint32_t can_id, std::vector<uint8_t> msg)
 {
- 
     std::string value;
     const CanMember *cm = nullptr;
     const ElsterIndex *ei = processCanMessage(msg, can_id, value, &cm);
+
+    // Skip nodes that are not mapped in CanMembers and only broadcast
+    // placeholder/unknown values (e.g. WPM3 display FES 0x100, mixer module 2
+    // 0x601, redundant DHW duplicates). They fall back to the OTHER member.
+    if (cm->CanId == 0x000)
+    {
+        return;
+    }
 
     // Skip permanently blacklisted signals
     if (isPermanentlyBlacklisted(ei->Name))
