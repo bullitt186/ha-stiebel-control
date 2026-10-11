@@ -1786,6 +1786,21 @@ inline float sgReadyBoostState4Value() { return sgReadyController.boostState4();
 inline void  setSgReadyBoost3(float v) { sgReadyController.setBoostState3(v); }
 inline void  setSgReadyBoost4(float v) { sgReadyController.setBoostState4(v); }
 
+// Publishes the current SG Ready state and boost values (retained). Called on
+// boot, on MQTT connect and periodically, so the retained values survive a
+// broker restart instead of being published only once on connect.
+inline void publishSgReadyState() {
+    int idx = currentSgReadyState - 1;
+    if (idx < 0 || idx > 3) idx = 1;  // fall back to "2 - Normal"
+    const char* s = sgReadyOptions[idx];
+    id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_STATE/state", s, strlen(s), 0, true);
+    char b3[16], b4[16];
+    snprintf(b3, sizeof(b3), "%.1f", sgReadyBoostState3Value());
+    snprintf(b4, sizeof(b4), "%.1f", sgReadyBoostState4Value());
+    id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_BOOST_STATE3/state", b3, strlen(b3), 0, true);
+    id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_BOOST_STATE4/state", b4, strlen(b4), 0, true);
+}
+
 // ============================================================================
 // COMPILE-TIME STRING HASHING FOR FAST SIGNAL DISPATCH
 // ============================================================================
