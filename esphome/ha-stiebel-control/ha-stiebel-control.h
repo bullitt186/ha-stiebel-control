@@ -1571,15 +1571,19 @@ inline float sgReadyBoostState4Value() { return sgReadyController.boostState4();
 inline void  setSgReadyBoost3(float v) { lastSgReadyCommandTs = millis(); sgReadyController.setBoostState3(v); }
 inline void  setSgReadyBoost4(float v) { lastSgReadyCommandTs = millis(); sgReadyController.setBoostState4(v); }
 
-// Watchdog against a dead control source: if the current SG Ready state is not
-// Normal and no command arrived for SG_READY_WATCHDOG_MS, fall back to Normal
-// (heat pump keeps working — never stranded in standby/boost).
+// Watchdog against a dead control source: only rescues from a stuck BOOST (3/4).
+// Standby (EVU lock) is a deliberate long-term state and stays as-is. If a boost
+// is active for longer than SG_READY_WATCHDOG_MS without any command refreshing
+// it, fall back to Normal (heat pump keeps working, protected against a
+// permanently boosted state even if the primary control is gone).
 void checkSgReadyWatchdog() {
     const uint32_t now = millis();
     if (lastSgReadyCommandTs == 0) return;  // never commanded on this boot
-    if (sgReadyController.currentState() == SgReadyController::STATE_NORMAL) return;
+    const int st = sgReadyController.currentState();
+    if (st == SgReadyController::STATE_NORMAL) return;
+    if (st == SgReadyController::STATE_EVU_LOCK) return;  // standby: intended, no auto-recover
     if (now - lastSgReadyCommandTs < SgReadyController::SG_READY_WATCHDOG_MS) return;
-    ESP_LOGW("SG_READY_WATCHDOG", "No SG Ready command for %lus — returning to Normal",
+    ESP_LOGW("SG_READY_WATCHDOG", "Boost active without command for %lus — returning to Normal",
              (unsigned long)(SgReadyController::SG_READY_WATCHDOG_MS / 1000UL));
     applySgReadyState(SgReadyController::STATE_NORMAL);
 }

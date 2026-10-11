@@ -67,11 +67,12 @@ public:
     static constexpr float MAX_DHW_TEMP  = 60.0f;
     static constexpr float MAX_ROOM_TEMP = 25.0f;
 
-    // Watchdog: if no SG Ready command (state or boost change) arrives within
-    // this window, the controller returns to Normal. This guarantees the heat
-    // pump is never stranded in standby/boost if the control source (e.g. evcc,
-    // HA automation, MQTT) stops talking.
-    static constexpr uint32_t SG_READY_WATCHDOG_MS = 10u * 60u * 1000u;
+    // Watchdog: only rescues from a stuck BOOST (3/4). Standby/EVU lock (1) is a
+    // deliberate long-term state and never auto-terminated. If no SG Ready command
+    // arrives for this window WHILE a boost is active, the controller returns to
+    // Normal — protects against a permanently boosted heat pump if the control
+    // source (evcc, HA automation, MQTT) stops talking.
+    static constexpr uint32_t SG_READY_WATCHDOG_MS = 3u * 60u * 60u * 1000u;  // 3 h
 
     struct Config {
         float boostState3 = 5.0f;   // DHW boost for state 3 (°C)
