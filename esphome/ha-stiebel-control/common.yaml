@@ -21,7 +21,7 @@ esphome:
   friendly_name: "Heating Pump CAN Interface"
   project:
     name: "bullitt186.ha-stiebel-control"
-    version: "2.1.1"
+    version: "2.1.2"
   on_boot:
     priority: 600
     then:
@@ -71,7 +71,7 @@ api:
 
 ota:
   platform: esphome
-  password: f0e6110663e3bef67846f076d7e4db81
+  password: !secret ota_password
 
 safe_mode:
   reboot_timeout: 5min

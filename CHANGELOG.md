@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ---
 
+## [2.1.2] — 2026-10-11
+
+### Fixed
+
+- **OTA password was hardcoded** — `common.yaml` contained a literal OTA password string instead of
+  `!secret ota_password`. Users who clone fresh now get the correct `!secret` reference; existing
+  deployments are unaffected (ESPHome keeps the flashed password). Closes #32.
+
+---
+
 ## [2.1.1] — 2026-07-25
 
 ### Fixed
