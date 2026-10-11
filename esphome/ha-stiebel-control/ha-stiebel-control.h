@@ -372,15 +372,21 @@ CanIdBytes generate_write_id(unsigned short can_id)
     return {static_cast<uint8_t>(address & 0xF0), static_cast<uint8_t>(can_id & 7)};
 }
 
+// Explicit fallback node for CAN IDs not in the member table. Using a dedicated
+// constant (instead of "the last array element") keeps the fallback independent
+// of the CanMembers[] ordering.
+static const CanMember UNKNOWN_NODE = {"OTHER", 0x0000};
+
 const CanMember &lookupCanMember(uint32_t canId)
 {
-    for (size_t i = 0; i < sizeof(CanMembers) / sizeof(CanMember); ++i) {
+    const size_t count = sizeof(CanMembers) / sizeof(CanMember);
+    for (size_t i = 0; i < count; ++i) {
         if (CanMembers[i].CanId == canId) {
             return CanMembers[i];
         }
     }
-    // Return the last element if member is not found
-    return CanMembers[sizeof(CanMembers) / sizeof(CanMembers[0]) - 1];
+    // Fallback: explicit OTHER node (skipped by processAndUpdate via CanId == 0x0000)
+    return UNKNOWN_NODE;
 }
 
 // Check if signal is permanently blacklisted (lookup in ElsterTable)
