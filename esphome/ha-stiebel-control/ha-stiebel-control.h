@@ -151,6 +151,23 @@ static const CalculatedSensorConfig calculatedSensors[] = {
 
 static const size_t CALCULATED_SENSOR_COUNT = sizeof(calculatedSensors) / sizeof(CalculatedSensorConfig);
 
+// Named indices for calculatedSensors[] — keeps array-order programming safe
+enum CalcSensorIndex {
+    CALC_IDX_DATE = 0,
+    CALC_IDX_TIME,
+    CALC_IDX_BETRIEBSART,
+    CALC_IDX_DELTA_T_CONTINUOUS,
+    CALC_IDX_DELTA_T_RUNNING,
+    CALC_IDX_COMPRESSOR_ACTIVE,
+    CALC_IDX_CAN_TEC,
+    CALC_IDX_CAN_REC,
+    CALC_IDX_CAN_BUS_ERRORS,
+    CALC_IDX_CAN_STATE,
+    CALC_SENSOR_INDEX_COUNT
+};
+static_assert(CALC_SENSOR_INDEX_COUNT == CALCULATED_SENSOR_COUNT,
+              "CalcSensorIndex enum is out of sync with calculatedSensors[]");
+
 // ============================================================================
 // WRITABLE NUMBER CONFIGURATION (for MQTT Number entities)
 // ============================================================================
@@ -834,6 +851,27 @@ void publishAllWritableSelectDiscoveries(bool forceRepublish = false) {
     ESP_LOGI("MQTT_DISC", "Completed publishing writable select discoveries");
 }
 
+// By-name lookup wrappers — avoid brittle positional array indexing in YAML handlers
+void publishWritableNumberDiscoveryByName(const char* signalName, bool forceRepublish = false) {
+    for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; i++) {
+        if (strcmp(writableNumbers[i].signalName, signalName) == 0) {
+            publishWritableNumberDiscovery(writableNumbers[i], forceRepublish);
+            return;
+        }
+    }
+    ESP_LOGW("MQTT", "No writable number for signal '%s'", signalName);
+}
+
+void publishWritableSelectDiscoveryByName(const char* signalName, bool forceRepublish = false) {
+    for (size_t i = 0; i < WRITABLE_SELECT_COUNT; i++) {
+        if (strcmp(writableSelects[i].signalName, signalName) == 0) {
+            publishWritableSelectDiscovery(writableSelects[i], forceRepublish);
+            return;
+        }
+    }
+    ESP_LOGW("MQTT", "No writable select for signal '%s'", signalName);
+}
+
 // ============================================================================
 // Note: Datetime controls are now implemented using Home Assistant input_datetime
 // helpers synced via text_sensor platform and triggered by buttons.
@@ -843,7 +881,7 @@ void publishAllWritableSelectDiscoveries(bool forceRepublish = false) {
 void publishDate()
 {
     // Publish discovery (only once - cached)
-    publishCalculatedSensorDiscovery(calculatedSensors[0]);
+    publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_DATE]);
     
     // Validate that all values have been received
     if (lastJahr < 0 || lastMonat < 0 || lastTag < 0) {
@@ -881,7 +919,7 @@ void publishDate()
 void publishTime()
 {
     // Publish discovery (only once - cached)
-    publishCalculatedSensorDiscovery(calculatedSensors[1]);
+    publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_TIME]);
     
     // Validate that the essential values have been received.
     // Some models (e.g. WPL 10 AC / WPM3) do not provide SEKUNDE, so treat it
@@ -921,7 +959,7 @@ void publishTime()
 void publishBetriebsart(const std::string& sommerBetriebValue)
 {
     // Publish discovery (only once - cached)
-    publishCalculatedSensorDiscovery(calculatedSensors[2]);
+    publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_BETRIEBSART]);
     
     // Determine Betriebsart based on SOMMERBETRIEB value
     // SOMMERBETRIEB is et_little_bool type, so value is "on" or "off"
@@ -945,7 +983,7 @@ void publishBetriebsart(const std::string& sommerBetriebValue)
 void publishDeltaTContinuous()
 {
     // Publish discovery (only once - cached)
-    publishCalculatedSensorDiscovery(calculatedSensors[3]);
+    publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_DELTA_T_CONTINUOUS]);
     
     // Check if both temperature values are valid
     if (std::isnan(lastWpVorlaufIst) || std::isnan(lastRuecklaufIstTemp)) {
@@ -969,7 +1007,7 @@ void publishDeltaTContinuous()
 void publishDeltaTRunning()
 {
     // Publish discovery (only once - cached)
-    publishCalculatedSensorDiscovery(calculatedSensors[4]);
+    publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_DELTA_T_RUNNING]);
     
     // Check if compressor is running (value > 2 or not NaN and not 0)
     bool compressorRunning = (!std::isnan(lastVerdichterValue) && lastVerdichterValue > 2.0);
@@ -1000,7 +1038,7 @@ void publishDeltaTRunning()
 void publishCompressorActive()
 {
     // Publish discovery (only once - cached)
-    publishCalculatedSensorDiscovery(calculatedSensors[5]);
+    publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_COMPRESSOR_ACTIVE]);
     
     // Check if compressor value is valid
     if (std::isnan(lastVerdichterValue)) {
@@ -1678,10 +1716,10 @@ void publishCanDiagnostics() {
     }
 
     // Publish discovery (only once per UID — cached internally)
-    publishCalculatedSensorDiscovery(calculatedSensors[6]);
-    publishCalculatedSensorDiscovery(calculatedSensors[7]);
-    publishCalculatedSensorDiscovery(calculatedSensors[8]);
-    publishCalculatedSensorDiscovery(calculatedSensors[9]);
+    publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_CAN_TEC]);
+    publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_CAN_REC]);
+    publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_CAN_BUS_ERRORS]);
+    publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_CAN_STATE]);
 
     char buf[16];
 

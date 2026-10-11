@@ -168,7 +168,7 @@ mqtt:
         - lambda: |-
             ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP command: %s", x.c_str());
             // Ensure discovery is published
-            publishWritableNumberDiscovery(writableNumbers[0]);
+            publishWritableNumberDiscoveryByName("EINSTELL_SPEICHERSOLLTEMP");
             // Write to CAN bus
             const char* value = x.c_str();
             writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP", value);
@@ -180,7 +180,7 @@ mqtt:
         - lambda: |-
             ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP2 command: %s", x.c_str());
             // Ensure discovery is published
-            publishWritableNumberDiscovery(writableNumbers[1]);
+            publishWritableNumberDiscoveryByName("EINSTELL_SPEICHERSOLLTEMP2");
             // Write to CAN bus
             const char* value = x.c_str();
             writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP2", value);
@@ -193,7 +193,7 @@ mqtt:
         - lambda: |-
             ESP_LOGI("MQTT_CMD", "Received PROGRAMMSCHALTER command: %s", x.c_str());
             // Ensure discovery is published
-            publishWritableSelectDiscovery(writableSelects[0]);
+            publishWritableSelectDiscoveryByName("PROGRAMMSCHALTER");
             // Write to CAN bus
             const char* value = x.c_str();
             writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", value);
@@ -206,7 +206,7 @@ mqtt:
         - lambda: |-
             ESP_LOGI("MQTT_CMD", "Received SG_READY_STATE command: %s", x.c_str());
             // Ensure discovery is published
-            publishWritableSelectDiscovery(writableSelects[1]);
+            publishWritableSelectDiscoveryByName("SG_READY_STATE");
 
             // Parse the state from the string (format: "1 - EVU Sperre", "2 - Normal", etc.)
             int state = 0;
@@ -227,7 +227,7 @@ mqtt:
         - lambda: |-
             ESP_LOGI("MQTT_CMD", "Received SG_READY_BOOST_STATE3 command: %s", x.c_str());
             // Ensure discovery is published
-            publishWritableNumberDiscovery(writableNumbers[2]);
+            publishWritableNumberDiscoveryByName("SG_READY_BOOST_STATE3");
             // Parse and store the boost value
             char* endPtr;
             float boost = strtof(x.c_str(), &endPtr);
@@ -252,7 +252,7 @@ mqtt:
         - lambda: |-
             ESP_LOGI("MQTT_CMD", "Received SG_READY_BOOST_STATE4 command: %s", x.c_str());
             // Ensure discovery is published
-            publishWritableNumberDiscovery(writableNumbers[3]);
+            publishWritableNumberDiscoveryByName("SG_READY_BOOST_STATE4");
             // Parse and store the boost value
             char* endPtr;
             float boost = strtof(x.c_str(), &endPtr);
@@ -276,7 +276,7 @@ mqtt:
       then:
         - lambda: |-
             ESP_LOGI("MQTT_CMD", "Received RAUMSOLLTEMP_I command: %s", x.c_str());
-            publishWritableNumberDiscovery(writableNumbers[4]);
+            publishWritableNumberDiscoveryByName("RAUMSOLLTEMP_I");
             const char* value = x.c_str();
             writeSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I", value);
             readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I");
@@ -285,7 +285,7 @@ mqtt:
       then:
         - lambda: |-
             ESP_LOGI("MQTT_CMD", "Received RAUMSOLLTEMP_II command: %s", x.c_str());
-            publishWritableNumberDiscovery(writableNumbers[5]);
+            publishWritableNumberDiscoveryByName("RAUMSOLLTEMP_II");
             const char* value = x.c_str();
             writeSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_II", value);
             readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_II");
@@ -294,7 +294,7 @@ mqtt:
       then:
         - lambda: |-
             ESP_LOGI("MQTT_CMD", "Received RAUMSOLLTEMP_III command: %s", x.c_str());
-            publishWritableNumberDiscovery(writableNumbers[6]);
+            publishWritableNumberDiscoveryByName("RAUMSOLLTEMP_III");
             const char* value = x.c_str();
             writeSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_III", value);
             readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_III");
@@ -303,7 +303,7 @@ mqtt:
       then:
         - lambda: |-
             ESP_LOGI("MQTT_CMD", "Received RAUMSOLLTEMP_NACHT command: %s", x.c_str());
-            publishWritableNumberDiscovery(writableNumbers[7]);
+            publishWritableNumberDiscoveryByName("RAUMSOLLTEMP_NACHT");
             const char* value = x.c_str();
             writeSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_NACHT", value);
             readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_NACHT");
