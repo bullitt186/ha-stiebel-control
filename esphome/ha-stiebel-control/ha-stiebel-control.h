@@ -279,11 +279,19 @@ static std::set<std::string> discoveredWritableNumbers;
 // Track which writable selects have been discovered
 static std::set<std::string> discoveredWritableSelects;
 
-// Track next scheduled request time per unique signal key (MEMBER_SIGNAL)
-static std::unordered_map<std::string, unsigned long> nextRequestTime;
-
-// Track starting position for round-robin signal processing (prevents starvation)
-static int signalProcessingStartIndex = 0;
+// ── Prebuilt poll schedule ───────────────────────────────────────────────────
+// One slot per (requested signal x concrete member), built once at startup so
+// the request loop is a plain indexed walk: no string-key hashing, no per-iteration
+// heap allocations. For cm_other signals the 3 fan-out slots sit contiguously and
+// share a groupId, preserving "only one group member sent per iteration".
+struct PollSlot {
+    const CanMember* member;   // concrete poll target
+    const ElsterIndex* signal; // resolved from ElsterTable (never 0xFFFF/blacklisted)
+    unsigned long intervalMs;
+    unsigned long nextAt;      // runtime: next poll time
+    int groupId;               // >0 shared by cm_other fan-out slots; 0 = independent
+};
+static std::vector<PollSlot> pollSlots;
 
 // Track sensor values for calculated sensors
 static float lastWpVorlaufIst = NAN;
@@ -1880,16 +1888,15 @@ void processSignalRequests() {
     if (!containersReserved) {
         containersReserved = true;
         uidCache.reserve(UID_CACHE_RESERVE);
-        nextRequestTime.reserve(REQUEST_SCHEDULE_RESERVE);
         copEnergyValues.reserve(COP_VALUES_RESERVE);
         ESP_LOGI("CONTAINERS", "Runtime containers reserved");
     }
     static uint32_t lastContainerLog = 0;
     if (now - lastContainerLog > 600000U) {
         lastContainerLog = now;
-        ESP_LOGI("CONTAINERS", "uidCache=%zu discoveredSignals=%zu nextRequestTime=%zu copEnergy=%zu",
+        ESP_LOGI("CONTAINERS", "uidCache=%zu discoveredSignals=%zu pollSlots=%zu copEnergy=%zu",
                  (size_t)uidCache.size(), (size_t)discoveredSignals.size(),
-                 (size_t)nextRequestTime.size(), (size_t)copEnergyValues.size());
+                 (size_t)pollSlots.size(), (size_t)copEnergyValues.size());
     }
 
     // Startup delay: wait before starting signal requests
@@ -1908,8 +1915,11 @@ void processSignalRequests() {
         ESP_LOGI("REQUEST_MGR", "Signal request manager active - processing %d signal definitions", 
                  SIGNAL_REQUEST_COUNT);
         
-        // Initialize all signal schedules with random offsets to spread out initial load
-        ESP_LOGI("REQUEST_MGR", "Initializing signal schedules with random offsets to prevent burst");
+        // Prebuild the poll schedule once: resolved signal pointers + concrete
+        // members + intervals, with random initial offsets to spread the load.
+        // The hot loop below is then a plain indexed walk (no string building,
+        // no map lookups, no heap allocations).
+        pollSlots.reserve(REQUEST_SCHEDULE_RESERVE);
         for (int i = 0; i < SIGNAL_REQUEST_COUNT; i++) {
             const SignalRequest& req = signalRequests[i];
             const ElsterIndex* ei = GetElsterIndex(req.signalName);
@@ -1921,130 +1931,65 @@ void processSignalRequests() {
             unsigned long intervalMs = req.frequency * 1000UL;
             
             if (req.member == cm_other) {
-                // Schedule for all members
+                // Fan-out to the fixed "all members" trio; the 3 slots are pushed
+                // contiguously and share groupId = i+1 (unique per signal).
                 const CanMember* allMembers[] = {
                     &CanMembers[cm_kessel],
                     &CanMembers[cm_manager],
                     &CanMembers[cm_heizmodul]
                 };
-                for (size_t m = 0; m < 3; m++) {
-                    std::string key = std::string(allMembers[m]->Name) + "_" + ei->Name;
+                for (const auto* member : allMembers) {
                     // Random offset between 0 and full interval using ESP32 hardware RNG
                     unsigned long randomOffset = getRandomInRange(0, intervalMs + 1);
-                    nextRequestTime[key] = now + randomOffset;
+                    pollSlots.push_back({member, ei, intervalMs, now + randomOffset, i + 1});
                 }
             } else {
                 // Schedule for specific member
                 const CanMember* member = &CanMembers[req.member];
-                std::string key = std::string(member->Name) + "_" + ei->Name;
                 // Random offset between 0 and full interval using ESP32 hardware RNG
                 unsigned long randomOffset = getRandomInRange(0, intervalMs + 1);
-                nextRequestTime[key] = now + randomOffset;
+                pollSlots.push_back({member, ei, intervalMs, now + randomOffset, 0});
             }
         }
-        ESP_LOGI("REQUEST_MGR", "Initialized %d signal schedules", nextRequestTime.size());
+        ESP_LOGI("REQUEST_MGR", "Initialized %d poll slots", (int)pollSlots.size());
     }
     
-    // Rate limiting: send up to MAX_REQUESTS_PER_ITERATION requests per iteration
-    // Randomization in scheduling prevents bursts
+    // Rate limiting: send up to MAX_REQUESTS_PER_ITERATION requests per iteration.
+    // Randomization in scheduling prevents bursts.
     int requestsSentThisIteration = 0;
-    
-    // Round-robin processing: start from last position to prevent starvation of signals at end of array
-    // Process all signals, wrapping around, until we hit rate limit or complete full cycle
+    const int slotCount = (int)pollSlots.size();
+    if (slotCount == 0) {
+        return;
+    }
+
+    // Walk the prebuilt schedule as a plain indexed array. lastGroupSentThisIteration
+    // enforces that a cm_other fan-out group sends at most one member per iteration.
     int processedCount = 0;
-    int currentIndex = signalProcessingStartIndex;
-    
-    while (processedCount < SIGNAL_REQUEST_COUNT && requestsSentThisIteration < MAX_REQUESTS_PER_ITERATION) {
-        const SignalRequest& req = signalRequests[currentIndex];
+    int currentIndex = 0;
+    int lastGroupSentThisIteration = 0;
+
+    while (processedCount < slotCount && requestsSentThisIteration < MAX_REQUESTS_PER_ITERATION) {
+        PollSlot &slot = pollSlots[currentIndex];
         processedCount++;
-        
-        const ElsterIndex* ei = GetElsterIndex(req.signalName);
-        if (!ei || ei->Index == 0xFFFF) {
-            // Move to next signal and continue
-            currentIndex = (currentIndex + 1) % SIGNAL_REQUEST_COUNT;
-            continue; // Signal not found in table
+
+        if (slot.groupId != 0 && slot.groupId == lastGroupSentThisIteration) {
+            currentIndex = (currentIndex + 1) % slotCount;
+            continue; // This group already sent a member this iteration -> defer
         }
-        
-        // Skip blacklisted signals - don't request them on CAN bus
-        if (isPermanentlyBlacklisted(ei->Name)) {
-            currentIndex = (currentIndex + 1) % SIGNAL_REQUEST_COUNT;
-            continue; // Signal is blacklisted
+
+        if (now >= slot.nextAt) {
+            readSignal(slot.member, slot.signal);
+            requestsSentThisIteration++;
+            lastGroupSentThisIteration = slot.groupId;
+
+            // Calculate next poll time with random offset (0 to 5% of interval) to
+            // keep signals from synchronizing while staying close to target frequency
+            unsigned long maxJitter = (slot.intervalMs / 20); // 5% of interval
+            if (maxJitter < 500) maxJitter = 500; // Minimum 500ms jitter
+            slot.nextAt = now + slot.intervalMs + getRandomInRange(0, maxJitter + 1);
         }
-        
-        unsigned long intervalMs = req.frequency * 1000UL;
-        
-        // Determine which members to request from
-        if (req.member == cm_other) {
-            // Request from all members (each tracked independently)
-            const CanMember* allMembers[] = {
-                &CanMembers[cm_kessel],
-                &CanMembers[cm_manager],
-                &CanMembers[cm_heizmodul]
-            };
-            
-            // Track how many members we've sent to in this cm_other group to stagger them
-            int sentInThisGroup = 0;
-            
-            for (const auto* member : allMembers) {
-                // Don't break - just skip remaining members for this signal
-                // The outer loop will continue with next signal
-                if (requestsSentThisIteration >= MAX_REQUESTS_PER_ITERATION) {
-                    break; // Hit rate limit for this iteration
-                }
-                
-                // Use ei->Name (from ElsterTable) to match blacklist key format
-                std::string key = std::string(member->Name) + "_" + ei->Name;
-                
-                // Get the next scheduled time for this signal
-                unsigned long nextScheduled = nextRequestTime[key];
-                
-                // Check if this signal is overdue (current time >= scheduled time)
-                if (now >= nextScheduled) {
-                    // For cm_other: only send to ONE member per iteration to prevent bursts
-                    // Other members will be checked in subsequent iterations
-                    if (sentInThisGroup == 0) {
-                        readSignal(member, ei);
-                        requestsSentThisIteration++;
-                        sentInThisGroup++;
-                        
-                        // Calculate next scheduled time with random offset (0 to 5% of interval)
-                        // This keeps signals from synchronizing while staying close to target frequency
-                        unsigned long maxJitter = (intervalMs / 20); // 5% of interval
-                        if (maxJitter < 500) maxJitter = 500; // Minimum 500ms jitter
-                        unsigned long randomDelay = getRandomInRange(0, maxJitter + 1);
-                        nextRequestTime[key] = now + intervalMs + randomDelay;
-                        
-                        // ESP_LOGD("REQUEST_MGR", "Sent %s, next in %lums", key.c_str(), intervalMs + randomDelay);
-                    }
-                    // Else: skip this member for now, will be checked next iteration
-                }
-            }
-        } else {
-            // Request from specific member
-            const CanMember* member = &CanMembers[req.member];
-            std::string key = std::string(member->Name) + "_" + ei->Name;
-            
-            // Get the next scheduled time for this signal
-            unsigned long nextScheduled = nextRequestTime[key];
-            
-            // Check if this signal is overdue (current time >= scheduled time)
-            if (now >= nextScheduled) {
-                readSignal(member, ei);
-                requestsSentThisIteration++;
-                
-                // Calculate next scheduled time with random offset (0 to 5% of interval)
-                // This keeps signals from synchronizing while staying close to target frequency
-                unsigned long maxJitter = (intervalMs / 20); // 5% of interval
-                if (maxJitter < 500) maxJitter = 500; // Minimum 500ms jitter
-                unsigned long randomDelay = getRandomInRange(0, maxJitter + 1);
-                nextRequestTime[key] = now + intervalMs + randomDelay;
-                
-                // ESP_LOGD("REQUEST_MGR", "Sent %s, next in %lums", key.c_str(), intervalMs + randomDelay);
-            }
-        }
-        
-        // Move to next signal in round-robin fashion (wrap around at end)
-        currentIndex = (currentIndex + 1) % SIGNAL_REQUEST_COUNT;
+
+        currentIndex = (currentIndex + 1) % slotCount;
     }
 }
 
