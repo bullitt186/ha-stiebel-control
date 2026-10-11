@@ -337,6 +337,14 @@ extern const SignalRequest signalRequests[];
 extern const size_t SIGNAL_REQUEST_COUNT_VALUE;
 #define SIGNAL_REQUEST_COUNT SIGNAL_REQUEST_COUNT_VALUE
 
+// ── Runtime container capacity hints ────────────────────────────────────────
+// reserve() only pre-allocates buckets to avoid rehashing; it never limits
+// growth. Some values are ESTIMATES (comment) — verify against the "CONTAINERS"
+// size log (every 10 min) and the Free Heap sensor.
+static const size_t UID_CACHE_RESERVE        = 128;                                 // ESTIMATE: responding signals × mapped members
+static const size_t REQUEST_SCHEDULE_RESERVE = SIGNAL_REQUEST_COUNT * 3;            // request table upper bound (cm_other polls up to 3 members)
+static const size_t COP_VALUES_RESERVE       = 16;                                  // ESTIMATE: small fixed set of energy-sum keys
+
 // Runtime state for signal request manager
 static bool requestManagerStarted = false;
 static unsigned long requestManagerStartTime = 0;
@@ -1871,9 +1879,9 @@ void processSignalRequests() {
     static bool containersReserved = false;
     if (!containersReserved) {
         containersReserved = true;
-        uidCache.reserve(128);
-        nextRequestTime.reserve(128);
-        copEnergyValues.reserve(16);
+        uidCache.reserve(UID_CACHE_RESERVE);
+        nextRequestTime.reserve(REQUEST_SCHEDULE_RESERVE);
+        copEnergyValues.reserve(COP_VALUES_RESERVE);
         ESP_LOGI("CONTAINERS", "Runtime containers reserved");
     }
     static uint32_t lastContainerLog = 0;
