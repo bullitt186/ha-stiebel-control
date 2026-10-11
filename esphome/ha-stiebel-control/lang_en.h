@@ -221,6 +221,18 @@
 #define LNAME_CALC_EL_LEISTUNG_W               "Current Electrical Power"
 #undef  LNAME_CALC_BETRIEBSSTATUS
 #define LNAME_CALC_BETRIEBSSTATUS              "Operating State"
+#undef  LNAME_CALC_ENERGIE_HEIZ_TAG_KWH
+#define LNAME_CALC_ENERGIE_HEIZ_TAG_KWH        "Heating Energy Today"
+#undef  LNAME_CALC_ENERGIE_WW_TAG_KWH
+#define LNAME_CALC_ENERGIE_WW_TAG_KWH          "DHW Energy Today"
+#undef  LNAME_CALC_WAERME_HEIZ_TAG_KWH
+#define LNAME_CALC_WAERME_HEIZ_TAG_KWH         "Heating Heat Output Today"
+#undef  LNAME_CALC_WAERME_WW_TAG_KWH
+#define LNAME_CALC_WAERME_WW_TAG_KWH           "DHW Heat Output Today"
+#undef  LNAME_CALC_EL_LEISTUNG_HEIZ_W
+#define LNAME_CALC_EL_LEISTUNG_HEIZ_W          "Current Electrical Power Heating"
+#undef  LNAME_CALC_EL_LEISTUNG_WW_W
+#define LNAME_CALC_EL_LEISTUNG_WW_W            "Current Electrical Power DHW"
 
 // ============================================================================
 // Writable number friendly names

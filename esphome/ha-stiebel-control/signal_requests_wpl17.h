@@ -157,14 +157,14 @@ extern const SignalRequest signalRequests[] = {
     // Energie-Register (MWh = et_double_val, kWh = separate Register).
     // Die kombinierten "Gesamt kWh" berechneten Sensoren (MWh*1000+kWh) werden
     // in ha-stiebel-control.h aus diesen Werten abgeleitet.
-    {"EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", FREQ_10MIN, cm_heizmodul},
-    {"EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH", FREQ_10MIN, cm_heizmodul},
-    {"EL_AUFNAHMELEISTUNG_WW_SUM_MWH",   FREQ_10MIN, cm_heizmodul},
-    {"EL_AUFNAHMELEISTUNG_WW_SUM_KWH",   FREQ_10MIN, cm_heizmodul},
-    {"WAERMEERTRAG_HEIZ_SUM_MWH",        FREQ_10MIN, cm_heizmodul},
-    {"WAERMEERTRAG_HEIZ_SUM_KWH",        FREQ_10MIN, cm_heizmodul},
-    {"WAERMEERTRAG_WW_SUM_MWH",          FREQ_10MIN, cm_heizmodul},
-    {"WAERMEERTRAG_WW_SUM_KWH",          FREQ_10MIN, cm_heizmodul},
+    {"EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", FREQ_10MIN, cm_heizmodul_wpl},
+    {"EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH", FREQ_10MIN, cm_heizmodul_wpl},
+    {"EL_AUFNAHMELEISTUNG_WW_SUM_MWH",   FREQ_10MIN, cm_heizmodul_wpl},
+    {"EL_AUFNAHMELEISTUNG_WW_SUM_KWH",   FREQ_10MIN, cm_heizmodul_wpl},
+    {"WAERMEERTRAG_HEIZ_SUM_MWH",        FREQ_10MIN, cm_heizmodul_wpl},
+    {"WAERMEERTRAG_HEIZ_SUM_KWH",        FREQ_10MIN, cm_heizmodul_wpl},
+    {"WAERMEERTRAG_WW_SUM_MWH",          FREQ_10MIN, cm_heizmodul_wpl},
+    {"WAERMEERTRAG_WW_SUM_KWH",          FREQ_10MIN, cm_heizmodul_wpl},
 
     // --- AKTUELLE ELEKTRISCHE LEISTUNG (W): aus feinen Tageszählern (Wh) abgeleitet ---
     // Diese Wh-Zähler werden alle 30s gelesen; aus der Differenz pro Zeit berechnet
@@ -172,7 +172,13 @@ extern const SignalRequest signalRequests[] = {
     // HINWEIS: Die TAG_WH-Zaehler liegen auf dem WPL17-Heizmodul (0x514), das sie
     // passiv sendet (sensor.heizmodul_wpl_*). Von 0x500 lieferten sie 0.
     {"EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH", FREQ_30S, cm_heizmodul_wpl},
+    {"EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", FREQ_30S, cm_heizmodul_wpl},
     {"EL_AUFNAHMELEISTUNG_WW_TAG_WH",   FREQ_30S, cm_heizmodul_wpl},
+    {"EL_AUFNAHMELEISTUNG_WW_TAG_KWH",  FREQ_30S, cm_heizmodul_wpl},
+    {"WAERMEERTRAG_HEIZ_TAG_WH",        FREQ_30S, cm_heizmodul_wpl},
+    {"WAERMEERTRAG_HEIZ_TAG_KWH",       FREQ_30S, cm_heizmodul_wpl},
+    {"WAERMEERTRAG_WW_TAG_WH",          FREQ_30S, cm_heizmodul_wpl},
+    {"WAERMEERTRAG_WW_TAG_KWH",         FREQ_30S, cm_heizmodul_wpl},
 
     // --- OPTIONAL: Verdichter-Drehzahl / Laufzeiten (testen, -255 -> auskommentieren) ---
     // {"ISTDREHZAHL_VERDICHTER_1",   FREQ_30S,   cm_heizmodul},  // Ist-Drehzahl Verdichter (U/min)

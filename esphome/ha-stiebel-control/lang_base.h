@@ -121,6 +121,12 @@
 #define LNAME_CALC_WAERME_WW_TOTAL_KWH         "Waerme Ertrag Warmwasser Gesamt kWh"
 #define LNAME_CALC_EL_LEISTUNG_W                "Aktuelle elektrische Leistung"
 #define LNAME_CALC_BETRIEBSSTATUS               "Betriebsstatus"
+#define LNAME_CALC_ENERGIE_HEIZ_TAG_KWH         "Energie Heizung heute"
+#define LNAME_CALC_ENERGIE_WW_TAG_KWH           "Energie Warmwasser heute"
+#define LNAME_CALC_WAERME_HEIZ_TAG_KWH          "Waerme Ertrag Heizung heute"
+#define LNAME_CALC_WAERME_WW_TAG_KWH            "Waerme Ertrag Warmwasser heute"
+#define LNAME_CALC_EL_LEISTUNG_HEIZ_W           "Aktuelle el. Leistung Heizung"
+#define LNAME_CALC_EL_LEISTUNG_WW_W             "Aktuelle el. Leistung Warmwasser"
 
 // ============================================================================
 // Writable number friendly names (writableNumbers[])
