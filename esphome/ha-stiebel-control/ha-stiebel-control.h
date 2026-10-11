@@ -1435,8 +1435,9 @@ public:
     static ESPPreferenceObject nvsActive;
 
     void writeCanSignal(const char* signalName, const char* value) override {
+        // Non-blocking: both calls only enqueue CAN frames (FIFO TX queue), so the
+        // write is transmitted before the read-back request. No delay() in the loop.
         writeSignal(&CanMembers[cm_manager], signalName, value);
-        delay(100);
         readSignal(&CanMembers[cm_manager], signalName);
     }
 
