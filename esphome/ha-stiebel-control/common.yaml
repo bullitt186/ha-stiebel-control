@@ -124,13 +124,13 @@ mqtt:
         ESP_LOGI("MQTT_CONN", "Publishing initial SG Ready states...");
         // Publish default SG Ready state (2 - Normal)
         const char* sgStateStr = sgReadyOptions[1]; // Index 1 = "2 - Normal"
-        id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_STATE/state", sgStateStr, strlen(sgStateStr), 0, true);
+        publishMqttChecked("heatingpump/MANAGER/SG_READY_STATE/state", sgStateStr, strlen(sgStateStr), 0, true);
         // Publish current boost values (reflect actual in-memory values, not hardcoded defaults)
         char boost3Str[16], boost4Str[16];
         snprintf(boost3Str, sizeof(boost3Str), "%.1f", sgReadyBoostState3Value());
         snprintf(boost4Str, sizeof(boost4Str), "%.1f", sgReadyBoostState4Value());
-        id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_BOOST_STATE3/state", boost3Str, strlen(boost3Str), 0, true);
-        id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_BOOST_STATE4/state", boost4Str, strlen(boost4Str), 0, true);
+        publishMqttChecked("heatingpump/MANAGER/SG_READY_BOOST_STATE3/state", boost3Str, strlen(boost3Str), 0, true);
+        publishMqttChecked("heatingpump/MANAGER/SG_READY_BOOST_STATE4/state", boost4Str, strlen(boost4Str), 0, true);
         // Update sensors with initial values
         id(sg_ready_boost_state3_sensor).publish_state(sgReadyBoostState3Value());
         id(sg_ready_boost_state4_sensor).publish_state(sgReadyBoostState4Value());
@@ -239,7 +239,7 @@ mqtt:
                 snprintf(stateTopic, sizeof(stateTopic), "heatingpump/MANAGER/SG_READY_BOOST_STATE3/state");
                 char valueStr[16];
                 snprintf(valueStr, sizeof(valueStr), "%.1f", sgReadyBoostState3Value());
-                id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
+                publishMqttChecked(stateTopic, valueStr, strlen(valueStr), 0, true);
                 // Update sensor
                 id(sg_ready_boost_state3_sensor).publish_state(sgReadyBoostState3Value());
             } else {
@@ -264,7 +264,7 @@ mqtt:
                 snprintf(stateTopic, sizeof(stateTopic), "heatingpump/MANAGER/SG_READY_BOOST_STATE4/state");
                 char valueStr[16];
                 snprintf(valueStr, sizeof(valueStr), "%.1f", sgReadyBoostState4Value());
-                id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
+                publishMqttChecked(stateTopic, valueStr, strlen(valueStr), 0, true);
                 // Update sensor
                 id(sg_ready_boost_state4_sensor).publish_state(sgReadyBoostState4Value());
             } else {

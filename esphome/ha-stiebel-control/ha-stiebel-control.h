@@ -578,6 +578,27 @@ void writeSignal(const CanMember *cm, const char *elsterName, const char *str)
     return;
 }
 
+// Publish to MQTT with throttled failure logging. A failed publish (e.g. broker
+// temporarily offline) is reported at most every 5 s instead of being silently
+// swallowed — the return value of ESPHome's publish() is bool.
+static uint32_t lastMqttFailLogTs = 0;
+inline void publishMqttChecked(const char* topic, const char* payload, size_t len,
+                               const uint8_t qos = 0, const bool retain = true) {
+    const bool ok = id(mqtt_client).publish(topic, payload, len, qos, retain);
+    if (!ok) {
+        const uint32_t now = millis();
+        if (now - lastMqttFailLogTs > 5000U) {
+            lastMqttFailLogTs = now;
+            ESP_LOGW("MQTT", "publish failed to '%s': %.*s", topic, (int)len, payload);
+        }
+    }
+}
+// std::string-topic overload (matches ESPHome's publish overload set)
+inline void publishMqttChecked(const std::string &topic, const char* payload, size_t len,
+                               const uint8_t qos = 0, const bool retain = true) {
+    publishMqttChecked(topic.c_str(), payload, len, qos, retain);
+}
+
 // Unified function to publish MQTT discovery for calculated sensors
 void publishCalculatedSensorDiscovery(const CalculatedSensorConfig& config, bool forceRepublish = false) {
     // Check if already published (unless force republish)
@@ -642,7 +663,7 @@ void publishCalculatedSensorDiscovery(const CalculatedSensorConfig& config, bool
 
     // Publish discovery message
     std::string payloadStr = payload.str();
-    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    publishMqttChecked(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
 
     ESP_LOGI("MQTT", "Discovery published for calculated sensor: %s", config.name);
 }
@@ -735,7 +756,7 @@ void publishWritableNumberDiscovery(const WritableNumberConfig& config, bool for
 
     // Publish discovery message
     std::string payloadStr = payload.str();
-    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    publishMqttChecked(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
 
     ESP_LOGI("MQTT", "Discovery published for writable number: %s", config.friendlyName);
 }
@@ -834,7 +855,7 @@ void publishWritableSelectDiscovery(const WritableSelectConfig& config, bool for
 
     // Publish discovery message
     std::string payloadStr = payload.str();
-    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    publishMqttChecked(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
 
     // Mark as discovered
     discoveredWritableSelects.insert(uniqueIdStr);
@@ -918,7 +939,7 @@ void publishDate()
     
     // Publish state to MQTT
     const char* stateTopic = "heatingpump/calculated/date/state";
-    id(mqtt_client).publish(stateTopic, datum.c_str(), datum.length(), 0, true);
+    publishMqttChecked(stateTopic, datum.c_str(), datum.length(), 0, true);
     ESP_LOGI("CALC", "Published date: %s (Jahr=%d, Monat=%d, Tag=%d)", datum.c_str(), ijahr, imonat, itag);
 }
 
@@ -955,7 +976,7 @@ void publishTime()
     
     // Publish state to MQTT
     const char* stateTopic = "heatingpump/calculated/time/state";
-    id(mqtt_client).publish(stateTopic, zeit, strlen(zeit), 0, true);
+    publishMqttChecked(stateTopic, zeit, strlen(zeit), 0, true);
     ESP_LOGI("CALC", "Published time: %s (Stunde=%d, Minute=%d, Sekunde=%d)", zeit, istunde, iminute, isekunde);
 }
 
@@ -982,7 +1003,7 @@ void publishBetriebsart(const std::string& sommerBetriebValue)
     
     // Publish state to MQTT
     const char* stateTopic = "heatingpump/calculated/betriebsart/state";
-    id(mqtt_client).publish(stateTopic, betriebsart.c_str(), betriebsart.length(), 0, true);
+    publishMqttChecked(stateTopic, betriebsart.c_str(), betriebsart.length(), 0, true);
     // ESP_LOGD("CALC", "Published Betriebsart: %s (SOMMERBETRIEB=%s)", betriebsart.c_str(), sommerBetriebValue.c_str());
 }
 
@@ -1007,7 +1028,7 @@ void publishDeltaTContinuous()
     char value[16];
     snprintf(value, sizeof(value), "%.2f", deltaT);
     const char* stateTopic = "heatingpump/calculated/delta_t_continuous/state";
-    id(mqtt_client).publish(stateTopic, value, strlen(value), 0, true);
+    publishMqttChecked(stateTopic, value, strlen(value), 0, true);
 }
 
 void publishDeltaTRunning()
@@ -1038,7 +1059,7 @@ void publishDeltaTRunning()
     char value[16];
     snprintf(value, sizeof(value), "%.2f", deltaT);
     const char* stateTopic = "heatingpump/calculated/delta_t_running/state";
-    id(mqtt_client).publish(stateTopic, value, strlen(value), 0, true);
+    publishMqttChecked(stateTopic, value, strlen(value), 0, true);
 }
 
 void publishCompressorActive()
@@ -1057,7 +1078,7 @@ void publishCompressorActive()
     // Publish state to MQTT
     const char* state = isActive ? "on" : "off";
     const char* stateTopic = "heatingpump/calculated/compressor_active/state";
-    id(mqtt_client).publish(stateTopic, state, strlen(state), 0, true);
+    publishMqttChecked(stateTopic, state, strlen(state), 0, true);
     // Note: Delta T running is published separately by scheduler
 }
 
@@ -1194,7 +1215,7 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
     
     // Publish discovery message with retain flag
     std::string payloadStr = payload.str();
-    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    publishMqttChecked(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
     
     ESP_LOGI("MQTT", "Discovery published for %s", friendlyName);
 }
@@ -1260,7 +1281,7 @@ void publishMqttState(const CanMember &cm, const ElsterIndex *ei, const std::str
     }
     
     // Publish state with retain flag
-    id(mqtt_client).publish(stateTopic, value.c_str(), value.length(), 0, true);
+    publishMqttChecked(stateTopic, value.c_str(), value.length(), 0, true);
 }
 
 // Diagnostics removed for simplification
@@ -1286,7 +1307,7 @@ void publishCOPDiscovery() {
                 << "\"name\":\"Stiebel Eltron Wärmepumpe\","
                 << "\"manufacturer\":\"Stiebel Eltron\"}}";
         std::string payloadStr = payload.str();
-        id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+        publishMqttChecked(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
     }
     
     // COP Heizung
@@ -1302,7 +1323,7 @@ void publishCOPDiscovery() {
                 << "\"name\":\"Stiebel Eltron Wärmepumpe\","
                 << "\"manufacturer\":\"Stiebel Eltron\"}}";
         std::string payloadStr = payload.str();
-        id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+        publishMqttChecked(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
     }
     
     // COP Gesamt
@@ -1318,7 +1339,7 @@ void publishCOPDiscovery() {
                 << "\"name\":\"Stiebel Eltron Wärmepumpe\","
                 << "\"manufacturer\":\"Stiebel Eltron\"}}";
         std::string payloadStr = payload.str();
-        id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+        publishMqttChecked(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
     }
     
     discoveryPublished = true;
@@ -1374,7 +1395,7 @@ void updateCOPCalculations() {
             char valueStr[16];
             snprintf(valueStr, sizeof(valueStr), "%.2f", cop_ww);
             const char* stateTopic = "heatingpump/calculated/cop_ww/state";
-            id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
+            publishMqttChecked(stateTopic, valueStr, strlen(valueStr), 0, true);
             ESP_LOGI("COP", "COP WW: %.2f (Wärme: %.3f MWh, El: %.3f MWh)", cop_ww, waerme_ww, el_ww);
         }
     }
@@ -1392,7 +1413,7 @@ void updateCOPCalculations() {
             char valueStr[16];
             snprintf(valueStr, sizeof(valueStr), "%.2f", cop_heiz);
             const char* stateTopic = "heatingpump/calculated/cop_heiz/state";
-            id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
+            publishMqttChecked(stateTopic, valueStr, strlen(valueStr), 0, true);
             ESP_LOGI("COP", "COP Heizung: %.2f (Wärme: %.3f MWh, El: %.3f MWh)", cop_heiz, waerme_heiz, el_heiz);
         }
     }
@@ -1414,7 +1435,7 @@ void updateCOPCalculations() {
             char valueStr[16];
             snprintf(valueStr, sizeof(valueStr), "%.2f", cop_gesamt);
             const char* stateTopic = "heatingpump/calculated/cop_gesamt/state";
-            id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
+            publishMqttChecked(stateTopic, valueStr, strlen(valueStr), 0, true);
             ESP_LOGI("COP", "COP Gesamt: %.2f (Wärme: %.3f MWh, El: %.3f MWh)", cop_gesamt, waerme_total, el_total);
         }
     }
@@ -1442,7 +1463,7 @@ public:
     }
 
     void publishMqtt(const char* topic, const char* value) override {
-        id(mqtt_client).publish(topic, value, strlen(value), 0, true);
+        publishMqttChecked(topic, value, strlen(value), 0, true);
     }
 
     void saveBoostState(float dhw, float room, bool active) override {
@@ -1711,7 +1732,9 @@ void publishCanDiagnostics() {
 
     if (status.state == TWAI_STATE_BUS_OFF) {
         ESP_LOGW("CAN_RECOVERY", "TWAI bus-off detected, initiating recovery");
-        twai_initiate_recovery();
+        if (twai_initiate_recovery() != ESP_OK) {
+            ESP_LOGE("CAN_RECOVERY", "twai_initiate_recovery() failed — bus may stay off");
+        }
     } else if (status.state == TWAI_STATE_STOPPED) {
         // twai_initiate_recovery() leaves the controller STOPPED once recovery
         // completes (128 bus-free occurrences) — must explicitly restart.
@@ -1719,7 +1742,9 @@ void publishCanDiagnostics() {
         // window (before twai_start_v2() in setup_internal()) completes
         // long before this 30s-cadence diagnostic loop ever runs.
         ESP_LOGW("CAN_RECOVERY", "TWAI stopped after recovery, restarting");
-        twai_start();
+        if (twai_start() != ESP_OK) {
+            ESP_LOGE("CAN_RECOVERY", "twai_start() failed — controller not restarted");
+        }
     }
 
     // Publish discovery (only once per UID — cached internally)
@@ -1731,13 +1756,13 @@ void publishCanDiagnostics() {
     char buf[16];
 
     snprintf(buf, sizeof(buf), "%lu", (unsigned long)status.tx_error_counter);
-    id(mqtt_client).publish("heatingpump/calculated/can_tec/state", buf, strlen(buf), 0, true);
+    publishMqttChecked("heatingpump/calculated/can_tec/state", buf, strlen(buf), 0, true);
 
     snprintf(buf, sizeof(buf), "%lu", (unsigned long)status.rx_error_counter);
-    id(mqtt_client).publish("heatingpump/calculated/can_rec/state", buf, strlen(buf), 0, true);
+    publishMqttChecked("heatingpump/calculated/can_rec/state", buf, strlen(buf), 0, true);
 
     snprintf(buf, sizeof(buf), "%lu", (unsigned long)status.bus_error_count);
-    id(mqtt_client).publish("heatingpump/calculated/can_bus_errors/state", buf, strlen(buf), 0, true);
+    publishMqttChecked("heatingpump/calculated/can_bus_errors/state", buf, strlen(buf), 0, true);
 
     const char* stateStr;
     switch (status.state) {
@@ -1747,7 +1772,7 @@ void publishCanDiagnostics() {
         case TWAI_STATE_RECOVERING: stateStr = "Erholung";  break;
         default:                    stateStr = "Unbekannt"; break;
     }
-    id(mqtt_client).publish("heatingpump/calculated/can_state/state",
+    publishMqttChecked("heatingpump/calculated/can_state/state",
                             stateStr, strlen(stateStr), 0, true);
 }
 

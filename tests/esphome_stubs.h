@@ -51,11 +51,12 @@ struct FakeMqttClient {
     struct Published { std::string topic; std::string payload; };
     std::vector<Published> messages;
     // Overloads for const char* and std::string topics (ha-stiebel-control.h uses both)
-    void publish(const char* topic, const char* payload, size_t /*len*/, int /*qos*/, bool /*retain*/) {
+    bool publish(const char* topic, const char* payload, size_t /*len*/, int /*qos*/, bool /*retain*/) {
         messages.push_back({topic, payload ? payload : ""});
+        return true;
     }
-    void publish(const std::string& topic, const char* payload, size_t len, int qos, bool retain) {
-        publish(topic.c_str(), payload, len, qos, retain);
+    bool publish(const std::string& topic, const char* payload, size_t len, int qos, bool retain) {
+        return publish(topic.c_str(), payload, len, qos, retain);
     }
     void clear() { messages.clear(); }
 };
