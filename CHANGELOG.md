@@ -5,6 +5,36 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ---
 
+## [2.2.0] — 2026-10-11
+
+### Added
+
+- **WPL10AC (WPM3) heat pump model** — hardware-verified by @fwetex on real hardware.
+  Requires the WPM3 CAN B / display connection at 50 kbps. Opt in with `device_model: "wpl10ac"`.
+  Includes DHW/boiler temperature, room actual temperature + humidity, setpoints, and
+  WPM3-specific operating mode names (Komfortbetrieb, Eco-Modus, …). Closes #34.
+- **New Elster registers**: `RAUMISTTEMP` (0x4ec7, room actual temperature),
+  `FEUCHTE` (0x4ec8, humidity).
+- **Smoke test manifest** for wpl10ac (`tests/models/wpl10ac_smoke.json`), verified on hardware.
+
+### Fixed
+
+- **SG Ready normal-mode value** is now model-aware: `"Komfortbetrieb"` for WPL10AC,
+  `"Tagbetrieb"` for all other models — previously hardcoded to `"Tagbetrieb"`.
+- **`MISCHERMODUL_2` renamed to `RAUMFERNFUEHLER_2`** — corrects the CAN ID from 0x601
+  to 0x401 (this member was unused in all existing signal tables so no behaviour change).
+- **`SOMMERBETRIEB` type** changed from `et_bool` to `et_little_bool` (matches the actual
+  CAN encoding; C++ code already treated it as such).
+- **`SEKUNDE` optional in `publishTime()`** — falls back to 0 if not available (WPM3 does not
+  provide it).
+
+### Improved
+
+- Log message buffer enlarged from 120 to 160 chars to prevent truncation of long CAN traces.
+- paho-mqtt 1.x/2.x compatibility shim in `tests/test_mqtt_smoke.py`.
+
+---
+
 ## [2.1.2] — 2026-10-11
 
 ### Fixed
