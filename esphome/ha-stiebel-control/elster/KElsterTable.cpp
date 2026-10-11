@@ -19,6 +19,8 @@
 
 
 #include <string.h>
+#include <stdio.h>
+#include <stddef.h>
 #include <unordered_map>
 #include <string>
 #include "NUtils.h"
@@ -30,86 +32,89 @@ static std::unordered_map<unsigned short, const ElsterIndex*> indexCache;
 static std::unordered_map<std::string, const ElsterIndex*> nameCache;
 
 
-void SetValueType(char * Val, unsigned char Type, unsigned short Value)
+void SetValueType(char * Val, size_t ValSize, unsigned char Type, unsigned short Value)
 {
+   if (!Val || ValSize == 0)
+     return;
+
    if (Value == 0x8000)
-     strcpy(Val, "-255");
+     snprintf(Val, ValSize, "%s", "-255");
    else
    switch (Type)
    {
      case et_byte:
-       sprintf(Val, "%d", (signed char)Value);
+       snprintf(Val, ValSize, "%d", (signed char)Value);
        break;
 
      case et_dec_val:
-       sprintf(Val, "%.1f", ((double)((signed short)Value)) / 10.0);
+       snprintf(Val, ValSize, "%.1f", ((double)((signed short)Value)) / 10.0);
        break;
 
      case et_cent_val:
-       sprintf(Val, "%.2f", ((double)((signed short)Value)) / 100.0);
+       snprintf(Val, ValSize, "%.2f", ((double)((signed short)Value)) / 100.0);
        break;
 
      case et_mil_val:
-       sprintf(Val, "%.3f", ((double)((signed short)Value)) / 1000.0);
+       snprintf(Val, ValSize, "%.3f", ((double)((signed short)Value)) / 1000.0);
        break;
 
      case et_little_endian:
-       sprintf(Val, "%d", (Value >> 8) + 256*(Value & 0xff));
+       snprintf(Val, ValSize, "%d", (Value >> 8) + 256*(Value & 0xff));
        break;
        
      case et_little_bool:
        if (Value == 0x0100)
-         strcpy(Val, "on");
+         snprintf(Val, ValSize, "%s", "on");
        else
        if (!Value)
-         strcpy(Val, "off");
+         snprintf(Val, ValSize, "%s", "off");
        else
-         strcpy(Val, "?");
+         snprintf(Val, ValSize, "%s", "?");
        break;
        
      case et_bool:
        if (Value == 0x0001)
-         strcpy(Val, "on");
+         snprintf(Val, ValSize, "%s", "on");
        else
        if (!Value)
-         strcpy(Val, "off");
+         snprintf(Val, ValSize, "%s", "off");
        else
-         strcpy(Val, "?");
+         snprintf(Val, ValSize, "%s", "?");
        break;
      
      case et_betriebsart:
        if ((Value & 0xff) == 0 && (Value >> 8) <= (int) High(BetriebsartList))
-         strcpy(Val, BetriebsartList[Value >> 8].Name);
+         snprintf(Val, ValSize, "%s", BetriebsartList[Value >> 8].Name);
        else
-         strcpy(Val, "?");
+         snprintf(Val, ValSize, "%s", "?");
        break;
 
      case et_zeit:
-       sprintf(Val, "%2.2d:%2.2d", Value & 0xff, Value >> 8);
+       snprintf(Val, ValSize, "%2.2d:%2.2d", Value & 0xff, Value >> 8);
        break;
 
      case et_datum:
-       sprintf(Val, "%2.2d.%2.2d.", Value >> 8, Value & 0xff);
+       snprintf(Val, ValSize, "%2.2d.%2.2d.", Value >> 8, Value & 0xff);
        break;
 
      case et_time_domain:
        if (Value & 0x8080)
-         strcpy(Val, "not used time domain");
+         snprintf(Val, ValSize, "%s", "not used time domain");
        else
-         sprintf(Val, "%2.2d:%2.2d-%2.2d:%2.2d",
+         snprintf(Val, ValSize, "%2.2d:%2.2d-%2.2d:%2.2d",
                  (Value >> 8) / 4, 15*((Value >> 8) % 4),
                  (Value & 0xff) / 4, 15*(Value % 4));
        break;
 
      case et_dev_nr:
        if (Value >= 0x80)
-         strcpy(Val, "--");
+         snprintf(Val, ValSize, "%s", "--");
        else
-         sprintf(Val, "%d", Value + 1);
+         snprintf(Val, ValSize, "%d", Value + 1);
        break;
 
      case et_dev_id:
-       sprintf(Val, "%d-%2.2d", (Value >> 8), Value & 0xff);
+       snprintf(Val, ValSize, "%d-%2.2d", (Value >> 8), Value & 0xff);
        break;
 
      case et_err_nr:
@@ -122,33 +127,36 @@ void SetValueType(char * Val, unsigned char Type, unsigned short Value)
            break;
          }
        if (idx >= 0)
-         strcpy(Val, ErrorList[idx].Name);
+         snprintf(Val, ValSize, "%s", ErrorList[idx].Name);
        else
-         sprintf(Val, "ERR %d", Value);
+         snprintf(Val, ValSize, "ERR %d", Value);
        break;
      }
 
      case et_default:
      default:
-       sprintf(Val, "%d", (signed short)Value);
+       snprintf(Val, ValSize, "%d", (signed short)Value);
        break;
    }
 }
 
-void SetDoubleType(char * Val, unsigned char Type, double Value)
+void SetDoubleType(char * Val, size_t ValSize, unsigned char Type, double Value)
 {
+  if (!Val || ValSize == 0)
+    return;
+
   switch (Type)
   {
     case et_double_val:
-      sprintf(Val, "%.3f", Value);
+      snprintf(Val, ValSize, "%.3f", Value);
       break;
 
     case et_triple_val:
-      sprintf(Val, "%.6f", Value);
+      snprintf(Val, ValSize, "%.6f", Value);
       break;
 
     default:
-      sprintf(Val, "%g", Value);
+      snprintf(Val, ValSize, "%g", Value);
       break;
   }
 }

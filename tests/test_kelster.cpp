@@ -9,97 +9,97 @@
 // ============================================================================
 TEST_CASE("SetValueType: 0x8000 sentinel returns -255", "[kelster]") {
     char val[32];
-    SetValueType(val, et_dec_val, 0x8000);
+    SetValueType(val, sizeof(val), et_dec_val, 0x8000);
     CHECK(std::string(val) == "-255");
 }
 TEST_CASE("SetValueType: et_dec_val formats with 1 decimal", "[kelster]") {
     char val[32];
-    SetValueType(val, et_dec_val, 0x00C8); // 200 raw = 20.0°C
+    SetValueType(val, sizeof(val), et_dec_val, 0x00C8); // 200 raw = 20.0°C
     CHECK(std::string(val) == "20.0");
 }
 TEST_CASE("SetValueType: et_dec_val negative value", "[kelster]") {
     char val[32];
     // -5.0 → signed short -50 → cast to unsigned short = 0xFFCE
-    SetValueType(val, et_dec_val, (unsigned short)(short)(-50));
+    SetValueType(val, sizeof(val), et_dec_val, (unsigned short)(short)(-50));
     CHECK(std::string(val) == "-5.0");
 }
 TEST_CASE("SetValueType: et_cent_val formats with 2 decimals", "[kelster]") {
     char val[32];
-    SetValueType(val, et_cent_val, 314); // 3.14
+    SetValueType(val, sizeof(val), et_cent_val, 314); // 3.14
     CHECK(std::string(val) == "3.14");
 }
 TEST_CASE("SetValueType: et_mil_val formats with 3 decimals", "[kelster]") {
     char val[32];
-    SetValueType(val, et_mil_val, 1000); // 1.000
+    SetValueType(val, sizeof(val), et_mil_val, 1000); // 1.000
     CHECK(std::string(val) == "1.000");
 }
 TEST_CASE("SetValueType: et_byte signed", "[kelster]") {
     char val[32];
-    SetValueType(val, et_byte, 255); // signed char 255 = -1
+    SetValueType(val, sizeof(val), et_byte, 255); // signed char 255 = -1
     CHECK(std::string(val) == "-1");
 }
 TEST_CASE("SetValueType: et_bool on", "[kelster]") {
     char val[32];
-    SetValueType(val, et_bool, 1);
+    SetValueType(val, sizeof(val), et_bool, 1);
     CHECK(std::string(val) == "on");
 }
 TEST_CASE("SetValueType: et_bool off", "[kelster]") {
     char val[32];
-    SetValueType(val, et_bool, 0);
+    SetValueType(val, sizeof(val), et_bool, 0);
     CHECK(std::string(val) == "off");
 }
 TEST_CASE("SetValueType: et_bool unknown", "[kelster]") {
     char val[32];
-    SetValueType(val, et_bool, 42);
+    SetValueType(val, sizeof(val), et_bool, 42);
     CHECK(std::string(val) == "?");
 }
 TEST_CASE("SetValueType: et_little_bool on", "[kelster]") {
     char val[32];
-    SetValueType(val, et_little_bool, 0x0100);
+    SetValueType(val, sizeof(val), et_little_bool, 0x0100);
     CHECK(std::string(val) == "on");
 }
 TEST_CASE("SetValueType: et_little_bool off", "[kelster]") {
     char val[32];
-    SetValueType(val, et_little_bool, 0);
+    SetValueType(val, sizeof(val), et_little_bool, 0);
     CHECK(std::string(val) == "off");
 }
 TEST_CASE("SetValueType: et_zeit formats HH:MM", "[kelster]") {
     char val[32];
     // Value = (hour) | (minute << 8) — hour in low byte, minute in high byte
-    SetValueType(val, et_zeit, (unsigned short)(14 | (30 << 8)));
+    SetValueType(val, sizeof(val), et_zeit, (unsigned short)(14 | (30 << 8)));
     CHECK(std::string(val) == "14:30");
 }
 TEST_CASE("SetValueType: et_datum formats DD.MM.", "[kelster]") {
     char val[32];
     // Value = (day << 8) | month
-    SetValueType(val, et_datum, (unsigned short)((15 << 8) | 6));
+    SetValueType(val, sizeof(val), et_datum, (unsigned short)((15 << 8) | 6));
     CHECK(std::string(val) == "15.06.");
 }
 TEST_CASE("SetValueType: et_dev_nr below 0x80 adds 1", "[kelster]") {
     char val[32];
-    SetValueType(val, et_dev_nr, 0);
+    SetValueType(val, sizeof(val), et_dev_nr, 0);
     CHECK(std::string(val) == "1");
 }
 TEST_CASE("SetValueType: et_dev_nr >= 0x80 returns --", "[kelster]") {
     char val[32];
-    SetValueType(val, et_dev_nr, 0x80);
+    SetValueType(val, sizeof(val), et_dev_nr, 0x80);
     CHECK(std::string(val) == "--");
 }
 TEST_CASE("SetValueType: et_dev_id formats N-NN", "[kelster]") {
     char val[32];
-    SetValueType(val, et_dev_id, (unsigned short)((2 << 8) | 5));
+    SetValueType(val, sizeof(val), et_dev_id, (unsigned short)((2 << 8) | 5));
     CHECK(std::string(val) == "2-05");
 }
 TEST_CASE("SetValueType: et_default formats as signed int", "[kelster]") {
     char val[32];
-    SetValueType(val, et_default, (unsigned short)(short)(-1));
+    SetValueType(val, sizeof(val), et_default, (unsigned short)(short)(-1));
     CHECK(std::string(val) == "-1");
 }
 TEST_CASE("SetValueType: et_little_endian swaps bytes", "[kelster]") {
     char val[32];
     // little endian: result = (value >> 8) + 256*(value & 0xff)
     // value = 0x0102 → (0x01) + 256*(0x02) = 1 + 512 = 513
-    SetValueType(val, et_little_endian, 0x0102);
+    SetValueType(val, sizeof(val), et_little_endian, 0x0102);
     CHECK(std::string(val) == "513");
 }
 
@@ -108,19 +108,19 @@ TEST_CASE("SetValueType: et_little_endian swaps bytes", "[kelster]") {
 // ============================================================================
 TEST_CASE("SetDoubleType: et_double_val 3 decimals", "[kelster]") {
     char val[32];
-    SetDoubleType(val, et_double_val, 3.141);
+    SetDoubleType(val, sizeof(val), et_double_val, 3.141);
     CHECK(std::string(val) == "3.141");
 }
 TEST_CASE("SetDoubleType: et_triple_val 6 decimals", "[kelster]") {
     char val[32];
-    SetDoubleType(val, et_triple_val, 1.234567);
+    SetDoubleType(val, sizeof(val), et_triple_val, 1.234567);
     // sprintf %g may trim trailing zeros — just check prefix
     std::string s(val);
     CHECK(s.find("1.234567") != std::string::npos);
 }
 TEST_CASE("SetDoubleType: default type uses %g", "[kelster]") {
     char val[32];
-    SetDoubleType(val, et_default, 100.0);
+    SetDoubleType(val, sizeof(val), et_default, 100.0);
     CHECK(std::string(val) == "100");
 }
 
@@ -184,7 +184,7 @@ TEST_CASE("GetElsterIndex by index: unknown index returns INDEX_NOT_FOUND sentin
 // ============================================================================
 TEST_CASE("TranslateString: et_dec_val round-trip 20.0", "[kelster]") {
     char val[32];
-    SetValueType(val, et_dec_val, 200); // 200/10 = 20.0
+    SetValueType(val, sizeof(val), et_dec_val, 200); // 200/10 = 20.0
     const char* p = val;
     int result = TranslateString(p, et_dec_val);
     CHECK(result == 200);
@@ -192,7 +192,7 @@ TEST_CASE("TranslateString: et_dec_val round-trip 20.0", "[kelster]") {
 TEST_CASE("TranslateString: et_dec_val round-trip negative -5.0", "[kelster]") {
     char val[32];
     unsigned short raw = (unsigned short)(short)(-50); // -5.0
-    SetValueType(val, et_dec_val, raw);
+    SetValueType(val, sizeof(val), et_dec_val, raw);
     const char* p = val;
     int result = TranslateString(p, et_dec_val);
     CHECK((short)result == -50);
