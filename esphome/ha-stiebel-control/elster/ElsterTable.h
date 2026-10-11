@@ -3715,7 +3715,7 @@ static const ElsterIndex ElsterTable[] =
   { "WP_STATUS", 0xfdae, et_little_endian, LNAME_WP_STATUS, "sensor", "", "", "", "mdi:heat-pump", NULL, NULL, false, true },
   { "DAUERLAUF_PUFFERLADEPUMPE", 0xfdaf, et_little_endian, "Dauerlauf Pufferladepumpe", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "PUMPENZYKLEN", 0xfdb2, et_little_endian, "Pumpenzyklen", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "SOMMERBETRIEB", 0xfdb4, et_little_bool, LNAME_SOMMERBETRIEB, "binary_sensor", "", "", "", "mdi:weather-sunny", NULL, NULL, false, true },
+  { "SOMMERBETRIEB", 0xfdb4, et_little_bool, LNAME_SOMMERBETRIEB, "binary_sensor", "", "", "", "mdi:weather-sunny", "on", "off", false, true },
   { "SOLARBETRIEB", 0xfdb7, et_little_endian, "Solarbetrieb", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "AUTOMATIK_WARMWASSER", 0xfdb9, et_little_bool, "Automatik Warmwasser", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "ZWEITER_WE_STATUS", 0xfdba, 0, "Zweiter WE Status", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },

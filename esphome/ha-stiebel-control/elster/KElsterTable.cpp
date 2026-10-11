@@ -67,15 +67,17 @@ void SetValueType(char * Val, unsigned char Type, unsigned short Value)
          strcpy(Val, "?");
        break;
        
-     case et_bool:
-       if (Value == 0x0001)
-         strcpy(Val, "on");
-       else
-       if (!Value)
-         strcpy(Val, "off");
-       else
-         strcpy(Val, "?");
-       break;
+case et_bool:
+        // WPL13 sends 0x0001 = on; WPL17 sends 0x0100 = on (little-endian bool).
+        // Accept BOTH so the shared table entry works on every model.
+        if (Value == 0x0001 || Value == 0x0100)
+          strcpy(Val, "on");
+        else
+        if (!Value)
+          strcpy(Val, "off");
+        else
+          strcpy(Val, "?");
+        break;
      
      case et_betriebsart:
        if ((Value & 0xff) == 0 && (Value >> 8) <= (int) High(BetriebsartList))

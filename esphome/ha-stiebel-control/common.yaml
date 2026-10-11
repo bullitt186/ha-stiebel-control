@@ -15,7 +15,6 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with this program. If not, see http://www.gnu.org/licenses/ .
 #
-
 esphome:
   name: heatingpump
   friendly_name: "Heating Pump CAN Interface"
@@ -36,9 +35,12 @@ esphome:
     - ha-stiebel-control/elster/NUtils.cpp
     - ha-stiebel-control/elster/NTypes.h
     - ha-stiebel-control/config.h
+    # language_select.h picks the language (lang_base.h for DE, lang_en.h for EN).
+    # lang_en.h must NOT be listed here: ESPHome auto-includes every listed file,
+    # so listing it would apply the EN overrides even when language_select.h
+    # selected lang_base.h (LANGUAGE_SELECT_ACTIVE is always defined).
     - ha-stiebel-control/language_select.h
     - ha-stiebel-control/lang_base.h
-    - ha-stiebel-control/lang_en.h
     - ha-stiebel-control/sg_ready_controller.h
     - ha-stiebel-control/ha-stiebel-control.h
     - ha-stiebel-control/signal_requests_base.h
@@ -117,6 +119,8 @@ mqtt:
         publishAllWritableNumberDiscoveries();
         // Publish MQTT select discoveries for operating mode control
         publishAllWritableSelectDiscoveries();
+        // Publish MQTT calculated sensor discoveries (COP, combined energy totals, etc.)
+        publishAllCalculatedSensorDiscoveries();
         // Datetime control now handled by Home Assistant input_datetime helpers
         ESP_LOGI("MQTT_CONN", "Discovery publication complete");
 
@@ -163,29 +167,47 @@ mqtt:
             ESP_LOGI("MQTT_CMD", "All discoveries republished");
 
     # Temperature setpoint controls
+    # HINWEIS: EINSTELL_SPEICHERSOLLTEMP wird auf WPL17 (CAN-B) vom KESSEL_CANB
+    # (0x201) gehalten. Das writable number-Feld erscheint dort am KESSEL_CANB-Geraet
+    # und nutzt den Topic heatingpump/KESSEL_CANB/.../set. Fuer andere Modelle
+    # bleibt der MANAGER-Topic aktiv. Beide Topics werden abonniert.
+    - topic: heatingpump/KESSEL_CANB/EINSTELL_SPEICHERSOLLTEMP/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP (Kessel CANB) command: %s", x.c_str());
+            publishWritableNumberDiscovery(writableNumbers[0]);
+            const char* value = x.c_str();
+            writeSignal(&CanMembers[cm_kessel_canb], "EINSTELL_SPEICHERSOLLTEMP", value);
+            readSignal(&CanMembers[cm_kessel_canb], "EINSTELL_SPEICHERSOLLTEMP");
+
     - topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP/set
       then:
         - lambda: |-
             ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP command: %s", x.c_str());
-            // Ensure discovery is published
             publishWritableNumberDiscovery(writableNumbers[0]);
-            // Write to CAN bus
             const char* value = x.c_str();
-            writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP", value);
-            // Read back to update state
-            readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP");
+            const CanMember* target = (strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0) ? &CanMembers[cm_kessel_canb] : &CanMembers[cm_manager];
+            writeSignal(target, "EINSTELL_SPEICHERSOLLTEMP", value);
+            readSignal(target, "EINSTELL_SPEICHERSOLLTEMP");
+
+    - topic: heatingpump/KESSEL_CANB/EINSTELL_SPEICHERSOLLTEMP2/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP2 (Kessel CANB) command: %s", x.c_str());
+            publishWritableNumberDiscovery(writableNumbers[1]);
+            const char* value = x.c_str();
+            writeSignal(&CanMembers[cm_kessel_canb], "EINSTELL_SPEICHERSOLLTEMP2", value);
+            readSignal(&CanMembers[cm_kessel_canb], "EINSTELL_SPEICHERSOLLTEMP2");
 
     - topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP2/set
       then:
         - lambda: |-
             ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP2 command: %s", x.c_str());
-            // Ensure discovery is published
             publishWritableNumberDiscovery(writableNumbers[1]);
-            // Write to CAN bus
             const char* value = x.c_str();
-            writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP2", value);
-            // Read back to update state
-            readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP2");
+            const CanMember* target = (strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0) ? &CanMembers[cm_kessel_canb] : &CanMembers[cm_manager];
+            writeSignal(target, "EINSTELL_SPEICHERSOLLTEMP2", value);
+            readSignal(target, "EINSTELL_SPEICHERSOLLTEMP2");
 
     # Operating mode control
     - topic: heatingpump/MANAGER/PROGRAMMSCHALTER/set
@@ -307,6 +329,15 @@ mqtt:
             const char* value = x.c_str();
             writeSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_NACHT", value);
             readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_NACHT");
+
+    - topic: heatingpump/KESSEL_CANB/HEIZKURVE/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received HEIZKURVE command: %s", x.c_str());
+            publishWritableNumberDiscovery(writableNumbers[8]);
+            const char* value = x.c_str();
+            writeSignal(&CanMembers[cm_kessel_canb], "HEIZKURVE", value);
+            readSignal(&CanMembers[cm_kessel_canb], "HEIZKURVE");
 
 
 #########################################
@@ -442,7 +473,7 @@ button:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-  use_address: 192.168.30.107  # production device IP for OTA
+  use_address: 192.168.179.60  # production device IP for OTA
   fast_connect: true
   power_save_mode: none
   reboot_timeout: 5min
@@ -505,7 +536,7 @@ sensor:
       return ((dBm - MIN_DBM) / (MAX_DBM - MIN_DBM)) * 100;
 
   # -----------------------------------------------------------------------
-  # COP energy accumulator sensors (universal — present on all Elster models)
+  # COP energy accumulator sensors (universal - present on all Elster models)
   # -----------------------------------------------------------------------
   - platform: template
     name: "EL_AUFNAHMELEISTUNG_HEIZ_SUM"
@@ -614,7 +645,7 @@ sensor:
     device_class: "power_factor"
     accuracy_decimals: 2
 
-  # Operating mode and season sensors — used to trigger CAN reads
+  # Operating mode and season sensors - used to trigger CAN reads
   - platform: template
     name: "PROGRAMMSCHALTER"
     id: PROGRAMMSCHALTER

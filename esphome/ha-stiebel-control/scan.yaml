@@ -1,0 +1,18 @@
+#
+#  WPL17 CAN-B Scan Model-Package (Diagnose)
+#
+#  Selektiert die Scan-Request-Tabelle (signal_requests_scan.h) fuer die
+#  Diagnose-Firmware heatingpump_scan.yaml. Diese Tabelle fragt gezielt
+#  einzelne CAN-B-Signale/Members ab, um unbekannte Register zu finden
+#  (z.B. fuer die Kuehlfunktion) oder Writes zu testen.
+#
+#  Fuer die PRODUKTION verwende stattdessen wpl17.yaml (signal_requests_wpl17.h).
+#
+#  HINWEIS: Der Header ha-stiebel-control.h enthaelt zusaetzliche Diagnose-
+#  Funktionen (processCanMessageDebug, disableCanRequests), die hier genutzt
+#  werden, aber in der Produktion inaktiv bleiben (disableCanRequests default false).
+#
+
+esphome:
+  includes:
+    - ha-stiebel-control/signal_requests_scan.h

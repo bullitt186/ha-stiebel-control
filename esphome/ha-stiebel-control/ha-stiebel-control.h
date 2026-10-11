@@ -65,6 +65,11 @@ static const CanMember CanMembers[] =
         {"PC", 0x680},
         {"FREMDGERAET", 0x700},
         {"DCF_MODUL", 0x780},
+        // WPL17 (CAN-B, X1.2, 50 kbps) model-specific members. The WPL17 has two
+        // buses (CAN-A 20 kbps / CAN-B 50 kbps); these addresses live on CAN-B.
+        {"HEIZMODUL_WPL", 0x514},  // WPL17 Heizmodul (fine daily energy counters)
+        {"KESSEL_CANB", 0x201},    // WPL17 DHW / room / heating-curve registers
+        {"MISCHERMODUL_2", 0x601}, // WPL17 exposes the heating program here
         {"OTHER", 0x000}};
 
 typedef enum
@@ -87,6 +92,9 @@ typedef enum
     cm_pc,
     cm_fremdgeraet,
     cm_dcf_modul,
+    cm_heizmodul_wpl,
+    cm_kessel_canb,
+    cm_mischermodul_2,
     cm_other
 } CanMemberType;
 
@@ -147,6 +155,28 @@ static const CalculatedSensorConfig calculatedSensors[] = {
      "sensor", "", "", "total_increasing", "mdi:network-off", "", "", "diagnostic", false},
     {"stiebel_calculated_can_state",      LNAME_CALC_CAN_STATE,      "heatingpump/calculated/can_state/state",
      "sensor", "", "", "", "mdi:can", "", "", "diagnostic", false},
+
+    // Kombinierte Energie-Gesamtwerte (MWh*1000 + kWh), zusaetzlich zu den Einzelwerten
+    {"stiebel_calculated_energie_heiz_total_kwh", LNAME_CALC_ENERGIE_HEIZ_TOTAL_KWH, "heatingpump/calculated/energie_heiz_total_kwh/state",
+     "sensor", "energy", "kWh", "total_increasing", "mdi:flash", "", "", "", true},
+    {"stiebel_calculated_energie_ww_total_kwh", LNAME_CALC_ENERGIE_WW_TOTAL_KWH, "heatingpump/calculated/energie_ww_total_kwh/state",
+     "sensor", "energy", "kWh", "total_increasing", "mdi:flash", "", "", "", true},
+    {"stiebel_calculated_waerme_heiz_total_kwh", LNAME_CALC_WAERME_HEIZ_TOTAL_KWH, "heatingpump/calculated/waerme_heiz_total_kwh/state",
+     "sensor", "energy", "kWh", "total_increasing", "mdi:fire", "", "", "", true},
+    {"stiebel_calculated_waerme_ww_total_kwh", LNAME_CALC_WAERME_WW_TOTAL_KWH, "heatingpump/calculated/waerme_ww_total_kwh/state",
+     "sensor", "energy", "kWh", "total_increasing", "mdi:fire", "", "", "", true},
+
+    // Aktuelle elektrische Leistung (W) — aus den feinen Tageszaehlern (EL_*_TAG_WH)
+    // abgeleitet (Differenz der Wh-Zaehler pro Zeitintervall). Kein Stromzaehler noetig;
+    // die WP zaehlt ihren Stromverbrauch selbst.
+    {"stiebel_calculated_el_leistung_w", LNAME_CALC_EL_LEISTUNG_W, "heatingpump/calculated/el_leistung_w/state",
+     "sensor", "power", "W", "measurement", "mdi:lightning-bolt", "", "", "", true},
+
+    // Abgeleiteter Betriebsstatus: "Aus" | "Heizen" | "Warmwasser" | "Kuehlen".
+    // Ersetzt das (auf der WPL17 unbrauchbare) WP_STATUS-Bitfeld, siehe Ableitung in
+    // publishCombinedEnergySensors().
+    {"stiebel_calculated_betriebsstatus", LNAME_CALC_BETRIEBSSTATUS, "heatingpump/calculated/betriebsstatus/state",
+     "sensor", "", "", "", "mdi:heat-pump", "", "", "", true},
 };
 
 static const size_t CALCULATED_SENSOR_COUNT = sizeof(calculatedSensors) / sizeof(CalculatedSensorConfig);
@@ -168,13 +198,26 @@ struct WritableNumberConfig {
 };
 
 static const WritableNumberConfig writableNumbers[] = {
-    // Primary storage target temperature
+    // ============================================================
+    // SCHREIBBARE WERTE (MQTT Number Entities)
+    // ============================================================
+    // Hinweis fuer User: Moechtest du ein Feld nicht schreibbar haben
+    // (z.B. weil es auf dem Dashboard nicht erscheinen soll oder am
+    // Geraet nicht vorhanden ist), kommentiere die Zeile aus (// davor).
+    //
+    // ACHTUNG: Diese Werte werden DIREKT auf die WPL17 geschrieben.
+    // Nur aktivieren, was das Geraet wirklich kann. Die "heiklen"
+    // Felder (die du nicht im Dashboard zeigen willst) kannst du
+    // einfach hier lassen und im Dashboard ausblenden.
+    // ============================================================
+
+    // Primary storage target temperature (WW-Solltemperatur)
     {"EINSTELL_SPEICHERSOLLTEMP", LNAME_NUM_SPEICHERSOLLTEMP,
-     cm_manager, 20.0, 60.0, 1.0, "°C", "mdi:thermometer-high", "temperature"},
+     cm_kessel_canb, 20.0, 60.0, 1.0, "°C", "mdi:thermometer-high", "temperature"},
 
     // Secondary storage target temperature (comfort/eco modes)
     {"EINSTELL_SPEICHERSOLLTEMP2", LNAME_NUM_SPEICHERSOLLTEMP2,
-     cm_manager, 20.0, 60.0, 1.0, "°C", "mdi:thermometer-low", "temperature"},
+     cm_kessel_canb, 20.0, 60.0, 1.0, "°C", "mdi:thermometer-low", "temperature"},
 
     // SG Ready boost temperatures (not real CAN signals, handled internally)
     {"SG_READY_BOOST_STATE3", LNAME_NUM_SG_READY_BOOST3,
@@ -183,7 +226,9 @@ static const WritableNumberConfig writableNumbers[] = {
     {"SG_READY_BOOST_STATE4", LNAME_NUM_SG_READY_BOOST4,
      cm_manager, 0.0, 15.0, 0.5, "°C", "mdi:thermometer-chevron-up", "temperature"},
 
-    // Room temperature setpoints for heating circuits 1–3 and night/reduced mode
+    // Room temperature setpoints for heating circuits 1–3 and night/reduced mode.
+    // ACHTUNG: WPL17 hat nur 1 Heizkreis -> RAUMSOLLTEMP_II/_III liefern -255.
+    // Sie sind fuer wpl17 automatisch uebersprungen (siehe publishAllWritableNumberDiscoveries).
     {"RAUMSOLLTEMP_I", LNAME_NUM_RAUMSOLLTEMP_I,
      cm_manager, 10.0, 30.0, 0.5, "°C", "mdi:home-thermometer", "temperature"},
 
@@ -194,7 +239,12 @@ static const WritableNumberConfig writableNumbers[] = {
      cm_manager, 10.0, 30.0, 0.5, "°C", "mdi:home-thermometer", "temperature"},
 
     {"RAUMSOLLTEMP_NACHT", LNAME_NUM_RAUMSOLLTEMP_NACHT,
-     cm_manager, 10.0, 30.0, 0.5, "°C", "mdi:home-thermometer-outline", "temperature"}
+     cm_manager, 10.0, 30.0, 0.5, "°C", "mdi:home-thermometer-outline", "temperature"},
+
+    // Heizkurve (Steigung), et_cent_val -> 0.40 wird als roh 40 geschrieben.
+    // Liegt auf KESSEL_CANB (0x201) — dort ist der schreibbare Wert.
+    {"HEIZKURVE", LNAME_NUM_HEIZKURVE,
+     cm_kessel_canb, 0.0, 2.0, 0.05, "", "mdi:chart-line", ""}
 };
 
 static const size_t WRITABLE_NUMBER_COUNT = sizeof(writableNumbers) / sizeof(WritableNumberConfig);
@@ -231,9 +281,17 @@ static const char* sgReadyOptions[] = {
 };
 
 static const WritableSelectConfig writableSelects[] = {
-    // Heat pump operating mode
+    // ============================================================
+    // SCHREIBBARE AUSWAHLFELDER (MQTT Select Entities)
+    // ============================================================
+    // Auskommentieren = Feld erscheint nicht als schreibbares Element.
+    // ============================================================
+
+    // Heat pump operating mode (Automatik/Tagbetrieb/Absenkbetrieb/etc.)
     {"PROGRAMMSCHALTER", LNAME_SEL_PROGRAMMSCHALTER,
      cm_manager, programmschalterOptions, 6, "mdi:dip-switch"},
+
+    // SG Ready state (Smart Grid Ready)
     {"SG_READY_STATE", LNAME_SEL_SG_READY,
      cm_manager, sgReadyOptions, 4, "mdi:solar-power"}
 };
@@ -312,6 +370,11 @@ extern const size_t SIGNAL_REQUEST_COUNT_VALUE;
 // Runtime state for signal request manager
 static bool requestManagerStarted = false;
 static unsigned long requestManagerStartTime = 0;
+
+// PASSIVE LISTEN MODE: wenn true, sendet processSignalRequests() NICHTS.
+// Wird von der YAML-Konfiguration (heatingpump_scan.yaml) per on_boot gesetzt,
+// damit die Scan-Firmware rein passiv auf dem Bus lauscht.
+static bool disableCanRequests = false;
 
 // ============================================================================
 // CAN BUS HELPER FUNCTIONS
@@ -445,6 +508,55 @@ const ElsterIndex *processCanMessage(const std::vector<uint8_t> &msg, uint32_t c
 
     uint16_t rawIdx = (msg[2] == 0xfa) ? (uint16_t)(msg[4] + (msg[3] << 8)) : (uint16_t)msg[2];
     ESP_LOGI("processCanMessage()", "%s (0x%02x):\t%s:\t%s\t(idx=0x%04x, %s)", cm.Name, (unsigned)can_id, ei->Name, charValue, (unsigned)rawIdx, ElsterTypeStr[ei->Type]);
+
+    signalValue = charValue;
+    return ei;
+}
+
+// Passiver Dekodierer: identisch zu processCanMessage, aber OHNE INFO-Log.
+// Gibt den ElsterIndex + formatierten Wert zurueck, damit der LISTEN-Sniffer
+// gezielt nur Temperatur-Signale (et_dec_val/et_cent_val) loggen kann.
+// Hinweis: 0x8000 (kein Sensor) wird als Wert -255 formatiert (SetValueType).
+const ElsterIndex *processCanMessageDebug(const std::vector<uint8_t> &msg, uint32_t can_id, std::string &signalValue, const CanMember **outCanMember)
+{
+    if (msg.size() < 7)
+    {
+        return &ElsterTable[0];
+    }
+
+    const CanMember &cm = lookupCanMember(can_id);
+    *outCanMember = &cm;
+
+    const ElsterIndex *ei;
+    uint8_t byte1;
+    uint8_t byte2;
+    char charValue[16];
+
+    if (msg[2] == 0xfa)
+    {
+        byte1 = msg[5];
+        byte2 = msg[6];
+        ei = GetElsterIndex(msg[4] + (msg[3] << 8));
+    }
+    else
+    {
+        byte1 = msg[3];
+        byte2 = msg[4];
+        ei = GetElsterIndex(msg[2]);
+    }
+
+    switch (ei->Type)
+    {
+    case et_double_val:
+        SetDoubleType(charValue, ei->Type, static_cast<double>(byte2 + (byte1 << 8)));
+        break;
+    case et_triple_val:
+        SetDoubleType(charValue, ei->Type, static_cast<double>(byte2 + (byte1 << 8)));
+        break;
+    default:
+        SetValueType(charValue, ei->Type, static_cast<int>(byte2 + (byte1 << 8)));
+        break;
+    }
 
     signalValue = charValue;
     return ei;
@@ -627,14 +739,35 @@ void publishAllCalculatedSensorDiscoveries(bool forceRepublish = false) {
 // MQTT WRITABLE NUMBER (for temperature setpoints, etc.)
 // ============================================================================
 
+// Liefert den effektiven CAN-Member fuer einen writable number Eintrag.
+// Auf WPL17 (CAN-B) liegen EINSTELL_SPEICHERSOLLTEMP / _2 und HEIZKURVE auf dem
+// Kessel (0x201) statt auf dem Manager (0x480). Andere Modelle (CAN-A) behalten
+// den konfigurierten Member. Damit erscheint das HA-Eingabefeld am richtigen
+// Geraet und der Command-/State-Topic passt zum Owner des Registers.
+static const CanMember* getWritableNumberMember(const WritableNumberConfig& config) {
+    if (strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0) {
+        if (strcmp(config.signalName, "EINSTELL_SPEICHERSOLLTEMP") == 0 ||
+            strcmp(config.signalName, "EINSTELL_SPEICHERSOLLTEMP2") == 0 ||
+            strcmp(config.signalName, "HEIZKURVE") == 0) {
+            return &CanMembers[cm_kessel_canb];
+        }
+    }
+    return &CanMembers[config.member];
+}
+
 // Publish MQTT discovery for a writable number entity
 void publishWritableNumberDiscovery(const WritableNumberConfig& config, bool forceRepublish = false) {
-    // Get CanMember for building topics
-    const CanMember* cm = &CanMembers[config.member];
+    // Get CanMember for building topics (modellabhaengig fuer WPL17)
+    const CanMember* cm = getWritableNumberMember(config);
     
-    // Build unique ID
+    // Build unique ID. HEIZKURVE gets a "_set" suffix so it never collides with the
+    // read-only HEIZKURVE signal sensor of the same name (sensor.kessel_canb_heizkurve).
     char uniqueId[128];
-    snprintf(uniqueId, sizeof(uniqueId), "stiebel_%s_%s", cm->Name, config.signalName);
+    if (strcmp(config.signalName, "HEIZKURVE") == 0) {
+        snprintf(uniqueId, sizeof(uniqueId), "stiebel_%s_%s_set", cm->Name, config.signalName);
+    } else {
+        snprintf(uniqueId, sizeof(uniqueId), "stiebel_%s_%s", cm->Name, config.signalName);
+    }
     std::string uid(uniqueId);
     std::transform(uid.begin(), uid.end(), uid.begin(), ::tolower);
     
@@ -668,10 +801,16 @@ void publishWritableNumberDiscovery(const WritableNumberConfig& config, bool for
             << "\"min\":" << config.min << ","
             << "\"max\":" << config.max << ","
             << "\"step\":" << config.step << ","
-            << "\"mode\":\"box\","
-            << "\"unit_of_measurement\":\"" << config.unit << "\","
-            << "\"device_class\":\"" << config.deviceClass << "\","
-            << "\"icon\":\"" << config.icon << "\",";
+            << "\"mode\":\"box\",";
+    // Nur nicht-leere optionale Felder senden: HA verwirft sonst die ganze
+    // Discovery (z. B. 'device_class':'' ist fuer 'number' ungueltig).
+    if (config.unit[0] != '\0') {
+        payload << "\"unit_of_measurement\":\"" << config.unit << "\",";
+    }
+    if (config.deviceClass[0] != '\0') {
+        payload << "\"device_class\":\"" << config.deviceClass << "\",";
+    }
+    payload << "\"icon\":\"" << config.icon << "\",";
     
     // Check if this is an SG Ready control - assign to main device
     bool isSgReady = (strncmp(config.signalName, "SG_READY_", 9) == 0);
@@ -713,7 +852,16 @@ void publishAllWritableNumberDiscoveries(bool forceRepublish = false) {
     
     ESP_LOGI("MQTT_DISC", "Publishing %d writable number discoveries", WRITABLE_NUMBER_COUNT);
     for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; i++) {
-        ESP_LOGI("MQTT_DISC", "Publishing writable number %d: %s", i, writableNumbers[i].signalName);
+        // WPL17 has only ONE heating circuit (RAUMSOLLTEMP_I). Skip II/III so the
+        // number entities are not created on single-circuit models (-255 only).
+        const char* sig = writableNumbers[i].signalName;
+        if (strcmp(sig, "RAUMSOLLTEMP_II") == 0 || strcmp(sig, "RAUMSOLLTEMP_III") == 0) {
+            if (strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0) {
+                ESP_LOGI("MQTT_DISC", "Skipping %s on %s (single heating circuit)", sig, HA_DEVICE_MODEL_STR);
+                continue;
+            }
+        }
+        ESP_LOGI("MQTT_DISC", "Publishing writable number %d: %s", i, sig);
         publishWritableNumberDiscovery(writableNumbers[i], forceRepublish);
     }
     ESP_LOGI("MQTT_DISC", "Completed publishing writable number discoveries");
@@ -1299,6 +1447,9 @@ void storeCOPEnergyValue(const char* signalName, const std::string &value) {
     ESP_LOGD("COP", "Stored %s = %.3f", signalName, fval);
 }
 
+// Vorwaertsdeklaration: publiziert kombinierte Energie-Gesamtwerte (MWh*1000 + kWh)
+void publishCombinedEnergySensors();
+
 // Calculate and publish COP values if all required data is available
 void updateCOPCalculations() {
     publishCOPDiscovery();
@@ -1359,6 +1510,201 @@ void updateCOPCalculations() {
             id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
             ESP_LOGI("COP", "COP Gesamt: %.2f (Wärme: %.3f MWh, El: %.3f MWh)", cop_gesamt, waerme_total, el_total);
         }
+    }
+
+    // === KOMBINIERTE ENERGIE-GESAMTWERTE (MWh*1000 + kWh) ===
+    // Zusaetzliche Sensoren; die Einzelwerte (MWh/kWh) bleiben fuer Kompatibilitaet.
+    publishCombinedEnergySensors();
+}
+
+// ============================================================================
+// DEGLITCH FUER KOMBINIERTE ENERGIE-GESAMTWERTE
+// ============================================================================
+// Die Gesamtwerte werden als MWh*1000 + kWh berechnet. Die Einzelregister liegen
+// in einem nur nach Signalnamen geschluesselten Cache, daher koennen MWh und kWh
+// kurzzeitig von unterschiedlichen CAN-Membern stammen (oder einen ungueltigen
+// Marker wie 0x8000 -> 32768000 tragen). Das erzeugt transiente Spitzen von ca.
+// +/-1000 kWh (nachts, wenn das Register aktualisiert/umlaeuft) sowie kleinere.
+// Echte Energiezaehler wachsen nur, deshalb:
+//   - kleine, nicht sinkende Schritte werden sofort akzeptiert,
+//   - jede Verkleinerung oder ein Sprung > MAX_SMALL_STEP gilt als verdaechtig;
+//     der letzte gute Wert wird weiter gesendet, bis der neue Wert CONFIRM_MS
+//     lang stabil bleibt (ein Glitch verschwindet lange vorher).
+static bool sanitizeEnergyTotal(const char* key, float raw, float& out) {
+    static std::unordered_map<std::string, float> stableValue;    // zuletzt akzeptierter Wert
+    static std::unordered_map<std::string, float> pendingValue;   // verdaechtiger Kandidat
+    static std::unordered_map<std::string, unsigned long> pendingSince;
+
+    const float TOL_EPS = 0.5f;                 // Toleranz "gleicher Wert"
+    const float MAX_SMALL_STEP = 20.0f;         // normales Wachstum (kWh), sofort ok
+    const float TOL = 25.0f;                    // Naehe eines Kandidaten zu seiner Region
+    const unsigned long CONFIRM_MS = 900000UL;  // 15 min stabile Bestaetigung
+
+    // Klar ungueltige Marker (0x8000 -> 32768000, -255, ...) verwerfen
+    if (raw <= -1000.0f || raw >= 1000000.0f) {
+        auto s = stableValue.find(key);
+        if (s != stableValue.end()) { out = s->second; return false; }
+        return false;
+    }
+
+    auto it = stableValue.find(key);
+    if (it == stableValue.end()) {              // ersten Wert uebernehmen
+        stableValue[key] = raw;
+        out = raw;
+        return true;
+    }
+    const float last = it->second;
+
+    // Normales, nicht sinkendes Wachstum -> sofort akzeptieren
+    if (raw >= last - TOL_EPS && raw <= last + MAX_SMALL_STEP) {
+        stableValue[key] = raw;
+        pendingValue.erase(key);
+        pendingSince.erase(key);
+        out = raw;
+        return true;
+    }
+
+    // Verdaechtig: Verkleinerung oder grosser Sprung -> erst nach Stablezeit uebernehmen
+    auto p = pendingValue.find(key);
+    float diff = (p != pendingValue.end()) ? (p->second - raw) : 0.0f;
+    if (diff < 0.0f) diff = -diff;
+    if (p == pendingValue.end() || diff > TOL) {
+        pendingValue[key] = raw;
+        pendingSince[key] = millis();
+    } else if ((millis() - pendingSince[key]) >= CONFIRM_MS) {
+        stableValue[key] = raw;
+        pendingValue.erase(key);
+        pendingSince.erase(key);
+        out = raw;
+        return true;
+    }
+
+    out = last;   // letzten guten Wert weiter senden
+    return false;
+}
+
+// Publiziert kombinierte Gesamt-kWh-Werte aus den einzelnen MWh- und kWh-Registern.
+// Formel: Gesamt_kWh = MWh_Reg * 1000 + kWh_Reg
+// Die Einzelregister (MWh, kWh) werden weiterhin separat veroeffentlicht.
+void publishCombinedEnergySensors() {
+    // Energie (Stromaufnahme) Heizung Gesamt
+    if (copEnergyValues.find("EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH") != copEnergyValues.end() &&
+        copEnergyValues.find("EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH") != copEnergyValues.end()) {
+        float rawTotal = copEnergyValues["EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH"] * 1000.0f + copEnergyValues["EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH"];
+        float total;
+        sanitizeEnergyTotal("combined_energie_heiz", rawTotal, total);
+        char valueStr[32];
+        snprintf(valueStr, sizeof(valueStr), "%.3f", total);
+        publishCalculatedSensorDiscovery(calculatedSensors[10], false);
+        id(mqtt_client).publish("heatingpump/calculated/energie_heiz_total_kwh/state", valueStr, strlen(valueStr), 0, true);
+        ESP_LOGI("ENERGIE", "Energie Heizung Gesamt: %.3f kWh", total);
+    }
+    // Energie (Stromaufnahme) Warmwasser Gesamt
+    if (copEnergyValues.find("EL_AUFNAHMELEISTUNG_WW_SUM_MWH") != copEnergyValues.end() &&
+        copEnergyValues.find("EL_AUFNAHMELEISTUNG_WW_SUM_KWH") != copEnergyValues.end()) {
+        float rawTotal = copEnergyValues["EL_AUFNAHMELEISTUNG_WW_SUM_MWH"] * 1000.0f + copEnergyValues["EL_AUFNAHMELEISTUNG_WW_SUM_KWH"];
+        float total;
+        sanitizeEnergyTotal("combined_energie_ww", rawTotal, total);
+        char valueStr[32];
+        snprintf(valueStr, sizeof(valueStr), "%.3f", total);
+        publishCalculatedSensorDiscovery(calculatedSensors[11], false);
+        id(mqtt_client).publish("heatingpump/calculated/energie_ww_total_kwh/state", valueStr, strlen(valueStr), 0, true);
+        ESP_LOGI("ENERGIE", "Energie Warmwasser Gesamt: %.3f kWh", total);
+    }
+    // Waerme Ertrag Heizung Gesamt
+    if (copEnergyValues.find("WAERMEERTRAG_HEIZ_SUM_MWH") != copEnergyValues.end() &&
+        copEnergyValues.find("WAERMEERTRAG_HEIZ_SUM_KWH") != copEnergyValues.end()) {
+        float rawTotal = copEnergyValues["WAERMEERTRAG_HEIZ_SUM_MWH"] * 1000.0f + copEnergyValues["WAERMEERTRAG_HEIZ_SUM_KWH"];
+        float total;
+        sanitizeEnergyTotal("combined_waerme_heiz", rawTotal, total);
+        char valueStr[32];
+        snprintf(valueStr, sizeof(valueStr), "%.3f", total);
+        publishCalculatedSensorDiscovery(calculatedSensors[12], false);
+        id(mqtt_client).publish("heatingpump/calculated/waerme_heiz_total_kwh/state", valueStr, strlen(valueStr), 0, true);
+        ESP_LOGI("ENERGIE", "Waerme Heizung Gesamt: %.3f kWh", total);
+    }
+    // Waerme Ertrag Warmwasser Gesamt
+    if (copEnergyValues.find("WAERMEERTRAG_WW_SUM_MWH") != copEnergyValues.end() &&
+        copEnergyValues.find("WAERMEERTRAG_WW_SUM_KWH") != copEnergyValues.end()) {
+        float rawTotal = copEnergyValues["WAERMEERTRAG_WW_SUM_MWH"] * 1000.0f + copEnergyValues["WAERMEERTRAG_WW_SUM_KWH"];
+        float total;
+        sanitizeEnergyTotal("combined_waerme_ww", rawTotal, total);
+        char valueStr[32];
+        snprintf(valueStr, sizeof(valueStr), "%.3f", total);
+        publishCalculatedSensorDiscovery(calculatedSensors[13], false);
+        id(mqtt_client).publish("heatingpump/calculated/waerme_ww_total_kwh/state", valueStr, strlen(valueStr), 0, true);
+        ESP_LOGI("ENERGIE", "Waerme Warmwasser Gesamt: %.3f kWh", total);
+    }
+
+    // === AKTUELLE ELEKTRISCHE LEISTUNG (W) + ABGELEITETER BETRIEBSSTATUS ===
+    // Beides aus den feinen Tageszaehlern EL_*_TAG_WH (1 Wh Aufloesung):
+    //  - Leistung = (Wh_neu - Wh_alt) / (t_neu - t_alt) * 3600 -> W
+    //  - Betriebsstatus: welcher der beiden getrennten Verbrauchszaehler steigt,
+    //    verraet den Betrieb (so trennt die WP selbst Heizen und Warmwasser).
+    //    Das WP_STATUS-Bitfeld des Geraets ist auf der WPL17 unbrauchbar (immer 0).
+    if (copEnergyValues.find("EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH") != copEnergyValues.end() &&
+        copEnergyValues.find("EL_AUFNAHMELEISTUNG_WW_TAG_WH") != copEnergyValues.end()) {
+
+        static bool lastElPowerInit = false;
+        static float lastElPowerWh = 0.0f;
+        static float lastHeizTagWh = 0.0f;
+        static float lastWwTagWh = 0.0f;
+        static uint32_t lastElPowerMs = 0;
+        static const char* opState = "Aus";
+        static uint32_t opStateMs = 0;
+
+        float heizTagWh = copEnergyValues["EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH"];
+        float wwTagWh   = copEnergyValues["EL_AUFNAHMELEISTUNG_WW_TAG_WH"];
+        float wh = heizTagWh + wwTagWh;
+        uint32_t nowMs = millis();
+
+        if (lastElPowerInit) {
+            float dtSec = (nowMs - lastElPowerMs) / 1000.0f;
+            float dWh = wh - lastElPowerWh;
+            if (dtSec >= 20.0f && dtSec < 600.0f && dWh >= 0.0f) {
+                float leistungW = dWh / dtSec * 3600.0f;
+                char valueStr[32];
+                snprintf(valueStr, sizeof(valueStr), "%.0f", leistungW);
+                publishCalculatedSensorDiscovery(calculatedSensors[14], false);
+                id(mqtt_client).publish("heatingpump/calculated/el_leistung_w/state", valueStr, strlen(valueStr), 0, true);
+                ESP_LOGI("ENERGIE", "Aktuelle elektrische Leistung: %.0f W (dWh=%.3f in %.0fs)", leistungW, dWh, dtSec);
+            }
+
+            // Betriebsstatus (min. 30 s Verweildauer, um Flackern zu vermeiden)
+            if (dtSec >= 20.0f && dtSec < 900.0f) {
+                float dHeiz = heizTagWh - lastHeizTagWh; if (dHeiz < 0.0f) dHeiz = 0.0f; // Tageszaehler-Reset
+                float dWw   = wwTagWh   - lastWwTagWh;   if (dWw   < 0.0f) dWw   = 0.0f;
+                float pHeiz = dHeiz / dtSec * 3600.0f;
+                float pWw   = dWw   / dtSec * 3600.0f;
+                float pTot  = pHeiz + pWw;
+
+                const char* ns;
+                if (pTot < 50.0f) {
+                    ns = "Aus";
+                } else if (copEnergyValues.find("KUEHLZUSTAND") != copEnergyValues.end() &&
+                           copEnergyValues["KUEHLZUSTAND"] > 0.5f) {
+                    ns = "Kuehlen";
+                } else if (pWw > pHeiz) {
+                    ns = "Warmwasser";
+                } else {
+                    ns = "Heizen";
+                }
+
+                if (strcmp(ns, opState) != 0 && (opStateMs == 0 || (nowMs - opStateMs) >= 30000UL)) {
+                    opState = ns;
+                    opStateMs = nowMs;
+                    ESP_LOGI("STATUS", "Betriebsstatus: %s (PHeiz=%.0f W, PWw=%.0f W)", opState, pHeiz, pWw);
+                }
+                publishCalculatedSensorDiscovery(calculatedSensors[15], false);
+                id(mqtt_client).publish("heatingpump/calculated/betriebsstatus/state", opState, strlen(opState), 0, true);
+            }
+        }
+
+        lastElPowerWh = wh;
+        lastHeizTagWh = heizTagWh;
+        lastWwTagWh = wwTagWh;
+        lastElPowerMs = nowMs;
+        lastElPowerInit = true;
     }
 }
 
@@ -1480,6 +1826,12 @@ constexpr uint32_t HASH_WAERMEERTRAG_2WE_WW = hash("WAERMEERTRAG_2WE_WW_SUM_MWH"
 constexpr uint32_t HASH_WAERMEERTRAG_2WE_HEIZ = hash("WAERMEERTRAG_2WE_HEIZ_SUM_MWH");
 constexpr uint32_t HASH_WAERMEERTRAG_WW = hash("WAERMEERTRAG_WW_SUM_MWH");
 constexpr uint32_t HASH_WAERMEERTRAG_HEIZ = hash("WAERMEERTRAG_HEIZ_SUM_MWH");
+constexpr uint32_t HASH_EL_AUFNAHMELEISTUNG_HEIZ_KWH = hash("EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH");
+constexpr uint32_t HASH_EL_AUFNAHMELEISTUNG_WW_KWH = hash("EL_AUFNAHMELEISTUNG_WW_SUM_KWH");
+constexpr uint32_t HASH_WAERMEERTRAG_HEIZ_KWH = hash("WAERMEERTRAG_HEIZ_SUM_KWH");
+constexpr uint32_t HASH_WAERMEERTRAG_WW_KWH = hash("WAERMEERTRAG_WW_SUM_KWH");
+constexpr uint32_t HASH_EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH = hash("EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH");
+constexpr uint32_t HASH_EL_AUFNAHMELEISTUNG_WW_TAG_WH = hash("EL_AUFNAHMELEISTUNG_WW_TAG_WH");
 
 
 
@@ -1628,6 +1980,12 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
         case HASH_WAERMEERTRAG_2WE_HEIZ:
         case HASH_WAERMEERTRAG_WW:
         case HASH_WAERMEERTRAG_HEIZ:
+        case HASH_EL_AUFNAHMELEISTUNG_HEIZ_KWH:
+        case HASH_EL_AUFNAHMELEISTUNG_WW_KWH:
+        case HASH_WAERMEERTRAG_HEIZ_KWH:
+        case HASH_WAERMEERTRAG_WW_KWH:
+        case HASH_EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH:
+        case HASH_EL_AUFNAHMELEISTUNG_WW_TAG_WH:
             storeCOPEnergyValue(signalName, value);
             updateCOPCalculations();
             break;
@@ -1769,6 +2127,11 @@ void processCalculatedSensors() {
 // Process signal request table with frequency-based scheduling
 void processSignalRequests() {
     unsigned long now = millis();
+    
+    // PASSIVE LISTEN MODE: keine Requests senden
+    if (disableCanRequests) {
+        return;
+    }
     
     // Startup delay: wait before starting signal requests
     if (!requestManagerStarted) {

@@ -1,0 +1,19 @@
+#
+#  WPL17 Heat Pump — Model Package
+#
+#  Selects the WPL17 signal request table (SIGNAL_REQUESTS_BASE + WPL17-specific
+#  signals). All universal sensors live in common.yaml.
+#
+#  IMPORTANT: WPL17 needs can_bit_rate: 50kbps in heatingpump.yaml substitutions
+#  (the project default is 20kbps). See signal_requests_wpl17.h header comment.
+#
+#  UNVERIFIED ON REAL HARDWARE — see signal_requests_wpl17.h header comment.
+#  Please test against a real unit before relying on it.
+#
+#  To add a new model, create signal_requests_yourmodel.h and a thin yourmodel.yaml
+#  following this pattern. See CONTRIBUTING.md for full instructions.
+#
+
+esphome:
+  includes:
+    - ha-stiebel-control/signal_requests_wpl17.h
