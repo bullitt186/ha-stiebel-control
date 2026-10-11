@@ -1076,3 +1076,55 @@ TEST_CASE("i18n: named ElsterTable signals have non-empty friendlyName via LNAME
             CHECK(std::string(ei->friendlyName).length() > 0);
     }
 }
+
+// ============================================================================
+// dates/time validators (updateDateTime / updateTime / updateDate guards)
+// ============================================================================
+
+TEST_CASE("isValidTimeString", "[datetime]") {
+    CHECK(isValidTimeString("17:30:00"));
+    CHECK(isValidTimeString("00:00:00"));
+    CHECK(isValidTimeString("23:59:59"));
+
+    CHECK_FALSE(isValidTimeString(nullptr));
+    CHECK_FALSE(isValidTimeString(""));                 // empty
+    CHECK_FALSE(isValidTimeString("17:30"));            // too short
+    CHECK_FALSE(isValidTimeString("17:30:000"));        // too long
+    CHECK_FALSE(isValidTimeString("7:30:00"));          // width
+    CHECK_FALSE(isValidTimeString("17 30 00"));         // wrong separators
+    CHECK_FALSE(isValidTimeString("17:3x:00"));         // non-digit
+    CHECK_FALSE(isValidTimeString("24:00:00"));         // hour overflow
+    CHECK_FALSE(isValidTimeString("17:60:00"));         // minute overflow
+    CHECK_FALSE(isValidTimeString("17:30:60"));         // second overflow
+}
+
+TEST_CASE("isValidDateString", "[datetime]") {
+    CHECK(isValidDateString("2026-10-11"));
+    CHECK(isValidDateString("2000-01-01"));
+
+    CHECK_FALSE(isValidDateString(nullptr));
+    CHECK_FALSE(isValidDateString(""));                 // empty
+    CHECK_FALSE(isValidDateString("2026-10-11 17:30")); // full timestamp — NOT a bare date
+    CHECK_FALSE(isValidDateString("26-10-11"));         // too short
+    CHECK_FALSE(isValidDateString("2026/10/11"));       // wrong separators
+    CHECK_FALSE(isValidDateString("2026-1x-11"));       // non-digit
+    CHECK_FALSE(isValidDateString("2026-10-1"));        // truncated day
+}
+
+// The exact regression: updateDateTime must split "YYYY-MM-DD HH:MM:SS" before
+// calling the length-checking validators (the full 19-char string fails both).
+TEST_CASE("updateDateTime full timestamp split: date and time parts validate separately", "[datetime]") {
+    const char* full = "2026-10-11 17:30:00";
+    REQUIRE(strlen(full) == 19);
+    REQUIRE(full[10] == ' ');
+
+    char dateBuf[11];
+    memcpy(dateBuf, full, 10);
+    dateBuf[10] = '\0';
+    CHECK(isValidDateString(dateBuf));
+    CHECK(isValidTimeString(full + 11));
+
+    // Passing the full 19-char string to the date validator must fail
+    // (this is what always rejected a valid timestamp before the fix).
+    CHECK_FALSE(isValidDateString(full));
+}

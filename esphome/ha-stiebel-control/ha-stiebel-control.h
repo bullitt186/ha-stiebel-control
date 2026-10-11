@@ -361,6 +361,36 @@ static unsigned long requestManagerStartTime = 0;
 // CAN BUS HELPER FUNCTIONS
 // ============================================================================
 
+// Pure format validators (no ESPHome dependencies — compiled in tests too).
+inline bool isDigitChar(char c) { return c >= '0' && c <= '9'; }
+
+// Strict format validation so updateTime/updateDate never do partial writes
+// (e.g. only "STUNDE" when the HA text sensor delivered a truncated payload).
+// Accepted: "HH:MM:SS" (8 chars) / "YYYY-MM-DD" (10 chars).
+inline bool isValidTimeString(const char* s)
+{
+    if (!s || strlen(s) != 8) return false;
+    if (s[2] != ':' || s[5] != ':') return false;
+    for (int i = 0; i < 8; i++) {
+        if (i == 2 || i == 5) continue;
+        if (!isDigitChar(s[i])) return false;
+    }
+    return (s[0]-'0')*10 + (s[1]-'0') < 24
+        && (s[3]-'0')*10 + (s[4]-'0') < 60
+        && (s[6]-'0')*10 + (s[7]-'0') < 60;
+}
+
+inline bool isValidDateString(const char* s)
+{
+    if (!s || strlen(s) != 10) return false;
+    if (s[4] != '-' || s[7] != '-') return false;
+    for (int i = 0; i < 10; i++) {
+        if (i == 4 || i == 7) continue;
+        if (!isDigitChar(s[i])) return false;
+    }
+    return true;
+}
+
 // Only compile function implementations when building with ESPHome framework
 // Skip when compiling ha-dummy.cpp or other standalone contexts
 #if !defined(HA_DUMMY_BUILD)
@@ -2023,39 +2053,6 @@ void processAndUpdate(uint32_t can_id, const std::vector<uint8_t> &msg)
     return;
 }
 
-inline bool isDigitChar(char c) { return c >= '0' && c <= '9'; }
-
-// Strict format validation so updateTime/updateDate never do partial writes
-// (e.g. only "STUNDE" when the HA text sensor delivered a truncated payload).
-// Accepted: "HH:MM:SS" (8 chars) / "YYYY-MM-DD" (10 chars).
-inline bool isValidTimeString(const char* s)
-{
-    if (!s || strlen(s) != 8) return false;
-    if (s[2] != ':' || s[5] != ':') return false;
-    for (int i = 0; i < 8; i++) {
-        if (i == 2 || i == 5) continue;
-        if (!isDigitChar(s[i])) return false;
-    }
-    return (s[0]-'0')*10 + (s[1]-'0') < 24
-        && (s[3]-'0')*10 + (s[4]-'0') < 60
-        && (s[6]-'0')*10 + (s[7]-'0') < 60;
-}
-
-inline bool isValidDateString(const char* s)
-{
-    if (!s || strlen(s) != 10) return false;
-    if (s[4] != '-' || s[7] != '-') return false;
-    for (int i = 0; i < 10; i++) {
-        if (i == 4 || i == 7) continue;
-        if (!isDigitChar(s[i])) return false;
-    }
-    return true;
-}
-
-// Full "YYYY-MM-DD HH:MM:SS" write (from heatingpump/DATETIME/set): validates
-// first, then writes date + time through the existing strict setters.
-inline void updateDateTime(const char *dts);
-
 void updateTime(CanMember cm, const char *str_time)
 {
     if (!isValidTimeString(str_time)) {
@@ -2136,7 +2133,7 @@ inline void updateDateTime(const char *dts)
     memcpy(buf, p, n);
     buf[n] = '\0';
 
-    if (n != 19 || buf[10] != ' ' || !isValidDateString(buf) || !isValidTimeString(buf + 11)) {
+    if (n != 19 || buf[10] != ' ') {
         // Diagnostic: hex dump first 32 bytes so invisible characters are visible
         char hex[65];
         const size_t hn = (n > 32) ? 32 : n;
@@ -2147,8 +2144,21 @@ inline void updateDateTime(const char *dts)
                  buf, n, hex);
         return;
     }
+
+    // Validate date (chars 0-9) and time (chars 11-18) separately — the helpers
+    // check exact lengths, so the full timestamp must be split first.
+    char dateBuf[11];
+    memcpy(dateBuf, buf, 10);
+    dateBuf[10] = '\0';
+    bool dateOk = isValidDateString(dateBuf);
+    bool timeOk = isValidTimeString(buf + 11);
+    if (!dateOk || !timeOk) {
+        ESP_LOGW("SET_DATETIME", "Invalid timestamp \"%s\" (dateOk=%d, timeOk=%d) — refusing",
+                 buf, (int)dateOk, (int)timeOk);
+        return;
+    }
     ESP_LOGI("SET_DATETIME", "Setting WPM date/time to \"%s\"", buf);
-    updateDate(CanMembers[cm_manager], buf);
+    updateDate(CanMembers[cm_manager], dateBuf);
     updateTime(CanMembers[cm_manager], buf + 11);
 }
 
