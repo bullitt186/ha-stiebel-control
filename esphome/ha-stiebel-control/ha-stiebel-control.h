@@ -1561,12 +1561,24 @@ constexpr uint32_t HASH_WAERMEERTRAG_2WE_HEIZ = hash("WAERMEERTRAG_2WE_HEIZ_SUM_
 constexpr uint32_t HASH_WAERMEERTRAG_WW = hash("WAERMEERTRAG_WW_SUM_MWH");
 constexpr uint32_t HASH_WAERMEERTRAG_HEIZ = hash("WAERMEERTRAG_HEIZ_SUM_MWH");
 
-
+// Sentinel values from the Elster decoder meaning "not available / unknown":
+//   0x8000 → "-255", unknown bool → "?", et_dev_nr "not present" → "--",
+//   et_default 0x8000 → "-32768".
+// These are skipped so Home Assistant does not accumulate ghost entities that
+// are permanently unavailable (and COP/calculated values never use them).
+inline bool isInvalidSignalValue(const std::string &value) {
+    return value == "-255" || value == "?" || value == "--" || value == "-32768";
+}
 
 void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string &value)
 {
     // Skip empty values
     if (value.empty()) {
+        return;
+    }
+
+    // Skip invalid sentinel values (see isInvalidSignalValue)
+    if (isInvalidSignalValue(value)) {
         return;
     }
     

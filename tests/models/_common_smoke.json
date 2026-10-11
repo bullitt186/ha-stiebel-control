@@ -12,7 +12,6 @@
     "heatingpump/MANAGER/EVU_SPERRE_AKTIV/state",
     "heatingpump/MANAGER/PROGRAMMSCHALTER/state",
     "heatingpump/MANAGER/SG_READY_STATE/state",
-    "heatingpump/MANAGER/WW_ECO/state",
     "heatingpump/HEIZMODUL/VERDICHTER/state",
     "heatingpump/HEIZMODUL/EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH/state",
     "heatingpump/HEIZMODUL/EL_AUFNAHMELEISTUNG_WW_SUM_MWH/state",
