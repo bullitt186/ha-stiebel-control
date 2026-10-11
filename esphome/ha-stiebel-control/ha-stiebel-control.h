@@ -1865,7 +1865,25 @@ void processCalculatedSensors() {
 // Process signal request table with frequency-based scheduling
 void processSignalRequests() {
     unsigned long now = millis();
-    
+
+    // Pre-allocate runtime containers once (avoids rehashing during operation);
+    // then log their sizes every 10 min so unbounded growth is visible.
+    static bool containersReserved = false;
+    if (!containersReserved) {
+        containersReserved = true;
+        uidCache.reserve(128);
+        nextRequestTime.reserve(128);
+        copEnergyValues.reserve(16);
+        ESP_LOGI("CONTAINERS", "Runtime containers reserved");
+    }
+    static uint32_t lastContainerLog = 0;
+    if (now - lastContainerLog > 600000U) {
+        lastContainerLog = now;
+        ESP_LOGI("CONTAINERS", "uidCache=%zu discoveredSignals=%zu nextRequestTime=%zu copEnergy=%zu",
+                 (size_t)uidCache.size(), (size_t)discoveredSignals.size(),
+                 (size_t)nextRequestTime.size(), (size_t)copEnergyValues.size());
+    }
+
     // Startup delay: wait before starting signal requests
     if (!requestManagerStarted) {
         if (requestManagerStartTime == 0) {
