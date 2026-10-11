@@ -359,20 +359,6 @@ text_sensor:
   - platform: debug
     reset_reason:
       name: "Reset Reason"
-  #########################################
-  #                                       #
-  #   HOME ASSISTANT TEXT SENSOREN        #
-  #                                       #
-  #########################################
-  - platform: homeassistant
-    name: "Wärmepumpe Datum Setpoint"
-    id: warmepumpe_datum
-    entity_id: input_datetime.heatingpump_date
-
-  - platform: homeassistant
-    name: "Wärmepumpe Uhrzeit Setpoint"
-    id: warmepumpe_uhrzeit
-    entity_id: input_datetime.heatingpump_time
 
   #########################################
   #                                       #
@@ -413,27 +399,36 @@ text_sensor:
 
 #########################################
 #                                       #
+#   TIME (Systemzeit für WPM-Sync)      #
+#                                       #
+#########################################
+time:
+  - platform: homeassistant
+    id: wpm_time
+    timezone: Europe/Berlin
+
+#########################################
+#                                       #
 #   BUTTON                              #
 #                                       #
 #########################################
 button:
   - platform: template
-    name: "Update Uhrzeit"
+    name: "WPM Datum & Uhrzeit übernehmen"
     id: update_uhrzeit
     icon: "mdi:clock-check"
     on_press:
       then:
-        lambda: |-
-          updateTime(CanMembers[cm_manager], id(warmepumpe_uhrzeit).state.c_str());
-
-  - platform: template
-    name: "Update Datum"
-    id: update_datum
-    icon: "mdi:calendar-check"
-    on_press:
-      then:
-        lambda: |-
-          updateDate(CanMembers[cm_manager], id(warmepumpe_datum).state.c_str());
+        - lambda: |-
+            esphome::ESPTime t = id(wpm_time).now();
+            if (!t.is_valid() || t.year < 2000) {
+              ESP_LOGW("SET_DATETIME", "Systemzeit noch nicht synchronisiert (Jahr=%d) — Button ignorieren", (int)t.year);
+              return;
+            }
+            char dts[24];
+            snprintf(dts, sizeof(dts), "%04d-%02d-%02d %02d:%02d:%02d",
+                     (int)t.year, (int)t.month, (int)t.day_of_month, (int)t.hour, (int)t.minute, (int)t.second);
+            updateDateTime(dts);
 
   - platform: template
     name: "Republish MQTT Discoveries"
