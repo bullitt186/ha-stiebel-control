@@ -105,7 +105,7 @@ mqtt:
   # Keepalive for connection monitoring
   keepalive: 15s
   # Disable reboot on MQTT disconnect - will keep trying to reconnect indefinitely
-  reboot_timeout: 0s
+  reboot_timeout: 600s
   on_connect:
     - logger.log:
         level: INFO
@@ -337,10 +337,21 @@ interval:
 
 #########################################
 #                                       #
+#   DEBUG                               #
+#                                       #
+#########################################
+debug:
+  update_interval: 60s
+
+#########################################
+#                                       #
 #   TEXT SENSOREN                       #
 #                                       #
 #########################################
 text_sensor:
+  - platform: debug
+    reset_reason:
+      name: "Reset Reason"
   #########################################
   #                                       #
   #   HOME ASSISTANT TEXT SENSOREN        #
@@ -503,6 +514,19 @@ sensor:
       if (dBm < MIN_DBM) dBm = MIN_DBM;
       if (dBm > MAX_DBM) dBm = MAX_DBM;
       return ((dBm - MIN_DBM) / (MAX_DBM - MIN_DBM)) * 100;
+
+  # Uptime — resets to 0 on reboot; helps diagnose disconnects (reboot vs link loss)
+  - platform: uptime
+    name: "Uptime"
+    icon: "mdi:timer-outline"
+    update_interval: 60s
+    id: uptime_sensor
+
+  # Free heap — if this trends down over time, a memory leak is killing the API
+  - platform: debug
+    free:
+      name: "Free Heap"
+      icon: "mdi:memory"
 
   # -----------------------------------------------------------------------
   # COP energy accumulator sensors (universal — present on all Elster models)
