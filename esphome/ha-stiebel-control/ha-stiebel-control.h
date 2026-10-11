@@ -1535,6 +1535,10 @@ ESPPreferenceObject EspHomeSgReadyIO::nvsActive;
 static EspHomeSgReadyIO sgReadyIO;
 static SgReadyController sgReadyController(sgReadyIO);
 
+// Wall time of the last SG Ready command (state or boost) — refreshed by any
+// control input, consumed by the watchdog below.
+static uint32_t lastSgReadyCommandTs = 0;
+
 // Called from on_boot lambda in common.yaml
 void initBoostStatePrefs() {
     EspHomeSgReadyIO::nvsDhw    = global_preferences->make_preference<float>(0xB007BA5E, true);
@@ -1552,6 +1556,7 @@ void loadBoostState() {
 
 // Called from MQTT on_message lambda in common.yaml
 void applySgReadyState(int state) {
+    lastSgReadyCommandTs = millis();
     ESP_LOGI("SG_READY", "Applying SG Ready state %d", state);
     if (sgReadyController.applyState(state)) {
         currentSgReadyState = sgReadyController.currentState();
@@ -1563,8 +1568,21 @@ void applySgReadyState(int state) {
 // Accessor helpers used by YAML sensor lambdas and MQTT on_connect block
 inline float sgReadyBoostState3Value() { return sgReadyController.boostState3(); }
 inline float sgReadyBoostState4Value() { return sgReadyController.boostState4(); }
-inline void  setSgReadyBoost3(float v) { sgReadyController.setBoostState3(v); }
-inline void  setSgReadyBoost4(float v) { sgReadyController.setBoostState4(v); }
+inline void  setSgReadyBoost3(float v) { lastSgReadyCommandTs = millis(); sgReadyController.setBoostState3(v); }
+inline void  setSgReadyBoost4(float v) { lastSgReadyCommandTs = millis(); sgReadyController.setBoostState4(v); }
+
+// Watchdog against a dead control source: if the current SG Ready state is not
+// Normal and no command arrived for SG_READY_WATCHDOG_MS, fall back to Normal
+// (heat pump keeps working — never stranded in standby/boost).
+void checkSgReadyWatchdog() {
+    const uint32_t now = millis();
+    if (lastSgReadyCommandTs == 0) return;  // never commanded on this boot
+    if (sgReadyController.currentState() == SgReadyController::STATE_NORMAL) return;
+    if (now - lastSgReadyCommandTs < SgReadyController::SG_READY_WATCHDOG_MS) return;
+    ESP_LOGW("SG_READY_WATCHDOG", "No SG Ready command for %lus — returning to Normal",
+             (unsigned long)(SgReadyController::SG_READY_WATCHDOG_MS / 1000UL));
+    applySgReadyState(SgReadyController::STATE_NORMAL);
+}
 
 // ============================================================================
 // COMPILE-TIME STRING HASHING FOR FAST SIGNAL DISPATCH
@@ -1838,6 +1856,9 @@ void publishCanDiagnostics() {
 // This function should be called regularly from the main loop
 void processCalculatedSensors() {
     unsigned long now = millis();
+
+    // SG Ready watchdog — must run regularly regardless of other schedules.
+    checkSgReadyWatchdog();
     
     // Initialize scheduled update times on first run (with random offsets to spread load)
     static bool initialized = false;

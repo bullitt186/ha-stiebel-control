@@ -11,6 +11,7 @@
 
 #include <string>
 #include <cstring>
+#include <cstdint>
 
 // Operating mode written by SG Ready when boosting back to normal operation.
 // The WPM3 (WPL 10 AC) calls this mode "Komfortbetrieb", older WPM2 "Tagbetrieb".
@@ -65,6 +66,12 @@ public:
     // Temperature ceiling for DHW boost
     static constexpr float MAX_DHW_TEMP  = 60.0f;
     static constexpr float MAX_ROOM_TEMP = 25.0f;
+
+    // Watchdog: if no SG Ready command (state or boost change) arrives within
+    // this window, the controller returns to Normal. This guarantees the heat
+    // pump is never stranded in standby/boost if the control source (e.g. evcc,
+    // HA automation, MQTT) stops talking.
+    static constexpr uint32_t SG_READY_WATCHDOG_MS = 10u * 60u * 1000u;
 
     struct Config {
         float boostState3 = 5.0f;   // DHW boost for state 3 (°C)
