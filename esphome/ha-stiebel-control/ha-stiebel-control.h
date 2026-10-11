@@ -288,8 +288,19 @@ static unsigned long nextDateTimeUpdate = 0;
 static unsigned long nextBetriebsartUpdate = 0;
 static unsigned long nextCanDiagUpdate = 0;
 
-// UID cache to avoid repeated string operations on every signal update
-static std::unordered_map<std::string, std::string> uidCache;
+// UID cache keyed by (CAN id, signal-name pointer). The name pointers are stable
+// (string literals in the static ElsterTable), so lookups allocate nothing.
+struct UidKey {
+    uint32_t canId;
+    const char* signal;
+    bool operator==(const UidKey &o) const { return canId == o.canId && signal == o.signal; }
+};
+struct UidKeyHash {
+    size_t operator()(const UidKey &k) const {
+        return (size_t)k.canId ^ ((size_t)k.signal << 1);
+    }
+};
+static std::unordered_map<UidKey, std::string, UidKeyHash> uidCache;
 
 // ============================================================================
 // SIGNAL REQUEST CONFIGURATION
@@ -1008,34 +1019,35 @@ void publishCompressorActive()
 
 // Helper: Check if pattern appears anywhere in text (case-insensitive substring match)
 // Get or create cached UID for a signal (eliminates repeated string ops)
-inline std::string getOrCreateUID(const CanMember &cm, const char* signalName) {
-    // Create cache key
-    char cacheKey[256];
-    snprintf(cacheKey, sizeof(cacheKey), "%u:%s", (unsigned)cm.CanId, signalName);
-    
-    // Check cache first
-    auto it = uidCache.find(cacheKey);
+// Get or create cached UID for a signal (no per-call string allocation).
+// Returns a reference into the cache — valid until the entry is erased
+// (unordered_map references stay valid across rehash/insert).
+inline const std::string& getOrCreateUID(const CanMember &cm, const char* signalName) {
+    UidKey key{cm.CanId, signalName};
+
+    // Check cache first (no temporary string constructed)
+    auto it = uidCache.find(key);
     if (it != uidCache.end()) {
         return it->second;
     }
-    
-    // Generate UID if not cached (no need to lookup CanMember - already have it)
+
+    // Generate UID if not cached
     char uid[128];
     snprintf(uid, sizeof(uid), "stiebel_%s_%s", cm.Name, signalName);
     std::string result(uid);
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     std::replace(result.begin(), result.end(), ' ', '_');
-    
-    // Store in cache
-    uidCache[cacheKey] = result;
-    return result;
+
+    // Store in cache and return reference to the stored value
+    auto res = uidCache.emplace(key, std::move(result));
+    return res.first->second;
 }
 
 // Publish MQTT Discovery config for a signal
 void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
     
     // Get cached UID (avoids repeated string operations)
-    std::string uid = getOrCreateUID(cm, ei->Name);
+    const std::string& uid = getOrCreateUID(cm, ei->Name);
     
     // Note: Caller is responsible for checking discoveredSignals and inserting uid
     // This function just publishes the MQTT discovery message
@@ -1505,7 +1517,7 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
     }
     
     // Check if discovery is needed
-    std::string uid = getOrCreateUID(cm, ei->Name);
+    const std::string& uid = getOrCreateUID(cm, ei->Name);
     bool needsDiscovery = (discoveredSignals.find(uid) == discoveredSignals.end());
     
     if (needsDiscovery) {
@@ -1928,7 +1940,7 @@ void processSignalRequests() {
     }
 }
 
-void processAndUpdate(uint32_t can_id, std::vector<uint8_t> msg)
+void processAndUpdate(uint32_t can_id, const std::vector<uint8_t> &msg)
 {
     // Ignore short/invalid frames (would decode to garbage)
     if (msg.size() < 7)
