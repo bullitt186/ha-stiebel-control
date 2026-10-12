@@ -1657,15 +1657,17 @@ void publishCombinedEnergySensors() {
     // Fuer WPL17 ausschliesslich den member-scharfen gleitenden Wert nutzen
     // (kein Legacy-Fallback), sonst wuerde der Deglitch den niedrigeren,
     // korrekten Startwert als "Verkleinerung" verwerfen.
-    auto publishTotal = [](const CalculatedSensorConfig& cfg, const char* topic, const char* key,
+    // Fuer WPL17 ausschliesslich den member-scharfen gleitenden Wert
+    // (SUM_MWH*1000 + SUM_KWH + TAG_KWH + TAG_WH/1000) aus HEIZMODUL_WPL nutzen.
+    // Damit ist der totale Zaehler fortlaufend (kein Sprung beim naechtlichen
+    // Rollover). Die SUM-Register werden dazu mit FREQ_1MIN gelesen.
+    const bool useMember = (strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0);
+    auto publishTotal = [useMember](const CalculatedSensorConfig& cfg, const char* topic, const char* key,
                            const char* sumMwh, const char* sumKwh, const char* tagKwh, const char* tagWh) {
         float rawTotal; bool have = false;
-        // Bevorzugt gleitend (Member HEIZMODUL_WPL). Die WPL17 sendet SUM jedoch
-        // nur einmal nachts und beantwortet keine SUM-Reads - tagsueber fehlt SUM,
-        // daher Fallback auf den Namen-gekeyten Geraete-SUM.
         if (getSlidingTotalKwh("HEIZMODUL_WPL", sumMwh, sumKwh, tagKwh, tagWh, rawTotal)) {
             have = true;
-        } else if (copEnergyValues.find(sumMwh) != copEnergyValues.end() &&
+        } else if (!useMember && copEnergyValues.find(sumMwh) != copEnergyValues.end() &&
                    copEnergyValues.find(sumKwh) != copEnergyValues.end()) {
             rawTotal = copEnergyValues[sumMwh] * 1000.0f + copEnergyValues[sumKwh];
             have = true;
