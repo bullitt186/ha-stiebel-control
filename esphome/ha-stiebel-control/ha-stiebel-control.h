@@ -1647,6 +1647,42 @@ inline bool getSlidingTotalKwh(const char* memberName, const char* sumMwh, const
     return false;
 }
 
+// NVS-persistierter SUM-Sockel: total = Sockel + Tagesanteil. Die WPL17 liefert
+// die SUM-Register nur einmal nachts bzw. nicht auf Anforderung; der Sockel
+// uebersteht daher Reboots und der Gesamtwert bleibt fortlaufend.
+struct EnergyBaseStorage { uint32_t magic; float v[4]; };
+static ESPPreferenceObject energyBasePref;
+static EnergyBaseStorage energyBase = {0x454E4B42u, {0, 0, 0, 0}};
+static bool energyBaseReady = false;
+
+inline void ensureEnergyBase() {
+    if (energyBaseReady) return;
+    energyBaseReady = true;
+    energyBasePref = global_preferences->make_preference<EnergyBaseStorage>(0x454E4B42u, true);
+    EnergyBaseStorage tmp;
+    if (energyBasePref.load(&tmp) && tmp.magic == 0x454E4B42u) energyBase = tmp;
+}
+
+// slot: 0=EL Heizung, 1=EL Warmwasser, 2=Waerme Heizung, 3=Waerme Warmwasser
+inline bool wplBaseTotal(int slot, const char* sumMwh, const char* sumKwh,
+                         const char* tagKwh, const char* tagWh, float& out) {
+    ensureEnergyBase();
+    float sm, sk, tk, tw;
+    if (getEnergyForMember("HEIZMODUL_WPL", sumMwh, sm) && getEnergyForMember("HEIZMODUL_WPL", sumKwh, sk)) {
+        float base = sm * 1000.0f + sk;
+        if (base > 0.0f && base != energyBase.v[slot]) {   // nur bei Aenderung schreiben (NVS-Schonung)
+            energyBase.v[slot] = base;
+            energyBasePref.save(&energyBase);
+        }
+    }
+    if (energyBase.v[slot] <= 0.0f) return false;
+    out = energyBase.v[slot];
+    if (getEnergyForMember("HEIZMODUL_WPL", tagKwh, tk) && getEnergyForMember("HEIZMODUL_WPL", tagWh, tw)) {
+        out += tk + tw / 1000.0f;
+    }
+    return true;
+}
+
 // Publiziert kombinierte Gesamt-kWh-Werte aus den einzelnen MWh- und kWh-Registern.
 // Formel: Gesamt_kWh = MWh_Reg * 1000 + kWh_Reg
 // Die Einzelregister (MWh, kWh) werden weiterhin separat veroeffentlicht.
@@ -1662,15 +1698,15 @@ void publishCombinedEnergySensors() {
     // Damit ist der totale Zaehler fortlaufend (kein Sprung beim naechtlichen
     // Rollover). Die SUM-Register werden dazu mit FREQ_1MIN gelesen.
     const bool useMember = (strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0);
-    auto publishTotal = [useMember](const CalculatedSensorConfig& cfg, const char* topic, const char* key,
+    auto publishTotal = [useMember](const CalculatedSensorConfig& cfg, const char* topic, const char* key, int slot,
                            const char* sumMwh, const char* sumKwh, const char* tagKwh, const char* tagWh) {
         float rawTotal; bool have = false;
-        if (getSlidingTotalKwh("HEIZMODUL_WPL", sumMwh, sumKwh, tagKwh, tagWh, rawTotal)) {
-            have = true;
-        } else if (!useMember && copEnergyValues.find(sumMwh) != copEnergyValues.end() &&
+        if (wplBaseTotal(slot, sumMwh, sumKwh, tagKwh, tagWh, rawTotal)) {
+            have = true;   // WPL-Basis (NVS-Sockel + Tagesanteil), sobald SUM bekannt
+        } else if (copEnergyValues.find(sumMwh) != copEnergyValues.end() &&
                    copEnergyValues.find(sumKwh) != copEnergyValues.end()) {
             rawTotal = copEnergyValues[sumMwh] * 1000.0f + copEnergyValues[sumKwh];
-            have = true;
+            have = true;   // Fallback: Geraete-SUM (naechtlich aktualisiert)
         }
         if (!have) return;
         float total;
@@ -1681,16 +1717,16 @@ void publishCombinedEnergySensors() {
         id(mqtt_client).publish(topic, valueStr, strlen(valueStr), 0, true);
         ESP_LOGI("ENERGIE", "Gesamt (%s): %.3f kWh", key, total);
     };
-    publishTotal(calculatedSensors[10], "heatingpump/calculated/energie_heiz_total_kwh/state", "combined_energie_heiz",
+    publishTotal(calculatedSensors[10], "heatingpump/calculated/energie_heiz_total_kwh/state", "combined_energie_heiz", 0,
                  "EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", "EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH",
                  "EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", "EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH");
-    publishTotal(calculatedSensors[11], "heatingpump/calculated/energie_ww_total_kwh/state", "combined_energie_ww",
+    publishTotal(calculatedSensors[11], "heatingpump/calculated/energie_ww_total_kwh/state", "combined_energie_ww", 1,
                  "EL_AUFNAHMELEISTUNG_WW_SUM_MWH", "EL_AUFNAHMELEISTUNG_WW_SUM_KWH",
                  "EL_AUFNAHMELEISTUNG_WW_TAG_KWH", "EL_AUFNAHMELEISTUNG_WW_TAG_WH");
-    publishTotal(calculatedSensors[12], "heatingpump/calculated/waerme_heiz_total_kwh/state", "combined_waerme_heiz",
+    publishTotal(calculatedSensors[12], "heatingpump/calculated/waerme_heiz_total_kwh/state", "combined_waerme_heiz", 2,
                  "WAERMEERTRAG_HEIZ_SUM_MWH", "WAERMEERTRAG_HEIZ_SUM_KWH",
                  "WAERMEERTRAG_HEIZ_TAG_KWH", "WAERMEERTRAG_HEIZ_TAG_WH");
-    publishTotal(calculatedSensors[13], "heatingpump/calculated/waerme_ww_total_kwh/state", "combined_waerme_ww",
+    publishTotal(calculatedSensors[13], "heatingpump/calculated/waerme_ww_total_kwh/state", "combined_waerme_ww", 3,
                  "WAERMEERTRAG_WW_SUM_MWH", "WAERMEERTRAG_WW_SUM_KWH",
                  "WAERMEERTRAG_WW_TAG_KWH", "WAERMEERTRAG_WW_TAG_WH");
 
