@@ -36,10 +36,13 @@ esphome:
     - ha-stiebel-control/elster/NUtils.cpp
     - ha-stiebel-control/elster/NTypes.h
     - ha-stiebel-control/config.h
-    # language is chosen by language_select.h (DE default / EN via `language`); do NOT
-    # list lang_base.h/lang_en.h here — ESPHome would auto-include both and lang_en.h
-    # would unconditionally override all LNAME_* strings to English.
+    # Language files MUST be listed: ESPHome copies them into src/ and
+    # language_select.h includes them by name. lang_en.h's overrides are guarded
+    # by HA_LANGUAGE_EN, so the German default is unaffected even though ESPHome
+    # auto-includes the file into the main translation unit.
     - ha-stiebel-control/language_select.h
+    - ha-stiebel-control/lang_base.h
+    - ha-stiebel-control/lang_en.h
     - ha-stiebel-control/sg_ready_controller.h
     - ha-stiebel-control/ha-stiebel-control.h
     - ha-stiebel-control/signal_requests_base.h

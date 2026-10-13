@@ -7,16 +7,16 @@
  *
  * To add a translation: #undef LNAME_FOO, then #define LNAME_FOO "English"
  *
- * NOTE: This file is listed in esphome: includes: so ESPHome copies it to src/.
- * The overrides below are guarded by LANGUAGE_SELECT_ACTIVE so they are only
- * applied when language_select.h explicitly includes this file — not when
- * ESPHome auto-includes it directly from main.cpp.
+ * NOTE: This file is listed in esphome: includes: so ESPHome copies it to src/
+ * (language_select.h includes it by name). ESPHome also auto-includes it into
+ * the main translation unit, so the overrides below are guarded by HA_LANGUAGE_EN:
+ * they only apply when English is actually selected — never for the German default.
  */
 
 #pragma once
 #include "lang_base.h"
 
-#if defined(LANGUAGE_SELECT_ACTIVE)
+#if defined(HA_LANGUAGE_EN)
 
 // ============================================================================
 // ElsterTable signal friendly names
