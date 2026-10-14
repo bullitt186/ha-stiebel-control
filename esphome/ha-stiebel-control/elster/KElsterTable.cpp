@@ -27,9 +27,13 @@
 #include "KElsterTable.h"
 #include "ElsterTable.h"
 
-// Lazy-initialized caches for O(1) lookups after first access
+// Lazy-initialized caches for O(1) lookups after first access.
+// Bounded: the WPM3 broadcasts many distinct register indices over time; an
+// unbounded cache would grow the heap. Uncached entries simply fall back to the
+// linear search (still correct, just slower).
 static std::unordered_map<unsigned short, const ElsterIndex*> indexCache;
 static std::unordered_map<std::string, const ElsterIndex*> nameCache;
+static const size_t MAX_ELSTER_CACHE = 256;
 
 
 void SetValueType(char * Val, size_t ValSize, unsigned char Type, unsigned short Value)
@@ -194,13 +198,13 @@ const ElsterIndex * GetElsterIndex(unsigned short Index)
   for (i = 0; i <= High(ElsterTable); i++) {
     if (ElsterTable[i].Index == Index) {
       const ElsterIndex* result = &ElsterTable[i];
-      indexCache[Index] = result;  // Cache for next time
+      if (indexCache.size() < MAX_ELSTER_CACHE) indexCache[Index] = result;  // Cache for next time
       return result;
     }
   }
 
   // Not found - cache default and return
-  indexCache[Index] = &ElsterTable[0];
+  if (indexCache.size() < MAX_ELSTER_CACHE) indexCache[Index] = &ElsterTable[0];
   return &ElsterTable[0];
 }
 
@@ -220,13 +224,13 @@ const ElsterIndex * GetElsterIndex(const char* str)
   for (i = 0; i <= High(ElsterTable); i++) {
     if (!strcmp(ElsterTable[i].Name, str)) {
       const ElsterIndex* result = &ElsterTable[i];
-      nameCache[key] = result;  // Cache for next time
+      if (nameCache.size() < MAX_ELSTER_CACHE) nameCache[key] = result;  // Cache for next time
       return result;
     }
   }
 
   // Not found - cache default and return
-  nameCache[key] = &ElsterTable[0];
+  if (nameCache.size() < MAX_ELSTER_CACHE) nameCache[key] = &ElsterTable[0];
   return &ElsterTable[0];
 }
 

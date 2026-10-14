@@ -373,6 +373,12 @@ struct UidKeyHash {
 };
 static std::unordered_map<UidKey, std::string, UidKeyHash> uidCache;
 
+// Hard cap on distinct published signals. The WPM3 broadcasts many service
+// registers over time (TEST_OBJEKT, ESTRICH_*, BIVALENZ*, …); each would
+// otherwise add a permanent uid + HA entity and grow the heap in steps.
+// Known signals keep updating; NEW ones are ignored once the cap is reached.
+static const size_t MAX_PUBLISHED_SIGNALS = 300;
+
 // ============================================================================
 // SIGNAL REQUEST CONFIGURATION
 // ============================================================================
@@ -1786,6 +1792,15 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
         }
     }
     
+    // Bound memory: ignore NEW signals once the cap is reached (see
+    // MAX_PUBLISHED_SIGNALS). Already-known signals keep updating normally.
+    {
+        UidKey probe{cm.CanId, ei->Name};
+        if (uidCache.find(probe) == uidCache.end() && discoveredSignals.size() >= MAX_PUBLISHED_SIGNALS) {
+            return;
+        }
+    }
+
     // Check if discovery is needed
     const std::string& uid = getOrCreateUID(cm, ei->Name);
     bool needsDiscovery = (discoveredSignals.find(uid) == discoveredSignals.end());
