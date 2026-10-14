@@ -1661,11 +1661,13 @@ void publishSgReadyStates() {
     publishMqttChecked("heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE3/state", rboost3Str, strlen(rboost3Str), 0, true);
     publishMqttChecked("heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE4/state", rboost4Str, strlen(rboost4Str), 0, true);
 
-    // Mirror the "normal" setpoints into the WW_SOLL / RAUM_SOLL entities so
-    // they reflect the real device values (panel changes included).
-    if (!std::isnan(lastEinstellSollTemp)) {
+    // Mirror the normal setpoints into WW_SOLL / RAUM_SOLL. The DHW value
+    // prefers the ACTIVE setpoint (polled reliably from KESSEL); the panel
+    // setting (broadcast by BEDIENMODUL_WPM3 only on change) is the fallback.
+    float wwSoll = !std::isnan(lastSpeicherSollTemp) ? lastSpeicherSollTemp : lastEinstellSollTemp;
+    if (!std::isnan(wwSoll)) {
         char b[16];
-        snprintf(b, sizeof(b), "%.1f", lastEinstellSollTemp);
+        snprintf(b, sizeof(b), "%.1f", wwSoll);
         publishMqttChecked("heatingpump/MANAGER/WW_SOLL/state", b, strlen(b), 0, true);
     }
     if (!std::isnan(lastRaumSollTemp)) {

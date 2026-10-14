@@ -165,6 +165,7 @@ mqtt:
             const char* value = x.c_str();
             writeCanSignalRouted("EINSTELL_SPEICHERSOLLTEMP", value);
             writeCanSignalRouted("EINSTELL_SPEICHERSOLLTEMP2", value);
+            publishMqttChecked("heatingpump/MANAGER/WW_SOLL/state", value, strlen(value), 0, true);
 
     # Normal room setpoint — writes RAUMSOLLTEMP_I (manager)
     - topic: heatingpump/MANAGER/RAUM_SOLL/set
