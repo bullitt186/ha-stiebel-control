@@ -35,6 +35,27 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+
+// Heap diagnostics for the periodic CONTAINERS log (native test build → 0).
+#ifdef ESP_PLATFORM
+extern "C" uint32_t esp_get_free_heap_size(void);
+extern "C" uint32_t esp_get_minimum_free_heap_size(void);
+#endif
+inline uint32_t diagFreeHeap() {
+#ifdef ESP_PLATFORM
+    return esp_get_free_heap_size();
+#else
+    return 0;
+#endif
+}
+inline uint32_t diagMinFreeHeap() {
+#ifdef ESP_PLATFORM
+    return esp_get_minimum_free_heap_size();
+#else
+    return 0;
+#endif
+}
+
 // ============================================================================
 // CAN BUS MEMBER DEFINITIONS
 // ============================================================================
@@ -2085,9 +2106,10 @@ void processSignalRequests() {
     static uint32_t lastContainerLog = 0;
     if (now - lastContainerLog > 600000U) {
         lastContainerLog = now;
-        ESP_LOGI("CONTAINERS", "uidCache=%zu discoveredSignals=%zu pollSlots=%zu copEnergy=%zu",
+        ESP_LOGI("CONTAINERS", "uidCache=%zu discoveredSignals=%zu pollSlots=%zu copEnergy=%zu freeHeap=%u minFreeHeap=%u",
                  (size_t)uidCache.size(), (size_t)discoveredSignals.size(),
-                 (size_t)pollSlots.size(), (size_t)copEnergyValues.size());
+                 (size_t)pollSlots.size(), (size_t)copEnergyValues.size(),
+                 (unsigned)diagFreeHeap(), (unsigned)diagMinFreeHeap());
     }
 
     // Startup delay: wait before starting signal requests
