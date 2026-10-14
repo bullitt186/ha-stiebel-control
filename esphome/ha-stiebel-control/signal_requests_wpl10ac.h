@@ -86,12 +86,6 @@ extern const SignalRequest signalRequests[] = {
     {"LAUFZEIT_NHZ_WW",                  FREQ_10MIN, cm_heizmodul}, // backup heater hours DHW
     {"ANZEIGE_HOCHDRUCK",                FREQ_1MIN,  cm_heizmodul}, // refrigerant high pressure
     {"ANZEIGE_NIEDERDRUCK",              FREQ_1MIN,  cm_heizmodul}, // refrigerant low pressure
-
-    // ---- Power candidates (test whether the WPM3 answers with a live value) ----
-    {"KESSELLEISTUNG",                   FREQ_1MIN,  cm_kessel},    // boiler/heating power
-    {"NHZ_LEISTUNG1",                    FREQ_1MIN,  cm_heizmodul}, // backup heater power
-    {"LEISTUNG_PUMPE_HZK",               FREQ_1MIN,  cm_kessel},    // heating pump power
-    {"WAERMEMENGE",                      FREQ_1MIN,  cm_manager},   // heat meter reading
 };
 
 extern const size_t SIGNAL_REQUEST_COUNT_VALUE = sizeof(signalRequests) / sizeof(SignalRequest);
