@@ -156,13 +156,13 @@ public:
 
     // Update configurable room boost amounts (°C)
     void setRoomBoost3(float boost) {
-        if (boost >= 0.0f && boost <= 10.0f) {
+        if (boost >= 0.0f && boost <= 5.0f) {
             config_.roomBoost3 = boost;
         }
     }
 
     void setRoomBoost4(float boost) {
-        if (boost >= 0.0f && boost <= 10.0f) {
+        if (boost >= 0.0f && boost <= 5.0f) {
             config_.roomBoost4 = boost;
         }
     }

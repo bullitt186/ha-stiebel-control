@@ -264,7 +264,7 @@ mqtt:
             publishWritableNumberDiscoveryByName("SG_READY_ROOM_BOOST_STATE3");
             char* endPtr;
             float boost = strtof(x.c_str(), &endPtr);
-            if (endPtr != x.c_str() && *endPtr == '\0' && boost >= 0.0 && boost <= 10.0) {
+            if (endPtr != x.c_str() && *endPtr == '\0' && boost >= 0.0 && boost <= 5.0) {
                 setSgReadyRoomBoost3(boost);
                 ESP_LOGI("SG_READY", "Room boost state 3 set to %.1f°C", boost);
                 char stateTopic[128];
@@ -284,7 +284,7 @@ mqtt:
             publishWritableNumberDiscoveryByName("SG_READY_ROOM_BOOST_STATE4");
             char* endPtr;
             float boost = strtof(x.c_str(), &endPtr);
-            if (endPtr != x.c_str() && *endPtr == '\0' && boost >= 0.0 && boost <= 10.0) {
+            if (endPtr != x.c_str() && *endPtr == '\0' && boost >= 0.0 && boost <= 5.0) {
                 setSgReadyRoomBoost4(boost);
                 ESP_LOGI("SG_READY", "Room boost state 4 set to %.1f°C", boost);
                 char stateTopic[128];

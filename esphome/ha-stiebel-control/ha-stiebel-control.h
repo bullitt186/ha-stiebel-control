@@ -212,10 +212,10 @@ static const WritableNumberConfig writableNumbers[] = {
 
     // SG Ready room boost offsets (not real CAN signals, handled internally)
     {"SG_READY_ROOM_BOOST_STATE3", LNAME_NUM_SG_READY_ROOM_BOOST3,
-     cm_manager, 0.0, 10.0, 0.5, "°C", "mdi:home-thermometer-plus", "temperature"},
+     cm_manager, 0.0, 5.0, 0.5, "°C", "mdi:home-thermometer-plus", "temperature"},
 
     {"SG_READY_ROOM_BOOST_STATE4", LNAME_NUM_SG_READY_ROOM_BOOST4,
-     cm_manager, 0.0, 10.0, 0.5, "°C", "mdi:home-thermometer-chevron-up", "temperature"},
+     cm_manager, 0.0, 5.0, 0.5, "°C", "mdi:home-thermometer-chevron-up", "temperature"},
 
     // Room temperature setpoints for heating circuits 1–3 and night/reduced mode
     {"RAUMSOLLTEMP_I", LNAME_NUM_RAUMSOLLTEMP_I,
