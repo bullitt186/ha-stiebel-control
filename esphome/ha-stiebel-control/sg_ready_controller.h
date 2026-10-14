@@ -21,12 +21,17 @@
 #define SG_READY_NORMAL_MODE "Tagbetrieb"
 #endif
 
-// WPL 10 AC / WPM3 NOTE: writing the ACTIVE SPEICHERSOLLTEMP register (0x0003)
-// in addition to EINSTELL_SPEICHERSOLLTEMP was tested and REVERTED — it
-// destabilized the WPM3's DHW setpoint handling (the setpoint started following
-// the Eco temperature values). The WPM3 quirk is NOT register-related; the DHW
-// boost write to EINSTELL_SPEICHERSOLLTEMP (0x0013) remains without visible
-// effect on this model.
+// WPL 10 AC / WPM3 NOTE: the ACTIVE DHW setpoint (SPEICHERSOLLTEMP, 0x0003)
+// follows the ECO setting (EINSTELL_SPEICHERSOLLTEMP2, 0x0a06) even in
+// Komfortbetrieb — a WPM3 firmware quirk. (Writing the active register itself
+// was tested and destabilized the WPM3's DHW setpoint handling; see git
+// history.) Workaround: write the SAME DHW setpoint to BOTH Einstell
+// registers (0x0013 and 0x0a06), so whichever mapping the WPM3 currently
+// follows, boost and restore both apply. The two panel settings are
+// deliberately kept in sync.
+#ifdef HA_MODEL_wpl10ac
+#define SG_READY_SYNC_DHW_SETTINGS
+#endif
 
 // ============================================================================
 // IO INTERFACE — injected in production, stubbed in tests
@@ -208,11 +213,22 @@ private:
         }
     }
 
+    // Write a DHW setpoint. On the WPL 10 AC / WPM3 the active setpoint may
+    // follow either Einstell register (see note at the top) — write BOTH with
+    // the same value so the panel settings stay in sync and boost/restore
+    // apply regardless of which mapping the WPM3 currently uses.
+    void writeDhwSetpoint(const char* value) {
+        io_.writeCanSignal("EINSTELL_SPEICHERSOLLTEMP", value);
+#ifdef SG_READY_SYNC_DHW_SETTINGS
+        io_.writeCanSignal("EINSTELL_SPEICHERSOLLTEMP2", value);
+#endif
+    }
+
     void restoreDhw() {
         if (state_.active && state_.originalDhwTemp > 0.0f) {
             char buf[16];
             snprintf(buf, sizeof(buf), "%.1f", state_.originalDhwTemp);
-            io_.writeCanSignal("EINSTELL_SPEICHERSOLLTEMP", buf);
+            writeDhwSetpoint(buf);
             state_.originalDhwTemp = 0.0f;
         }
     }
@@ -260,7 +276,7 @@ private:
             if (boosted > MAX_DHW_TEMP) boosted = MAX_DHW_TEMP;
             char buf[16];
             snprintf(buf, sizeof(buf), "%.1f", boosted);
-            io_.writeCanSignal("EINSTELL_SPEICHERSOLLTEMP", buf);
+            writeDhwSetpoint(buf);
         }
 
         float boostedRoom = state_.originalRoomTemp + ROOM_BOOST_STATE3;
@@ -282,7 +298,7 @@ private:
             if (boosted > MAX_DHW_TEMP) boosted = MAX_DHW_TEMP;
             char buf[16];
             snprintf(buf, sizeof(buf), "%.1f", boosted);
-            io_.writeCanSignal("EINSTELL_SPEICHERSOLLTEMP", buf);
+            writeDhwSetpoint(buf);
         }
 
         float boostedRoom = state_.originalRoomTemp + ROOM_BOOST_STATE4;
