@@ -1588,6 +1588,22 @@ void checkSgReadyWatchdog() {
     applySgReadyState(SgReadyController::STATE_NORMAL);
 }
 
+// Republish the SG Ready control states (retained). Unlike polled CAN signals,
+// these topics are otherwise only written on connect or on state change — a
+// broker restart that loses retained messages would leave HA showing the
+// controls as unavailable until the next change. Called on MQTT connect and
+// periodically (see common.yaml) so the topics always self-heal.
+void publishSgReadyStates() {
+    const char* stateStr = SgReadyController::stateLabel(sgReadyController.currentState());
+    publishMqttChecked("heatingpump/MANAGER/SG_READY_STATE/state", stateStr, strlen(stateStr), 0, true);
+
+    char boost3Str[16], boost4Str[16];
+    snprintf(boost3Str, sizeof(boost3Str), "%.1f", sgReadyBoostState3Value());
+    snprintf(boost4Str, sizeof(boost4Str), "%.1f", sgReadyBoostState4Value());
+    publishMqttChecked("heatingpump/MANAGER/SG_READY_BOOST_STATE3/state", boost3Str, strlen(boost3Str), 0, true);
+    publishMqttChecked("heatingpump/MANAGER/SG_READY_BOOST_STATE4/state", boost4Str, strlen(boost4Str), 0, true);
+}
+
 // ============================================================================
 // COMPILE-TIME STRING HASHING FOR FAST SIGNAL DISPATCH
 // ============================================================================
