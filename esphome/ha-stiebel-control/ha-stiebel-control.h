@@ -196,7 +196,7 @@ static const WritableNumberConfig writableNumbers[] = {
     // (0x0013 + 0x0a06) to the display/operating unit (0x201), keeping them in
     // sync (the active setpoint follows the WPM3's internal mapping).
     {"WW_SOLL", LNAME_NUM_WW_SOLL,
-     cm_manager, 20.0, 60.0, 1.0, "°C", "mdi:water-thermometer", "temperature", true},
+     cm_manager, 20.0, 60.0, 1.0, "°C", "mdi:water-boiler", "temperature", true},
 
     // Room normal setpoint — writes RAUMSOLLTEMP_I (0x0005) to the manager.
     // Additional to the RAUMSOLLTEMP_I entity (same value, main device).
@@ -208,14 +208,14 @@ static const WritableNumberConfig writableNumbers[] = {
      cm_manager, 0.0, 10.0, 0.5, "°C", "mdi:thermometer-plus", "temperature"},
 
     {"SG_READY_BOOST_STATE4", LNAME_NUM_SG_READY_BOOST4,
-     cm_manager, 0.0, 15.0, 0.5, "°C", "mdi:thermometer-chevron-up", "temperature"},
+     cm_manager, 0.0, 15.0, 0.5, "°C", "mdi:fire", "temperature"},
 
     // SG Ready room boost offsets (not real CAN signals, handled internally)
     {"SG_READY_ROOM_BOOST_STATE3", LNAME_NUM_SG_READY_ROOM_BOOST3,
-     cm_manager, 0.0, 5.0, 0.5, "°C", "mdi:home-thermometer-plus", "temperature"},
+     cm_manager, 0.0, 5.0, 0.5, "°C", "mdi:home-thermometer", "temperature"},
 
     {"SG_READY_ROOM_BOOST_STATE4", LNAME_NUM_SG_READY_ROOM_BOOST4,
-     cm_manager, 0.0, 5.0, 0.5, "°C", "mdi:home-thermometer-chevron-up", "temperature"},
+     cm_manager, 0.0, 5.0, 0.5, "°C", "mdi:fire", "temperature"},
 
     // Room temperature setpoints for heating circuits 1–3 and night/reduced mode
     {"RAUMSOLLTEMP_I", LNAME_NUM_RAUMSOLLTEMP_I,

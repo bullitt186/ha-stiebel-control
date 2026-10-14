@@ -117,10 +117,11 @@ mqtt:
         tag: "MQTT_CONN"
     - lambda: |-
         ESP_LOGI("MQTT_CONN", "Publishing writable entity discoveries...");
-        // Publish MQTT number discoveries for writable temperature setpoints
+        // Publish the SG Ready state control first (appears at the top), then
+        // the writable number settings, then the operating-mode select.
+        publishWritableSelectDiscoveryByName("SG_READY_STATE");
         publishAllWritableNumberDiscoveries();
-        // Publish MQTT select discoveries for operating mode control
-        publishAllWritableSelectDiscoveries();
+        publishWritableSelectDiscoveryByName("PROGRAMMSCHALTER");
         // Datetime control now handled by Home Assistant input_datetime helpers
         ESP_LOGI("MQTT_CONN", "Discovery publication complete");
 
