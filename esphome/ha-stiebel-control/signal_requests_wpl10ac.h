@@ -71,6 +71,21 @@ extern const SignalRequest signalRequests[] = {
     {"WAERMEERTRAG_WW_SUM_KWH",          FREQ_10MIN, cm_heizmodul},
     {"WAERMEERTRAG_WW_TAG_WH",           FREQ_10MIN, cm_heizmodul},
     {"WAERMEERTRAG_WW_TAG_KWH",          FREQ_10MIN, cm_heizmodul},
+
+    // ========================================================================
+    // MAINTENANCE / MONITORING — pressure, flow, runtimes
+    // (member/frequency best-guess; prune what the WPM3 does not answer)
+    // ========================================================================
+    {"WASSERDRUCK",                      FREQ_1MIN,  cm_kessel},    // heating circuit water pressure
+    {"DURCHFLUSS_CH",                    FREQ_1MIN,  cm_kessel},    // heating flow
+    {"DURCHFLUSS_WW",                    FREQ_1MIN,  cm_kessel},    // DHW flow
+    {"LAUFZEIT_VERDICHTER_HEIZEN",       FREQ_10MIN, cm_heizmodul}, // compressor hours heating
+    {"LAUFZEIT_VERDICHTER_KUEHLEN",      FREQ_10MIN, cm_heizmodul}, // compressor hours cooling
+    {"LAUFZEIT_VERDICHTER_WW",           FREQ_10MIN, cm_heizmodul}, // compressor hours DHW
+    {"LAUFZEIT_NHZ_HEIZEN",              FREQ_10MIN, cm_heizmodul}, // backup heater hours heating
+    {"LAUFZEIT_NHZ_WW",                  FREQ_10MIN, cm_heizmodul}, // backup heater hours DHW
+    {"ANZEIGE_HOCHDRUCK",                FREQ_1MIN,  cm_heizmodul}, // refrigerant high pressure
+    {"ANZEIGE_NIEDERDRUCK",              FREQ_1MIN,  cm_heizmodul}, // refrigerant low pressure
 };
 
 extern const size_t SIGNAL_REQUEST_COUNT_VALUE = sizeof(signalRequests) / sizeof(SignalRequest);
