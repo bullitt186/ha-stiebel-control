@@ -21,6 +21,13 @@
 #define SG_READY_NORMAL_MODE "Tagbetrieb"
 #endif
 
+// WPL 10 AC / WPM3: writing EINSTELL_SPEICHERSOLLTEMP (0x0013) has no effect on
+// the active DHW setpoint (WPM3 firmware quirk). Additionally write the ACTIVE
+// SPEICHERSOLLTEMP register (0x000e) — both registers are kept in sync.
+#ifdef HA_MODEL_wpl10ac
+#define SG_READY_WRITE_ACTIVE_DHW
+#endif
+
 // ============================================================================
 // IO INTERFACE — injected in production, stubbed in tests
 // ============================================================================
@@ -40,6 +47,16 @@ public:
 
     // Load boost state from NVS; returns false if nothing stored
     virtual bool loadBoostState(float& dhwTemp, float& roomTemp, bool& active) = 0;
+
+    // Read the device's current DHW / room setpoints (for capturing the
+    // "original" values before a boost). Returns the values with 0.0 for any
+    // setpoint that is unknown. Default implementation reports "unknown", so
+    // test stubs and simple integrations keep the fallback behavior.
+    virtual bool readCurrentSetpoints(float& dhwTemp, float& roomTemp) {
+        dhwTemp = 0.0f;
+        roomTemp = 0.0f;
+        return false;
+    }
 };
 
 // ============================================================================
@@ -177,19 +194,36 @@ private:
     State  state_;
 
     void captureOriginals() {
+        // Prefer the device's CURRENT setpoints as the "original" values so a
+        // boost/restore cycle returns to what the heat pump actually had —
+        // not a hardcoded default. Unknown values (0.0) fall back to defaults.
+        float curDhw = 0.0f, curRoom = 0.0f;
+        io_.readCurrentSetpoints(curDhw, curRoom);
+
         if (!state_.active || state_.originalDhwTemp == 0.0f) {
-            state_.originalDhwTemp = DEFAULT_DHW_TEMP;
+            state_.originalDhwTemp = (curDhw > 0.0f) ? curDhw : DEFAULT_DHW_TEMP;
         }
         if (!state_.active || state_.originalRoomTemp == 0.0f) {
-            state_.originalRoomTemp = DEFAULT_ROOM_TEMP;
+            state_.originalRoomTemp = (curRoom > 0.0f) ? curRoom : DEFAULT_ROOM_TEMP;
         }
+    }
+
+    // Write a DHW setpoint to the CAN bus. On the WPL 10 AC / WPM3 the
+    // EINSTELL_SPEICHERSOLLTEMP register write alone has no effect on the
+    // active setpoint — additionally write the active SPEICHERSOLLTEMP
+    // register so both stay in sync and the boost actually applies.
+    void writeDhwSetpoint(const char* value) {
+        io_.writeCanSignal("EINSTELL_SPEICHERSOLLTEMP", value);
+#ifdef SG_READY_WRITE_ACTIVE_DHW
+        io_.writeCanSignal("SPEICHERSOLLTEMP", value);
+#endif
     }
 
     void restoreDhw() {
         if (state_.active && state_.originalDhwTemp > 0.0f) {
             char buf[16];
             snprintf(buf, sizeof(buf), "%.1f", state_.originalDhwTemp);
-            io_.writeCanSignal("EINSTELL_SPEICHERSOLLTEMP", buf);
+            writeDhwSetpoint(buf);
             state_.originalDhwTemp = 0.0f;
         }
     }
@@ -237,7 +271,7 @@ private:
             if (boosted > MAX_DHW_TEMP) boosted = MAX_DHW_TEMP;
             char buf[16];
             snprintf(buf, sizeof(buf), "%.1f", boosted);
-            io_.writeCanSignal("EINSTELL_SPEICHERSOLLTEMP", buf);
+            writeDhwSetpoint(buf);
         }
 
         float boostedRoom = state_.originalRoomTemp + ROOM_BOOST_STATE3;
@@ -259,7 +293,7 @@ private:
             if (boosted > MAX_DHW_TEMP) boosted = MAX_DHW_TEMP;
             char buf[16];
             snprintf(buf, sizeof(buf), "%.1f", boosted);
-            io_.writeCanSignal("EINSTELL_SPEICHERSOLLTEMP", buf);
+            writeDhwSetpoint(buf);
         }
 
         float boostedRoom = state_.originalRoomTemp + ROOM_BOOST_STATE4;

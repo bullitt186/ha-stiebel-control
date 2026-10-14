@@ -298,6 +298,12 @@ static float lastWpVorlaufIst = NAN;
 static float lastRuecklaufIstTemp = NAN;
 static float lastVerdichterValue = NAN;
 
+// Current setpoints from the device — captured by the SG Ready boost so a
+// boost/restore cycle returns to the ACTUAL values (not hardcoded defaults).
+// Room setpoint: MANAGER poll (30s); active DHW setpoint: KESSEL poll (10min).
+static float lastSpeicherSollTemp = NAN;
+static float lastRaumSollTemp = NAN;
+
 // Track date/time component values
 static int lastJahr = -1;
 static int lastMonat = -1;
@@ -1508,6 +1514,15 @@ public:
         readSignal(&CanMembers[cm_manager], signalName);
     }
 
+    // Current setpoints tracked from the CAN polls (see updateSensor dispatch).
+    // Unknown values (never polled) are reported as 0.0 so the controller falls
+    // back to its defaults.
+    bool readCurrentSetpoints(float& dhwTemp, float& roomTemp) override {
+        dhwTemp  = std::isnan(lastSpeicherSollTemp) ? 0.0f : lastSpeicherSollTemp;
+        roomTemp = std::isnan(lastRaumSollTemp)     ? 0.0f : lastRaumSollTemp;
+        return true;
+    }
+
     void publishMqtt(const char* topic, const char* value) override {
         publishMqttChecked(topic, value, strlen(value), 0, true);
     }
@@ -1636,6 +1651,8 @@ constexpr uint32_t HASH_MINUTE = hash("MINUTE");
 constexpr uint32_t HASH_SEKUNDE = hash("SEKUNDE");
 constexpr uint32_t HASH_SOMMERBETRIEB = hash("SOMMERBETRIEB");
 constexpr uint32_t HASH_WPVORLAUFIST = hash("WPVORLAUFIST");
+constexpr uint32_t HASH_RAUMSOLLTEMP_I = hash("RAUMSOLLTEMP_I");
+constexpr uint32_t HASH_SPEICHERSOLLTEMP = hash("SPEICHERSOLLTEMP");
 constexpr uint32_t HASH_RUECKLAUFISTTEMP = hash("RUECKLAUFISTTEMP");
 constexpr uint32_t HASH_VERDICHTER = hash("VERDICHTER");
 constexpr uint32_t HASH_EL_AUFNAHMELEISTUNG_HEIZ = hash("EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH");
@@ -1761,7 +1778,29 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
         case HASH_SOMMERBETRIEB:
             publishBetriebsart(value);
             break;
-        
+
+        case HASH_RAUMSOLLTEMP_I: {
+            // Track current room setpoint — the SG Ready boost captures this
+            // as the "original" value so a restore returns to the real value.
+            char* endPtr;
+            float floatValue = strtof(value.c_str(), &endPtr);
+            if (endPtr != value.c_str() && *endPtr == '\0') {
+                lastRaumSollTemp = floatValue;
+            }
+            break;
+        }
+
+        case HASH_SPEICHERSOLLTEMP: {
+            // Track current active DHW setpoint — the SG Ready boost captures
+            // this as the "original" value so a restore returns to the real value.
+            char* endPtr;
+            float floatValue = strtof(value.c_str(), &endPtr);
+            if (endPtr != value.c_str() && *endPtr == '\0') {
+                lastSpeicherSollTemp = floatValue;
+            }
+            break;
+        }
+
         case HASH_WPVORLAUFIST: {
             char* endPtr;
             float floatValue = strtof(value.c_str(), &endPtr);

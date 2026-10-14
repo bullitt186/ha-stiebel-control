@@ -49,6 +49,17 @@ struct FakeIO : ISgReadyIO {
         return true;
     }
 
+    // Current device setpoints (0.0 = unknown) for captureOriginals tests
+    float currentDhw  = 0.0f;
+    float currentRoom = 0.0f;
+    bool  hasCurrent  = false;
+
+    bool readCurrentSetpoints(float& dhw, float& room) override {
+        dhw  = currentDhw;
+        room = currentRoom;
+        return hasCurrent;
+    }
+
     // Helpers for assertions
     bool hadCan(const std::string& signal, const std::string& value = "") const {
         for (auto& c : calls)
@@ -215,6 +226,60 @@ TEST_CASE("state 3 → state 2: restores original DHW and room temps", "[sg_read
     CHECK(io.lastCan("RAUMSOLLTEMP_I") == "20.0");
     CHECK(io.hadCan("PROGRAMMSCHALTER", "Tagbetrieb"));
     CHECK(ctrl.isActive() == false);
+}
+
+TEST_CASE("captureOriginals uses the device's current setpoints", "[sg_ready]") {
+    FakeIO io;
+    SgReadyController ctrl(io);
+    ctrl.setBoostState3(5.0f);
+
+    // Device reports: active DHW setpoint 40.0, room setpoint 21.0
+    io.currentDhw = 40.0f;
+    io.currentRoom = 21.0f;
+    io.hasCurrent = true;
+
+    ctrl.applyState(SgReadyController::STATE_RECOMMENDED);
+
+    // Boost is based on the REAL values: 40.0 + 5.0 = 45.0, 21.0 + 1.0 = 22.0
+    CHECK(io.lastCan("EINSTELL_SPEICHERSOLLTEMP") == "45.0");
+    CHECK(io.lastCan("RAUMSOLLTEMP_I") == "22.0");
+
+    io.reset();
+    ctrl.applyState(SgReadyController::STATE_NORMAL);
+
+    // Restore returns to the REAL original values, not the 48/20 defaults
+    CHECK(io.lastCan("EINSTELL_SPEICHERSOLLTEMP") == "40.0");
+    CHECK(io.lastCan("RAUMSOLLTEMP_I") == "21.0");
+}
+
+TEST_CASE("captureOriginals falls back to defaults when setpoints unknown", "[sg_ready]") {
+    FakeIO io;
+    SgReadyController ctrl(io);
+    ctrl.setBoostState3(5.0f);
+
+    // Unknown setpoints (never polled) — hasCurrent false, values 0.0
+    ctrl.applyState(SgReadyController::STATE_RECOMMENDED);
+
+    // Fallback: DEFAULT_DHW_TEMP 48.0 + 5.0 = 53.0, DEFAULT_ROOM_TEMP 20.0 + 1.0 = 21.0
+    CHECK(io.lastCan("EINSTELL_SPEICHERSOLLTEMP") == "53.0");
+    CHECK(io.lastCan("RAUMSOLLTEMP_I") == "21.0");
+}
+
+TEST_CASE("captureOriginals uses partial setpoints, default for the rest", "[sg_ready]") {
+    FakeIO io;
+    SgReadyController ctrl(io);
+    ctrl.setBoostState3(5.0f);
+
+    // Only the room setpoint is known (DHW never polled)
+    io.currentDhw = 0.0f;
+    io.currentRoom = 22.5f;
+    io.hasCurrent = true;
+
+    ctrl.applyState(SgReadyController::STATE_RECOMMENDED);
+
+    // DHW: default 48.0 + 5.0 = 53.0; room: real 22.5 + 1.0 = 23.5
+    CHECK(io.lastCan("EINSTELL_SPEICHERSOLLTEMP") == "53.0");
+    CHECK(io.lastCan("RAUMSOLLTEMP_I") == "23.5");
 }
 
 TEST_CASE("state 1 → state 2: restores temps if active", "[sg_ready]") {
