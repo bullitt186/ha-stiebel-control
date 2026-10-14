@@ -127,9 +127,6 @@ mqtt:
         // Publish initial states for SG Ready controls (retained)
         ESP_LOGI("MQTT_CONN", "Publishing initial SG Ready states...");
         publishSgReadyStates();
-        // Update sensors with initial values
-        id(sg_ready_boost_state3_sensor).publish_state(sgReadyBoostState3Value());
-        id(sg_ready_boost_state4_sensor).publish_state(sgReadyBoostState4Value());
         id(SG_READY_CURRENT_STATE).publish_state(
           currentSgReadyState == 0 ? "Deaktiviert" :
           currentSgReadyState == 1 ? "1 - EVU Sperre" :
@@ -158,30 +155,26 @@ mqtt:
             publishAllCalculatedSensorDiscoveries(true);
             ESP_LOGI("MQTT_CMD", "All discoveries republished");
 
-    # Temperature setpoint controls
-    - topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP/set
+    # Normal DHW (WW) setpoint — writes BOTH Einstell registers so they stay in
+    # sync (the WPM3 active setpoint follows one of them internally)
+    - topic: heatingpump/MANAGER/WW_SOLL/set
       then:
         - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP command: %s", x.c_str());
-            // Ensure discovery is published
-            publishWritableNumberDiscoveryByName("EINSTELL_SPEICHERSOLLTEMP");
-            // Write to CAN bus
+            ESP_LOGI("MQTT_CMD", "Received WW_SOLL command: %s", x.c_str());
+            publishWritableNumberDiscoveryByName("WW_SOLL");
             const char* value = x.c_str();
-            writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP", value);
-            // Read back to update state
-            readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP");
+            writeCanSignalRouted("EINSTELL_SPEICHERSOLLTEMP", value);
+            writeCanSignalRouted("EINSTELL_SPEICHERSOLLTEMP2", value);
 
-    - topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP2/set
+    # Normal room setpoint — writes RAUMSOLLTEMP_I (manager)
+    - topic: heatingpump/MANAGER/RAUM_SOLL/set
       then:
         - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP2 command: %s", x.c_str());
-            // Ensure discovery is published
-            publishWritableNumberDiscoveryByName("EINSTELL_SPEICHERSOLLTEMP2");
-            // Write to CAN bus
+            ESP_LOGI("MQTT_CMD", "Received RAUM_SOLL command: %s", x.c_str());
+            publishWritableNumberDiscoveryByName("RAUM_SOLL");
             const char* value = x.c_str();
-            writeSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP2", value);
-            // Read back to update state
-            readSignal(&CanMembers[cm_manager], "EINSTELL_SPEICHERSOLLTEMP2");
+            writeSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I", value);
+            readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I");
 
     # Operating mode control
     - topic: heatingpump/MANAGER/PROGRAMMSCHALTER/set
@@ -236,8 +229,6 @@ mqtt:
                 char valueStr[16];
                 snprintf(valueStr, sizeof(valueStr), "%.1f", sgReadyBoostState3Value());
                 publishMqttChecked(stateTopic, valueStr, strlen(valueStr), 0, true);
-                // Update sensor
-                id(sg_ready_boost_state3_sensor).publish_state(sgReadyBoostState3Value());
             } else {
                 ESP_LOGW("MQTT_CMD", "Invalid boost value: %s", x.c_str());
             }
@@ -261,10 +252,48 @@ mqtt:
                 char valueStr[16];
                 snprintf(valueStr, sizeof(valueStr), "%.1f", sgReadyBoostState4Value());
                 publishMqttChecked(stateTopic, valueStr, strlen(valueStr), 0, true);
-                // Update sensor
-                id(sg_ready_boost_state4_sensor).publish_state(sgReadyBoostState4Value());
             } else {
                 ESP_LOGW("MQTT_CMD", "Invalid boost value: %s", x.c_str());
+            }
+
+    # SG Ready room boost offset for State 3
+    - topic: heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE3/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received SG_READY_ROOM_BOOST_STATE3 command: %s", x.c_str());
+            publishWritableNumberDiscoveryByName("SG_READY_ROOM_BOOST_STATE3");
+            char* endPtr;
+            float boost = strtof(x.c_str(), &endPtr);
+            if (endPtr != x.c_str() && *endPtr == '\0' && boost >= 0.0 && boost <= 10.0) {
+                setSgReadyRoomBoost3(boost);
+                ESP_LOGI("SG_READY", "Room boost state 3 set to %.1f°C", boost);
+                char stateTopic[128];
+                snprintf(stateTopic, sizeof(stateTopic), "heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE3/state");
+                char valueStr[16];
+                snprintf(valueStr, sizeof(valueStr), "%.1f", sgReadyRoomBoost3Value());
+                publishMqttChecked(stateTopic, valueStr, strlen(valueStr), 0, true);
+            } else {
+                ESP_LOGW("MQTT_CMD", "Invalid room boost value: %s", x.c_str());
+            }
+
+    # SG Ready room boost offset for State 4
+    - topic: heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE4/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received SG_READY_ROOM_BOOST_STATE4 command: %s", x.c_str());
+            publishWritableNumberDiscoveryByName("SG_READY_ROOM_BOOST_STATE4");
+            char* endPtr;
+            float boost = strtof(x.c_str(), &endPtr);
+            if (endPtr != x.c_str() && *endPtr == '\0' && boost >= 0.0 && boost <= 10.0) {
+                setSgReadyRoomBoost4(boost);
+                ESP_LOGI("SG_READY", "Room boost state 4 set to %.1f°C", boost);
+                char stateTopic[128];
+                snprintf(stateTopic, sizeof(stateTopic), "heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE4/state");
+                char valueStr[16];
+                snprintf(valueStr, sizeof(valueStr), "%.1f", sgReadyRoomBoost4Value());
+                publishMqttChecked(stateTopic, valueStr, strlen(valueStr), 0, true);
+            } else {
+                ESP_LOGW("MQTT_CMD", "Invalid room boost value: %s", x.c_str());
             }
 
     # Room temperature setpoints for heating circuits 1–3 and night/reduced mode
@@ -475,31 +504,6 @@ captive_portal:
 #                                       #
 #########################################
 sensor:
-  # SG Ready boost temperature sensors
-  - platform: template
-    name: "SG Ready Boost State 3"
-    id: sg_ready_boost_state3_sensor
-    unit_of_measurement: "°C"
-    device_class: "temperature"
-    state_class: "measurement"
-    accuracy_decimals: 1
-    icon: "mdi:thermometer-plus"
-    update_interval: 30s
-    lambda: |-
-      return sgReadyBoostState3Value();
-
-  - platform: template
-    name: "SG Ready Boost State 4"
-    id: sg_ready_boost_state4_sensor
-    unit_of_measurement: "°C"
-    device_class: "temperature"
-    state_class: "measurement"
-    accuracy_decimals: 1
-    icon: "mdi:thermometer-plus"
-    update_interval: 30s
-    lambda: |-
-      return sgReadyBoostState4Value();
-
   # WiFi and system sensors
   - platform: wifi_signal
     name: "WiFi Signal dBm"

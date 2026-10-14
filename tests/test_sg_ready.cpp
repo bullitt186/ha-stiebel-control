@@ -210,6 +210,37 @@ TEST_CASE("room boost is capped at 25°C", "[sg_ready]") {
     CHECK(io.lastCan("RAUMSOLLTEMP_I") == "25.0");
 }
 
+TEST_CASE("setRoomBoost3/4 configure the room boost offset", "[sg_ready]") {
+    FakeIO io;
+    SgReadyController ctrl(io);
+    io.currentDhw = 45.0f;
+    io.currentRoom = 21.0f;
+    io.hasCurrent = true;
+
+    ctrl.setRoomBoost3(3.0f);
+    ctrl.applyState(SgReadyController::STATE_RECOMMENDED);
+    CHECK(io.lastCan("RAUMSOLLTEMP_I") == "24.0");  // 21.0 + 3.0
+    CHECK(ctrl.roomBoost3() == Approx(3.0f));
+
+    io.reset();
+    ctrl.setRoomBoost4(4.5f);
+    ctrl.applyState(SgReadyController::STATE_FORCED);
+    CHECK(io.lastCan("RAUMSOLLTEMP_I") == "25.0");  // 21.0 + 4.5 capped at 25.0
+    CHECK(ctrl.roomBoost4() == Approx(4.5f));
+}
+
+TEST_CASE("room boost can be disabled (0 = no room write)", "[sg_ready]") {
+    FakeIO io;
+    SgReadyController ctrl(io);
+    io.currentDhw = 45.0f;
+    io.currentRoom = 21.0f;
+    io.hasCurrent = true;
+
+    ctrl.setRoomBoost3(0.0f);
+    ctrl.applyState(SgReadyController::STATE_RECOMMENDED);
+    CHECK(io.countCan("RAUMSOLLTEMP_I") == 0);
+}
+
 TEST_CASE("state 3 → state 2: restores original DHW and room temps", "[sg_ready]") {
     FakeIO io;
     SgReadyController ctrl(io);

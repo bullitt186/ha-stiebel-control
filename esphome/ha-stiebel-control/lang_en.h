@@ -217,10 +217,18 @@
 #define LNAME_NUM_SPEICHERSOLLTEMP             "DHW Target Temperature Setting"
 #undef  LNAME_NUM_SPEICHERSOLLTEMP2
 #define LNAME_NUM_SPEICHERSOLLTEMP2            "DHW Target Temperature 2 Setting"
+#undef  LNAME_NUM_WW_SOLL
+#define LNAME_NUM_WW_SOLL                      "DHW Setpoint"
+#undef  LNAME_NUM_RAUM_SOLL
+#define LNAME_NUM_RAUM_SOLL                    "Room Setpoint"
 #undef  LNAME_NUM_SG_READY_BOOST3
-#define LNAME_NUM_SG_READY_BOOST3              "SG Ready Boost State 3"
+#define LNAME_NUM_SG_READY_BOOST3              "DHW Boost Recommended"
 #undef  LNAME_NUM_SG_READY_BOOST4
-#define LNAME_NUM_SG_READY_BOOST4              "SG Ready Boost State 4"
+#define LNAME_NUM_SG_READY_BOOST4              "DHW Boost Forced"
+#undef  LNAME_NUM_SG_READY_ROOM_BOOST3
+#define LNAME_NUM_SG_READY_ROOM_BOOST3         "Room Boost Recommended"
+#undef  LNAME_NUM_SG_READY_ROOM_BOOST4
+#define LNAME_NUM_SG_READY_ROOM_BOOST4         "Room Boost Forced"
 #undef  LNAME_NUM_RAUMSOLLTEMP_I
 #define LNAME_NUM_RAUMSOLLTEMP_I               "Room Target Temperature I Setting"
 #undef  LNAME_NUM_RAUMSOLLTEMP_II

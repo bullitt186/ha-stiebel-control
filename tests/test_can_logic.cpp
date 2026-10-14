@@ -962,9 +962,16 @@ TEST_CASE("publishWritableNumberDiscovery: SG_READY signal uses main device (no 
 
 TEST_CASE("publishWritableNumberDiscovery: regular signal uses sub-device with via_device", "[mqtt]") {
     resetDiscoveryState();
-    publishWritableNumberDiscovery(writableNumbers[0], true);  // EINSTELL_SPEICHERSOLLTEMP
+    publishWritableNumberDiscovery(writableNumbers[6], true);  // RAUMSOLLTEMP_I (sub-device)
     std::string payload = mqttFindPayload("homeassistant/number/heatingpump/");
     CHECK(payload.find("\"via_device\"") != std::string::npos);
+}
+
+TEST_CASE("publishWritableNumberDiscovery: onMainDevice flag routes to main device (no via_device)", "[mqtt]") {
+    resetDiscoveryState();
+    publishWritableNumberDiscovery(writableNumbers[0], true);  // WW_SOLL (onMainDevice)
+    std::string payload = mqttFindPayload("homeassistant/number/heatingpump/");
+    CHECK(payload.find("via_device") == std::string::npos);
 }
 
 TEST_CASE("publishWritableNumberDiscovery: cached — second call skips publish", "[mqtt]") {

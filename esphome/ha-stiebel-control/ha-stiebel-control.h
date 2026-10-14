@@ -188,23 +188,34 @@ struct WritableNumberConfig {
     const char* unit;              // Unit of measurement
     const char* icon;              // MDI icon
     const char* deviceClass;       // HA device class
+    bool onMainDevice = false;     // true = group the entity under the main device
 };
 
 static const WritableNumberConfig writableNumbers[] = {
-    // Primary storage target temperature
-    {"EINSTELL_SPEICHERSOLLTEMP", LNAME_NUM_SPEICHERSOLLTEMP,
-     cm_manager, 20.0, 60.0, 1.0, "°C", "mdi:thermometer-high", "temperature"},
+    // Combined DHW (WW) normal setpoint — writes BOTH Einstell registers
+    // (0x0013 + 0x0a06) to the display/operating unit (0x201), keeping them in
+    // sync (the active setpoint follows the WPM3's internal mapping).
+    {"WW_SOLL", LNAME_NUM_WW_SOLL,
+     cm_manager, 20.0, 60.0, 1.0, "°C", "mdi:water-thermometer", "temperature", true},
 
-    // Secondary storage target temperature (comfort/eco modes)
-    {"EINSTELL_SPEICHERSOLLTEMP2", LNAME_NUM_SPEICHERSOLLTEMP2,
-     cm_manager, 20.0, 60.0, 1.0, "°C", "mdi:thermometer-low", "temperature"},
+    // Room normal setpoint — writes RAUMSOLLTEMP_I (0x0005) to the manager.
+    // Additional to the RAUMSOLLTEMP_I entity (same value, main device).
+    {"RAUM_SOLL", LNAME_NUM_RAUM_SOLL,
+     cm_manager, 10.0, 30.0, 0.5, "°C", "mdi:home-thermometer", "temperature", true},
 
-    // SG Ready boost temperatures (not real CAN signals, handled internally)
+    // SG Ready DHW boost temperatures (not real CAN signals, handled internally)
     {"SG_READY_BOOST_STATE3", LNAME_NUM_SG_READY_BOOST3,
      cm_manager, 0.0, 10.0, 0.5, "°C", "mdi:thermometer-plus", "temperature"},
 
     {"SG_READY_BOOST_STATE4", LNAME_NUM_SG_READY_BOOST4,
      cm_manager, 0.0, 15.0, 0.5, "°C", "mdi:thermometer-chevron-up", "temperature"},
+
+    // SG Ready room boost offsets (not real CAN signals, handled internally)
+    {"SG_READY_ROOM_BOOST_STATE3", LNAME_NUM_SG_READY_ROOM_BOOST3,
+     cm_manager, 0.0, 10.0, 0.5, "°C", "mdi:home-thermometer-plus", "temperature"},
+
+    {"SG_READY_ROOM_BOOST_STATE4", LNAME_NUM_SG_READY_ROOM_BOOST4,
+     cm_manager, 0.0, 10.0, 0.5, "°C", "mdi:home-thermometer-chevron-up", "temperature"},
 
     // Room temperature setpoints for heating circuits 1–3 and night/reduced mode
     {"RAUMSOLLTEMP_I", LNAME_NUM_RAUMSOLLTEMP_I,
@@ -309,6 +320,8 @@ static float lastVerdichterValue = NAN;
 // Room setpoint: MANAGER poll (30s); active DHW setpoint: KESSEL poll (10min).
 static float lastSpeicherSollTemp = NAN;
 static float lastRaumSollTemp = NAN;
+// DHW panel setting (broadcast by BEDIENMODUL_WPM3) — mirrored into WW_SOLL.
+static float lastEinstellSollTemp = NAN;
 
 // Track date/time component values
 static int lastJahr = -1;
@@ -788,10 +801,10 @@ void publishWritableNumberDiscovery(const WritableNumberConfig& config, bool for
             << "\"device_class\":\"" << config.deviceClass << "\","
             << "\"icon\":\"" << config.icon << "\",";
     
-    // Check if this is an SG Ready control - assign to main device
+    // SG Ready controls and explicitly flagged controls go to the main device
     bool isSgReady = (strncmp(config.signalName, "SG_READY_", 9) == 0);
     
-    if (isSgReady) {
+    if (isSgReady || config.onMainDevice) {
         // SG Ready controls go to main device
         payload << "\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL_STR "\"],"
                 << "\"name\":\"Stiebel Eltron Wärmepumpe\","
@@ -1507,6 +1520,23 @@ void updateCOPCalculations() {
 // ESPHOME IO ADAPTER FOR SG READY CONTROLLER
 // ============================================================================
 
+// Route a write + read-back to the CAN member that actually owns the register.
+// WPM3 (wpl10ac): the Einstell-DHW registers live on the display/operating unit
+// (BEDIENMODUL_WPM3, 0x201) — the MANAGER ignores writes to them and answers
+// reads with "not available" (0x8000 → -255). Everything else goes to the
+// manager. Non-blocking: both calls only enqueue CAN frames (FIFO TX queue).
+inline void writeCanSignalRouted(const char* signalName, const char* value) {
+    const CanMember* member = &CanMembers[cm_manager];
+#ifdef HA_MODEL_wpl10ac
+    if (strcmp(signalName, "EINSTELL_SPEICHERSOLLTEMP") == 0 ||
+        strcmp(signalName, "EINSTELL_SPEICHERSOLLTEMP2") == 0) {
+        member = &CanMembers[cm_bedienmodul_wpm3];
+    }
+#endif
+    writeSignal(member, signalName, value);
+    readSignal(member, signalName);
+}
+
 class EspHomeSgReadyIO : public ISgReadyIO {
 public:
     static ESPPreferenceObject nvsDhw;
@@ -1514,22 +1544,7 @@ public:
     static ESPPreferenceObject nvsActive;
 
     void writeCanSignal(const char* signalName, const char* value) override {
-#ifdef HA_MODEL_wpl10ac
-        // WPM3: the Einstell-DHW registers are owned by the display/operating
-        // unit (BEDIENMODUL_WPM3, 0x201) which broadcasts the panel values.
-        // The MANAGER ignores writes to them and answers reads with "not
-        // available" (0x8000 → -255) — route these signals to 0x201 instead.
-        if (strcmp(signalName, "EINSTELL_SPEICHERSOLLTEMP") == 0 ||
-            strcmp(signalName, "EINSTELL_SPEICHERSOLLTEMP2") == 0) {
-            writeSignal(&CanMembers[cm_bedienmodul_wpm3], signalName, value);
-            readSignal(&CanMembers[cm_bedienmodul_wpm3], signalName);
-            return;
-        }
-#endif
-        // Non-blocking: both calls only enqueue CAN frames (FIFO TX queue), so the
-        // write is transmitted before the read-back request. No delay() in the loop.
-        writeSignal(&CanMembers[cm_manager], signalName, value);
-        readSignal(&CanMembers[cm_manager], signalName);
+        writeCanSignalRouted(signalName, value);
     }
 
     // Current setpoints tracked from the CAN polls (see updateSensor dispatch).
@@ -1601,8 +1616,12 @@ void applySgReadyState(int state) {
 // Accessor helpers used by YAML sensor lambdas and MQTT on_connect block
 inline float sgReadyBoostState3Value() { return sgReadyController.boostState3(); }
 inline float sgReadyBoostState4Value() { return sgReadyController.boostState4(); }
+inline float sgReadyRoomBoost3Value() { return sgReadyController.roomBoost3(); }
+inline float sgReadyRoomBoost4Value() { return sgReadyController.roomBoost4(); }
 inline void  setSgReadyBoost3(float v) { lastSgReadyCommandTs = millis(); sgReadyController.setBoostState3(v); }
 inline void  setSgReadyBoost4(float v) { lastSgReadyCommandTs = millis(); sgReadyController.setBoostState4(v); }
+inline void  setSgReadyRoomBoost3(float v) { lastSgReadyCommandTs = millis(); sgReadyController.setRoomBoost3(v); }
+inline void  setSgReadyRoomBoost4(float v) { lastSgReadyCommandTs = millis(); sgReadyController.setRoomBoost4(v); }
 
 // Watchdog against a dead control source: only rescues from a stuck BOOST (3/4).
 // Standby (EVU lock) is a deliberate long-term state and stays as-is. If a boost
@@ -1635,6 +1654,25 @@ void publishSgReadyStates() {
     snprintf(boost4Str, sizeof(boost4Str), "%.1f", sgReadyBoostState4Value());
     publishMqttChecked("heatingpump/MANAGER/SG_READY_BOOST_STATE3/state", boost3Str, strlen(boost3Str), 0, true);
     publishMqttChecked("heatingpump/MANAGER/SG_READY_BOOST_STATE4/state", boost4Str, strlen(boost4Str), 0, true);
+
+    char rboost3Str[16], rboost4Str[16];
+    snprintf(rboost3Str, sizeof(rboost3Str), "%.1f", sgReadyRoomBoost3Value());
+    snprintf(rboost4Str, sizeof(rboost4Str), "%.1f", sgReadyRoomBoost4Value());
+    publishMqttChecked("heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE3/state", rboost3Str, strlen(rboost3Str), 0, true);
+    publishMqttChecked("heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE4/state", rboost4Str, strlen(rboost4Str), 0, true);
+
+    // Mirror the "normal" setpoints into the WW_SOLL / RAUM_SOLL entities so
+    // they reflect the real device values (panel changes included).
+    if (!std::isnan(lastEinstellSollTemp)) {
+        char b[16];
+        snprintf(b, sizeof(b), "%.1f", lastEinstellSollTemp);
+        publishMqttChecked("heatingpump/MANAGER/WW_SOLL/state", b, strlen(b), 0, true);
+    }
+    if (!std::isnan(lastRaumSollTemp)) {
+        char b[16];
+        snprintf(b, sizeof(b), "%.1f", lastRaumSollTemp);
+        publishMqttChecked("heatingpump/MANAGER/RAUM_SOLL/state", b, strlen(b), 0, true);
+    }
 }
 
 // ============================================================================
@@ -1671,6 +1709,7 @@ constexpr uint32_t HASH_SOMMERBETRIEB = hash("SOMMERBETRIEB");
 constexpr uint32_t HASH_WPVORLAUFIST = hash("WPVORLAUFIST");
 constexpr uint32_t HASH_RAUMSOLLTEMP_I = hash("RAUMSOLLTEMP_I");
 constexpr uint32_t HASH_SPEICHERSOLLTEMP = hash("SPEICHERSOLLTEMP");
+constexpr uint32_t HASH_EINSTELL_SPEICHERSOLLTEMP = hash("EINSTELL_SPEICHERSOLLTEMP");
 constexpr uint32_t HASH_RUECKLAUFISTTEMP = hash("RUECKLAUFISTTEMP");
 constexpr uint32_t HASH_VERDICHTER = hash("VERDICHTER");
 constexpr uint32_t HASH_EL_AUFNAHMELEISTUNG_HEIZ = hash("EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH");
@@ -1815,6 +1854,17 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
             float floatValue = strtof(value.c_str(), &endPtr);
             if (endPtr != value.c_str() && *endPtr == '\0') {
                 lastSpeicherSollTemp = floatValue;
+            }
+            break;
+        }
+
+        case HASH_EINSTELL_SPEICHERSOLLTEMP: {
+            // Panel DHW setting (broadcast by BEDIENMODUL_WPM3) — mirrored into
+            // the WW_SOLL entity so it shows the real setpoint.
+            char* endPtr;
+            float floatValue = strtof(value.c_str(), &endPtr);
+            if (endPtr != value.c_str() && *endPtr == '\0') {
+                lastEinstellSollTemp = floatValue;
             }
             break;
         }

@@ -81,10 +81,6 @@ public:
     static constexpr float DEFAULT_DHW_TEMP  = 48.0f;
     static constexpr float DEFAULT_ROOM_TEMP = 20.0f;
 
-    // Hardcoded room boost offsets per state
-    static constexpr float ROOM_BOOST_STATE3 = 1.0f;
-    static constexpr float ROOM_BOOST_STATE4 = 2.0f;
-
     // Temperature ceiling for DHW boost
     static constexpr float MAX_DHW_TEMP  = 60.0f;
     static constexpr float MAX_ROOM_TEMP = 25.0f;
@@ -99,6 +95,8 @@ public:
     struct Config {
         float boostState3 = 5.0f;   // DHW boost for state 3 (°C)
         float boostState4 = 8.0f;   // DHW boost for state 4 (°C)
+        float roomBoost3  = 1.0f;   // room boost for state 3 (°C)
+        float roomBoost4  = 2.0f;   // room boost for state 4 (°C)
     };
 
     struct State {
@@ -156,11 +154,26 @@ public:
         }
     }
 
+    // Update configurable room boost amounts (°C)
+    void setRoomBoost3(float boost) {
+        if (boost >= 0.0f && boost <= 10.0f) {
+            config_.roomBoost3 = boost;
+        }
+    }
+
+    void setRoomBoost4(float boost) {
+        if (boost >= 0.0f && boost <= 10.0f) {
+            config_.roomBoost4 = boost;
+        }
+    }
+
     // Getters for inspection / sensor publishing
     int   currentState()    const { return state_.currentState; }
     bool  isActive()        const { return state_.active; }
     float boostState3()     const { return config_.boostState3; }
     float boostState4()     const { return config_.boostState4; }
+    float roomBoost3()      const { return config_.roomBoost3; }
+    float roomBoost4()      const { return config_.roomBoost4; }
     float originalDhwTemp() const { return state_.originalDhwTemp; }
     float originalRoomTemp() const { return state_.originalRoomTemp; }
 
@@ -279,11 +292,13 @@ private:
             writeDhwSetpoint(buf);
         }
 
-        float boostedRoom = state_.originalRoomTemp + ROOM_BOOST_STATE3;
-        if (boostedRoom > MAX_ROOM_TEMP) boostedRoom = MAX_ROOM_TEMP;
-        char roomBuf[16];
-        snprintf(roomBuf, sizeof(roomBuf), "%.1f", boostedRoom);
-        io_.writeCanSignal("RAUMSOLLTEMP_I", roomBuf);
+        if (config_.roomBoost3 > 0.1f) {
+            float boostedRoom = state_.originalRoomTemp + config_.roomBoost3;
+            if (boostedRoom > MAX_ROOM_TEMP) boostedRoom = MAX_ROOM_TEMP;
+            char roomBuf[16];
+            snprintf(roomBuf, sizeof(roomBuf), "%.1f", boostedRoom);
+            io_.writeCanSignal("RAUMSOLLTEMP_I", roomBuf);
+        }
     }
 
     void applyForced() {
@@ -301,11 +316,13 @@ private:
             writeDhwSetpoint(buf);
         }
 
-        float boostedRoom = state_.originalRoomTemp + ROOM_BOOST_STATE4;
-        if (boostedRoom > MAX_ROOM_TEMP) boostedRoom = MAX_ROOM_TEMP;
-        char roomBuf[16];
-        snprintf(roomBuf, sizeof(roomBuf), "%.1f", boostedRoom);
-        io_.writeCanSignal("RAUMSOLLTEMP_I", roomBuf);
+        if (config_.roomBoost4 > 0.1f) {
+            float boostedRoom = state_.originalRoomTemp + config_.roomBoost4;
+            if (boostedRoom > MAX_ROOM_TEMP) boostedRoom = MAX_ROOM_TEMP;
+            char roomBuf[16];
+            snprintf(roomBuf, sizeof(roomBuf), "%.1f", boostedRoom);
+            io_.writeCanSignal("RAUMSOLLTEMP_I", roomBuf);
+        }
     }
 };
 
