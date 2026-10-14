@@ -1533,6 +1533,13 @@ inline void writeCanSignalRouted(const char* signalName, const char* value) {
         member = &CanMembers[cm_bedienmodul_wpm3];
     }
 #endif
+    // Track the DHW setting locally so the WW_SOLL state stays stable even though
+    // the WPM3 does not apply Einstell changes to the active setpoint.
+    if (strcmp(signalName, "EINSTELL_SPEICHERSOLLTEMP") == 0) {
+        char* endPtr;
+        float v = strtof(value, &endPtr);
+        if (endPtr != value && *endPtr == '\0') lastEinstellSollTemp = v;
+    }
     writeSignal(member, signalName, value);
     readSignal(member, signalName);
 }
@@ -1548,11 +1555,15 @@ public:
     }
 
     // Current setpoints tracked from the CAN polls (see updateSensor dispatch).
-    // Unknown values (never polled) are reported as 0.0 so the controller falls
+    // Unknown values (never seen) are reported as 0.0 so the controller falls
     // back to its defaults.
     bool readCurrentSetpoints(float& dhwTemp, float& roomTemp) override {
-        dhwTemp  = std::isnan(lastSpeicherSollTemp) ? 0.0f : lastSpeicherSollTemp;
-        roomTemp = std::isnan(lastRaumSollTemp)     ? 0.0f : lastRaumSollTemp;
+        // Prefer the DHW SETTING (lastEinstellSollTemp) as the boost baseline so
+        // a restore does not overwrite a user-set value with the stale active
+        // setpoint. Fall back to the active setpoint (lastSpeicherSollTemp).
+        dhwTemp  = !std::isnan(lastEinstellSollTemp) ? lastEinstellSollTemp
+                 : (std::isnan(lastSpeicherSollTemp) ? 0.0f : lastSpeicherSollTemp);
+        roomTemp = std::isnan(lastRaumSollTemp) ? 0.0f : lastRaumSollTemp;
         return true;
     }
 
@@ -1661,10 +1672,10 @@ void publishSgReadyStates() {
     publishMqttChecked("heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE3/state", rboost3Str, strlen(rboost3Str), 0, true);
     publishMqttChecked("heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE4/state", rboost4Str, strlen(rboost4Str), 0, true);
 
-    // Mirror the normal setpoints into WW_SOLL / RAUM_SOLL. The DHW value
-    // prefers the ACTIVE setpoint (polled reliably from KESSEL); the panel
-    // setting (broadcast by BEDIENMODUL_WPM3 only on change) is the fallback.
-    float wwSoll = !std::isnan(lastSpeicherSollTemp) ? lastSpeicherSollTemp : lastEinstellSollTemp;
+    // Mirror the normal setpoints into WW_SOLL / RAUM_SOLL. The DHW value is the
+    // STORED setting (lastEinstellSollTemp — updated by our writes and by panel
+    // change broadcasts) so it stays stable; the active setpoint is the fallback.
+    float wwSoll = !std::isnan(lastEinstellSollTemp) ? lastEinstellSollTemp : lastSpeicherSollTemp;
     if (!std::isnan(wwSoll)) {
         char b[16];
         snprintf(b, sizeof(b), "%.1f", wwSoll);
