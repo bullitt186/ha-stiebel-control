@@ -65,6 +65,9 @@ TEST_CASE("lookupCanMember: MANAGER (0x480)", "[can]") {
 TEST_CASE("lookupCanMember: KESSEL (0x180)", "[can]") {
     CHECK(std::string(lookupCanMember(0x180).Name) == "KESSEL");
 }
+TEST_CASE("lookupCanMember: BEDIENMODUL_WPM3 (0x201) — WPM3 display unit", "[can]") {
+    CHECK(std::string(lookupCanMember(0x201).Name) == "BEDIENMODUL_WPM3");
+}
 TEST_CASE("lookupCanMember: PC (0x680)", "[can]") {
     CHECK(std::string(lookupCanMember(0x680).Name) == "PC");
 }

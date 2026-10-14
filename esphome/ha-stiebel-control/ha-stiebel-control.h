@@ -49,6 +49,11 @@ static const CanMember CanMembers[] =
     {
         //  Name  CanId
         {"KESSEL", 0x180},
+        // WPM3 display/operating unit (CAN B): broadcasts the panel settings
+        // (EINSTELL_SPEICHERSOLLTEMP / ..._SOLLTEMP2) and the display DHW
+        // temperature. KESSEL/MANAGER do not answer reads for these registers,
+        // so this node is the only source for them on the WPL 10 AC / WPM3.
+        {"BEDIENMODUL_WPM3", 0x201},
         {"ATEZ", 0x280},
         {"BEDIENMODUL_1", 0x300},
         {"BEDIENMODUL_2", 0x301},
@@ -71,6 +76,7 @@ typedef enum
 {
     // Die Reihenfolge muss mit CanMembers übereinstimmen!
     cm_kessel = 0,
+    cm_bedienmodul_wpm3,
     cm_atez,
     cm_bedienmodul_1,
     cm_bedienmodul_2,
