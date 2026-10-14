@@ -21,7 +21,7 @@
 #define SG_READY_NORMAL_MODE "Tagbetrieb"
 #endif
 
-// WPL 10 AC / WPM3 NOTE: writing the ACTIVE SPEICHERSOLLTEMP register (0x000e)
+// WPL 10 AC / WPM3 NOTE: writing the ACTIVE SPEICHERSOLLTEMP register (0x0003)
 // in addition to EINSTELL_SPEICHERSOLLTEMP was tested and REVERTED — it
 // destabilized the WPM3's DHW setpoint handling (the setpoint started following
 // the Eco temperature values). The WPM3 quirk is NOT register-related; the DHW
