@@ -1514,6 +1514,18 @@ public:
     static ESPPreferenceObject nvsActive;
 
     void writeCanSignal(const char* signalName, const char* value) override {
+#ifdef HA_MODEL_wpl10ac
+        // WPM3: the Einstell-DHW registers are owned by the display/operating
+        // unit (BEDIENMODUL_WPM3, 0x201) which broadcasts the panel values.
+        // The MANAGER ignores writes to them and answers reads with "not
+        // available" (0x8000 → -255) — route these signals to 0x201 instead.
+        if (strcmp(signalName, "EINSTELL_SPEICHERSOLLTEMP") == 0 ||
+            strcmp(signalName, "EINSTELL_SPEICHERSOLLTEMP2") == 0) {
+            writeSignal(&CanMembers[cm_bedienmodul_wpm3], signalName, value);
+            readSignal(&CanMembers[cm_bedienmodul_wpm3], signalName);
+            return;
+        }
+#endif
         // Non-blocking: both calls only enqueue CAN frames (FIFO TX queue), so the
         // write is transmitted before the read-back request. No delay() in the loop.
         writeSignal(&CanMembers[cm_manager], signalName, value);
@@ -2067,6 +2079,18 @@ void processSignalRequests() {
                 pollSlots.push_back({member, ei, intervalMs, now + randomOffset, 0});
             }
         }
+
+        // Poll the SG-Ready capture-relevant setpoints immediately instead of
+        // spreading them over their (up to 10 min) interval, so a boost applied
+        // shortly after boot captures the REAL device values rather than falling
+        // back to the hardcoded defaults.
+        for (auto& slot : pollSlots) {
+            if (strcmp(slot.signal->Name, "RAUMSOLLTEMP_I") == 0 ||
+                strcmp(slot.signal->Name, "SPEICHERSOLLTEMP") == 0) {
+                slot.nextAt = now + getRandomInRange(0, 2000);
+            }
+        }
+
         ESP_LOGI("REQUEST_MGR", "Initialized %d poll slots", (int)pollSlots.size());
     }
     
