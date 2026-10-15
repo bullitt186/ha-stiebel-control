@@ -227,7 +227,7 @@ static const WritableNumberConfig writableNumbers[] = {
     // (z.B. weil es auf dem Dashboard nicht erscheinen soll oder am
     // Geraet nicht vorhanden ist), kommentiere die Zeile aus (// davor).
     //
-    // ACHTUNG: Diese Werte werden DIREKT auf die WPL17 geschrieben.
+    // ACHTUNG: Diese Werte werden DIREKT auf die Waermepumpe geschrieben.
     // Nur aktivieren, was das Geraet wirklich kann. Die "heiklen"
     // Felder (die du nicht im Dashboard zeigen willst) kannst du
     // einfach hier lassen und im Dashboard ausblenden.
@@ -235,11 +235,11 @@ static const WritableNumberConfig writableNumbers[] = {
 
     // Primary storage target temperature (WW-Solltemperatur)
     {"EINSTELL_SPEICHERSOLLTEMP", LNAME_NUM_SPEICHERSOLLTEMP,
-     cm_kessel_canb, 20.0, 60.0, 1.0, "°C", "mdi:thermometer-high", "temperature"},
+     cm_manager, 20.0, 60.0, 1.0, "°C", "mdi:thermometer-high", "temperature"},
 
     // Secondary storage target temperature (comfort/eco modes)
     {"EINSTELL_SPEICHERSOLLTEMP2", LNAME_NUM_SPEICHERSOLLTEMP2,
-     cm_kessel_canb, 20.0, 60.0, 1.0, "°C", "mdi:thermometer-low", "temperature"},
+     cm_manager, 20.0, 60.0, 1.0, "°C", "mdi:thermometer-low", "temperature"},
 
     // SG Ready boost temperatures (not real CAN signals, handled internally)
     {"SG_READY_BOOST_STATE3", LNAME_NUM_SG_READY_BOOST3,
@@ -877,11 +877,17 @@ void publishAllWritableNumberDiscoveries(bool forceRepublish = false) {
         // WPL17 has only ONE heating circuit (RAUMSOLLTEMP_I). Skip II/III so the
         // number entities are not created on single-circuit models (-255 only).
         const char* sig = writableNumbers[i].signalName;
-        if (strcmp(sig, "RAUMSOLLTEMP_II") == 0 || strcmp(sig, "RAUMSOLLTEMP_III") == 0) {
-            if (strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0) {
-                ESP_LOGI("MQTT_DISC", "Skipping %s on %s (single heating circuit)", sig, HA_DEVICE_MODEL_STR);
-                continue;
-            }
+        bool isWpl17 = (strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0);
+        // WPL17 has only ONE heating circuit (RAUMSOLLTEMP_I). Skip II/III so the
+        // number entities are not created on single-circuit models (-255 only).
+        if ((strcmp(sig, "RAUMSOLLTEMP_II") == 0 || strcmp(sig, "RAUMSOLLTEMP_III") == 0) && isWpl17) {
+            ESP_LOGI("MQTT_DISC", "Skipping %s on %s (single heating circuit)", sig, HA_DEVICE_MODEL_STR);
+            continue;
+        }
+        // HEIZKURVE only exists on KESSEL_CANB (WPL17); skip on other models.
+        if (strcmp(sig, "HEIZKURVE") == 0 && !isWpl17) {
+            ESP_LOGI("MQTT_DISC", "Skipping %s on %s (WPL17 only)", sig, HA_DEVICE_MODEL_STR);
+            continue;
         }
         ESP_LOGI("MQTT_DISC", "Publishing writable number %d: %s", i, sig);
         publishWritableNumberDiscovery(writableNumbers[i], forceRepublish);
@@ -1562,11 +1568,12 @@ static bool sanitizeEnergyTotal(const char* key, float raw, float& out) {
     const float TOL = 25.0f;                    // Naehe eines Kandidaten zu seiner Region
     const unsigned long CONFIRM_MS = 900000UL;  // 15 min stabile Bestaetigung
 
-    // Klar ungueltige Marker (0x8000 -> 32768000, -255, ...) verwerfen
+    // Klar ungueltige Marker (0x8000 -> 32768000, -255, ...) verwerfen.
+    // Rueckgabe = "ein publizierbarer Wert liegt in out vor".
     if (raw <= -1000.0f || raw >= 1000000.0f) {
         auto s = stableValue.find(key);
-        if (s != stableValue.end()) { out = s->second; return false; }
-        return false;
+        if (s != stableValue.end()) { out = s->second; return true; }
+        return false;   // noch kein stabiler Wert -> nicht publizieren
     }
 
     auto it = stableValue.find(key);
@@ -1602,7 +1609,7 @@ static bool sanitizeEnergyTotal(const char* key, float raw, float& out) {
     }
 
     out = last;   // letzten guten Wert weiter senden
-    return false;
+    return true;
 }
 
 // ============================================================================
@@ -1710,7 +1717,7 @@ void publishCombinedEnergySensors() {
         }
         if (!have) return;
         float total;
-        sanitizeEnergyTotal(key, rawTotal, total);
+        if (!sanitizeEnergyTotal(key, rawTotal, total)) return;   // kein Wert -> nicht senden
         char valueStr[32];
         snprintf(valueStr, sizeof(valueStr), "%.3f", total);
         publishCalculatedSensorDiscovery(cfg, false);

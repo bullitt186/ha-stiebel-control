@@ -94,11 +94,6 @@ Raum-Soll-Temp, Heizkurve, Energien, Betriebsmodus) is only readable on **CAN-B
 `can_bit_rate: 50kbps` and `device_model: "wpl17"` in `heatingpump.yaml`.
 See `signal_requests_wpl17.h` header for details.
 
-There is also a **scan/diagnostic variant** (`heatingpump_scan.yaml` +
-`signal_requests_scan.h`) for reverse-engineering unknown registers (e.g. the
-built-in but disabled cooling function) — see its header comment. Not for
-production use.
-
 To add support for your heat pump, see [Contributing](#contributing) below.
 
 ---

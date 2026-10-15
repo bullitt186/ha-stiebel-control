@@ -21,11 +21,11 @@ republish.
 Examples:
   # dry-run (list only)
   python3 helperscripts/clean_mqtt_discovery.py \\
-      --broker 192.168.30.10 --user iotuser --password secret
+      --broker 192.168.1.10 --user mqtt_user --password secret
 
   # clear everything for the node, then let the device republish
   python3 helperscripts/clean_mqtt_discovery.py \\
-      --broker 192.168.30.10 --user iotuser --password secret --apply
+      --broker 192.168.1.10 --user mqtt_user --password secret --apply
 """
 
 import argparse

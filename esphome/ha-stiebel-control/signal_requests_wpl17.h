@@ -15,10 +15,10 @@
  *
  * CAN-B member addresses (verified on a real WPL17 ICS classic):
  *   KESSEL_CANB   0x201 — Speicher-Ist/Soll-Temp, Raum-Soll-Temp, Heizkurve, Pumpen, Status
- *   MANAGER_CANB  0x480 — Programm-Schalter, Sommerbetrieb, Speicher-Soll, Raum-Soll,
+ *   MANAGER       0x480 — Programm-Schalter, Sommerbetrieb, Speicher-Soll, Raum-Soll,
  *                         Heizgrenzen, Ferien, Takt, WP-Status
- *   HEIZMODUL_CANB 0x500 — Energien (Strom/Waerme MWh+kWh), Verdichter, Vorlauf/Ruecklauf,
- *                         Drehzahlen, Laufzeiten, Kuehl-Zustand
+ *   HEIZMODUL     0x500 — Verdichter, Vorlauf/Ruecklauf, Drehzahlen, Laufzeiten
+ *   HEIZMODUL_WPL 0x514 — Energien (Strom/Waerme MWh+kWh), feine Tageszaehler
  *
  * ANPASSEN FUER DEIN GERAET (How to customise):
  *  -------------------------------------------------
@@ -62,7 +62,7 @@ extern const SignalRequest signalRequests[] = {
     // ========================================================================
     // WPL17 (CAN-B): KESSEL_CANB (0x201) — Speicher/Raum/Heizkurve/Aussentemp
     // ========================================================================
-    {"AUSSENTEMP",                 FREQ_30S,   cm_kessel_canb},
+    {"AUSSENTEMP",                 FREQ_30S,   cm_kessel},      // Aussentemperatur liegt auf dem Kessel (0x180), nicht auf KESSEL_CANB
     {"SPEICHERISTTEMP",            FREQ_30S,   cm_kessel_canb},
     {"SPEICHERSOLLTEMP",           FREQ_1MIN,  cm_kessel_canb},
     {"EINSTELL_SPEICHERSOLLTEMP",  FREQ_1MIN,  cm_kessel_canb},
@@ -91,35 +91,34 @@ extern const SignalRequest signalRequests[] = {
     // {"WW_DURCHLADEN",           FREQ_1MIN,  cm_kessel},       // WW-Schnellladung           (-255)
     // {"WASSERDRUCK",             FREQ_10MIN, cm_kessel},       // Heizungswasserdruck        (-255)
 
-    // --- EINSTELLREGISTER gegen KESSEL (0x180) getestet — liefern auf der Komfortebene -255.
-    // Analog AUSSENTEMP/VORLAUFSOLLTEMP koennten diese Heizungs-Einstellwerte auf dem
-    // Kessel liegen. Auskommentieren wenn -255.
-    {"HEIZGRENZE_TAG",            FREQ_10MIN, cm_kessel},       // Heizgrenze Tag
-    {"HEIZGRENZE_NACHT",          FREQ_10MIN, cm_kessel},       // Heizgrenze Nacht
-    {"TAKTSPERRE",                FREQ_10MIN, cm_kessel},       // Min.-Ausschaltzeit Verdichter
-    {"WW_HYSTERSE",               FREQ_10MIN, cm_kessel},       // WW-Hysterese
-    {"RUECKLAUF_HYSTERESE",       FREQ_10MIN, cm_kessel},       // Rücklauf-Hysterese
-    {"WW_BETRIEB",                FREQ_1MIN,  cm_kessel},       // WW-Betriebsmodus
-    {"AKTIVES_HEIZPROGRAMM",      FREQ_1MIN,  cm_kessel},       // welches Heizprogramm
-    {"ECO_BETRIEB",               FREQ_1MIN,  cm_kessel},       // Eco-Betrieb
-    {"ECO_EIN_AUS",               FREQ_1MIN,  cm_kessel},       // Eco-Schalter
-    {"PARTY_EIN_AUS",             FREQ_1MIN,  cm_kessel},       // Party-Schalter
-    {"FERIENBETRIEB",             FREQ_1MIN,  cm_kessel},       // Ferienmodus
-    {"FERIEN_ABSENKTEMP",         FREQ_10MIN, cm_kessel},       // Ferien-Absenktemp
-    {"BIVALENTPARALLELTEMPERATUR_HZG", FREQ_10MIN, cm_kessel},  // Bivalenzpunkt Heizung
-    {"BIVALENTPARALLELTEMPERATUR_WW",  FREQ_10MIN, cm_kessel},  // Bivalenzpunkt WW
-    {"WP_PUMPENSTATUS",           FREQ_30S,   cm_kessel},       // Bitfeld Pumpenstatus
+    // --- NICHT VERIFIZIERT (default AUS): lieferten auf der Komfortebene -255 und
+    //     sind auf dem Kessel nicht bestaetigt. Zum Testen einkommentieren; falls -255,
+    //     wieder auskommentieren.
+    // {"HEIZGRENZE_TAG",            FREQ_10MIN, cm_kessel},       // Heizgrenze Tag
+    // {"HEIZGRENZE_NACHT",          FREQ_10MIN, cm_kessel},       // Heizgrenze Nacht
+    // {"TAKTSPERRE",                FREQ_10MIN, cm_kessel},       // Min.-Ausschaltzeit Verdichter
+    // {"WW_HYSTERSE",               FREQ_10MIN, cm_kessel},       // WW-Hysterese
+    // {"RUECKLAUF_HYSTERESE",       FREQ_10MIN, cm_kessel},       // Rücklauf-Hysterese
+    // {"WW_BETRIEB",                FREQ_1MIN,  cm_kessel},       // WW-Betriebsmodus
+    // {"AKTIVES_HEIZPROGRAMM",      FREQ_1MIN,  cm_kessel},       // welches Heizprogramm
+    // {"ECO_BETRIEB",               FREQ_1MIN,  cm_kessel},       // Eco-Betrieb
+    // {"ECO_EIN_AUS",               FREQ_1MIN,  cm_kessel},       // Eco-Schalter
+    // {"PARTY_EIN_AUS",             FREQ_1MIN,  cm_kessel},       // Party-Schalter
+    // {"FERIENBETRIEB",             FREQ_1MIN,  cm_kessel},       // Ferienmodus
+    // {"FERIEN_ABSENKTEMP",         FREQ_10MIN, cm_kessel},       // Ferien-Absenktemp
+    // {"BIVALENTPARALLELTEMPERATUR_HZG", FREQ_10MIN, cm_kessel},  // Bivalenzpunkt Heizung
+    // {"BIVALENTPARALLELTEMPERATUR_WW",  FREQ_10MIN, cm_kessel},  // Bivalenzpunkt WW
+    // {"WP_PUMPENSTATUS",           FREQ_30S,   cm_kessel},       // Bitfeld Pumpenstatus
 
     // ========================================================================
-    // WPL17 (CAN-B): MANAGER_CANB (0x480) — Betriebsmodus + Speicher/Raum/Heizkurve
+    // WPL17 (CAN-B): MANAGER (0x480) — Betriebsmodus + Speicher/Raum/Heizkurve
     // ========================================================================
     {"PROGRAMMSCHALTER",           FREQ_1MIN,  cm_manager},  // Automatik/Tagbetrieb/etc.
     {"SOMMERBETRIEB",              FREQ_1MIN,  cm_manager},  // Heizung aus, nur WW (on/off)
-    {"EINSTELL_SPEICHERSOLLTEMP",  FREQ_1MIN,  cm_manager},
-    {"RAUMSOLLTEMP_I",             FREQ_1MIN,  cm_manager},
-    {"RAUMSOLLTEMP_NACHT",         FREQ_1MIN,  cm_manager},
-    // HEIZKURVE nur vom KESSEL_CANB abfragen (0x201) - dort liegt der schreibbare
-    // Wert. Der Manager liefert einen redundanten/veralteten Wert (0.4).
+    // EINSTELL_SPEICHERSOLLTEMP / RAUMSOLLTEMP_I / RAUMSOLLTEMP_NACHT are requested
+    // once, from KESSEL_CANB (0x201) above - the authoritative, writable member on
+    // the WPL17 (MANAGER returns -255 for EINSTELL_SPEICHERSOLLTEMP).
+    // HEIZKURVE likewise only from KESSEL_CANB (0x201); the Manager value is stale.
 
     // --- OPTIONAL: Betriebs-/Statuswerte (testen, -255 -> auskommentieren) ---
     // VERIFIZIERT auf Manager (0x480): WP_STATUS, ANTILEGIONELLEN. Die anderen
@@ -128,7 +127,7 @@ extern const SignalRequest signalRequests[] = {
     {"WP_STATUS",                 FREQ_30S,   cm_manager},  // Bitfeld Betriebsstatus (Verdichter/Heiz/WW/Kühl) ✓
     {"ANTILEGIONELLEN",           FREQ_1MIN,  cm_manager},  // Legionellenschutz aktiv ✓ (0)
 
-    // -255 auf Manager_CANB (Komfortebene):
+    // -255 auf MANAGER (Komfortebene):
     // {"WP_PUMPENSTATUS",           FREQ_30S,   cm_manager},  // Bitfeld Pumpenstatus  (-255)
     // {"AKTIVES_HEIZPROGRAMM",      FREQ_1MIN,  cm_manager},  // welches Heizprogramm   (-255)
     // {"ECO_BETRIEB",               FREQ_1MIN,  cm_manager},  // Eco-Betrieb            (-255)
@@ -148,7 +147,7 @@ extern const SignalRequest signalRequests[] = {
     // {"BIVALENTPARALLELTEMPERATUR_WW",  FREQ_10MIN, cm_manager},  // Bivalenzpunkt WW       (-255)
 
     // ========================================================================
-    // WPL17 (CAN-B): HEIZMODUL_CANB (0x500) — Energien + Vorlauf/Ruecklauf/Verdichter
+    // WPL17 (CAN-B): HEIZMODUL (0x500) — Energien + Vorlauf/Ruecklauf/Verdichter
     // ========================================================================
     {"WPVORLAUFIST",               FREQ_30S,   cm_heizmodul},
     {"RUECKLAUFISTTEMP",           FREQ_30S,   cm_heizmodul},
