@@ -1613,7 +1613,7 @@ static bool sanitizeEnergyTotal(const char* key, float raw, float& out) {
 }
 
 // ============================================================================
-// GLEITENDER ENERGIE-GESAMTWERT (kein NVS noetig)
+// GLEITENDER ENERGIE-GESAMTWERT (NVS-Sockel + Tagesanteil, ohne Rollover-Doppelzaehlung)
 // ============================================================================
 // Der Geraete-Gesamtzahler (SUM_MWH/SUM_KWH) aktualisiert sich nur einmal pro
 // Nacht; die Tageszaehler (TAG_KWH/TAG_WH) laufen den Tag ueber. Der gleitende
@@ -1670,22 +1670,50 @@ inline void ensureEnergyBase() {
     if (energyBasePref.load(&tmp) && tmp.magic == 0x454E4B42u) energyBase = tmp;
 }
 
+// Zustand fuer den naechtlichen Rollover. SUM und TAG aktualisieren sich zeitlich
+// versetzt: SUM springt ~23:49 auf den neuen Wert (der den abgelaufenen Tag bereits
+// enthaelt), TAG wird erst ~23:51 auf 0 gesetzt. In diesem Fenster wuerde SUM + TAG
+// den Vortag doppelt zaehlen ("Mitternachts-Peak"). Deshalb wird der beim SUM-Wechsel
+// aktuelle Tagesanteil als "gefaltet" gemerkt und nicht erneut addiert; beim
+// Tagesreset (TAG faellt auf ~0) ist er abgegolten.
+static float energyTagLast[4]   = {0.0f, 0.0f, 0.0f, 0.0f};   // letzter Tagesanteil (kWh)
+static float energyTagFolded[4] = {0.0f, 0.0f, 0.0f, 0.0f};   // in SUM bereits enthaltener Anteil
+static bool  energyTagValid[4]  = {false, false, false, false};
+
 // slot: 0=EL Heizung, 1=EL Warmwasser, 2=Waerme Heizung, 3=Waerme Warmwasser
 inline bool wplBaseTotal(int slot, const char* sumMwh, const char* sumKwh,
                          const char* tagKwh, const char* tagWh, float& out) {
     ensureEnergyBase();
     float sm, sk, tk, tw;
+
+    // Tagesanteil (TAG_KWH + TAG_WH/1000) lesen. Er ist innerhalb eines Tages
+    // monoton und faellt nur beim Tageswechsel (~23:51) auf 0 zurueck.
+    bool haveTag = getEnergyForMember("HEIZMODUL_WPL", tagKwh, tk) &&
+                   getEnergyForMember("HEIZMODUL_WPL", tagWh, tw);
+    float tag = haveTag ? (tk + tw / 1000.0f) : 0.0f;
+
+    // Tageswechsel erkannt -> der gefaltete Anteil ist abgegolten.
+    if (haveTag && energyTagValid[slot] && tag < energyTagLast[slot] - 0.05f) {
+        energyTagFolded[slot] = 0.0f;
+    }
+    if (haveTag) { energyTagLast[slot] = tag; energyTagValid[slot] = true; }
+
+    // SUM-Sockel (MWh*1000 + kWh) lesen. Bei Aenderung (naechtlicher Rollover)
+    // ist der aktuelle Tagesanteil in SUM bereits enthalten -> merken, damit er
+    // nicht doppelt addiert wird.
     if (getEnergyForMember("HEIZMODUL_WPL", sumMwh, sm) && getEnergyForMember("HEIZMODUL_WPL", sumKwh, sk)) {
         float base = sm * 1000.0f + sk;
         if (base > 0.0f && base != energyBase.v[slot]) {   // nur bei Aenderung schreiben (NVS-Schonung)
+            if (energyBase.v[slot] > 0.0f && haveTag) energyTagFolded[slot] = tag;
             energyBase.v[slot] = base;
             energyBasePref.save(&energyBase);
         }
     }
     if (energyBase.v[slot] <= 0.0f) return false;
     out = energyBase.v[slot];
-    if (getEnergyForMember("HEIZMODUL_WPL", tagKwh, tk) && getEnergyForMember("HEIZMODUL_WPL", tagWh, tw)) {
-        out += tk + tw / 1000.0f;
+    if (haveTag) {
+        float add = tag - energyTagFolded[slot];
+        out += (add > 0.0f) ? add : 0.0f;   // nie negativ -> kein Ruecksprung
     }
     return true;
 }
