@@ -1693,7 +1693,15 @@ inline bool wplBaseTotal(int slot, const char* sumMwh, const char* sumKwh,
     float tag = haveTag ? (tk + tw / 1000.0f) : 0.0f;
 
     // Tageswechsel erkannt -> der gefaltete Anteil ist abgegolten.
-    if (haveTag && energyTagValid[slot] && tag < energyTagLast[slot] - 0.05f) {
+    // Wichtig: TAG_KWH und TAG_WH setzen NICHT exakt gleichzeitig zurueck. Im
+    // Zwischenzyklus (ein Zaehler schon neu, der andere noch alt) faellt der
+    // Tagesanteil nur um <1 kWh - das ist KEIN Tageswechsel. Ein echter Reset
+    // faellt dagegen auf ~0 bzw. um den ganzen Tag. Sonst wuerde der noch alte
+    // Zaehleranteil erneut addiert und erzeugt weiter einen Peak.
+    const float TAG_RESET_NEAR = 0.5f;   // Tagesanteil praktisch bei 0
+    const float TAG_RESET_DROP = 1.0f;   // oder Rueckgang um mehr als 1 kWh
+    if (haveTag && energyTagValid[slot] &&
+        (tag < TAG_RESET_NEAR || tag < energyTagLast[slot] - TAG_RESET_DROP)) {
         energyTagFolded[slot] = 0.0f;
     }
     if (haveTag) { energyTagLast[slot] = tag; energyTagValid[slot] = true; }
