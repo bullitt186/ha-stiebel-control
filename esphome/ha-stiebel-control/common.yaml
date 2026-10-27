@@ -15,6 +15,10 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with this program. If not, see http://www.gnu.org/licenses/ .
 #
+# Defaults — override in your top-level heatingpump.yaml substitutions
+substitutions:
+  disable_sg_ready: "false"   # "true" hides all SG Ready entities (e.g. WPC7, which has no SG Ready input)
+
 esphome:
   name: heatingpump
   friendly_name: "Heating Pump CAN Interface"
@@ -50,6 +54,7 @@ esphome:
       - "-DHA_DEVICE_MODEL=${device_model}"
       - "-DHA_MODEL_${device_model}"
       - "-DHA_LANGUAGE_${language}"
+      - "-DHA_DISABLE_SG_READY_${disable_sg_ready}"
 
 
 #########################################
@@ -393,6 +398,7 @@ text_sensor:
   - platform: template
     name: "SG Ready Aktueller Zustand"
     id: SG_READY_CURRENT_STATE
+    internal: ${disable_sg_ready}
     icon: "mdi:solar-power"
     update_interval: 5s
     lambda: |-
@@ -491,6 +497,7 @@ sensor:
   - platform: template
     name: "SG Ready Boost State 3"
     id: sg_ready_boost_state3_sensor
+    internal: ${disable_sg_ready}
     unit_of_measurement: "°C"
     device_class: "temperature"
     state_class: "measurement"
@@ -503,6 +510,7 @@ sensor:
   - platform: template
     name: "SG Ready Boost State 4"
     id: sg_ready_boost_state4_sensor
+    internal: ${disable_sg_ready}
     unit_of_measurement: "°C"
     device_class: "temperature"
     state_class: "measurement"

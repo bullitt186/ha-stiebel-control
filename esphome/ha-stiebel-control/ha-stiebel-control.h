@@ -779,6 +779,9 @@ static const CanMember* getWritableNumberMember(const WritableNumberConfig& conf
 
 // Publish MQTT discovery for a writable number entity
 void publishWritableNumberDiscovery(const WritableNumberConfig& config, bool forceRepublish = false) {
+#ifdef HA_DISABLE_SG_READY_true
+    if (strncmp(config.signalName, "SG_READY_", 9) == 0) return;  // SG Ready disabled via substitution
+#endif
     // Get CanMember for building topics (modellabhaengig fuer WPL17)
     const CanMember* cm = getWritableNumberMember(config);
     
@@ -900,6 +903,9 @@ void publishAllWritableNumberDiscoveries(bool forceRepublish = false) {
 // ============================================================================
 
 void publishWritableSelectDiscovery(const WritableSelectConfig& config, bool forceRepublish = false) {
+#ifdef HA_DISABLE_SG_READY_true
+    if (strncmp(config.signalName, "SG_READY_", 9) == 0) return;  // SG Ready disabled via substitution
+#endif
     // Get CAN member
     const CanMember* cm = &CanMembers[config.member];
     
@@ -1951,6 +1957,9 @@ inline void  setSgReadyBoost4(float v) { sgReadyController.setBoostState4(v); }
 // boot, on MQTT connect and periodically, so the retained values survive a
 // broker restart instead of being published only once on connect.
 inline void publishSgReadyState() {
+#ifdef HA_DISABLE_SG_READY_true
+    return;
+#endif
     int idx = currentSgReadyState - 1;
     if (idx < 0 || idx > 3) idx = 1;  // fall back to "2 - Normal"
     const char* s = sgReadyOptions[idx];

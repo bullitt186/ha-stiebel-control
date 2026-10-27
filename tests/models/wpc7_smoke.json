@@ -1,0 +1,7 @@
+{
+  "description": "Required topics for WPC7 / Stiebel WPC-07cool / Tecalor TTF07c. UNVERIFIED — ported from community project kr0ner/OneESP32ToRuleThemAll desk research, no physical hardware tested. Stub — populate/correct after verifying on real hardware. See tests/models/wpl13e_smoke.json for the expected format.",
+  "required_topics": [
+    "heatingpump/KESSEL/SPEICHERISTTEMP/state",
+    "heatingpump/KESSEL/QUELLE_IST/state"
+  ]
+}
