@@ -50,6 +50,7 @@
 #define LNAME_ANTILEGIONELLEN                  "Antilegionellen"
 #define LNAME_ANTILEGIONELLEN_ZEITPUNKT        "Antilegionellen Zeitpunkt"
 #define LNAME_HEIZKURVE                        "Heizkurve"
+#define LNAME_NUM_HEIZKURVE                    "Heizkurve Steigung Einstellung"
 #define LNAME_PROGRAMMSCHALTER                 "Programmschalter"
 #define LNAME_TAG                              "Tag"
 #define LNAME_MONAT                            "Monat"
@@ -114,6 +115,18 @@
 #define LNAME_CALC_CAN_REC                     "CAN RX Fehlerzähler"
 #define LNAME_CALC_CAN_BUS_ERRORS              "CAN Bus Fehler"
 #define LNAME_CALC_CAN_STATE                   "CAN Bus Zustand"
+#define LNAME_CALC_ENERGIE_HEIZ_TOTAL_KWH      "Energie Heizung Gesamt kWh"
+#define LNAME_CALC_ENERGIE_WW_TOTAL_KWH        "Energie Warmwasser Gesamt kWh"
+#define LNAME_CALC_WAERME_HEIZ_TOTAL_KWH       "Waerme Ertrag Heizung Gesamt kWh"
+#define LNAME_CALC_WAERME_WW_TOTAL_KWH         "Waerme Ertrag Warmwasser Gesamt kWh"
+#define LNAME_CALC_EL_LEISTUNG_W                "Aktuelle elektrische Leistung"
+#define LNAME_CALC_BETRIEBSSTATUS               "Betriebsstatus"
+#define LNAME_CALC_ENERGIE_HEIZ_TAG_KWH         "Energie Heizung heute"
+#define LNAME_CALC_ENERGIE_WW_TAG_KWH           "Energie Warmwasser heute"
+#define LNAME_CALC_WAERME_HEIZ_TAG_KWH          "Waerme Ertrag Heizung heute"
+#define LNAME_CALC_WAERME_WW_TAG_KWH            "Waerme Ertrag Warmwasser heute"
+#define LNAME_CALC_EL_LEISTUNG_HEIZ_W           "Aktuelle el. Leistung Heizung"
+#define LNAME_CALC_EL_LEISTUNG_WW_W             "Aktuelle el. Leistung Warmwasser"
 
 // ============================================================================
 // Writable number friendly names (writableNumbers[])

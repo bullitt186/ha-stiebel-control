@@ -209,6 +209,30 @@
 #define LNAME_CALC_CAN_BUS_ERRORS              "CAN Bus Errors"
 #undef  LNAME_CALC_CAN_STATE
 #define LNAME_CALC_CAN_STATE                   "CAN Bus State"
+#undef  LNAME_CALC_ENERGIE_HEIZ_TOTAL_KWH
+#define LNAME_CALC_ENERGIE_HEIZ_TOTAL_KWH      "Heating Electrical Energy Total kWh"
+#undef  LNAME_CALC_ENERGIE_WW_TOTAL_KWH
+#define LNAME_CALC_ENERGIE_WW_TOTAL_KWH        "DHW Electrical Energy Total kWh"
+#undef  LNAME_CALC_WAERME_HEIZ_TOTAL_KWH
+#define LNAME_CALC_WAERME_HEIZ_TOTAL_KWH       "Heating Heat Output Total kWh"
+#undef  LNAME_CALC_WAERME_WW_TOTAL_KWH
+#define LNAME_CALC_WAERME_WW_TOTAL_KWH         "DHW Heat Output Total kWh"
+#undef  LNAME_CALC_EL_LEISTUNG_W
+#define LNAME_CALC_EL_LEISTUNG_W               "Current Electrical Power"
+#undef  LNAME_CALC_BETRIEBSSTATUS
+#define LNAME_CALC_BETRIEBSSTATUS              "Operating State"
+#undef  LNAME_CALC_ENERGIE_HEIZ_TAG_KWH
+#define LNAME_CALC_ENERGIE_HEIZ_TAG_KWH        "Heating Energy Today"
+#undef  LNAME_CALC_ENERGIE_WW_TAG_KWH
+#define LNAME_CALC_ENERGIE_WW_TAG_KWH          "DHW Energy Today"
+#undef  LNAME_CALC_WAERME_HEIZ_TAG_KWH
+#define LNAME_CALC_WAERME_HEIZ_TAG_KWH         "Heating Heat Output Today"
+#undef  LNAME_CALC_WAERME_WW_TAG_KWH
+#define LNAME_CALC_WAERME_WW_TAG_KWH           "DHW Heat Output Today"
+#undef  LNAME_CALC_EL_LEISTUNG_HEIZ_W
+#define LNAME_CALC_EL_LEISTUNG_HEIZ_W          "Current Electrical Power Heating"
+#undef  LNAME_CALC_EL_LEISTUNG_WW_W
+#define LNAME_CALC_EL_LEISTUNG_WW_W            "Current Electrical Power DHW"
 
 // ============================================================================
 // Writable number friendly names

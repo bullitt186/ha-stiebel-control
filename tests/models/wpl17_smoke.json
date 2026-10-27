@@ -1,0 +1,22 @@
+{
+  "description": "Required topics for WPL17 (CAN-B, X1.2, 50 kbps). VERIFIED on real hardware (ICS classic). Mirrors the members used by signal_requests_wpl17.h: KESSEL_CANB (0x201) for the DHW/room/heating-curve setpoints, KESSEL (0x180) for AUSSENTEMP/pump status, MANAGER (0x480) for the operating mode, HEIZMODUL (0x500) for flow/return/compressor, HEIZMODUL_WPL (0x514) for the daily energy counters. RAUMSOLLTEMP_II/III are absent (single heating circuit).",
+  "required_topics": [
+    "heatingpump/KESSEL/AUSSENTEMP/state",
+    "heatingpump/KESSEL/PUMPENSTATUS/state",
+    "heatingpump/KESSEL_CANB/SPEICHERISTTEMP/state",
+    "heatingpump/KESSEL_CANB/SPEICHERSOLLTEMP/state",
+    "heatingpump/KESSEL_CANB/EINSTELL_SPEICHERSOLLTEMP/state",
+    "heatingpump/KESSEL_CANB/HEIZKURVE/state",
+    "heatingpump/KESSEL_CANB/RAUMSOLLTEMP_I/state",
+    "heatingpump/KESSEL_CANB/RAUMSOLLTEMP_NACHT/state",
+    "heatingpump/MANAGER/PROGRAMMSCHALTER/state",
+    "heatingpump/MANAGER/SOMMERBETRIEB/state",
+    "heatingpump/HEIZMODUL/WPVORLAUFIST/state",
+    "heatingpump/HEIZMODUL/RUECKLAUFISTTEMP/state",
+    "heatingpump/HEIZMODUL/VERDICHTER/state",
+    "heatingpump/HEIZMODUL_WPL/EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH/state",
+    "heatingpump/HEIZMODUL_WPL/WAERMEERTRAG_HEIZ_TAG_WH/state",
+    "heatingpump/calculated/energie_heiz_total_kwh/state",
+    "heatingpump/calculated/waerme_heiz_total_kwh/state"
+  ]
+}
