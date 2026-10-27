@@ -336,6 +336,15 @@ mqtt:
             writeSignal(&CanMembers[cm_kessel_canb], "HEIZKURVE", value);
             readSignal(&CanMembers[cm_kessel_canb], "HEIZKURVE");
 
+    - topic: heatingpump/MANAGER/HEIZKURVE/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received MANAGER HEIZKURVE command: %s", x.c_str());
+            publishWritableNumberDiscovery(writableNumbers[8]);
+            const char* value = x.c_str();
+            writeSignal(&CanMembers[cm_manager], "HEIZKURVE", value);
+            readSignal(&CanMembers[cm_manager], "HEIZKURVE");
+
 
 #########################################
 #                                       #

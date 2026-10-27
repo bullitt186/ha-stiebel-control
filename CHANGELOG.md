@@ -5,6 +5,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ---
 
+## [Unreleased]
+
+### Added (WPL13E, verified on real hardware against the WPMW II manual)
+
+- **Writable heating curve** (`HEIZKURVE` on MANAGER) — previously WPL17 only.
+- **kWh-resolution energy**: `*_SUM_KWH` and daily `*_TAG_KWH` registers. COP now includes the
+  kWh remainder (was whole MWh only) and the combined total/daily energy sensors appear.
+- Diagnostics: hot-gas temperature, compressor DHW runtime, electric booster (DHC) runtimes.
+
+### Changed
+
+- WPL13E: the heat pump module's `AUSSENTEMP` is labelled "Luftansaugtemperatur" (air intake at
+  the unit, per the manual); the controlling outdoor sensor stays "Außen Temperatur".
+
+### Removed (WPL13E — no valid value over 30 days to 11 months of HA history)
+
+- `SAMMLERISTTEMP` (-40 °C, no sensor), `HEIZKURVE` on KESSEL (always 0), `WW_HYSTERSE`,
+  `ANTILEGIONELLEN_ZEITPUNKT` (-255), compressor-1 / cooling / MANAGER runtime counters.
+
+---
+
 ## [2.4.2] — 2026-10-27
 
 ### Fixed

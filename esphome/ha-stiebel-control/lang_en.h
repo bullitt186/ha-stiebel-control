@@ -37,6 +37,8 @@
 #define LNAME_RAUMSOLLTEMP_NACHT               "Room Target Temperature Night"
 #undef  LNAME_AUSSENTEMP
 #define LNAME_AUSSENTEMP                       "Outside Temperature"
+#undef  LNAME_LUFTANSAUGTEMP
+#define LNAME_LUFTANSAUGTEMP                   "Air Intake Temperature"
 #undef  LNAME_SAMMLERISTTEMP
 #define LNAME_SAMMLERISTTEMP                   "Collector Actual Temperature"
 #undef  LNAME_SPEICHERISTTEMP

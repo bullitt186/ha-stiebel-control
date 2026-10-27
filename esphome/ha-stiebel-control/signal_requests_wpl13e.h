@@ -30,7 +30,7 @@ extern const SignalRequest signalRequests[] = {
     {"RAUMSOLLTEMP_NACHT",         FREQ_30S,   cm_manager},
     {"AUSSENTEMP",                 FREQ_30S,   cm_kessel},
     {"AUSSENTEMP",                 FREQ_30S,   cm_heizmodul},
-    {"SAMMLERISTTEMP",             FREQ_30S,   cm_kessel},
+    // SAMMLERISTTEMP dropped: -40.0 (no sensor) for 11 months on a real WPL13E
     {"SPEICHERISTTEMP",            FREQ_30S,   cm_kessel},
     {"VORLAUFISTTEMP",             FREQ_30S,   cm_kessel},
     {"EINSTELL_SPEICHERSOLLTEMP",  FREQ_30S,   cm_kessel},
@@ -44,33 +44,46 @@ extern const SignalRequest signalRequests[] = {
     {"BETRIEBSART_WP",             FREQ_10MIN, cm_manager},
 
     // ========================================================================
-    // PROBE SIGNALS — may or may not respond on WPL13E
-    // If the pump responds, these appear automatically in HA via MQTT discovery
+    // SETTINGS (WPMW II parameters)
+    // Dropped after 30 days of -255 on a real WPL13E: WW_HYSTERSE (manager+kessel;
+    // WW_HYSTERESE 0x0022 does not answer either), ANTILEGIONELLEN_ZEITPUNKT.
+    // HEIZKURVE on KESSEL is always 0.00 (6 months) - the real value is on MANAGER.
     // ========================================================================
     {"HEIZKURVE",                  FREQ_10MIN, cm_manager},
-    {"HEIZKURVE",                  FREQ_10MIN, cm_kessel},
-    {"WW_HYSTERSE",                FREQ_10MIN, cm_manager}, // typo in ElsterTable: "HYSTERSE"
-    {"WW_HYSTERSE",                FREQ_10MIN, cm_kessel},
     {"ANTILEGIONELLEN",            FREQ_10MIN, cm_manager},
-    {"ANTILEGIONELLEN_ZEITPUNKT",  FREQ_10MIN, cm_manager},
     {"GEBAEUDEART",                FREQ_10MIN, cm_manager},
 
     // ========================================================================
-    // COMPRESSOR RUNTIME COUNTERS (Laufzeit Verdichter)
-    // Poll both HEIZMODUL and MANAGER — which one has valid data is model-dependent
+    // ENERGY: SUM_MWH (base) is whole MWh only; the kWh remainder and the
+    // daily values ("WM TAG" in the WPMW II manual) refine COP and feed the
+    // combined total/daily sensors.
     // ========================================================================
-    {"LZ_VERD_1_HEIZBETRIEB",    FREQ_10MIN, cm_heizmodul},
-    {"LZ_VERD_2_HEIZBETRIEB",    FREQ_10MIN, cm_heizmodul},
-    {"LZ_VERD_1_2_HEIZBETRIEB",  FREQ_10MIN, cm_heizmodul},
-    {"LZ_VERD_1_KUEHLBETRIEB",   FREQ_10MIN, cm_heizmodul},
-    {"LZ_VERD_2_KUEHLBETRIEB",   FREQ_10MIN, cm_heizmodul},
-    {"LZ_VERD_1_2_KUEHLBETRIEB", FREQ_10MIN, cm_heizmodul},
-    {"LZ_VERD_1_HEIZBETRIEB",    FREQ_10MIN, cm_manager},
-    {"LZ_VERD_2_HEIZBETRIEB",    FREQ_10MIN, cm_manager},
-    {"LZ_VERD_1_2_HEIZBETRIEB",  FREQ_10MIN, cm_manager},
-    {"LZ_VERD_1_KUEHLBETRIEB",   FREQ_10MIN, cm_manager},
-    {"LZ_VERD_2_KUEHLBETRIEB",   FREQ_10MIN, cm_manager},
-    {"LZ_VERD_1_2_KUEHLBETRIEB", FREQ_10MIN, cm_manager},
+    {"EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH", FREQ_10MIN, cm_heizmodul},
+    {"EL_AUFNAHMELEISTUNG_WW_SUM_KWH",   FREQ_10MIN, cm_heizmodul},
+    {"WAERMEERTRAG_HEIZ_SUM_KWH",        FREQ_10MIN, cm_heizmodul},
+    {"WAERMEERTRAG_WW_SUM_KWH",          FREQ_10MIN, cm_heizmodul},
+    {"EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", FREQ_10MIN, cm_heizmodul},
+    {"EL_AUFNAHMELEISTUNG_WW_TAG_KWH",   FREQ_10MIN, cm_heizmodul},
+    {"WAERMEERTRAG_HEIZ_TAG_KWH",        FREQ_10MIN, cm_heizmodul},
+    {"WAERMEERTRAG_WW_TAG_KWH",          FREQ_10MIN, cm_heizmodul},
+
+    // ========================================================================
+    // DIAGNOSTICS ("INFO IWS" in the WPMW II manual)
+    // ANZEIGE_HOCHDRUCK/NIEDERDRUCK answer (~83 at standstill) but the scaling
+    // is unverified until seen with the compressor running - not exposed yet.
+    // ========================================================================
+    {"HEISSGAS_TEMP",              FREQ_1MIN,  cm_heizmodul},
+    {"LAUFZEIT_DHC1",              FREQ_60MIN, cm_heizmodul},
+    {"LAUFZEIT_DHC2",              FREQ_60MIN, cm_heizmodul},
+    {"LZ_DHC12",                   FREQ_60MIN, cm_heizmodul},
+
+    // ========================================================================
+    // COMPRESSOR RUNTIME (single compressor = "VERD_2" on the IWS)
+    // Dropped: VERD_1 / VERD_1_2 / KUEHL (no 2nd compressor, no cooling on the
+    // "E" variant; -255 or 0 for 30 days) and all MANAGER copies (0 / -255).
+    // ========================================================================
+    {"LZ_VERD_2_HEIZBETRIEB",      FREQ_10MIN, cm_heizmodul},
+    {"LZ_VERD_2_WW_BETRIEB",       FREQ_10MIN, cm_heizmodul},
 };
 
 extern const size_t SIGNAL_REQUEST_COUNT_VALUE = sizeof(signalRequests) / sizeof(SignalRequest);

@@ -777,6 +777,10 @@ static const CanMember* getWritableNumberMember(const WritableNumberConfig& conf
             return &CanMembers[cm_kessel_canb];
         }
     }
+    // WPL13E (WPMW II): the heating curve lives on the MANAGER, not on KESSEL_CANB
+    if (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") == 0 && strcmp(config.signalName, "HEIZKURVE") == 0) {
+        return &CanMembers[cm_manager];
+    }
     return &CanMembers[config.member];
 }
 
@@ -890,9 +894,10 @@ void publishAllWritableNumberDiscoveries(bool forceRepublish = false) {
             ESP_LOGI("MQTT_DISC", "Skipping %s on %s (single heating circuit)", sig, HA_DEVICE_MODEL_STR);
             continue;
         }
-        // HEIZKURVE only exists on KESSEL_CANB (WPL17); skip on other models.
-        if (strcmp(sig, "HEIZKURVE") == 0 && !isWpl17) {
-            ESP_LOGI("MQTT_DISC", "Skipping %s on %s (WPL17 only)", sig, HA_DEVICE_MODEL_STR);
+        // HEIZKURVE is verified writable on WPL17 (KESSEL_CANB) and WPL13E (MANAGER) only.
+        bool isWpl13e = (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") == 0);
+        if (strcmp(sig, "HEIZKURVE") == 0 && !isWpl17 && !isWpl13e) {
+            ESP_LOGI("MQTT_DISC", "Skipping %s on %s (WPL17/WPL13E only)", sig, HA_DEVICE_MODEL_STR);
             continue;
         }
         ESP_LOGI("MQTT_DISC", "Publishing writable number %d: %s", i, sig);
@@ -1201,6 +1206,12 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
     
     // Get friendly name: use ei->friendlyName or fallback to ei->Name
     const char* friendlyName = (ei->hasMetadata && ei->friendlyName) ? ei->friendlyName : ei->Name;
+    // WPMW II manual ("INFO IWS"): the heat pump module's AUSSENTEMP is the air
+    // intake temperature at the unit, not the outdoor sensor used for control.
+    if (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") == 0 && strcmp(cm.Name, "HEIZMODUL") == 0 &&
+        strcmp(ei->Name, "AUSSENTEMP") == 0) {
+        friendlyName = LNAME_LUFTANSAUGTEMP;
+    }
     
     // Get metadata: use ei fields if available, otherwise fall back to type defaults
     const char *component, *deviceClass, *unit, *stateClass, *icon;
@@ -1463,6 +1474,16 @@ void storeCOPEnergyValue(const char* signalName, const std::string &value) {
 // Vorwaertsdeklaration: publiziert kombinierte Energie-Gesamtwerte (MWh*1000 + kWh)
 void publishCombinedEnergySensors();
 
+// Energy in MWh incl. the kWh remainder register when the model provides it
+// (e.g. WPL13E: SUM_MWH is whole MWh only, SUM_KWH holds the 0..999 kWh part).
+static float copMWh(const std::string& base) {
+    float v = copEnergyValues[base + "_SUM_MWH"];
+    auto kwh = copEnergyValues.find(base + "_SUM_KWH");
+    // 0..999 only: invalid markers (e.g. 0x8000) must not skew the COP
+    if (kwh != copEnergyValues.end() && kwh->second >= 0.0f && kwh->second < 1000.0f) v += kwh->second / 1000.0f;
+    return v;
+}
+
 // Calculate and publish COP values if all required data is available
 void updateCOPCalculations() {
     publishCOPDiscovery();
@@ -1472,9 +1493,9 @@ void updateCOPCalculations() {
         copEnergyValues.find("WAERMEERTRAG_2WE_WW_SUM_MWH") != copEnergyValues.end() &&
         copEnergyValues.find("EL_AUFNAHMELEISTUNG_WW_SUM_MWH") != copEnergyValues.end()) {
         
-        float el_ww = copEnergyValues["EL_AUFNAHMELEISTUNG_WW_SUM_MWH"];
+        float el_ww = copMWh("EL_AUFNAHMELEISTUNG_WW");
         if (el_ww > 0.001f) { // Avoid division by zero
-            float waerme_ww = copEnergyValues["WAERMEERTRAG_WW_SUM_MWH"] + copEnergyValues["WAERMEERTRAG_2WE_WW_SUM_MWH"];
+            float waerme_ww = copMWh("WAERMEERTRAG_WW") + copMWh("WAERMEERTRAG_2WE_WW");
             float cop_ww = waerme_ww / el_ww;
             
             char valueStr[16];
@@ -1490,9 +1511,9 @@ void updateCOPCalculations() {
         copEnergyValues.find("WAERMEERTRAG_2WE_HEIZ_SUM_MWH") != copEnergyValues.end() &&
         copEnergyValues.find("EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH") != copEnergyValues.end()) {
         
-        float el_heiz = copEnergyValues["EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH"];
+        float el_heiz = copMWh("EL_AUFNAHMELEISTUNG_HEIZ");
         if (el_heiz > 0.001f) { // Avoid division by zero
-            float waerme_heiz = copEnergyValues["WAERMEERTRAG_HEIZ_SUM_MWH"] + copEnergyValues["WAERMEERTRAG_2WE_HEIZ_SUM_MWH"];
+            float waerme_heiz = copMWh("WAERMEERTRAG_HEIZ") + copMWh("WAERMEERTRAG_2WE_HEIZ");
             float cop_heiz = waerme_heiz / el_heiz;
             
             char valueStr[16];
@@ -1511,10 +1532,10 @@ void updateCOPCalculations() {
         copEnergyValues.find("EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH") != copEnergyValues.end() &&
         copEnergyValues.find("EL_AUFNAHMELEISTUNG_WW_SUM_MWH") != copEnergyValues.end()) {
         
-        float el_total = copEnergyValues["EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH"] + copEnergyValues["EL_AUFNAHMELEISTUNG_WW_SUM_MWH"];
+        float el_total = copMWh("EL_AUFNAHMELEISTUNG_HEIZ") + copMWh("EL_AUFNAHMELEISTUNG_WW");
         if (el_total > 0.001f) { // Avoid division by zero
-            float waerme_total = copEnergyValues["WAERMEERTRAG_HEIZ_SUM_MWH"] + copEnergyValues["WAERMEERTRAG_2WE_HEIZ_SUM_MWH"] +
-                               copEnergyValues["WAERMEERTRAG_WW_SUM_MWH"] + copEnergyValues["WAERMEERTRAG_2WE_WW_SUM_MWH"];
+            float waerme_total = copMWh("WAERMEERTRAG_HEIZ") + copMWh("WAERMEERTRAG_2WE_HEIZ") +
+                               copMWh("WAERMEERTRAG_WW") + copMWh("WAERMEERTRAG_2WE_WW");
             float cop_gesamt = waerme_total / el_total;
             
             char valueStr[16];
