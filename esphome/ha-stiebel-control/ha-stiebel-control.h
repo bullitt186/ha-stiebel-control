@@ -70,6 +70,7 @@ static const CanMember CanMembers[] =
         {"HEIZMODUL_WPL", 0x514},  // WPL17 Heizmodul (fine daily energy counters)
         {"KESSEL_CANB", 0x201},    // WPL17 DHW / room / heating-curve registers
         {"MISCHERMODUL_2", 0x601}, // WPL17 exposes the heating program here
+        {"FET", 0x402},            // WPL23 room control unit (Fernbedieneinheit) — unverified, see signal_requests_wpl23.h
         {"OTHER", 0x000}};
 
 typedef enum
@@ -95,6 +96,7 @@ typedef enum
     cm_heizmodul_wpl,
     cm_kessel_canb,
     cm_mischermodul_2,
+    cm_fet,
     cm_other
 } CanMemberType;
 
