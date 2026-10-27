@@ -120,12 +120,14 @@ mqtt:
         tag: "MQTT_CONN"
     - lambda: |-
         ESP_LOGI("MQTT_CONN", "Publishing writable entity discoveries...");
+        // Force (true): anything "published" during boot before the broker
+        // connection was up was lost, but is already marked as discovered.
+        // republishAllDiscoveries() also covers raw signals + calculated sensors.
+        republishAllDiscoveries();
         // Publish MQTT number discoveries for writable temperature setpoints
-        publishAllWritableNumberDiscoveries();
+        publishAllWritableNumberDiscoveries(true);
         // Publish MQTT select discoveries for operating mode control
-        publishAllWritableSelectDiscoveries();
-        // Publish MQTT calculated sensor discoveries (COP, combined energy totals, etc.)
-        publishAllCalculatedSensorDiscoveries();
+        publishAllWritableSelectDiscoveries(true);
         // Datetime control now handled by Home Assistant input_datetime helpers
         ESP_LOGI("MQTT_CONN", "Discovery publication complete");
 

@@ -14,6 +14,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   kWh remainder (was whole MWh only) and the combined total/daily energy sensors appear.
 - Diagnostics: hot-gas temperature, compressor DHW runtime, electric booster (DHC) runtimes.
 
+### Fixed
+
+- Entities' MQTT discovery is resent on every broker (re)connect. Discoveries sent during boot,
+  before the connection was up, were lost until the 15-minute refresh (e.g. renamed entities
+  or writable numbers appeared late).
+
 ### Changed
 
 - WPL13E: the heat pump module's `AUSSENTEMP` is labelled "Luftansaugtemperatur" (air intake at
