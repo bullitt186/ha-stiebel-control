@@ -4,7 +4,6 @@
     "heatingpump/status",
     "heatingpump/calculated/date/state",
     "heatingpump/calculated/time/state",
-    "heatingpump/calculated/betriebsart/state",
     "heatingpump/calculated/compressor_active/state",
     "heatingpump/calculated/cop_gesamt/state",
     "heatingpump/calculated/cop_heiz/state",

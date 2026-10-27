@@ -276,7 +276,6 @@ TEST_CASE("hash: known signal hashes match pre-computed constants", "[can]") {
     CHECK(hash_runtime("STUNDE")         == HASH_STUNDE);
     CHECK(hash_runtime("MINUTE")         == HASH_MINUTE);
     CHECK(hash_runtime("SEKUNDE")        == HASH_SEKUNDE);
-    CHECK(hash_runtime("SOMMERBETRIEB")  == HASH_SOMMERBETRIEB);
     CHECK(hash_runtime("WPVORLAUFIST")   == HASH_WPVORLAUFIST);
     CHECK(hash_runtime("RUECKLAUFISTTEMP") == HASH_RUECKLAUFISTTEMP);
     CHECK(hash_runtime("VERDICHTER")     == HASH_VERDICHTER);
@@ -712,22 +711,6 @@ TEST_CASE("publishTime: skips when minute out of range", "[calc]") {
     lastStunde = 12; lastMinute = 60; lastSekunde = 0;
     publishTime();
     CHECK(!mqttTopicPublished("calculated/time/state"));
-}
-
-// ============================================================================
-// publishBetriebsart
-// ============================================================================
-
-TEST_CASE("publishBetriebsart: on → Sommerbetrieb", "[calc]") {
-    resetDiscoveryState();
-    publishBetriebsart("on");
-    CHECK(mqttFindPayload("calculated/betriebsart/state") == "Sommerbetrieb");
-}
-
-TEST_CASE("publishBetriebsart: off → Normalbetrieb", "[calc]") {
-    resetDiscoveryState();
-    publishBetriebsart("off");
-    CHECK(mqttFindPayload("calculated/betriebsart/state") == "Normalbetrieb");
 }
 
 // ============================================================================

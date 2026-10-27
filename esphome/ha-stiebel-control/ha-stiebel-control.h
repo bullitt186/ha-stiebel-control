@@ -130,10 +130,6 @@ static const CalculatedSensorConfig calculatedSensors[] = {
     {"stiebel_calculated_time", LNAME_CALC_TIME, "heatingpump/calculated/time/state",
      "sensor", "", "", "", "mdi:clock", "", "", "", true},
 
-    // Betriebsart sensor
-    {"stiebel_calculated_betriebsart", LNAME_CALC_BETRIEBSART, "heatingpump/calculated/betriebsart/state",
-     "sensor", "", "", "", "mdi:cog", "", "", "", true},
-
     // Delta T continuous
     {"stiebel_calculated_delta_t_continuous", LNAME_CALC_DELTA_T_CONTINUOUS, "heatingpump/calculated/delta_t_continuous/state",
      "sensor", "temperature", "K", "measurement", "mdi:thermometer", "", "", "", true},
@@ -365,7 +361,6 @@ static int lastSekunde = -1;
 static unsigned long nextDeltaTUpdate = 0;
 static unsigned long nextCompressorUpdate = 0;
 static unsigned long nextDateTimeUpdate = 0;
-static unsigned long nextBetriebsartUpdate = 0;
 static unsigned long nextCanDiagUpdate = 0;
 
 // UID cache to avoid repeated string operations on every signal update
@@ -746,10 +741,10 @@ void publishCalculatedSensorDiscovery(const CalculatedSensorConfig& config, bool
 }
 
 // Publish all calculated sensor discoveries (used during startup and republish)
-// Energy/power/status sensors (calculatedSensors[10..]) need model-specific registers
+// Energy/power/status sensors (calculatedSensors[9..]) need model-specific registers
 // (SUM_KWH, TAG_*); they announce themselves on their first value in
 // publishCombinedEnergySensors(), so models without them get no dead HA entities.
-static const size_t FIRST_ON_DEMAND_CALCULATED_SENSOR = 10;
+static const size_t FIRST_ON_DEMAND_CALCULATED_SENSOR = 9;
 
 void publishAllCalculatedSensorDiscoveries(bool forceRepublish = false) {
     if (forceRepublish) {
@@ -1095,34 +1090,10 @@ void publishTime()
 // Datetime states are now handled by Home Assistant input_datetime helpers
 // Read by ESPHome text_sensors and written via button triggers
 
-void publishBetriebsart(const std::string& sommerBetriebValue)
-{
-    // Publish discovery (only once - cached)
-    publishCalculatedSensorDiscovery(calculatedSensors[2]);
-    
-    // Determine Betriebsart based on SOMMERBETRIEB value
-    // SOMMERBETRIEB is et_little_bool type, so value is "on" or "off"
-    std::string betriebsart;
-    std::string icon;
-    
-    if (sommerBetriebValue == "on") {
-        betriebsart = "Sommerbetrieb";
-        icon = "mdi:white-balance-sunny";
-    } else {
-        betriebsart = "Normalbetrieb";
-        icon = "mdi:circle-outline";
-    }
-    
-    // Publish state to MQTT
-    const char* stateTopic = "heatingpump/calculated/betriebsart/state";
-    id(mqtt_client).publish(stateTopic, betriebsart.c_str(), betriebsart.length(), 0, true);
-    // ESP_LOGD("CALC", "Published Betriebsart: %s (SOMMERBETRIEB=%s)", betriebsart.c_str(), sommerBetriebValue.c_str());
-}
-
 void publishDeltaTContinuous()
 {
     // Publish discovery (only once - cached)
-    publishCalculatedSensorDiscovery(calculatedSensors[3]);
+    publishCalculatedSensorDiscovery(calculatedSensors[2]);
     
     // Check if both temperature values are valid
     if (std::isnan(lastWpVorlaufIst) || std::isnan(lastRuecklaufIstTemp)) {
@@ -1146,7 +1117,7 @@ void publishDeltaTContinuous()
 void publishDeltaTRunning()
 {
     // Publish discovery (only once - cached)
-    publishCalculatedSensorDiscovery(calculatedSensors[4]);
+    publishCalculatedSensorDiscovery(calculatedSensors[3]);
     
     // Check if compressor is running (value > 2 or not NaN and not 0)
     bool compressorRunning = (!std::isnan(lastVerdichterValue) && lastVerdichterValue > 2.0);
@@ -1177,7 +1148,7 @@ void publishDeltaTRunning()
 void publishCompressorActive()
 {
     // Publish discovery (only once - cached)
-    publishCalculatedSensorDiscovery(calculatedSensors[5]);
+    publishCalculatedSensorDiscovery(calculatedSensors[4]);
     
     // Check if compressor value is valid
     if (std::isnan(lastVerdichterValue)) {
@@ -1774,16 +1745,16 @@ void publishCombinedEnergySensors() {
         id(mqtt_client).publish(topic, valueStr, strlen(valueStr), 0, true);
         ESP_LOGI("ENERGIE", "Gesamt (%s): %.3f kWh", key, total);
     };
-    publishTotal(calculatedSensors[10], "heatingpump/calculated/energie_heiz_total_kwh/state", "combined_energie_heiz", 0,
+    publishTotal(calculatedSensors[9], "heatingpump/calculated/energie_heiz_total_kwh/state", "combined_energie_heiz", 0,
                  "EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", "EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH",
                  "EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", "EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH");
-    publishTotal(calculatedSensors[11], "heatingpump/calculated/energie_ww_total_kwh/state", "combined_energie_ww", 1,
+    publishTotal(calculatedSensors[10], "heatingpump/calculated/energie_ww_total_kwh/state", "combined_energie_ww", 1,
                  "EL_AUFNAHMELEISTUNG_WW_SUM_MWH", "EL_AUFNAHMELEISTUNG_WW_SUM_KWH",
                  "EL_AUFNAHMELEISTUNG_WW_TAG_KWH", "EL_AUFNAHMELEISTUNG_WW_TAG_WH");
-    publishTotal(calculatedSensors[12], "heatingpump/calculated/waerme_heiz_total_kwh/state", "combined_waerme_heiz", 2,
+    publishTotal(calculatedSensors[11], "heatingpump/calculated/waerme_heiz_total_kwh/state", "combined_waerme_heiz", 2,
                  "WAERMEERTRAG_HEIZ_SUM_MWH", "WAERMEERTRAG_HEIZ_SUM_KWH",
                  "WAERMEERTRAG_HEIZ_TAG_KWH", "WAERMEERTRAG_HEIZ_TAG_WH");
-    publishTotal(calculatedSensors[13], "heatingpump/calculated/waerme_ww_total_kwh/state", "combined_waerme_ww", 3,
+    publishTotal(calculatedSensors[12], "heatingpump/calculated/waerme_ww_total_kwh/state", "combined_waerme_ww", 3,
                  "WAERMEERTRAG_WW_SUM_MWH", "WAERMEERTRAG_WW_SUM_KWH",
                  "WAERMEERTRAG_WW_TAG_KWH", "WAERMEERTRAG_WW_TAG_WH");
 
@@ -1836,7 +1807,7 @@ void publishCombinedEnergySensors() {
                 ns = (strcmp(opState, "Warmwasser") == 0) ? "Warmwasser" : "Heizen";
             }
             opState = ns;
-            publishCalculatedSensorDiscovery(calculatedSensors[15], false);
+            publishCalculatedSensorDiscovery(calculatedSensors[14], false);
             id(mqtt_client).publish("heatingpump/calculated/betriebsstatus/state", opState, strlen(opState), 0, true);
             lastStatusMs = nowMs;
         }
@@ -1850,11 +1821,11 @@ void publishCombinedEnergySensors() {
             snprintf(v, sizeof(v), "%.0f", pHeiz + pWw);
             snprintf(ph, sizeof(ph), "%.0f", pHeiz);
             snprintf(pw, sizeof(pw), "%.0f", pWw);
-            publishCalculatedSensorDiscovery(calculatedSensors[14], false);
+            publishCalculatedSensorDiscovery(calculatedSensors[13], false);
             id(mqtt_client).publish("heatingpump/calculated/el_leistung_w/state", v, strlen(v), 0, true);
-            publishCalculatedSensorDiscovery(calculatedSensors[20], false);
+            publishCalculatedSensorDiscovery(calculatedSensors[19], false);
             id(mqtt_client).publish("heatingpump/calculated/el_leistung_heiz_w/state", ph, strlen(ph), 0, true);
-            publishCalculatedSensorDiscovery(calculatedSensors[21], false);
+            publishCalculatedSensorDiscovery(calculatedSensors[20], false);
             id(mqtt_client).publish("heatingpump/calculated/el_leistung_ww_w/state", pw, strlen(pw), 0, true);
             ESP_LOGI("ENERGIE", "Leistung: %.0f W (Heiz %.0f, WW %.0f) in %.0fs", pHeiz + pWw, pHeiz, pWw, dtSec);
             accHeizWh = 0.0f; accWwWh = 0.0f; windowStartMs = nowMs;
@@ -1876,10 +1847,10 @@ void publishCombinedEnergySensors() {
             publishCalculatedSensorDiscovery(cfg, false);
             id(mqtt_client).publish(topic, s, strlen(s), 0, true);
         };
-        pubDaily("EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", "EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH", calculatedSensors[16], "heatingpump/calculated/energie_heiz_tag_kwh/state");
-        pubDaily("EL_AUFNAHMELEISTUNG_WW_TAG_KWH",   "EL_AUFNAHMELEISTUNG_WW_TAG_WH",   calculatedSensors[17], "heatingpump/calculated/energie_ww_tag_kwh/state");
-        pubDaily("WAERMEERTRAG_HEIZ_TAG_KWH",        "WAERMEERTRAG_HEIZ_TAG_WH",        calculatedSensors[18], "heatingpump/calculated/waerme_heiz_tag_kwh/state");
-        pubDaily("WAERMEERTRAG_WW_TAG_KWH",          "WAERMEERTRAG_WW_TAG_WH",          calculatedSensors[19], "heatingpump/calculated/waerme_ww_tag_kwh/state");
+        pubDaily("EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", "EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH", calculatedSensors[15], "heatingpump/calculated/energie_heiz_tag_kwh/state");
+        pubDaily("EL_AUFNAHMELEISTUNG_WW_TAG_KWH",   "EL_AUFNAHMELEISTUNG_WW_TAG_WH",   calculatedSensors[16], "heatingpump/calculated/energie_ww_tag_kwh/state");
+        pubDaily("WAERMEERTRAG_HEIZ_TAG_KWH",        "WAERMEERTRAG_HEIZ_TAG_WH",        calculatedSensors[17], "heatingpump/calculated/waerme_heiz_tag_kwh/state");
+        pubDaily("WAERMEERTRAG_WW_TAG_KWH",          "WAERMEERTRAG_WW_TAG_WH",          calculatedSensors[18], "heatingpump/calculated/waerme_ww_tag_kwh/state");
     }
 }
 
@@ -2009,7 +1980,6 @@ constexpr uint32_t HASH_TAG = hash("TAG");
 constexpr uint32_t HASH_STUNDE = hash("STUNDE");
 constexpr uint32_t HASH_MINUTE = hash("MINUTE");
 constexpr uint32_t HASH_SEKUNDE = hash("SEKUNDE");
-constexpr uint32_t HASH_SOMMERBETRIEB = hash("SOMMERBETRIEB");
 constexpr uint32_t HASH_WPVORLAUFIST = hash("WPVORLAUFIST");
 constexpr uint32_t HASH_RUECKLAUFISTTEMP = hash("RUECKLAUFISTTEMP");
 constexpr uint32_t HASH_VERDICHTER = hash("VERDICHTER");
@@ -2133,10 +2103,6 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
             break;
         }
         
-        case HASH_SOMMERBETRIEB:
-            publishBetriebsart(value);
-            break;
-        
         case HASH_WPVORLAUFIST: {
             char* endPtr;
             float floatValue = strtof(value.c_str(), &endPtr);
@@ -2228,10 +2194,10 @@ void publishCanDiagnostics() {
     }
 
     // Publish discovery (only once per UID — cached internally)
+    publishCalculatedSensorDiscovery(calculatedSensors[5]);
     publishCalculatedSensorDiscovery(calculatedSensors[6]);
     publishCalculatedSensorDiscovery(calculatedSensors[7]);
     publishCalculatedSensorDiscovery(calculatedSensors[8]);
-    publishCalculatedSensorDiscovery(calculatedSensors[9]);
 
     char buf[16];
 
@@ -2279,10 +2245,6 @@ void processCalculatedSensors() {
         unsigned long datetime_interval = CALC_DATETIME_FREQUENCY * 1000UL;
         nextDateTimeUpdate = now + getRandomInRange(0, datetime_interval + 1);
         
-        // Betriebsart sensor (1min frequency)
-        unsigned long betriebsart_interval = CALC_BETRIEBSART_FREQUENCY * 1000UL;
-        nextBetriebsartUpdate = now + getRandomInRange(0, betriebsart_interval + 1);
-
         // CAN diagnostics (30s frequency)
         unsigned long can_diag_interval = CALC_CAN_DIAG_FREQUENCY * 1000UL;
         nextCanDiagUpdate = now + getRandomInRange(0, can_diag_interval + 1);
@@ -2313,13 +2275,6 @@ void processCalculatedSensors() {
         nextDateTimeUpdate = now + (CALC_DATETIME_FREQUENCY * 1000UL) + getRandomInRange(0, 1000);
     }
     
-    // Check and publish Betriebsart sensor (only if SOMMERBETRIEB value is available)
-    if (now >= nextBetriebsartUpdate) {
-        // Betriebsart requires a value parameter, so we skip auto-publishing
-        // It will be published when SOMMERBETRIEB signal is received
-        nextBetriebsartUpdate = now + (CALC_BETRIEBSART_FREQUENCY * 1000UL) + getRandomInRange(0, 1000);
-    }
-
     // Check and publish CAN diagnostic sensors
     if (now >= nextCanDiagUpdate) {
         publishCanDiagnostics();

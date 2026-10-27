@@ -3,6 +3,10 @@
 #  For ESP32-S2 and other boards using external MCP2515 transceiver
 #
 
+# Default — override in heatingpump.yaml (WPL17/WPL23/WPL10AC need 50kbps, CAN-B)
+substitutions:
+  can_bit_rate: 20kbps
+
 #########################################
 #                                       #
 #   SPI Configuration                   #

@@ -3,6 +3,10 @@
 #  For ESP32-S3 and other variants with integrated CAN controller
 #
 
+# Default — override in heatingpump.yaml (WPL17/WPL23/WPL10AC need 50kbps, CAN-B)
+substitutions:
+  can_bit_rate: 20kbps
+
 #########################################
 #                                       #
 #   CAN BUS (Built-in TWAI)            #

@@ -5,6 +5,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ---
 
+## [2.4.2] — 2026-10-27
+
+### Fixed
+
+- **Compile error "Bit rate ${CAN_BIT_RATE} is not supported"** when `heatingpump.yaml` has no
+  `can_bit_rate` substitution (regression since 2.3.0). The CAN packages now default to
+  `20kbps`; CAN-B models (WPL17/WPL23/WPL10AC) still set `can_bit_rate: 50kbps`. (#39)
+
+### Removed
+
+- **Calculated `betriebsart` sensor.** It mapped `SOMMERBETRIEB` (0xfdb4) to "Sommerbetrieb",
+  but per the WPMW II manual that signal is the *summer-mode automatic* parameter (on/off),
+  not whether summer mode is currently active — so it showed "Sommerbetrieb" in winter.
+  The real operating mode remains available via `PROGRAMMSCHALTER` and `BETRIEBSART_WP`.
+  The orphaned entity can be removed with `helperscripts/clean_mqtt_discovery.py`.
+
+### Changed
+
+- `SOMMERBETRIEB` is now labelled "Sommerbetrieb-Automatik" / "Summer Mode Automatic"
+  (entity ID unchanged).
+
+---
+
 ## [2.4.1] — 2026-10-27
 
 ### Fixed

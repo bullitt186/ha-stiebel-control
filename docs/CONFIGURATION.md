@@ -112,7 +112,6 @@ Published to `heatingpump/calculated/` MQTT topics and auto-discovered in HA:
 |--------|-------|-------------|
 | Date | `heatingpump/calculated/date/state` | `YYYY-MM-DD` from heat pump clock |
 | Time | `heatingpump/calculated/time/state` | `HH:MM:SS` from heat pump clock |
-| Betriebsart | `heatingpump/calculated/betriebsart/state` | "Sommerbetrieb" or "Normalbetrieb" |
 | Delta T (continuous) | `heatingpump/calculated/delta_t_continuous/state` | Flow − return temp, always |
 | Delta T (running) | `heatingpump/calculated/delta_t_running/state` | Flow − return temp, only when compressor active |
 | Compressor active | `heatingpump/calculated/compressor_active/state` | on/off |

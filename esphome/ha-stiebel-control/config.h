@@ -63,8 +63,6 @@
 // Date/Time sensors update frequency (based on date/time signal frequency)
 #define CALC_DATETIME_FREQUENCY FREQ_1MIN
 
-// Betriebsart sensor update frequency (based on SOMMERBETRIEB frequency)
-#define CALC_BETRIEBSART_FREQUENCY FREQ_1MIN
 
 // CAN diagnostic sensors update frequency (ESP32-S3 / TWAI only)
 #define CALC_CAN_DIAG_FREQUENCY FREQ_30S

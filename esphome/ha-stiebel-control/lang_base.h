@@ -99,7 +99,7 @@
 #define LNAME_WAERMEERTRAG_HEIZ_SUM_MWH        "Wärme Ertrag Heizung Summe MWh"
 #define LNAME_GEBAEUDEART                      "Gebäudeart"
 #define LNAME_WP_STATUS                        "Wärmepumpe Status"
-#define LNAME_SOMMERBETRIEB                    "Sommerbetrieb"
+#define LNAME_SOMMERBETRIEB                    "Sommerbetrieb-Automatik"
 #define LNAME_BETRIEBSART_WP                   "Betriebsart Wärmepumpe"
 
 // ============================================================================
@@ -107,7 +107,6 @@
 // ============================================================================
 #define LNAME_CALC_DATE                        "Datum"
 #define LNAME_CALC_TIME                        "Uhrzeit"
-#define LNAME_CALC_BETRIEBSART                 "Betriebsart"
 #define LNAME_CALC_DELTA_T_CONTINUOUS          "Delta T WP (kontinuierlich)"
 #define LNAME_CALC_DELTA_T_RUNNING             "Delta T WP (nur bei Verdichter an)"
 #define LNAME_CALC_COMPRESSOR_ACTIVE           "WP Verdichter aktiv"

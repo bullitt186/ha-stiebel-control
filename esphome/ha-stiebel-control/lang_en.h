@@ -182,7 +182,7 @@
 #undef  LNAME_WP_STATUS
 #define LNAME_WP_STATUS                        "Heat Pump Status"
 #undef  LNAME_SOMMERBETRIEB
-#define LNAME_SOMMERBETRIEB                    "Summer Mode"
+#define LNAME_SOMMERBETRIEB                    "Summer Mode Automatic"
 #undef  LNAME_BETRIEBSART_WP
 #define LNAME_BETRIEBSART_WP                   "Heat Pump Operating Mode"
 
@@ -193,8 +193,6 @@
 #define LNAME_CALC_DATE                        "Date"
 #undef  LNAME_CALC_TIME
 #define LNAME_CALC_TIME                        "Time"
-#undef  LNAME_CALC_BETRIEBSART
-#define LNAME_CALC_BETRIEBSART                 "Operating Mode"
 #undef  LNAME_CALC_DELTA_T_CONTINUOUS
 #define LNAME_CALC_DELTA_T_CONTINUOUS          "Delta T HP (continuous)"
 #undef  LNAME_CALC_DELTA_T_RUNNING
