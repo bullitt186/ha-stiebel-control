@@ -344,12 +344,26 @@ TEST_CASE("updateCOPCalculations: cop_ww includes SUM_KWH remainder (WPL13E)", "
     storeCOPEnergyValue("WAERMEERTRAG_2WE_WW_SUM_MWH",    "0");
     storeCOPEnergyValue("EL_AUFNAHMELEISTUNG_WW_SUM_MWH", "14");
     storeCOPEnergyValue("EL_AUFNAHMELEISTUNG_WW_SUM_KWH", "75");
+    storeCOPEnergyValue("WAERMEERTRAG_HEIZ_SUM_KWH",        "613");
+    storeCOPEnergyValue("EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH", "730");
     updateCOPCalculations();
     bool found = false;
     for (auto& m : mqtt_client_instance().messages)
         if (m.topic.find("cop_ww") != std::string::npos) { CHECK(m.payload == "3.03"); found = true; }  // 42.629/14.075
     CHECK(found);
-    copEnergyValues.erase("WAERMEERTRAG_WW_SUM_KWH");
+    for (const char* k : {"WAERMEERTRAG_WW_SUM_KWH", "EL_AUFNAHMELEISTUNG_WW_SUM_KWH",
+                          "WAERMEERTRAG_HEIZ_SUM_KWH", "EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH"})
+        copEnergyValues.erase(k);
+}
+TEST_CASE("updateCOPCalculations: waits for all SUM_KWH remainders", "[can]") {
+    mqtt_client_instance().clear();
+    storeCOPEnergyValue("WAERMEERTRAG_WW_SUM_MWH",        "42");
+    storeCOPEnergyValue("WAERMEERTRAG_2WE_WW_SUM_MWH",    "0");
+    storeCOPEnergyValue("EL_AUFNAHMELEISTUNG_WW_SUM_MWH", "14");
+    storeCOPEnergyValue("EL_AUFNAHMELEISTUNG_WW_SUM_KWH", "75");   // only 1 of 4
+    updateCOPCalculations();
+    for (auto& m : mqtt_client_instance().messages)
+        CHECK(m.topic.find("cop_ww/state") == std::string::npos);
     copEnergyValues.erase("EL_AUFNAHMELEISTUNG_WW_SUM_KWH");
 }
 TEST_CASE("updateCOPCalculations: skips cop_ww when el divisor is 0", "[can]") {

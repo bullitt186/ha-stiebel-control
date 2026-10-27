@@ -1484,9 +1484,23 @@ static float copMWh(const std::string& base) {
     return v;
 }
 
+// Models with kWh remainder registers: wait until all four are known, otherwise
+// the COP jumps around after boot while only some remainders have arrived.
+static bool copKwhIncomplete() {
+    static const char* keys[] = {"WAERMEERTRAG_HEIZ_SUM_KWH", "WAERMEERTRAG_WW_SUM_KWH",
+                                 "EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH", "EL_AUFNAHMELEISTUNG_WW_SUM_KWH"};
+    int have = 0;
+    for (const char* k : keys) have += copEnergyValues.count(k);
+    return have > 0 && have < 4;
+}
+
 // Calculate and publish COP values if all required data is available
 void updateCOPCalculations() {
     publishCOPDiscovery();
+    if (copKwhIncomplete()) {
+        publishCombinedEnergySensors();
+        return;
+    }
     
     // COP WW: (WAERMEERTRAG_WW_SUM + WAERMEERTRAG_2WE_WW_SUM) / EL_AUFNAHMELEISTUNG_WW_SUM
     if (copEnergyValues.find("WAERMEERTRAG_WW_SUM_MWH") != copEnergyValues.end() &&
@@ -2025,12 +2039,24 @@ constexpr uint32_t HASH_WAERMEERTRAG_WW_TAG_KWH = hash("WAERMEERTRAG_WW_TAG_KWH"
 
 
 
+// WPL13E: the WPMW II itself polls these on the bus, so they appear even when we
+// don't request them. HA history (30 days to 11 months) shows only 0 / -255:
+// MANAGER copies of IWS values, compressor 1 (single-compressor unit), cooling.
+static bool isIgnoredOnWpl13e(const CanMember &cm, const char* name) {
+    if (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") != 0) return false;
+    bool manager = strcmp(cm.Name, "MANAGER") == 0;
+    if (strncmp(name, "LZ_VERD_", 8) == 0)
+        return manager || strstr(name, "VERD_1") || strstr(name, "KUEHL");
+    return manager && (strcmp(name, "WPVORLAUFIST") == 0 || strcmp(name, "VERDICHTER") == 0);
+}
+
 void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string &value)
 {
     // Skip empty values
     if (value.empty()) {
         return;
     }
+    if (isIgnoredOnWpl13e(cm, ei->Name)) return;
     
     // Invert boolean logic for EVU_SPERRE_AKTIV signal
     // CAN: 1 = lock inactive (off), 0 = lock active (on)

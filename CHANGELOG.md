@@ -16,6 +16,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Fixed
 
+- WPL13E: `compressor_active` was driven alternately by the IWS compressor value and a constant
+  0.0 copy from the MANAGER seen on the bus. MANAGER copies of IWS values (and compressor-1 /
+  cooling runtimes the WPMW II polls itself) are now ignored on WPL13E.
+- COP waits until all kWh remainder registers are known (no jumps right after boot).
 - Entities' MQTT discovery is resent on every broker (re)connect. Discoveries sent during boot,
   before the connection was up, were lost until the 15-minute refresh (e.g. renamed entities
   or writable numbers appeared late).
