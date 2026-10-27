@@ -5,6 +5,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **WPC7 / Stiebel WPC-07cool / Tecalor TTF07c model** — community-tested on real hardware
+  by @Mountain-wg and @EnderBow. Opt in with `device_model: "wpc7"` (CAN-A, 20 kbps).
+  Signals that returned -255 on real units are commented out. (#27)
+- **`disable_sg_ready` substitution** (default `"false"`): `"true"` hides all SG Ready
+  entities and skips their MQTT discovery — for models without SG Ready input (e.g. WPC7).
+  Already-retained discovery topics can be removed with `helperscripts/clean_mqtt_discovery.py`.
+
+---
+
 ## [2.3.0] — 2026-10-27
 
 ### Added

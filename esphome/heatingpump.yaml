@@ -20,6 +20,7 @@ substitutions:
   can_rx_pin: GPIO16  # RXD2 on Waveshare board
   can_id_pc: "0x680"
   can_bit_rate: 20kbps             # 20kbps = CAN-A (WPL13E/WPF10/WPC7); WPL17/WPL23/WPL10AC need 50kbps (CAN-B)
+  # disable_sg_ready: "true"      # hide SG Ready entities in HA (default "false")
 
 packages:
   board: !include ha-stiebel-control/board_esp32s3.yaml

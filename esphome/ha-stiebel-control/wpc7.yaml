@@ -4,8 +4,8 @@
 #  Selects the WPC7 signal request table (SIGNAL_REQUESTS_BASE + WPC7-specific
 #  signals). All universal sensors live in common.yaml.
 #
-#  UNVERIFIED ON REAL HARDWARE — see signal_requests_wpc7.h header comment and
-#  GitHub issue #2 / #21. Please test against a real unit before relying on it.
+#  COMMUNITY-TESTED on real WPC7 hardware (PR #27). Signals returning -255 there are
+#  commented out in signal_requests_wpc7.h. SG Ready is unsupported: set disable_sg_ready: "true".
 #
 #  To add a new model, create signal_requests_yourmodel.h and a thin yourmodel.yaml
 #  following this pattern. See CONTRIBUTING.md for full instructions.

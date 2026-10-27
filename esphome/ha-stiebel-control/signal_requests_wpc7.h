@@ -1,7 +1,7 @@
 /*
  * Signal Request Table — WPC7 / Stiebel WPC-07cool / Tecalor TTF07c
  *
- * UNVERIFIED ON REAL HARDWARE. Ported from community project
+ * Community-tested on real WPC7 hardware (PR #27). Ported from community project
  * kr0ner/OneESP32ToRuleThemAll (CAN register map for their TTF07c model),
  * re-implemented against this project's ElsterTable.h/signal_requests
  * conventions — no code or YAML was copied verbatim. See issue #2 and #21
@@ -49,13 +49,13 @@ extern const SignalRequest signalRequests[] = {
     {"QUELLE_IST",                 FREQ_30S,   cm_kessel},
     {"HEISSGAS_TEMP",              FREQ_1MIN,  cm_kessel},
     {"WW_HYSTERESE",               FREQ_10MIN, cm_kessel},
-    {"VOLUMENSTROM_WPC7",          FREQ_30S,   cm_kessel},
-    {"DRUCK_HEIZKREIS",            FREQ_30S,   cm_kessel},
-    {"QUELLENDRUCK",               FREQ_30S,   cm_kessel},
+    // -255 on real WPC7 (EnderBow, PR #27): {"VOLUMENSTROM_WPC7",          FREQ_30S,   cm_kessel},
+    // -255 on real WPC7 (EnderBow, PR #27): {"DRUCK_HEIZKREIS",            FREQ_30S,   cm_kessel},
+    // -255 on real WPC7 (EnderBow, PR #27): {"QUELLENDRUCK",               FREQ_30S,   cm_kessel},
     {"KUEHLEN_EINGESCHALTET",      FREQ_1MIN,  cm_kessel},
-    {"LEISTUNG_HEIZKREISPUMPE",    FREQ_1MIN,  cm_kessel},
-    {"LEISTUNG_WARMWASSERPUMPE",   FREQ_1MIN,  cm_kessel},
-    {"LEISTUNG_SOLEPUMPE",         FREQ_1MIN,  cm_kessel},
+    // -255 on real WPC7 (EnderBow, PR #27): {"LEISTUNG_HEIZKREISPUMPE",    FREQ_1MIN,  cm_kessel},
+    // -255 on real WPC7 (EnderBow, PR #27): {"LEISTUNG_WARMWASSERPUMPE",   FREQ_1MIN,  cm_kessel},
+    // -255 on real WPC7 (EnderBow, PR #27): {"LEISTUNG_SOLEPUMPE",         FREQ_1MIN,  cm_kessel},
     {"EINPHASIGER_BETRIEB",        FREQ_10MIN, cm_kessel},
     {"VERDICHTER_STARTS",          FREQ_10MIN, cm_kessel},
     {"VERDICHTER_STARTS_K",        FREQ_10MIN, cm_kessel},
@@ -85,12 +85,12 @@ extern const SignalRequest signalRequests[] = {
     // header comment). Values may be mis-scaled until verified.
     {"MAX_WASSERDRUCK",            FREQ_10MIN, cm_kessel},  // TTF07c: HDSENSORMAX, et_dec_val expected (row has et_default)
     {"MASCHINENDRUCK",             FREQ_30S,   cm_kessel},  // TTF07c: DRUCK_HOCHDRUCK, et_cent_val expected (row has et_default)
-    {"MATERIALNUMMER_HIGH",        FREQ_30S,   cm_kessel},  // TTF07c: HKISTTEMP, et_dec_val expected (row has et_default) — name mismatch too, low confidence
-    {"MESSSTROM_NIEDERDRUCK",      FREQ_30S,   cm_kessel},  // TTF07c: DRUCK_NIEDERDRUCK, et_cent_val expected (row has et_default)
+    // -255 on real WPC7 (EnderBow, PR #27): {"MATERIALNUMMER_HIGH",        FREQ_30S,   cm_kessel},  // TTF07c: HKISTTEMP, et_dec_val expected (row has et_default) — name mismatch too, low confidence
+    // -255 on real WPC7 (EnderBow, PR #27): {"MESSSTROM_NIEDERDRUCK",      FREQ_30S,   cm_kessel},  // TTF07c: DRUCK_NIEDERDRUCK, et_cent_val expected (row has et_default)
 
     // Index + Type match an existing row, name differs — same underlying
     // Elster signal, just curated under a different name already.
-    {"PUFFERTEMP_UNTEN1",          FREQ_1MIN,  cm_kessel},  // TTF07c: PUFFERISTTEMP
+    // -255 on real WPC7 (EnderBow, PR #27): {"PUFFERTEMP_UNTEN1",          FREQ_1MIN,  cm_kessel},  // TTF07c: PUFFERISTTEMP
     {"PUFFERSOLL",                 FREQ_1MIN,  cm_kessel},  // TTF07c: PUFFERSOLLTEMP
     {"MAX_HEIZUNG_TEMP",           FREQ_10MIN, cm_kessel},  // TTF07c: MAXVORLAUFTEMP — not queried by source YAML, untested guess
     {"HILFSKESSELSOLL",            FREQ_1MIN,  cm_kessel},  // TTF07c: HKSOLLTEMP
@@ -111,7 +111,7 @@ extern const SignalRequest signalRequests[] = {
     // ========================================================================
     // WPC7-SPECIFIC: signals queried from HK1 / BEDIENMODUL_2 (0x301)
     // ========================================================================
-    {"VORLAUFISTTEMP_WPC7",        FREQ_30S,   cm_bedienmodul_2},
+    // -255 on real WPC7 (EnderBow, PR #27): {"VORLAUFISTTEMP_WPC7",        FREQ_30S,   cm_bedienmodul_2},
     {"RAUMISTTEMP",                FREQ_1MIN,  cm_bedienmodul_2},
     {"VERSTELLTE_RAUMSOLLTEMP",    FREQ_1MIN,  cm_bedienmodul_2},
     {"VORLAUFSOLLTEMP",            FREQ_1MIN,  cm_bedienmodul_2},
