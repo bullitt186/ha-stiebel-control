@@ -5,6 +5,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ---
 
+## [2.4.1] — 2026-10-27
+
+### Fixed
+
+- **No more dead energy/power/status entities on models without the WPL17 registers**
+  (e.g. WPL13E): the combined energy totals, daily energy, electrical power and derived
+  operating-status sensors (added in 2.3.0) are now announced to HA only once they have a
+  value. Previously all 12 were created and stayed "unknown". Leftover entities can be
+  removed with `helperscripts/clean_mqtt_discovery.py`.
+- Removed a hardcoded personal OTA address (`use_address`) from `common.yaml`;
+  `make upload` now defaults to `heatingpump.local` (override with `OTA_ADDR=`).
+
+---
+
 ## [2.4.0] — 2026-10-27
 
 ### Added

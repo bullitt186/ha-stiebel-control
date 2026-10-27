@@ -746,13 +746,21 @@ void publishCalculatedSensorDiscovery(const CalculatedSensorConfig& config, bool
 }
 
 // Publish all calculated sensor discoveries (used during startup and republish)
+// Energy/power/status sensors (calculatedSensors[10..]) need model-specific registers
+// (SUM_KWH, TAG_*); they announce themselves on their first value in
+// publishCombinedEnergySensors(), so models without them get no dead HA entities.
+static const size_t FIRST_ON_DEMAND_CALCULATED_SENSOR = 10;
+
 void publishAllCalculatedSensorDiscoveries(bool forceRepublish = false) {
     if (forceRepublish) {
-        discoveredCalculatedSensors.clear();
         ESP_LOGI("MQTT", "Republishing all calculated sensor discoveries");
     }
-    
+
     for (size_t i = 0; i < CALCULATED_SENSOR_COUNT; i++) {
+        if (i >= FIRST_ON_DEMAND_CALCULATED_SENSOR &&
+            discoveredCalculatedSensors.find(calculatedSensors[i].uniqueId) == discoveredCalculatedSensors.end()) {
+            continue;   // not seen a value yet
+        }
         publishCalculatedSensorDiscovery(calculatedSensors[i], forceRepublish);
     }
 }

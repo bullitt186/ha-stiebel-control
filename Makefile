@@ -6,7 +6,7 @@ MQTT_BROKER  ?= $(shell grep 'mqtt_broker:' esphome/secrets.yaml | sed 's/mqtt_b
 MQTT_USER    ?= $(shell grep 'mqtt_username:' esphome/secrets.yaml | sed 's/mqtt_username:[[:space:]]*//' | tr -d '"')
 MQTT_PASS    ?= $(shell grep 'mqtt_password:' esphome/secrets.yaml | sed 's/mqtt_password:[[:space:]]*//' | tr -d '"')
 # OTA target: static IP from common.yaml wifi.use_address (mDNS does not work reliably in WSL)
-OTA_ADDR     ?= $(shell grep 'use_address:' esphome/ha-stiebel-control/common.yaml | head -1 | awk '{print $$2}')
+OTA_ADDR     ?= heatingpump.local   # override: make upload OTA_ADDR=192.168.x.y
 
 CXX      ?= g++
 CXXFLAGS  = -std=c++17 -Wall -Wextra \
