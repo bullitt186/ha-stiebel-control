@@ -5,6 +5,38 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ---
 
+## [2.3.0] — 2026-10-27
+
+### Added
+
+- **WPL17 (ICS classic) heat pump model** — hardware-verified by @Enrica-r over several weeks
+  incl. heating season. Connects via CAN-B (X1.2) at **50 kbps**. Opt in with
+  `device_model: "wpl17"`. Supersedes the unverified desk-research port (#28). (#36)
+- **`can_bit_rate` substitution** (default `20kbps`, existing models unaffected).
+- **New CAN members**: `HEIZMODUL_WPL` (0x514), `KESSEL_CANB` (0x201); `MISCHERMODUL_2` (0x601)
+  re-added for the WPL17 heating program.
+- **Derived sensors**: `calculated/betriebsstatus` (Aus/Heizen/Warmwasser/Kuehlen) and
+  `calculated/el_leistung_w` (electrical power from daily Wh counters).
+- **Diagnostic scan firmware** (`tools/heatingpump_scan.yaml`) and
+  `helperscripts/clean_mqtt_discovery.py` to prune orphaned retained discovery topics.
+- Smoke test manifest `tests/models/wpl17_smoke.json`.
+
+### Fixed
+
+- **Writable-number MQTT discovery** no longer emits an empty `device_class` — HA rejected
+  the whole discovery payload, silently hiding e.g. the heating-curve input.
+- **Combined energy totals** (`energie_*_total_kwh`, `waerme_*_total_kwh`) get a deglitch
+  filter against transient ±1000 kWh spikes at the nightly register rollover.
+- Manual PDF renamed so the repo clones on Windows (#35, #38).
+- CI: `ota_password` added to `ci_secrets.yaml`.
+
+### Note
+
+- `et_bool` values now also accept `0x0100` as `true` globally (same value in both byte
+  orders; `false` is always `0x0000`). No behaviour change expected for existing models.
+
+---
+
 ## [2.2.0] — 2026-10-11
 
 ### Added
