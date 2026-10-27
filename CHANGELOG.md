@@ -5,7 +5,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ---
 
-## [Unreleased]
+## [2.4.0] — 2026-10-27
 
 ### Added
 
@@ -15,6 +15,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - **`disable_sg_ready` substitution** (default `"false"`): `"true"` hides all SG Ready
   entities and skips their MQTT discovery — for models without SG Ready input (e.g. WPC7).
   Already-retained discovery topics can be removed with `helperscripts/clean_mqtt_discovery.py`.
+
+### Fixed
+
+- **`et_little_bool` now accepts `0x0001` as `on`** (like `et_bool` since 2.3.0), so
+  `SOMMERBETRIEB` no longer shows "unknown" on units sending `0x0001`.
+- **`ANTILEGIONELLEN`** is now a bool (on/off binary sensor) instead of a raw number —
+  WPC7 reported "unknown". ⚠️ Entity changes from `sensor` to `binary_sensor`; the old
+  sensor entity can be removed with `helperscripts/clean_mqtt_discovery.py`.
+- **`WP_PUMPENSTATUS`** (WPC7) published as on/off instead of 0/1.
 
 ---
 

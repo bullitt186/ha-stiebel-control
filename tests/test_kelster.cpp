@@ -63,6 +63,13 @@ TEST_CASE("SetValueType: et_little_bool off", "[kelster]") {
     SetValueType(val, et_little_bool, 0);
     CHECK(std::string(val) == "off");
 }
+TEST_CASE("SetValueType: et_little_bool accepts 0x0001 as on", "[kelster]") {
+    char val[32];
+    SetValueType(val, et_little_bool, 0x0001);
+    CHECK(std::string(val) == "on");
+    SetValueType(val, et_bool, 0x0100);
+    CHECK(std::string(val) == "on");
+}
 TEST_CASE("SetValueType: et_zeit formats HH:MM", "[kelster]") {
     char val[32];
     // Value = (hour) | (minute << 8) — hour in low byte, minute in high byte
