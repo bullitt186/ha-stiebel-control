@@ -907,7 +907,63 @@ void publishWritableNumberDiscovery(const WritableNumberConfig& config, bool for
 }
 
 // Publish all writable number discoveries
+// ============================================================================
+// MQTT CLIMATE (thermostat cards) - in addition to the number/select entities,
+// reusing their /set handlers and the model-specific CAN member mapping.
+// ============================================================================
+static const WritableNumberConfig* findWritableNumber(const char* signal) {
+    for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; i++)
+        if (strcmp(writableNumbers[i].signalName, signal) == 0) return &writableNumbers[i];
+    return nullptr;
+}
+
+void publishClimateDiscoveries() {
+#ifdef HA_READ_ONLY_true
+    return;
+#endif
+    const char* device = "\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL_STR "\"],"
+                         "\"name\":\"Stiebel Eltron Wärmepumpe\",\"manufacturer\":\"Stiebel Eltron\"}";
+    const bool wpl17 = strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0;
+
+    // Heating: room setpoint (day) + operating mode (Programmschalter) as presets
+    if (const WritableNumberConfig* room = findWritableNumber("RAUMSOLLTEMP_I")) {
+        const CanMember* cm = getWritableNumberMember(*room);
+        std::ostringstream p;
+        p << "{\"name\":\"" << LNAME_CLIMATE_HEIZUNG << "\",\"unique_id\":\"stiebel_climate_heizung\","
+          << "\"modes\":[\"heat\"],\"temperature_unit\":\"C\","
+          << "\"min_temp\":" << room->min << ",\"max_temp\":" << room->max << ",\"temp_step\":" << room->step << ","
+          << "\"temperature_command_topic\":\"heatingpump/" << cm->Name << "/RAUMSOLLTEMP_I/set\","
+          << "\"temperature_state_topic\":\"heatingpump/" << cm->Name << "/RAUMSOLLTEMP_I/state\","
+          << "\"preset_modes\":[";
+        for (size_t i = 0; i < sizeof(programmschalterOptions) / sizeof(programmschalterOptions[0]); i++)
+            p << (i ? "," : "") << "\"" << programmschalterOptions[i] << "\"";
+        p << "],\"preset_mode_command_topic\":\"heatingpump/MANAGER/PROGRAMMSCHALTER/set\","
+          << "\"preset_mode_state_topic\":\"heatingpump/MANAGER/PROGRAMMSCHALTER/state\","
+          << "\"action_topic\":\"heatingpump/calculated/compressor_active/state\","
+          << "\"action_template\":\"{{ 'heating' if value == 'on' else 'idle' }}\","
+          << "\"availability_topic\":\"heatingpump/status\",\"icon\":\"mdi:radiator\"," << device << "}";
+        std::string s = p.str();
+        id(mqtt_client).publish("homeassistant/climate/heatingpump/stiebel_climate_heizung/config", s.c_str(), s.length(), 0, true);
+    }
+
+    // Hot water: tank actual temperature + DHW setpoint
+    if (const WritableNumberConfig* dhw = findWritableNumber("EINSTELL_SPEICHERSOLLTEMP")) {
+        const CanMember* cm = getWritableNumberMember(*dhw);
+        std::ostringstream p;
+        p << "{\"name\":\"" << LNAME_CLIMATE_WARMWASSER << "\",\"unique_id\":\"stiebel_climate_warmwasser\","
+          << "\"modes\":[\"heat\"],\"temperature_unit\":\"C\","
+          << "\"min_temp\":" << dhw->min << ",\"max_temp\":" << dhw->max << ",\"temp_step\":" << dhw->step << ","
+          << "\"temperature_command_topic\":\"heatingpump/" << cm->Name << "/EINSTELL_SPEICHERSOLLTEMP/set\","
+          << "\"temperature_state_topic\":\"heatingpump/" << cm->Name << "/EINSTELL_SPEICHERSOLLTEMP/state\","
+          << "\"current_temperature_topic\":\"heatingpump/" << (wpl17 ? "KESSEL_CANB" : "KESSEL") << "/SPEICHERISTTEMP/state\","
+          << "\"availability_topic\":\"heatingpump/status\",\"icon\":\"mdi:water-boiler\"," << device << "}";
+        std::string s = p.str();
+        id(mqtt_client).publish("homeassistant/climate/heatingpump/stiebel_climate_warmwasser/config", s.c_str(), s.length(), 0, true);
+    }
+}
+
 void publishAllWritableNumberDiscoveries(bool forceRepublish = false) {
+    publishClimateDiscoveries();
     if (forceRepublish) {
         discoveredWritableNumbers.clear();
         ESP_LOGI("MQTT", "Republishing all writable number discoveries");

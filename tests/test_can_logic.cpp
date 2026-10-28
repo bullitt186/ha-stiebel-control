@@ -1192,3 +1192,19 @@ TEST_CASE("scan: answers of the scanned member are published, 0x8000 is not", "[
     CHECK(scanState.hits == 1);
     scanState = ScanState{};
 }
+
+// ============================================================================
+// MQTT climate
+// ============================================================================
+
+TEST_CASE("climate: heating and hot water discoveries reuse the number /set topics", "[mqtt]") {
+    resetDiscoveryState();
+    publishClimateDiscoveries();
+    std::string heat = mqttFindPayload("climate/heatingpump/stiebel_climate_heizung/config");
+    std::string dhw  = mqttFindPayload("climate/heatingpump/stiebel_climate_warmwasser/config");
+    CHECK(heat.find("heatingpump/MANAGER/RAUMSOLLTEMP_I/set") != std::string::npos);
+    CHECK(heat.find("PROGRAMMSCHALTER/set") != std::string::npos);
+    CHECK(heat.find("\"Tagbetrieb\"") != std::string::npos);
+    CHECK(dhw.find("EINSTELL_SPEICHERSOLLTEMP/set") != std::string::npos);
+    CHECK(dhw.find("KESSEL/SPEICHERISTTEMP/state") != std::string::npos);
+}

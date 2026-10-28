@@ -52,6 +52,8 @@
 #define LNAME_ANTILEGIONELLEN_ZEITPUNKT        "Antilegionellen Zeitpunkt"
 #define LNAME_HEIZKURVE                        "Heizkurve"
 #define LNAME_NUM_HEIZKURVE                    "Heizkurve Steigung Einstellung"
+#define LNAME_CLIMATE_HEIZUNG                  "Heizung"
+#define LNAME_CLIMATE_WARMWASSER               "Warmwasser"
 #define LNAME_PROGRAMMSCHALTER                 "Programmschalter"
 #define LNAME_TAG                              "Tag"
 #define LNAME_MONAT                            "Monat"

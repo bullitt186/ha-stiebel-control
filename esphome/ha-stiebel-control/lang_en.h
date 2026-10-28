@@ -289,4 +289,8 @@
 #define LNAME_COP_HEIZ                         "COP Heating"
 #undef  LNAME_COP_GESAMT
 #define LNAME_COP_GESAMT                       "COP Total"
+#undef  LNAME_CLIMATE_HEIZUNG
+#define LNAME_CLIMATE_HEIZUNG                  "Heating"
+#undef  LNAME_CLIMATE_WARMWASSER
+#define LNAME_CLIMATE_WARMWASSER               "Hot Water"
 #endif // LANGUAGE_SELECT_ACTIVE
