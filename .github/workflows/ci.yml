@@ -45,6 +45,9 @@ jobs:
       - name: Compile (ESP32-S3)
         run: esphome compile esphome/ci_heatingpump_s3.yaml
 
+      - name: Compile (ESP32-S3, read_only)
+        run: esphome -s read_only true compile esphome/ci_heatingpump_s3.yaml
+
   compile-s2:
     name: Compile ESP32-S2
     runs-on: ubuntu-latest

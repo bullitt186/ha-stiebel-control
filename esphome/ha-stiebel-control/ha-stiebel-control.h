@@ -641,6 +641,10 @@ void readSignal(const CanMember *cm, const char *elsterName)
 
 void writeSignal(const CanMember *cm, const ElsterIndex *ei, const char *&str)
 {
+#ifdef HA_READ_ONLY_true
+    ESP_LOGW("writeSignal()", "read_only: not writing \"%s\" = \"%s\" to %s", ei->Name, str, cm->Name);
+    return;
+#endif
     bool use_extended_id = false;
     int writeValue = TranslateString(str, ei->Type);
     if (writeValue == -1) {
@@ -804,6 +808,9 @@ static const CanMember* getWritableNumberMember(const WritableNumberConfig& conf
 
 // Publish MQTT discovery for a writable number entity
 void publishWritableNumberDiscovery(const WritableNumberConfig& config, bool forceRepublish = false) {
+#ifdef HA_READ_ONLY_true
+    return;  // read_only: no writable entities in HA
+#endif
 #ifdef HA_DISABLE_SG_READY_true
     if (strncmp(config.signalName, "SG_READY_", 9) == 0) return;  // SG Ready disabled via substitution
 #endif
@@ -929,6 +936,9 @@ void publishAllWritableNumberDiscoveries(bool forceRepublish = false) {
 // ============================================================================
 
 void publishWritableSelectDiscovery(const WritableSelectConfig& config, bool forceRepublish = false) {
+#ifdef HA_READ_ONLY_true
+    return;  // read_only: no writable entities in HA
+#endif
 #ifdef HA_DISABLE_SG_READY_true
     if (strncmp(config.signalName, "SG_READY_", 9) == 0) return;  // SG Ready disabled via substitution
 #endif

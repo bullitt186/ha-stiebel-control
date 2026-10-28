@@ -184,3 +184,21 @@ Discovery is re-published every 15 minutes for reliability, and can be triggered
 ```bash
 mosquitto_pub -h BROKER -u USER -P PASS -t "heatingpump/republish_discoveries" -m ""
 ```
+
+## COP and booster energy
+
+COP = (heat yield + 2WE yield) / electrical consumption, per DHW, heating and total.
+`WAERMEERTRAG_2WE_*` is the second heat source, i.e. the electric booster (NHZ/DHC);
+kr0ner/OneESP32ToRuleThemAll names the same WPM3 registers `EL_ENERGIEAUFNAHME_*_NHZ`.
+For a resistive booster heat ≈ electricity, so adding it to the heat side is correct as
+long as the booster's electricity is also part of `EL_AUFNAHMELEISTUNG_*` — which has not
+been verified on hardware. The MWh registers only carry whole MWh; where the model provides
+`*_SUM_KWH`, the remainder is added (`copMWh()`), and the COP waits until all four
+remainders are known (`copKwhIncomplete()`).
+
+## Polling back-off and entity creation
+
+A signal answering `-255` (0x8000, "not available") creates no HA entity until it has
+delivered a real value once. From the third consecutive `-255` its poll interval doubles
+per answer, capped at 6 h (`nextBackoffMs()`); a valid value resets it. Entities that
+already exist keep receiving `-255` so their history stays intact.
