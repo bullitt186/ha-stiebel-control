@@ -76,6 +76,9 @@ extern const SignalRequest signalRequests[] = {
     // is unverified until seen with the compressor running - not exposed yet.
     // ========================================================================
     {"HEISSGAS_TEMP",              FREQ_1MIN,  cm_heizmodul},
+    {"ANZEIGE_HOCHDRUCK",          FREQ_1MIN,  cm_heizmodul},
+    {"ANZEIGE_NIEDERDRUCK",        FREQ_1MIN,  cm_heizmodul},
+    {"PROBE_WP_STATUS_4EDA",       FREQ_30S,   cm_heizmodul},  // TEMP: status word candidate, remove before release
     {"LAUFZEIT_DHC1",              FREQ_60MIN, cm_heizmodul},
     {"LAUFZEIT_DHC2",              FREQ_60MIN, cm_heizmodul},
     {"LZ_DHC12",                   FREQ_60MIN, cm_heizmodul},

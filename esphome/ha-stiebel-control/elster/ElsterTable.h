@@ -3809,6 +3809,7 @@ static const ElsterIndex ElsterTable[] =
   { "BETRIEBS_STATUS_WPC7", 0x0a20, 0, "Betriebsstatus (WPC7 Bitmaske)", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false }, // suffixed: BETRIEBS_STATUS already used (0x0176) by other models
   { "REGLERDYNAMIK", 0xfdb0, et_little_endian, "Reglerdynamik", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "VERDICHTER_STILLSTAND", 0xfdb1, et_little_endian, "Verdichter Stillstandszeit", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "PROBE_WP_STATUS_4EDA", 0x4eda, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },  // TEMP
   // kr0ner/OneESP32ToRuleThemAll index facts (WPM3 generation)
 #if defined(HA_MODEL_wpl17) || defined(HA_MODEL_wpl23) || defined(HA_MODEL_wpl10ac) || defined(HA_MODEL_wpc7)
   { "UNTERK_COND", 0x0aff, et_dec_val, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
