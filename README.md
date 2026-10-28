@@ -142,8 +142,14 @@ Change the `@vX.Y.Z` tag in your local `heatingpump.yaml` to the new release and
 - **Multilingual** — entity display names in German (default) or English; set `language: "EN"` in `heatingpump.yaml`
 - **Calculated sensors** — COP (hot water / heating / total), Delta-T, compressor status
 - **Date/time sync** — set heat pump clock from HA via buttons
+- **Thermostat cards** — MQTT climate entities for heating (room setpoint + operating mode as presets) and hot water
+- **Fault text** — the heat pump's fault code as plain text with a remedy hint (attribute)
+- **Bus scan** — find every signal your model answers (HA button or MQTT), turned into a ready-to-use request block by `helperscripts/scan_report.py`
+- **Read-only mode** — `read_only: "true"` never writes to the heat pump
+- **Self-tuning polling** — signals your model does not provide (-255) are polled less and never create HA entities
+- **Dashboards** — ready-made Lovelace views and a system schema in [`dashboards/`](dashboards/)
 - **Frequency-based polling** — configurable per-signal intervals (10s–60min)
-- **Native test suite** — 138 Catch2 unit tests covering core logic, no hardware needed
+- **Native test suite** — 220+ Catch2 unit tests covering core logic, no hardware needed
 - **MQTT regression tests** — `make smoke-test` verifies required signals after each OTA flash
 
 For entity IDs, MQTT topics, and configuration options see [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
@@ -206,6 +212,9 @@ These entities use the ESPHome native API (not MQTT). If they show `unavailable`
 
 See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for the complete step-by-step guide.
 
+Start with a **bus scan** (Settings → Devices → Manager/Heizmodul/Kessel → "Bus-Scan …",
+enabled under diagnostics) and post the output of `helperscripts/scan_report.py` in your PR.
+
 In brief:
 1. Create `signal_requests_yourmodel.h` using `SIGNAL_REQUESTS_BASE` + your model's signals
 2. Create `yourmodel.yaml` (3 lines — just the `esphome: includes:` block)
@@ -229,6 +238,7 @@ This repo has a fully configured agentic harness. See [docs/AGENTIC_DEVELOPMENT.
 
 - **Jürg Müller** — original Elster protocol implementation and signal table
 - **roberreiters** — ESPHome CAN bus setup for Stiebel Eltron
+- **kr0ner/OneESP32ToRuleThemAll**, **aly-fly/Stiebel-Eltron_heat_pump_monitor** — register names and the WPM2 fault list (facts only)
 - **Bastian Stahmer** — ha-stiebel-control implementation
 - **Community contributors** — model support, testing, documentation
 

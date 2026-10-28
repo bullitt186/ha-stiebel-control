@@ -40,6 +40,9 @@ The key must match what HA's ESPHome integration has stored for this device. If 
 | `can_mosi_pin` | SPI MOSI (MCP2515 only) | board-specific — see note below |
 | `can_miso_pin` | SPI MISO (MCP2515 only) | board-specific — see note below |
 | `can_cs_pin` | SPI CS (MCP2515 only) | board-specific — see note below |
+| `can_bit_rate` | CAN bus speed: `20kbps` (CAN-A: WPL13E/WPF10/WPC7) or `50kbps` (CAN-B: WPL17/WPL23/WPL10AC) | `20kbps` |
+| `disable_sg_ready` | `"true"` hides all SG Ready entities (models without SG Ready input) | `"false"` |
+| `read_only` | `"true"`: never write to the heat pump — no setpoint/mode/climate entities, clock buttons hidden; reading and bus scan keep working | `"false"` |
 
 > **Pin assignments are board-specific.** Always verify against your board's schematic
 > before wiring. Known working values for common boards:
@@ -185,3 +188,59 @@ in its `ElsterTable.h` entry:
 
 Blacklisted signals are skipped before any processing — they never generate MQTT messages
 or HA entities.
+
+---
+
+## Thermostat (climate) entities
+
+Two MQTT climate entities complement the number/select entities (which stay unchanged):
+
+| Entity | Target temperature | Current temperature | Presets |
+|--------|--------------------|---------------------|---------|
+| `climate.…_heizung` | `RAUMSOLLTEMP_I` (day room setpoint) | — | operating modes of `PROGRAMMSCHALTER` |
+| `climate.…_warmwasser` | `EINSTELL_SPEICHERSOLLTEMP` | `SPEICHERISTTEMP` | — |
+
+They use the same `/set` topics as the number entities, so the CAN member mapping per model applies.
+
+## Fault text
+
+`FEHLERMELDUNG` is decoded via `ErrorList` in `ElsterTable.h` ("Keine Stoerung" when 0). The
+`abhilfe` attribute holds a short remedy (`heatingpump/<MEMBER>/FEHLERMELDUNG/attributes`).
+WPL13E requests the heat pump module (IWS); the WPMW II manager answers a constant 69 on this
+index, which is no known fault code, so it is not requested.
+
+## Bus scan
+
+Asks one CAN member for every index of the signal table (about 3,600, ~9 min at 150 ms per
+request) or for a hex range, and publishes every index that answers with a real value.
+Normal polling pauses during the scan.
+
+| Topic | Payload |
+|-------|---------|
+| `heatingpump/scan/start` | `HEIZMODUL` (table) or `MANAGER 0xfd00 0xfdff` (range) |
+| `heatingpump/scan/stop` | anything |
+| `heatingpump/scan/status` | `{"state":"running|done|stopped","member":…,"done":…,"total":…,"hits":…,"seconds":…}` |
+| `heatingpump/scan/<MEMBER>/0x<idx>` | `{"name":…,"raw":…,"value":…}` (retained) |
+
+The diagnostic buttons "Bus-Scan Manager/Heizmodul/Kessel" (disabled by default) start a table
+scan. Turn the results into a request block and a Markdown table:
+
+```bash
+mosquitto_sub -h BROKER -u USER -P PASS -t 'heatingpump/scan/#' -v -W 5 > scan.txt
+python3 helperscripts/scan_report.py scan.txt
+```
+
+## Polling back-off
+
+A signal answering `-255` (not available on this model) creates no HA entity until it has
+delivered a real value. From the third consecutive `-255` its interval doubles per answer,
+up to 6 h; a real value resets it. See `docs/ARCHITECTURE.md`.
+
+## Dashboards
+
+`dashboards/heatingpump_standard.yaml` is a complete dashboard (overview, energy, diagnostics)
+built from standard cards; `dashboards/heatingpump_schema.yaml` is a picture-elements card
+with a system schema — copy `dashboards/www/heatingpump/` to `/config/www/heatingpump/` first.
+Both use the entity IDs of a fresh install; HA keeps an entity's original ID, so older
+installs may need to adjust a few IDs (e.g. `sensor.heizmodul_luftansaugtemperatur` was
+`sensor.heizmodul_aussen_temperatur`).
