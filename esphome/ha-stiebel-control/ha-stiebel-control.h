@@ -1371,6 +1371,9 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
     if (icon[0] != '\0') {
         payload << ",\"icon\":\"" << icon << "\"";
     }
+    if (strcmp(ei->Name, "FEHLERMELDUNG") == 0) {
+        payload << ",\"json_attributes_topic\":\"heatingpump/" << cm.Name << "/FEHLERMELDUNG/attributes\"";
+    }
     
     // Device info - create individual device per CAN member as sub-device
     // Main device ID for the heat pump
@@ -2108,6 +2111,7 @@ constexpr uint32_t HASH_SEKUNDE = hash("SEKUNDE");
 constexpr uint32_t HASH_WPVORLAUFIST = hash("WPVORLAUFIST");
 constexpr uint32_t HASH_RUECKLAUFISTTEMP = hash("RUECKLAUFISTTEMP");
 constexpr uint32_t HASH_VERDICHTER = hash("VERDICHTER");
+constexpr uint32_t HASH_FEHLERMELDUNG = hash("FEHLERMELDUNG");
 constexpr uint32_t HASH_EL_AUFNAHMELEISTUNG_HEIZ = hash("EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH");
 constexpr uint32_t HASH_EL_AUFNAHMELEISTUNG_WW = hash("EL_AUFNAHMELEISTUNG_WW_SUM_MWH");
 constexpr uint32_t HASH_WAERMEERTRAG_2WE_WW = hash("WAERMEERTRAG_2WE_WW_SUM_MWH");
@@ -2138,6 +2142,22 @@ static bool isIgnoredOnWpl13e(const CanMember &cm, const char* name) {
     if (strncmp(name, "LZ_VERD_", 8) == 0)
         return manager || strstr(name, "VERD_1") || strstr(name, "KUEHL");
     return manager && (strcmp(name, "WPVORLAUFIST") == 0 || strcmp(name, "VERDICHTER") == 0);
+}
+
+// Short remedy for a decoded fault text (WPMW II manual fault list), shown as
+// attribute of the "Störung" sensor. ponytail: keyword match, not per code.
+const char* faultRemedy(const std::string& fault) {
+    std::string up(fault);
+    std::transform(up.begin(), up.end(), up.begin(), ::toupper);
+    auto has = [&](const char* k) { return up.find(k) != std::string::npos; };
+    if (fault == "Keine Stoerung") return "";
+    if (has("LEISTUNG")) return "Hochdruck baut sich nicht auf: Phasenfolge und Sicherungen pruefen.";
+    if (has("ABTAU")) return "Wasservolumenstrom oder Wassertemperatur beim Abtauen zu niedrig.";
+    if (has("HEISSGAS")) return "Heissgas zu hoch: Einspritz-/Expansionsventil pruefen (Fachhandwerker).";
+    if (has("SENSOR") || has("FUEHLER") || has("ERR T") || has("ERR AT")) return "Fuehler, Leitung und Steckverbindungen pruefen, ggf. tauschen.";
+    if (has("DRUCK") || up == "ND") return "Volumenstrom und Fuehlerankopplung pruefen; bei Wiederholung Kaeltekreis pruefen lassen.";
+    if (has("INV")) return "Inverterstoerung: Fachhandwerker.";
+    return "Siehe Fehlerliste im Handbuch des Waermepumpenmanagers.";
 }
 
 void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string &value)
@@ -2276,6 +2296,14 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
             break;
         }
         
+        case HASH_FEHLERMELDUNG: {
+            char topic[64], buf[192];
+            snprintf(topic, sizeof(topic), "heatingpump/%s/FEHLERMELDUNG/attributes", cm.Name);
+            snprintf(buf, sizeof(buf), "{\"abhilfe\":\"%s\"}", faultRemedy(value));
+            id(mqtt_client).publish(topic, buf, strlen(buf), 0, true);
+            break;
+        }
+
         case HASH_VERDICHTER: {
             char* endPtr;
             float floatValue = strtof(value.c_str(), &endPtr);

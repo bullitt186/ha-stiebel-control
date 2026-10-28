@@ -26,6 +26,7 @@
 #define LNAME_RAUMSOLLTEMP_III                 "Raum Soll Temperatur III"
 #define LNAME_RAUMSOLLTEMP_NACHT               "Raum Soll Temperatur Nacht"
 #define LNAME_AUSSENTEMP                       "Außen Temperatur"
+#define LNAME_FEHLERMELDUNG                    "Störung"
 #define LNAME_LUFTANSAUGTEMP                   "Luftansaugtemperatur"
 #define LNAME_SAMMLERISTTEMP                   "Sammler Ist Temperatur"
 #define LNAME_SPEICHERISTTEMP                  "Speicher Ist Temperatur"

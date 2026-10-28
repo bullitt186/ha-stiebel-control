@@ -64,17 +64,19 @@ test-all: $(TEST_BIN)
 	./$(TEST_BIN) --reporter console --success
 
 TEST_EXTRA_OBJS = $(patsubst tests/%.cpp,tests/%.o,$(TEST_EXTRA))
+# Every object includes these headers (ElsterTable.h is compiled into KElsterTable.o)
+TEST_HDRS = $(wildcard esphome/ha-stiebel-control/*.h esphome/ha-stiebel-control/elster/*.h tests/*.h)
 
-tests/%.o: tests/%.cpp
+tests/%.o: tests/%.cpp $(TEST_HDRS)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-tests/NUtils.o: esphome/ha-stiebel-control/elster/NUtils.cpp
+tests/NUtils.o: esphome/ha-stiebel-control/elster/NUtils.cpp $(TEST_HDRS)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-tests/KElsterTable.o: esphome/ha-stiebel-control/elster/KElsterTable.cpp
+tests/KElsterTable.o: esphome/ha-stiebel-control/elster/KElsterTable.cpp $(TEST_HDRS)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(TEST_BIN): $(TEST_SRCS) $(TEST_EXTRA_OBJS) $(ELSTER_OBJS) esphome/ha-stiebel-control/sg_ready_controller.h
+$(TEST_BIN): $(TEST_SRCS) $(TEST_EXTRA_OBJS) $(ELSTER_OBJS) $(TEST_HDRS)
 	$(CXX) $(CXXFLAGS) $(TEST_SRCS) $(TEST_EXTRA_OBJS) $(ELSTER_OBJS) -o $(TEST_BIN)
 
 clean-tests:

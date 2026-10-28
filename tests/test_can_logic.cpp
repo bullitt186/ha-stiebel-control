@@ -1208,3 +1208,22 @@ TEST_CASE("climate: heating and hot water discoveries reuse the number /set topi
     CHECK(dhw.find("EINSTELL_SPEICHERSOLLTEMP/set") != std::string::npos);
     CHECK(dhw.find("KESSEL/SPEICHERISTTEMP/state") != std::string::npos);
 }
+
+// ============================================================================
+// Fault text
+// ============================================================================
+
+TEST_CASE("fault: code decoding and remedy attribute", "[fault]") {
+    resetDiscoveryState();
+    const ElsterIndex* ei = GetElsterIndex("FEHLERMELDUNG");
+    REQUIRE(ei != nullptr);
+    CHECK(ei->Type == et_err_nr);
+    // HEIZMODUL answers fault 0x0004 (Hochdruck)
+    processAndUpdate(0x500, {0xD2, 0x00, 0x01, 0x00, 0x04, 0x00, 0x00});
+    CHECK(mqttFindPayload("HEIZMODUL/FEHLERMELDUNG/state") == "Hochdruck");
+    CHECK(mqttFindPayload("HEIZMODUL/FEHLERMELDUNG/attributes").find("Volumenstrom") != std::string::npos);
+    CHECK(mqttFindPayload("homeassistant/sensor/heatingpump/").find("json_attributes_topic") != std::string::npos);
+    CHECK(std::string(faultRemedy("Keine Stoerung")).empty());
+    CHECK(std::string(faultRemedy("ERR T-VL IWS")).find("Fuehler") != std::string::npos);
+    CHECK(std::string(faultRemedy("ERR 69")).find("Handbuch") != std::string::npos);
+}

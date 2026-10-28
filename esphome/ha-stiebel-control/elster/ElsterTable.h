@@ -112,7 +112,7 @@ static const ElsterIndex ElsterTable[] =
 //  Name                                                 Index   Type
 //  Struktur-Definition in KElsterTable.h 
   { "INDEX_NOT_FOUND"                             , 0x0000, 0               ,                                                             NULL,            NULL,          NULL,  NULL,               NULL,                    NULL, NULL, NULL,  true, false },
-  { "FEHLERMELDUNG"                               , 0x0001, 0               ,                                                             NULL,            NULL,          NULL,  NULL,               NULL,                    NULL, NULL, NULL,  true, false },
+  { "FEHLERMELDUNG", 0x0001, et_err_nr, LNAME_FEHLERMELDUNG, "sensor", "", "", "", "mdi:alert-circle-outline", NULL, NULL, false, true },
   { "UHRZEIT"                                     , 0x0009, et_zeit         ,                                                             NULL,            NULL,          NULL,  NULL,               NULL,                    NULL, NULL, NULL, false, false },
   { "DATUM"                                       , 0x000a, et_datum        ,                                                             NULL,            NULL,          NULL,  NULL,               NULL,                    NULL, NULL, NULL, false, false },
   { "GERAETE_ID"                                  , 0x000b, et_dev_id       ,                                                             NULL,            NULL,          NULL,  NULL,               NULL,                    NULL, NULL, NULL,  true, false },
@@ -3931,6 +3931,7 @@ static const ElsterIndex ElsterTable[] =
 
 static const ErrorIndex ErrorList[] =
 {
+  { 0x0000, "Keine Stoerung"},
   { 0x0002, "Schuetz klebt"},
   { 0x0003, "ERR HD-SENSOR"},
   { 0x0004, "Hochdruck"},
@@ -3954,7 +3955,29 @@ static const ErrorIndex ErrorList[] =
   { 0x001e, "HEISSGAS-MAX"},
   { 0x001f, "ERR HD-SENSOR"},
   { 0x0020, "Einfrierschutz"},
-  { 0x0021, "KEINE LEISTUNG"}
+  { 0x0021, "KEINE LEISTUNG"},
+  // Codes below are missing from Juerg's table; taken from the WPM2 fault list in
+  // aly-fly/Stiebel-Eltron_heat_pump_monitor (codes that contradict the entries
+  // above, e.g. 0x07/0x20, are not imported).
+  { 0x0014, "ERR T-VERD IWS"},
+  { 0x0016, "ERR AT IWS"},
+  { 0x0022, "KEINE LEISTUNG"},
+  { 0x0023, "ERR MIN UEBERHITZUNG"},
+  { 0x0025, "ERR KAELTEMITTEL"},
+  { 0x0028, "ERR T-VL IWS"},
+  { 0x0029, "ERR T-RL IWS"},
+  { 0x002a, "ABTAUEN"},
+  { 0x1f42, "ERR DIFFERENZDRUCK"},
+  { 0x1f49, "ERR STROMSENSOR"},
+  { 0x1f4a, "ERR OELAUSGLEICH"},
+  { 0x1fc6, "INV DSP KOMM"},
+  { 0x1fc7, "INV KOMM DSP"},
+  { 0x1fc8, "INV SCROLL TMIN"},
+  { 0x1fc9, "INV MOTOR TMIN"},
+  { 0x1fca, "INV PLATINE TMIN"},
+  { 0x1fcb, "INV INVERTER TMIN"},
+  { 0x1fcc, "INV PFC TMIN"},
+  { 0x1fcd, "INV FEHLERGRENZE"}
 };
 
 #ifdef HA_MODEL_wpl10ac

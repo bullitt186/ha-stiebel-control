@@ -51,6 +51,9 @@ extern const SignalRequest signalRequests[] = {
     // ========================================================================
     {"HEIZKURVE",                  FREQ_10MIN, cm_manager},
     {"ANTILEGIONELLEN",            FREQ_10MIN, cm_manager},
+    // Fault code of the heat pump module (IWS), decoded via ErrorList. The MANAGER
+    // answers a constant 69 on this index (no known fault code) - not requested.
+    {"FEHLERMELDUNG",              FREQ_1MIN,  cm_heizmodul},
     {"GEBAEUDEART",                FREQ_10MIN, cm_manager},
 
     // ========================================================================
