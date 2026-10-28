@@ -1,0 +1,12 @@
+{
+  "description": "WPL9 feedback baseline: live MQTT observation 2026-10-28 for DHW CAN-B feedback, pressure and FET; MANAGER return updates confirmed by the owner after flashing. Topic presence does not prove freshness or write acceptance.",
+  "required_topics": [
+    "heatingpump/KESSEL/SPEICHERISTTEMP/state",
+    "heatingpump/KESSEL/DRUCK_HEIZKREIS/state",
+    "heatingpump/RAUMFERNFUEHLER_2/RAUMISTTEMP/state",
+    "heatingpump/RAUMFERNFUEHLER_2/FEUCHTE/state",
+    "heatingpump/KESSEL_CANB/EINSTELL_SPEICHERSOLLTEMP/state",
+    "heatingpump/KESSEL_CANB/EINSTELL_SPEICHERSOLLTEMP2/state",
+    "heatingpump/MANAGER/RUECKLAUFISTTEMP/state"
+  ]
+}

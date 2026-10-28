@@ -1,0 +1,4 @@
+# WPL 09 ACS classic with WPM3/FET. See docs/WPL9.md for validation status.
+esphome:
+  includes:
+    - ha-stiebel-control/signal_requests_wpl9.h

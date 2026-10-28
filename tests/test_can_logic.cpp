@@ -1059,3 +1059,5 @@ TEST_CASE("i18n: named ElsterTable signals have non-empty friendlyName via LNAME
             CHECK(std::string(ei->friendlyName).length() > 0);
     }
 }
+
+#include "wpl9_cases.inc"

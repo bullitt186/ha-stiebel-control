@@ -13,13 +13,16 @@ concurrency:
 
 jobs:
   unit-tests:
-    name: Unit Tests (native host)
+    name: Unit Tests (${{ matrix.model }})
+    strategy:
+      matrix:
+        model: [test_model, wpl9, wpl10ac, wpl13e, wpl17, wpf10]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
       - name: Build and run tests
-        run: make test
+        run: make test MODEL_TEST_FLAGS=-DHA_DEVICE_MODEL=${{ matrix.model }}
 
       - name: Verify test count (regression guard)
         run: |
@@ -44,6 +47,18 @@ jobs:
 
       - name: Compile (ESP32-S3)
         run: esphome compile esphome/ci_heatingpump_s3.yaml
+
+  compile-wpl9:
+    name: Compile WPL9 (ESP32-S3)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install esphome==2026.5.3
+      - run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
+      - run: esphome compile esphome/ci_heatingpump_wpl9.yaml
 
   compile-s2:
     name: Compile ESP32-S2

@@ -9,7 +9,7 @@ MQTT_PASS    ?= $(shell grep 'mqtt_password:' esphome/secrets.yaml | sed 's/mqtt
 OTA_ADDR     ?= heatingpump.local   # override: make upload OTA_ADDR=192.168.x.y
 
 CXX      ?= g++
-CXXFLAGS  = -std=c++17 -Wall -Wextra \
+CXXFLAGS  = $(MODEL_TEST_FLAGS) -std=c++17 -Wall -Wextra \
             -I. -Itests \
             -Iesphome/ha-stiebel-control \
             -Iesphome/ha-stiebel-control/elster \
