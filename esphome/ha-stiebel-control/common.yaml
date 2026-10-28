@@ -20,6 +20,7 @@ substitutions:
   disable_sg_ready: "false"   # "true" hides all SG Ready entities (e.g. WPC7, which has no SG Ready input)
 
 esphome:
+  min_version: 2026.7.0
   name: heatingpump
   friendly_name: "Heating Pump CAN Interface"
   project:
@@ -49,12 +50,11 @@ esphome:
     - ha-stiebel-control/ha-stiebel-control.h
     - ha-stiebel-control/signal_requests_base.h
     # model-specific signal_requests_*.h is declared by each model yaml package
-  platformio_options:
-    build_flags:
-      - "-DHA_DEVICE_MODEL=${device_model}"
-      - "-DHA_MODEL_${device_model}"
-      - "-DHA_LANGUAGE_${language}"
-      - "-DHA_DISABLE_SG_READY_${disable_sg_ready}"
+  build_flags:
+    - "-DHA_DEVICE_MODEL=${device_model}"
+    - "-DHA_MODEL_${device_model}"
+    - "-DHA_LANGUAGE_${language}"
+    - "-DHA_DISABLE_SG_READY_${disable_sg_ready}"
 
 
 #########################################

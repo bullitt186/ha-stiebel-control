@@ -145,7 +145,7 @@ the `HA_MODEL_*` preprocessor flag (currently selects wpl13e or wpf10).
 **`<model>.yaml`** — thin ESPHome package that brings the model `.h` into the build via
 `esphome: includes:`.
 
-The `HA_DEVICE_MODEL` string define (injected via `platformio_options: build_flags`) controls
+The `HA_DEVICE_MODEL` string define (injected via `esphome: build_flags`) controls
 the HA device identifier: `stiebel_eltron_<model>`.
 
 ---
