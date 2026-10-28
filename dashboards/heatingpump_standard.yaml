@@ -170,6 +170,13 @@ views:
               - entity: sensor.heizmodul_laufzeit_nacherwarmung_stufe_2
               - entity: sensor.heizmodul_laufzeit_nacherwarmung_stufe_1_2
           - type: entities
+            title: Kältekreis
+            entities:
+              - entity: sensor.heizmodul_hochdruck
+              - entity: sensor.heizmodul_niederdruck
+              - entity: sensor.heizmodul_heissgastemperatur
+              - entity: sensor.heizmodul_verdampfer_temperatur
+          - type: entities
             title: Regelung
             entities:
               - entity: sensor.manager_heizkurve

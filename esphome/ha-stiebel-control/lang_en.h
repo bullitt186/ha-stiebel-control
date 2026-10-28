@@ -241,6 +241,10 @@
 #define LNAME_CALC_AUSSENTEMP_GEDAEMPFT        "Outside Temperature Damped"
 #undef  LNAME_SOMMERBETRIEB_TEMP
 #define LNAME_SOMMERBETRIEB_TEMP               "Summer Mode Threshold"
+#undef  LNAME_ANZEIGE_HOCHDRUCK
+#define LNAME_ANZEIGE_HOCHDRUCK                "High Pressure"
+#undef  LNAME_ANZEIGE_NIEDERDRUCK
+#define LNAME_ANZEIGE_NIEDERDRUCK              "Low Pressure"
 
 // ============================================================================
 // Writable number friendly names

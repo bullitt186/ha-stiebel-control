@@ -1923,8 +1923,18 @@ static const ElsterIndex ElsterTable[] =
   { "REKUPERATORISTTEMP", 0x07a3, 0, "Rekuperator Ist Temperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "MESSSTROM_HOCHDRUCK", 0x07a4, 0, "Messstrom Hochdruck", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "MESSSTROM_NIEDERDRUCK", 0x07a5, 0, "Messstrom Niederdruck", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+#ifdef HA_MODEL_wpl13e
+  // WPL13E (WPMW II/IWS): hundredths of bar - verified: standstill 7.5 bar, run HP 13.1 / LP 4.1 bar
+  { "ANZEIGE_HOCHDRUCK", 0x07a6, et_cent_val, LNAME_ANZEIGE_HOCHDRUCK, "sensor", "pressure", "bar", "measurement", "mdi:gauge", NULL, NULL, false, true },
+#else
   { "ANZEIGE_HOCHDRUCK", 0x07a6, et_dec_val, "Anzeige Hochdruck", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+#endif
+#ifdef HA_MODEL_wpl13e
+  // WPL13E (WPMW II/IWS): hundredths of bar - verified: standstill 7.5 bar, run HP 13.1 / LP 4.1 bar
+  { "ANZEIGE_NIEDERDRUCK", 0x07a7, et_cent_val, LNAME_ANZEIGE_NIEDERDRUCK, "sensor", "pressure", "bar", "measurement", "mdi:gauge", NULL, NULL, false, true },
+#else
   { "ANZEIGE_NIEDERDRUCK", 0x07a7, et_dec_val, "Anzeige Niederdruck", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+#endif
   { "VERDICHTER", 0x07a8, et_dec_val, LNAME_VERDICHTER, "sensor", "power", "W", "measurement", "mdi:pump", NULL, NULL, false, true },
   { "VERDAMPFERISTTEMP_KOMPENSIERT", 0x07a9, 0, "Verdampfer Ist Temperatur Kompensiert", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TAU_PENDEL_ERKENNUNGSZEIT", 0x07aa, 0, "Tau Pendel Erkennungszeit", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
@@ -3812,7 +3822,6 @@ static const ElsterIndex ElsterTable[] =
   // WPMW II parameter 10 "SOMMERBETRIEB / AUSSENTEMP" (10..30 degC), found by bus scan
   // on a WPL13E next to SOMMERBETRIEB (0xfdb4) and GEBAEUDEART (0xfdb3); raw 2560 = 10 degC.
   { "SOMMERBETRIEB_TEMP", 0xfdb5, et_little_endian, LNAME_SOMMERBETRIEB_TEMP, "sensor", "temperature", "°C", "measurement", "mdi:sun-thermometer", NULL, NULL, false, true },
-  { "PROBE_WP_STATUS_4EDA", 0x4eda, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },  // TEMP
   // kr0ner/OneESP32ToRuleThemAll index facts (WPM3 generation)
 #if defined(HA_MODEL_wpl17) || defined(HA_MODEL_wpl23) || defined(HA_MODEL_wpl10ac) || defined(HA_MODEL_wpc7)
   { "UNTERK_COND", 0x0aff, et_dec_val, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },

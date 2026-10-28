@@ -105,6 +105,8 @@
 #define LNAME_WP_STATUS                        "Wärmepumpe Status"
 #define LNAME_SOMMERBETRIEB                    "Sommerbetrieb-Automatik"
 #define LNAME_SOMMERBETRIEB_TEMP               "Sommerbetrieb Grenztemperatur"
+#define LNAME_ANZEIGE_HOCHDRUCK                "Hochdruck"
+#define LNAME_ANZEIGE_NIEDERDRUCK              "Niederdruck"
 #define LNAME_BETRIEBSART_WP                   "Betriebsart Wärmepumpe"
 
 // ============================================================================
