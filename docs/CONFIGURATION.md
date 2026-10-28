@@ -244,3 +244,14 @@ with a system schema — copy `dashboards/www/heatingpump/` to `/config/www/heat
 Both use the entity IDs of a fresh install; HA keeps an entity's original ID, so older
 installs may need to adjust a few IDs (e.g. `sensor.heizmodul_luftansaugtemperatur` was
 `sensor.heizmodul_aussen_temperatur`).
+
+## Summer mode (WPL13E)
+
+The WPMW II switches heating off when its *summer automatic* is on (`SOMMERBETRIEB`, parameter
+10) and the damped outside temperature reaches the threshold (`SOMMERBETRIEB_TEMP`, 0xfdb5,
+10–30 °C); it switches back 1 K below. The damping averages the controller's outside sensor
+over 24/48/72 h depending on `GEBAEUDEART` (1/2/3). The firmware reproduces this as
+`binary_sensor.…_sommerbetrieb_aktiv` and publishes the damped value as
+`sensor.…_aussentemperatur_gedampft`. The damped value is an exponential moving average kept
+in NVS; on the very first boot it starts from the current temperature and needs about a day to
+settle. Compare it with the display ("Sommerbetrieb" with the flap closed).

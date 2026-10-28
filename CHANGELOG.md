@@ -5,6 +5,44 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ---
 
+## [2.5.0] — unreleased
+
+Ideas and register facts from related projects (kr0ner/OneESP32ToRuleThemAll,
+aly-fly/Stiebel-Eltron_heat_pump_monitor, VasekCZ81/stiebel-can-service), verified on a WPL13E.
+
+### Added
+
+- **Bus scan** — ask one CAN member for every signal-table index or a hex range; answers are
+  published to `heatingpump/scan/…`, HA buttons "Bus-Scan Manager/Heizmodul/Kessel",
+  `helperscripts/scan_report.py` turns the result into a request block for new models.
+- **Thermostat cards** — MQTT climate entities for heating (room setpoint, operating mode as
+  presets, compressor as action) and hot water. Number/select entities are unchanged.
+- **Fault text** — `FEHLERMELDUNG` decoded to plain text ("Keine Stoerung", "Hochdruck", …)
+  with a remedy attribute; fault list extended by non-conflicting WPM2 codes.
+- **Summer mode (WPL13E)** — threshold `SOMMERBETRIEB_TEMP` (0xfdb5, found by bus scan) and
+  `sommerbetrieb_aktiv`, computed like the WPMW II does it (damped outside temperature over
+  24/48/72 h, 1 K hysteresis), plus the damped temperature itself. The damping starts from the
+  current temperature on first boot and is kept in NVS afterwards.
+- **`read_only` mode** — never writes to the heat pump; CI compiles this variant.
+- **Dashboards** — standard Lovelace dashboard and a system schema with own SVGs (`dashboards/`).
+- **Register names** — 32 `TEST_OBJEKT_*` rows named, 115 indices added for WPM3-generation
+  models only (`helperscripts/import_signal_names.py`; facts only).
+
+### Changed
+
+- Signals answering `-255` (not available) are polled with growing intervals (up to 6 h) and
+  create no HA entity until they deliver a real value.
+
+### Fixed
+
+- **Read requests of other bus nodes were decoded as values** (Elster telegram type was not
+  checked). This produced constant fake `0` readings for the requesting node, e.g. "MANAGER
+  VERDICHTER 0.0" on WPL13E, and hid real values such as the manager's return temperature.
+- Short CAN frames dereferenced an unset member.
+- `make test` did not rebuild objects after header changes (stale `ElsterTable.h` in tests).
+
+---
+
 ## [Unreleased]
 
 ### Added (WPL13E, verified on real hardware against the WPMW II manual)
