@@ -51,6 +51,9 @@ views:
             entity: binary_sensor.manager_evu_sperre_aktiv
             name: EVU-Sperre
           - type: tile
+            entity: binary_sensor.stiebel_eltron_warmepumpe_sommerbetrieb_aktiv
+            name: Sommerbetrieb
+          - type: tile
             entity: binary_sensor.manager_sommerbetrieb_automatik
             name: Sommer-Automatik
           - type: tile
@@ -86,6 +89,8 @@ views:
             entities:
               - entity: sensor.kessel_aussen_temperatur
                 name: Außen
+              - entity: sensor.stiebel_eltron_warmepumpe_aussentemperatur_gedampft
+                name: Außen gedämpft
               - entity: sensor.heizmodul_luftansaugtemperatur
                 name: Luftansaugung
               - entity: sensor.kessel_vorlauf_ist_temperatur
@@ -171,6 +176,7 @@ views:
               - entity: sensor.kessel_kessel_soll_temperatur
               - entity: sensor.stiebel_eltron_warmepumpe_delta_t_wp_nur_bei_verdichter_an
               - entity: sensor.manager_gebaeudeart
+              - entity: sensor.manager_sommerbetrieb_grenztemperatur
           - type: entities
             title: CAN-Bus
             entities:
