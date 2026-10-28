@@ -2539,6 +2539,13 @@ void processSignalRequests() {
 
 void processAndUpdate(uint32_t can_id, std::vector<uint8_t> msg)
 {
+    // processCanMessage() leaves the member unset for short frames
+    if (msg.size() < 7) return;
+    // Elster telegram type = low nibble of byte 0 (0 write, 1 read request, 2 response).
+    // A read request carries no value: decoding it attributed a fake 0 to the
+    // requesting node (e.g. the WPMW II polling the IWS -> "MANAGER VERDICHTER 0.0").
+    if ((msg[0] & 0x0F) == 1) return;
+
     std::string value;
     const CanMember *cm = nullptr;
     const ElsterIndex *ei = processCanMessage(msg, can_id, value, &cm);

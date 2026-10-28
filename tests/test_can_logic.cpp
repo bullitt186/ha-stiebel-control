@@ -638,6 +638,28 @@ TEST_CASE("nextBackoffMs: capped at 6 h, never below base", "[can]") {
     CHECK(nextBackoffMs(8UL * 3600UL * 1000UL, 5) == 8UL * 3600UL * 1000UL);
 }
 
+// processAndUpdate: Elster telegram type filter
+// Frame layout: [type | receiver address, receiver low bits, 0xFA, idx hi, idx lo, val hi, val lo]
+TEST_CASE("processAndUpdate: read request from another node is not a value", "[can]") {
+    resetDiscoveryState();
+    // MANAGER (0x480) asks HEIZMODUL (0x500, address 0xA0) for VERDICHTER (0x07a8): type 1
+    processAndUpdate(0x480, {0xA1, 0x00, 0xFA, 0x07, 0xA8, 0x00, 0x00});
+    CHECK(mqtt_client_instance().messages.empty());
+}
+
+TEST_CASE("processAndUpdate: response is published for the responding node", "[can]") {
+    resetDiscoveryState();
+    // HEIZMODUL (0x500) answers PC (0x680, address 0xD0): type 2, value 8 -> 0.8
+    processAndUpdate(0x500, {0xD2, 0x00, 0xFA, 0x07, 0xA8, 0x00, 0x08});
+    CHECK(mqttFindPayload("HEIZMODUL/VERDICHTER/state") == "0.8");
+}
+
+TEST_CASE("processAndUpdate: short frame is ignored without crash", "[can]") {
+    resetDiscoveryState();
+    processAndUpdate(0x500, {0xD2, 0x00, 0xFA});
+    CHECK(mqtt_client_instance().messages.empty());
+}
+
 TEST_CASE("updateSensor: EVU_SPERRE_AKTIV inverts on → off", "[mqtt]") {
     resetDiscoveryState();
     const CanMember& mgr = CanMembers[cm_manager];
