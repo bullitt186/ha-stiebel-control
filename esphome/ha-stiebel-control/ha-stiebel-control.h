@@ -597,11 +597,12 @@ const ElsterIndex *processCanMessageDebug(const std::vector<uint8_t> &msg, uint3
     return ei;
 }
 
-void readSignal(const CanMember *cm, const ElsterIndex *ei)
+// Read request for a raw Elster index (also indices unknown to ElsterTable, bus scan)
+void readSignalRaw(const CanMember *cm, uint16_t index, const char *name = "?")
 {
     constexpr bool use_extended_id = false; // No use of extended ID
-    const uint8_t IndexByte1 = static_cast<uint8_t>(ei->Index >> 8);
-    const uint8_t IndexByte2 = static_cast<uint8_t>(ei->Index & 0xFF);
+    const uint8_t IndexByte1 = static_cast<uint8_t>(index >> 8);
+    const uint8_t IndexByte2 = static_cast<uint8_t>(index & 0xFF);
     std::vector<uint8_t> data;
     CanIdBytes readId = generate_read_id(cm->CanId);
 
@@ -627,10 +628,15 @@ void readSignal(const CanMember *cm, const ElsterIndex *ei)
     }
 
     char logmsg[160];
-    snprintf(logmsg, sizeof(logmsg), "READ \"%s\" (0x%04x) FROM %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x", ei->Name, ei->Index, cm->Name, (unsigned)cm->CanId, readId.first, readId.second, data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
+    snprintf(logmsg, sizeof(logmsg), "READ \"%s\" (0x%04x) FROM %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x", name, index, cm->Name, (unsigned)cm->CanId, readId.first, readId.second, data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
     ESP_LOGI("readSignal()", "%s", logmsg);
 
     id(my_can).send_data(CanMembers[cm_pc].CanId, use_extended_id, data);
+}
+
+void readSignal(const CanMember *cm, const ElsterIndex *ei)
+{
+    readSignalRaw(cm, ei->Index, ei->Name);
 }
 
 void readSignal(const CanMember *cm, const char *elsterName)
@@ -2373,9 +2379,102 @@ void processCalculatedSensors() {
 // Signals that don't respond will simply not update in Home Assistant
 
 // Process signal request table with frequency-based scheduling
+// ============================================================================
+// BUS SCAN (MQTT heatingpump/scan/start "<MEMBER> [from to]", heatingpump/scan/stop)
+// ============================================================================
+// Asks one CAN member for every ElsterTable index (or a hex range) and publishes
+// each index that answers with a real value (not 0x8000) to
+// heatingpump/scan/<MEMBER>/<idx> (retained). One request per SCAN_GAP_MS; normal
+// polling pauses meanwhile. Results go out at once, nothing is buffered.
+static constexpr unsigned long SCAN_GAP_MS = 150;
+static constexpr unsigned long SCAN_TAIL_MS = 1000;  // wait for the last answers
+struct ScanState {
+    bool active = false;
+    const CanMember* cm = nullptr;
+    bool table = true;
+    uint32_t begin = 0, pos = 0, end = 0;
+    unsigned long lastSend = 0, startMs = 0;
+    uint16_t hits = 0;
+};
+static ScanState scanState;
+
+void publishScanStatus(const char* state) {
+    char buf[160];
+    uint32_t total = scanState.end - scanState.begin + 1;
+    uint32_t done = scanState.pos - scanState.begin;
+    snprintf(buf, sizeof(buf), "{\"state\":\"%s\",\"member\":\"%s\",\"done\":%u,\"total\":%u,\"hits\":%u,\"seconds\":%lu}",
+             state, scanState.cm ? scanState.cm->Name : "", (unsigned)done, (unsigned)total, scanState.hits,
+             (millis() - scanState.startMs) / 1000UL);
+    id(mqtt_client).publish("heatingpump/scan/status", buf, strlen(buf), 0, true);
+}
+
+// payload: "HEIZMODUL" (all table indices) or "HEIZMODUL 0x0000 0x0fff" (range)
+void startScan(const std::string& payload) {
+    char member[24] = {0};
+    unsigned from = 0, to = 0;
+    int n = sscanf(payload.c_str(), "%23s %x %x", member, &from, &to);
+    const CanMember* cm = nullptr;
+    for (size_t i = 0; i < sizeof(CanMembers) / sizeof(CanMember); ++i)
+        if (i != cm_pc && strcasecmp(CanMembers[i].Name, member) == 0) cm = &CanMembers[i];
+    if (n < 1 || !cm || (n == 3 && (to < from || to > 0xFFFF))) {
+        ESP_LOGW("SCAN", "Invalid scan request \"%s\" (expected \"<MEMBER> [from to]\")", payload.c_str());
+        return;
+    }
+    scanState = ScanState{};
+    scanState.active = true;
+    scanState.cm = cm;
+    scanState.table = (n != 3);
+    scanState.begin = scanState.pos = scanState.table ? 0 : from;
+    scanState.end = scanState.table ? High(ElsterTable) : to;
+    scanState.startMs = millis();
+    ESP_LOGI("SCAN", "Scanning %s (%s), normal polling paused", cm->Name, scanState.table ? "table" : "range");
+    publishScanStatus("running");
+}
+
+void stopScan(const char* state = "stopped") {
+    if (!scanState.active) return;
+    scanState.active = false;
+    ESP_LOGI("SCAN", "Scan %s: %u hits", state, scanState.hits);
+    publishScanStatus(state);
+}
+
+// Called every SCAN_GAP_MS from common.yaml
+void scanStep() {
+    if (!scanState.active || disableCanRequests) return;
+    unsigned long now = millis();
+    if (now - scanState.lastSend < SCAN_GAP_MS) return;
+    if (scanState.pos > scanState.end) {
+        if (now - scanState.lastSend >= SCAN_TAIL_MS) stopScan("done");
+        return;
+    }
+    uint16_t idx = scanState.table ? ElsterTable[scanState.pos].Index : static_cast<uint16_t>(scanState.pos);
+    scanState.pos++;
+    readSignalRaw(scanState.cm, idx, "SCAN");
+    scanState.lastSend = now;
+    if (scanState.pos % 100 == 0) publishScanStatus("running");
+}
+
+// Returns true if the frame was a scan answer (then it is not processed further)
+bool handleScanFrame(const CanMember& cm, const ElsterIndex* ei, const std::vector<uint8_t>& msg, const std::string& value) {
+    if (!scanState.active || &cm != scanState.cm || (msg[0] & 0x0F) != 2) return false;
+    bool longIdx = (msg[2] == 0xfa);
+    uint16_t idx = longIdx ? (msg[3] << 8) | msg[4] : msg[2];
+    uint16_t raw = longIdx ? (msg[5] << 8) | msg[6] : (msg[3] << 8) | msg[4];
+    if (raw != 0x8000) {
+        scanState.hits++;
+        char topic[48], buf[128];
+        snprintf(topic, sizeof(topic), "heatingpump/scan/%s/0x%04x", cm.Name, idx);
+        snprintf(buf, sizeof(buf), "{\"name\":\"%s\",\"raw\":%u,\"value\":\"%s\"}",
+                 ei->Index == idx ? ei->Name : "", raw, value.c_str());
+        id(mqtt_client).publish(topic, buf, strlen(buf), 0, true);
+    }
+    return true;
+}
+
 void processSignalRequests() {
     unsigned long now = millis();
-    
+    if (scanState.active) return;  // bus scan owns the request slot
+
     // PASSIVE LISTEN MODE: keine Requests senden
     if (disableCanRequests) {
         return;
@@ -2557,6 +2656,8 @@ void processAndUpdate(uint32_t can_id, std::vector<uint8_t> msg)
     {
         return;
     }
+
+    if (handleScanFrame(*cm, ei, msg, value)) return;
 
     // Skip permanently blacklisted signals
     if (isPermanentlyBlacklisted(ei->Name))

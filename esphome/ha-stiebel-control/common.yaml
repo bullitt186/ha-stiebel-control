@@ -156,6 +156,14 @@ mqtt:
       then:
         - logger.log: "Manual reconnect triggered"
 
+    # Bus scan: payload "<MEMBER>" (all table indices) or "<MEMBER> 0x0000 0x0fff"
+    - topic: heatingpump/scan/start
+      then:
+        - lambda: startScan(x);
+    - topic: heatingpump/scan/stop
+      then:
+        - lambda: stopScan();
+
     # Force republish all discoveries (including writable entities)
     - topic: heatingpump/republish_discoveries
       then:
@@ -362,6 +370,11 @@ interval:
       - lambda: |-
           processSignalRequests();
 
+  # Bus scan (idle unless started via heatingpump/scan/start)
+  - interval: 150ms
+    then:
+      - lambda: scanStep();
+
   # Process calculated sensor updates (runs every second)
   - interval: 1s
     then:
@@ -475,6 +488,33 @@ button:
       then:
         lambda: |-
           republishAllDiscoveries();
+
+  - platform: template
+    name: "Bus-Scan Manager"
+    icon: "mdi:radar"
+    entity_category: diagnostic
+    disabled_by_default: true
+    on_press:
+      then:
+        - lambda: startScan("MANAGER");
+
+  - platform: template
+    name: "Bus-Scan Heizmodul"
+    icon: "mdi:radar"
+    entity_category: diagnostic
+    disabled_by_default: true
+    on_press:
+      then:
+        - lambda: startScan("HEIZMODUL");
+
+  - platform: template
+    name: "Bus-Scan Kessel"
+    icon: "mdi:radar"
+    entity_category: diagnostic
+    disabled_by_default: true
+    on_press:
+      then:
+        - lambda: startScan("KESSEL");
 
   - platform: restart
     name: "Restart"

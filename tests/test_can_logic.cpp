@@ -1151,3 +1151,44 @@ TEST_CASE("i18n: named ElsterTable signals have non-empty friendlyName via LNAME
             CHECK(std::string(ei->friendlyName).length() > 0);
     }
 }
+
+// ============================================================================
+// Bus scan
+// ============================================================================
+
+TEST_CASE("scan: start parses member and mode, invalid payload is rejected", "[scan]") {
+    resetDiscoveryState();
+    scanState = ScanState{};
+    startScan("nonsense");
+    CHECK_FALSE(scanState.active);
+    startScan("HEIZMODUL 0x0200 0x0100");   // to < from
+    CHECK_FALSE(scanState.active);
+    startScan("heizmodul 0x07a0 0x07af");
+    CHECK(scanState.active);
+    CHECK_FALSE(scanState.table);
+    CHECK(scanState.cm == &CanMembers[cm_heizmodul]);
+    CHECK(mqttFindPayload("scan/status").find("\"total\":16") != std::string::npos);
+    mqtt_client_instance().clear();
+    stopScan();
+    CHECK_FALSE(scanState.active);
+    CHECK(mqttFindPayload("scan/status").find("stopped") != std::string::npos);
+}
+
+TEST_CASE("scan: answers of the scanned member are published, 0x8000 is not", "[scan]") {
+    resetDiscoveryState();
+    scanState = ScanState{};
+    startScan("HEIZMODUL");
+    REQUIRE(scanState.table);
+    mqtt_client_instance().clear();
+    const ElsterIndex* ei = GetElsterIndex("VERDICHTER");
+    std::vector<uint8_t> hit = {0xD2, 0x00, 0xFA, 0x07, 0xA8, 0x00, 0x08};
+    CHECK(handleScanFrame(CanMembers[cm_heizmodul], ei, hit, "0.8"));
+    CHECK(mqttFindPayload("scan/HEIZMODUL/0x07a8") == "{\"name\":\"VERDICHTER\",\"raw\":8,\"value\":\"0.8\"}");
+    mqtt_client_instance().clear();
+    std::vector<uint8_t> none = {0xD2, 0x00, 0xFA, 0x07, 0xA8, 0x80, 0x00};
+    CHECK(handleScanFrame(CanMembers[cm_heizmodul], ei, none, "-255"));
+    CHECK(mqtt_client_instance().messages.empty());
+    CHECK_FALSE(handleScanFrame(CanMembers[cm_manager], ei, hit, "0.8"));   // other member: normal path
+    CHECK(scanState.hits == 1);
+    scanState = ScanState{};
+}
