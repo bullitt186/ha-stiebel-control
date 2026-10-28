@@ -341,6 +341,24 @@ static std::set<std::string> discoveredWritableSelects;
 // Track next scheduled request time per unique signal key (MEMBER_SIGNAL)
 static std::unordered_map<std::string, unsigned long> nextRequestTime;
 
+// Consecutive -255 (0x8000, "not available") answers per key (MEMBER_SIGNAL).
+static std::unordered_map<std::string, uint8_t> invalidStreak;
+
+// Back off signals the model does not provide: from the 3rd consecutive -255 the
+// poll interval doubles per answer, capped at 6 h. A valid value resets the streak.
+static constexpr unsigned long BACKOFF_MAX_MS = 6UL * 3600UL * 1000UL;
+inline unsigned long nextBackoffMs(unsigned long baseMs, uint8_t streak) {
+    if (streak < 3) return baseMs;
+    unsigned shift = streak - 2;
+    if (shift > 16 || (baseMs << shift) > BACKOFF_MAX_MS) return baseMs > BACKOFF_MAX_MS ? baseMs : BACKOFF_MAX_MS;
+    return baseMs << shift;
+}
+
+inline unsigned long backoffIntervalMs(const std::string& key, unsigned long baseMs) {
+    auto it = invalidStreak.find(key);
+    return nextBackoffMs(baseMs, it == invalidStreak.end() ? 0 : it->second);
+}
+
 // Track starting position for round-robin signal processing (prevents starvation)
 static int signalProcessingStartIndex = 0;
 
@@ -2057,7 +2075,20 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
         return;
     }
     if (isIgnoredOnWpl13e(cm, ei->Name)) return;
-    
+
+    // -255 = the device does not provide this value: count it for the poll
+    // back-off and create no HA entity until a real value has been seen.
+    std::string uid = getOrCreateUID(cm, ei->Name);
+    std::string streakKey = std::string(cm.Name) + "_" + ei->Name;
+    if (value == "-255") {
+        uint8_t& streak = invalidStreak[streakKey];
+        if (streak < 255) streak++;
+        if (streak >= 3) ESP_LOGD("BACKOFF", "%s streak=%u", streakKey.c_str(), streak);
+        if (discoveredSignals.find(uid) == discoveredSignals.end()) return;
+    } else {
+        invalidStreak.erase(streakKey);
+    }
+
     // Invert boolean logic for EVU_SPERRE_AKTIV signal
     // CAN: 1 = lock inactive (off), 0 = lock active (on)
     // MQTT: "off" = lock inactive, "on" = lock active
@@ -2071,7 +2102,6 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
     }
     
     // Check if discovery is needed
-    std::string uid = getOrCreateUID(cm, ei->Name);
     bool needsDiscovery = (discoveredSignals.find(uid) == discoveredSignals.end());
     
     if (needsDiscovery) {
@@ -2461,7 +2491,7 @@ void processSignalRequests() {
                         unsigned long maxJitter = (intervalMs / 20); // 5% of interval
                         if (maxJitter < 500) maxJitter = 500; // Minimum 500ms jitter
                         unsigned long randomDelay = getRandomInRange(0, maxJitter + 1);
-                        nextRequestTime[key] = now + intervalMs + randomDelay;
+                        nextRequestTime[key] = now + backoffIntervalMs(key, intervalMs) + randomDelay;
                         
                         // ESP_LOGD("REQUEST_MGR", "Sent %s, next in %lums", key.c_str(), intervalMs + randomDelay);
                     }
@@ -2486,7 +2516,7 @@ void processSignalRequests() {
                 unsigned long maxJitter = (intervalMs / 20); // 5% of interval
                 if (maxJitter < 500) maxJitter = 500; // Minimum 500ms jitter
                 unsigned long randomDelay = getRandomInRange(0, maxJitter + 1);
-                nextRequestTime[key] = now + intervalMs + randomDelay;
+                nextRequestTime[key] = now + backoffIntervalMs(key, intervalMs) + randomDelay;
                 
                 // ESP_LOGD("REQUEST_MGR", "Sent %s, next in %lums", key.c_str(), intervalMs + randomDelay);
             }

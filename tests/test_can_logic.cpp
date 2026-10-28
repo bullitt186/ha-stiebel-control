@@ -436,6 +436,7 @@ static void resetDiscoveryState() {
     discoveredCalculatedSensors.clear();
     discoveredWritableNumbers.clear();
     discoveredWritableSelects.clear();
+    invalidStreak.clear();
     mqtt_client_instance().clear();
 }
 
@@ -595,6 +596,46 @@ TEST_CASE("updateSensor: skips discovery on second call (cached)", "[mqtt]") {
     updateSensor(mgr, ei, "31.0");
     CHECK(mqtt_client_instance().messages.size() == 1);
     CHECK(mqttFindPayload("RUECKLAUFISTTEMP/state") == "31.0");
+}
+
+TEST_CASE("updateSensor: -255 creates no entity until a valid value arrives", "[mqtt]") {
+    resetDiscoveryState();
+    const CanMember& mgr = CanMembers[cm_manager];
+    const ElsterIndex* ei = GetElsterIndex("RUECKLAUFISTTEMP");
+    REQUIRE(ei != nullptr);
+    updateSensor(mgr, ei, "-255");
+    CHECK(mqtt_client_instance().messages.empty());
+    updateSensor(mgr, ei, "30.5");
+    CHECK(mqttTopicPublished("homeassistant/sensor/heatingpump/"));
+    CHECK(mqttFindPayload("RUECKLAUFISTTEMP/state") == "30.5");
+    // once discovered, -255 is still published (entity keeps its history)
+    mqtt_client_instance().clear();
+    updateSensor(mgr, ei, "-255");
+    CHECK(mqttFindPayload("RUECKLAUFISTTEMP/state") == "-255");
+}
+
+TEST_CASE("backoff: interval grows from the 3rd -255 and resets on a valid value", "[can]") {
+    resetDiscoveryState();
+    const CanMember& mgr = CanMembers[cm_manager];
+    const ElsterIndex* ei = GetElsterIndex("RUECKLAUFISTTEMP");
+    const std::string key = "MANAGER_RUECKLAUFISTTEMP";
+    for (int i = 0; i < 2; i++) updateSensor(mgr, ei, "-255");
+    CHECK(backoffIntervalMs(key, 60000) == 60000);
+    updateSensor(mgr, ei, "-255");
+    CHECK(backoffIntervalMs(key, 60000) == 120000);
+    updateSensor(mgr, ei, "-255");
+    CHECK(backoffIntervalMs(key, 60000) == 240000);
+    updateSensor(mgr, ei, "30.5");
+    CHECK(backoffIntervalMs(key, 60000) == 60000);
+}
+
+TEST_CASE("nextBackoffMs: capped at 6 h, never below base", "[can]") {
+    CHECK(nextBackoffMs(30000, 0) == 30000);
+    CHECK(nextBackoffMs(30000, 2) == 30000);
+    CHECK(nextBackoffMs(30000, 3) == 60000);
+    CHECK(nextBackoffMs(30000, 200) == BACKOFF_MAX_MS);
+    CHECK(nextBackoffMs(600000, 20) == BACKOFF_MAX_MS);
+    CHECK(nextBackoffMs(8UL * 3600UL * 1000UL, 5) == 8UL * 3600UL * 1000UL);
 }
 
 TEST_CASE("updateSensor: EVU_SPERRE_AKTIV inverts on → off", "[mqtt]") {
