@@ -104,6 +104,7 @@
 #define LNAME_GEBAEUDEART                      "Gebäudeart"
 #define LNAME_WP_STATUS                        "Wärmepumpe Status"
 #define LNAME_SOMMERBETRIEB                    "Sommerbetrieb-Automatik"
+#define LNAME_SOMMERBETRIEB_TEMP               "Sommerbetrieb Grenztemperatur"
 #define LNAME_BETRIEBSART_WP                   "Betriebsart Wärmepumpe"
 
 // ============================================================================
@@ -130,6 +131,8 @@
 #define LNAME_CALC_WAERME_WW_TAG_KWH            "Waerme Ertrag Warmwasser heute"
 #define LNAME_CALC_EL_LEISTUNG_HEIZ_W           "Aktuelle el. Leistung Heizung"
 #define LNAME_CALC_EL_LEISTUNG_WW_W             "Aktuelle el. Leistung Warmwasser"
+#define LNAME_CALC_SOMMERBETRIEB_AKTIV         "Sommerbetrieb aktiv"
+#define LNAME_CALC_AUSSENTEMP_GEDAEMPFT        "Außentemperatur gedämpft"
 
 // ============================================================================
 // Writable number friendly names (writableNumbers[])

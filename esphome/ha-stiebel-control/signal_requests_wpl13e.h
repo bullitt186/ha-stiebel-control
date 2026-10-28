@@ -55,6 +55,7 @@ extern const SignalRequest signalRequests[] = {
     // answers a constant 69 on this index (no known fault code) - not requested.
     {"FEHLERMELDUNG",              FREQ_1MIN,  cm_heizmodul},
     {"GEBAEUDEART",                FREQ_10MIN, cm_manager},
+    {"SOMMERBETRIEB_TEMP",         FREQ_30MIN, cm_manager},  // summer-mode threshold
 
     // ========================================================================
     // ENERGY: SUM_MWH (base) is whole MWh only; the kWh remainder and the

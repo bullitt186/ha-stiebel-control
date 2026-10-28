@@ -195,6 +195,12 @@ static const CalculatedSensorConfig calculatedSensors[] = {
      "sensor", "power", "W", "measurement", "mdi:lightning-bolt", "", "", "", true},
     {"stiebel_calculated_el_leistung_ww_w", LNAME_CALC_EL_LEISTUNG_WW_W, "heatingpump/calculated/el_leistung_ww_w/state",
      "sensor", "power", "W", "measurement", "mdi:lightning-bolt", "", "", "", true},
+
+    // Summer mode as the WPMW II decides it (append only: indices above are hardcoded)
+    {"stiebel_calculated_sommerbetrieb_aktiv", LNAME_CALC_SOMMERBETRIEB_AKTIV, "heatingpump/calculated/sommerbetrieb_aktiv/state",
+     "binary_sensor", "", "", "", "mdi:weather-sunny", "on", "off", "", true},
+    {"stiebel_calculated_aussentemp_gedaempft", LNAME_CALC_AUSSENTEMP_GEDAEMPFT, "heatingpump/calculated/aussentemp_gedaempft/state",
+     "sensor", "temperature", "°C", "measurement", "mdi:thermometer-lines", "", "", "", true},
 };
 
 static const size_t CALCULATED_SENSOR_COUNT = sizeof(calculatedSensors) / sizeof(CalculatedSensorConfig);
@@ -2112,6 +2118,10 @@ constexpr uint32_t HASH_WPVORLAUFIST = hash("WPVORLAUFIST");
 constexpr uint32_t HASH_RUECKLAUFISTTEMP = hash("RUECKLAUFISTTEMP");
 constexpr uint32_t HASH_VERDICHTER = hash("VERDICHTER");
 constexpr uint32_t HASH_FEHLERMELDUNG = hash("FEHLERMELDUNG");
+constexpr uint32_t HASH_SOMMERBETRIEB = hash("SOMMERBETRIEB");
+constexpr uint32_t HASH_SOMMERBETRIEB_TEMP = hash("SOMMERBETRIEB_TEMP");
+constexpr uint32_t HASH_GEBAEUDEART = hash("GEBAEUDEART");
+constexpr uint32_t HASH_AUSSENTEMP = hash("AUSSENTEMP");
 constexpr uint32_t HASH_EL_AUFNAHMELEISTUNG_HEIZ = hash("EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH");
 constexpr uint32_t HASH_EL_AUFNAHMELEISTUNG_WW = hash("EL_AUFNAHMELEISTUNG_WW_SUM_MWH");
 constexpr uint32_t HASH_WAERMEERTRAG_2WE_WW = hash("WAERMEERTRAG_2WE_WW_SUM_MWH");
@@ -2133,15 +2143,81 @@ constexpr uint32_t HASH_WAERMEERTRAG_WW_TAG_KWH = hash("WAERMEERTRAG_WW_TAG_KWH"
 
 
 
-// WPL13E: the WPMW II itself polls these on the bus, so they appear even when we
-// don't request them. HA history (30 days to 11 months) shows only 0 / -255:
-// MANAGER copies of IWS values, compressor 1 (single-compressor unit), cooling.
+// WPL13E: the WPMW II polls the IWS runtime block itself, so these answers appear
+// on the bus although we don't request them. Single-compressor unit without
+// cooling: compressor 1 and cooling counters are only 0 / -255 (HA history).
+// (The former "MANAGER x = 0.0" copies were read requests, filtered in processAndUpdate.)
 static bool isIgnoredOnWpl13e(const CanMember &cm, const char* name) {
     if (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") != 0) return false;
-    bool manager = strcmp(cm.Name, "MANAGER") == 0;
-    if (strncmp(name, "LZ_VERD_", 8) == 0)
-        return manager || strstr(name, "VERD_1") || strstr(name, "KUEHL");
-    return manager && (strcmp(name, "WPVORLAUFIST") == 0 || strcmp(name, "VERDICHTER") == 0);
+    return strncmp(name, "LZ_VERD_", 8) == 0 && (strstr(name, "VERD_1") || strstr(name, "KUEHL"));
+}
+
+// ============================================================================
+// SUMMER MODE (WPMW II manual, parameter 10): with the automatic on, heating
+// stops while the damped outside temperature is >= the threshold, and resumes
+// 1 K below it. Damping = averaging over 24/48/72 h (GEBAEUDEART 1/2/3); we use
+// an exponential moving average and keep it in NVS across reboots.
+// ============================================================================
+inline float emaStep(float ema, float x, float dtHours, float tauHours) {
+    if (std::isnan(ema)) return x;
+    float a = dtHours / (tauHours + dtHours);
+    return ema + a * (x - ema);
+}
+
+inline bool summerDecision(bool automatic, float ema, float threshold, bool wasActive, float hysteresis = 1.0f) {
+    if (!automatic || std::isnan(ema) || std::isnan(threshold)) return false;
+    return wasActive ? ema >= threshold - hysteresis : ema >= threshold;
+}
+
+struct SummerState {
+    float ema = NAN;
+    float threshold = NAN;
+    int automatic = -1;          // -1 unknown, 0 off, 1 on
+    int buildingType = 1;        // GEBAEUDEART 1..3
+    bool active = false;
+    unsigned long lastUpdateMs = 0, lastSaveMs = 0;
+};
+static SummerState summer;
+static ESPPreferenceObject nvsSummerEma;
+
+void initSummerPrefs() {
+    nvsSummerEma = global_preferences->make_preference<float>(0x50AA0E3A, true);
+    float v;
+    if (nvsSummerEma.load(&v) && !std::isnan(v) && v > -50.0f && v < 60.0f) summer.ema = v;
+}
+
+static const CalculatedSensorConfig* findCalculatedSensor(const char* uid) {
+    for (size_t i = 0; i < CALCULATED_SENSOR_COUNT; i++)
+        if (strcmp(calculatedSensors[i].uniqueId, uid) == 0) return &calculatedSensors[i];
+    return nullptr;
+}
+
+void publishSummerState() {
+    if (std::isnan(summer.threshold) || summer.automatic < 0 || std::isnan(summer.ema)) return;
+    summer.active = summerDecision(summer.automatic == 1, summer.ema, summer.threshold, summer.active);
+    const CalculatedSensorConfig* active = findCalculatedSensor("stiebel_calculated_sommerbetrieb_aktiv");
+    const CalculatedSensorConfig* damped = findCalculatedSensor("stiebel_calculated_aussentemp_gedaempft");
+    publishCalculatedSensorDiscovery(*active, false);
+    publishCalculatedSensorDiscovery(*damped, false);
+    const char* st = summer.active ? "on" : "off";
+    id(mqtt_client).publish(active->stateTopic, st, strlen(st), 0, true);
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%.1f", summer.ema);
+    id(mqtt_client).publish(damped->stateTopic, buf, strlen(buf), 0, true);
+}
+
+// Outside temperature of the controller's own sensor (KESSEL on WPMW II, not the
+// IWS air intake). Only used once the model provides the threshold.
+void updateSummerOutsideTemp(float t, unsigned long now) {
+    if (std::isnan(summer.threshold)) return;
+    float dtHours = summer.lastUpdateMs ? (now - summer.lastUpdateMs) / 3600000.0f : 0.0f;
+    summer.lastUpdateMs = now;
+    summer.ema = emaStep(summer.ema, t, dtHours, 24.0f * summer.buildingType);
+    if (now - summer.lastSaveMs > 30UL * 60UL * 1000UL) {
+        nvsSummerEma.save(&summer.ema);
+        summer.lastSaveMs = now;
+    }
+    publishSummerState();
 }
 
 // Short remedy for a decoded fault text (WPMW II manual fault list), shown as
@@ -2296,6 +2372,28 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
             break;
         }
         
+        case HASH_SOMMERBETRIEB:
+            summer.automatic = (value == "on") ? 1 : (value == "off") ? 0 : -1;
+            publishSummerState();
+            break;
+
+        case HASH_SOMMERBETRIEB_TEMP: {
+            float v = strtof(value.c_str(), nullptr);
+            if (v >= 5.0f && v <= 35.0f) { summer.threshold = v; publishSummerState(); }
+            break;
+        }
+
+        case HASH_GEBAEUDEART: {
+            int v = atoi(value.c_str());
+            if (v >= 1 && v <= 3) summer.buildingType = v;
+            break;
+        }
+
+        case HASH_AUSSENTEMP:
+            if (strcmp(cm.Name, "KESSEL") == 0 && value != "-255")
+                updateSummerOutsideTemp(strtof(value.c_str(), nullptr), millis());
+            break;
+
         case HASH_FEHLERMELDUNG: {
             char topic[64], buf[192];
             snprintf(topic, sizeof(topic), "heatingpump/%s/FEHLERMELDUNG/attributes", cm.Name);

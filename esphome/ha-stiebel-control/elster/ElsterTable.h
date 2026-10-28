@@ -3809,6 +3809,9 @@ static const ElsterIndex ElsterTable[] =
   { "BETRIEBS_STATUS_WPC7", 0x0a20, 0, "Betriebsstatus (WPC7 Bitmaske)", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false }, // suffixed: BETRIEBS_STATUS already used (0x0176) by other models
   { "REGLERDYNAMIK", 0xfdb0, et_little_endian, "Reglerdynamik", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "VERDICHTER_STILLSTAND", 0xfdb1, et_little_endian, "Verdichter Stillstandszeit", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  // WPMW II parameter 10 "SOMMERBETRIEB / AUSSENTEMP" (10..30 degC), found by bus scan
+  // on a WPL13E next to SOMMERBETRIEB (0xfdb4) and GEBAEUDEART (0xfdb3); raw 2560 = 10 degC.
+  { "SOMMERBETRIEB_TEMP", 0xfdb5, et_little_endian, LNAME_SOMMERBETRIEB_TEMP, "sensor", "temperature", "°C", "measurement", "mdi:sun-thermometer", NULL, NULL, false, true },
   { "PROBE_WP_STATUS_4EDA", 0x4eda, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },  // TEMP
   // kr0ner/OneESP32ToRuleThemAll index facts (WPM3 generation)
 #if defined(HA_MODEL_wpl17) || defined(HA_MODEL_wpl23) || defined(HA_MODEL_wpl10ac) || defined(HA_MODEL_wpc7)

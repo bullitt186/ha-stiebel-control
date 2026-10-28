@@ -1227,3 +1227,38 @@ TEST_CASE("fault: code decoding and remedy attribute", "[fault]") {
     CHECK(std::string(faultRemedy("ERR T-VL IWS")).find("Fuehler") != std::string::npos);
     CHECK(std::string(faultRemedy("ERR 69")).find("Handbuch") != std::string::npos);
 }
+
+// ============================================================================
+// Summer mode
+// ============================================================================
+
+TEST_CASE("summer: EMA step and hysteresis decision", "[summer]") {
+    CHECK(emaStep(NAN, 12.0f, 0.0f, 24.0f) == Approx(12.0f));
+    CHECK(emaStep(10.0f, 20.0f, 0.0f, 24.0f) == Approx(10.0f));       // no time passed
+    CHECK(emaStep(10.0f, 20.0f, 24.0f, 24.0f) == Approx(15.0f));      // dt == tau -> halfway
+    CHECK_FALSE(summerDecision(false, 15.0f, 10.0f, false));          // automatic off
+    CHECK(summerDecision(true, 10.0f, 10.0f, false));                 // on at threshold
+    CHECK(summerDecision(true, 9.5f, 10.0f, true));                   // stays on within 1 K
+    CHECK_FALSE(summerDecision(true, 8.9f, 10.0f, true));             // off below threshold - 1 K
+    CHECK_FALSE(summerDecision(true, 9.5f, 10.0f, false));            // not on below threshold
+}
+
+TEST_CASE("summer: published once automatic, threshold and outside temperature are known", "[summer]") {
+    resetDiscoveryState();
+    summer = SummerState{};
+    const CanMember& mgr = CanMembers[cm_manager];
+    const CanMember& kessel = CanMembers[cm_kessel];
+    updateSensor(kessel, GetElsterIndex("AUSSENTEMP"), "12.0");      // threshold unknown: ignored
+    CHECK(mqttFindPayload("calculated/sommerbetrieb_aktiv/state").empty());
+    updateSensor(mgr, GetElsterIndex("SOMMERBETRIEB_TEMP"), "10");
+    updateSensor(mgr, GetElsterIndex("SOMMERBETRIEB"), "on");
+    updateSensor(kessel, GetElsterIndex("AUSSENTEMP"), "12.0");
+    CHECK(mqttFindPayload("calculated/aussentemp_gedaempft/state") == "12.0");
+    mqtt_client_instance().clear();
+    updateSensor(mgr, GetElsterIndex("SOMMERBETRIEB"), "on");
+    CHECK(mqttFindPayload("calculated/sommerbetrieb_aktiv/state") == "on");
+    mqtt_client_instance().clear();
+    updateSensor(mgr, GetElsterIndex("SOMMERBETRIEB"), "off");
+    CHECK(mqttFindPayload("calculated/sommerbetrieb_aktiv/state") == "off");
+    summer = SummerState{};
+}

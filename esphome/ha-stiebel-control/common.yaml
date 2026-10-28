@@ -32,6 +32,7 @@ esphome:
       - lambda: |-
           initBoostStatePrefs();
           loadBoostState();
+          initSummerPrefs();
   includes:
     - ha-stiebel-control/elster/ElsterTable.h
     - ha-stiebel-control/elster/KElsterTable.h

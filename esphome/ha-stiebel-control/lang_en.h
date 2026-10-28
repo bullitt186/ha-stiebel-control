@@ -235,6 +235,12 @@
 #define LNAME_CALC_EL_LEISTUNG_HEIZ_W          "Current Electrical Power Heating"
 #undef  LNAME_CALC_EL_LEISTUNG_WW_W
 #define LNAME_CALC_EL_LEISTUNG_WW_W            "Current Electrical Power DHW"
+#undef  LNAME_CALC_SOMMERBETRIEB_AKTIV
+#define LNAME_CALC_SOMMERBETRIEB_AKTIV         "Summer Mode Active"
+#undef  LNAME_CALC_AUSSENTEMP_GEDAEMPFT
+#define LNAME_CALC_AUSSENTEMP_GEDAEMPFT        "Outside Temperature Damped"
+#undef  LNAME_SOMMERBETRIEB_TEMP
+#define LNAME_SOMMERBETRIEB_TEMP               "Summer Mode Threshold"
 
 // ============================================================================
 // Writable number friendly names
