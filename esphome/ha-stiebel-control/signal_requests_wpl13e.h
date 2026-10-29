@@ -64,7 +64,8 @@ extern const SignalRequest signalRequests[] = {
     {"MAX_HEIZUNG_TEMP",                 FREQ_60MIN, cm_manager},
     {"MAX_TEMP_KESSEL",                  FREQ_60MIN, cm_manager},
     {"AUSSEN_FROSTTEMP",                 FREQ_60MIN, cm_manager},
-    {"LAUFZEIT_WP1",                     FREQ_30MIN, cm_manager},  // compressor total = heat + DHW
+    // LAUFZEIT_WP1 (0x01c4) is not requested: the WPMW II fills it only on demand
+    // (5576 h once, 0 otherwise); use LZ_VERD_2_HEIZBETRIEB + LZ_VERD_2_WW_BETRIEB.
     {"LAUFZEIT_2WE",                     FREQ_30MIN, cm_manager},  // electric booster total
 
     // ========================================================================
