@@ -160,7 +160,13 @@ static const ElsterIndex ElsterTable[] =
   { "FEUCHTE", 0x4ec8, et_dec_val, "Feuchte", "sensor", "humidity", "%", "measurement", "mdi:water-percent", NULL, NULL, false, true },
   { "VERSTELLTE_RAUMSOLLTEMP", 0x0012, et_dec_val, "Verstellte Raum Soll Temperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "EINSTELL_SPEICHERSOLLTEMP", 0x0013, et_dec_val, LNAME_EINSTELL_SPEICHERSOLLTEMP, "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL, false, true },
+#ifdef HA_MODEL_wpl13e
+  // WPL13E IWS: not an evaporator temperature. Falls to -30 at standstill (outside +5 °C), rises to +58..+76 within
+  // minutes of a compressor start, then decays. Meaning unknown; published without unit.
+  { "VERDAMPFERTEMP", 0x0014, et_byte, LNAME_VERDAMPFERTEMP, "sensor", NULL, NULL, "measurement", "mdi:help-circle-outline", NULL, NULL, false, true },
+#else
   { "VERDAMPFERTEMP", 0x0014, et_byte, LNAME_VERDAMPFERTEMP, "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL, false, true },
+#endif
   { "SAMMLERSOLLTEMP", 0x0015, et_dec_val, "Sammler Soll Temperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "RUECKLAUFISTTEMP", 0x0016, et_dec_val, LNAME_RUECKLAUFISTTEMP, "sensor", "temperature", "°C", "measurement", "mdi:thermometer-lines", NULL, NULL, false, true },
   { "SPEICHER_UNTEN_TEMP", 0x0017, et_dec_val, "Speicher Unten Temperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
@@ -254,7 +260,8 @@ static const ElsterIndex ElsterTable[] =
   { "FERIENDAUER_TAGE", 0x0106, 0, "Ferien Dauer Tage", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "RAUMFUEHLERKORREKTUR", 0x0109, 0, "Raumfühlerkorrektur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "AUSSENTEMPVERZOEGERUNG", 0x010c, et_dec_val, "Außen Temperatur Verzögerung", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "HEIZKURVE", 0x010e, et_cent_val, LNAME_HEIZKURVE, NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, true  },
+  // Heating curve slope is dimensionless (without metadata the et_cent_val default made it a °C temperature)
+  { "HEIZKURVE", 0x010e, et_cent_val, LNAME_HEIZKURVE, "sensor", NULL, NULL, "measurement", "mdi:chart-line", NULL, NULL, false, true  },
   { "RAUMEINFLUSS", 0x010f, 0, "Raum Einfluss", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   // Notbetrieb     0x0000
   // Bereitschaft   0x0100
@@ -1935,7 +1942,14 @@ static const ElsterIndex ElsterTable[] =
 #else
   { "ANZEIGE_NIEDERDRUCK", 0x07a7, et_dec_val, "Anzeige Niederdruck", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
 #endif
+#ifdef HA_MODEL_wpl13e
+  // WPL13E: status word, not a power. Raw 0x0008 at standstill, 0x0221/0x0228 while running (bit 9 = compressor on,
+  // same bit as ABTAUUNGAKTIV 0x0200), constant during a DHW charge while the electrical power rose 2.6 -> 3.2 kW.
+  // Kept as et_dec_val so compressor_active (> 2) keeps working.
+  { "VERDICHTER", 0x07a8, et_dec_val, LNAME_VERDICHTER, "sensor", NULL, NULL, "measurement", "mdi:pump", NULL, NULL, false, true },
+#else
   { "VERDICHTER", 0x07a8, et_dec_val, LNAME_VERDICHTER, "sensor", "power", "W", "measurement", "mdi:pump", NULL, NULL, false, true },
+#endif
   { "VERDAMPFERISTTEMP_KOMPENSIERT", 0x07a9, 0, "Verdampfer Ist Temperatur Kompensiert", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TAU_PENDEL_ERKENNUNGSZEIT", 0x07aa, 0, "Tau Pendel Erkennungszeit", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "VERZOEGERUNG_PENDELERKENNUNG", 0x07ab, 0, "Verzögerung Pendel Erkennung", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
