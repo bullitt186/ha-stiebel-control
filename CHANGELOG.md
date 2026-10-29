@@ -39,6 +39,9 @@ aly-fly/Stiebel-Eltron_heat_pump_monitor, VasekCZ81/stiebel-can-service), verifi
   checked). This produced constant fake `0` readings for the requesting node, e.g. "MANAGER
   VERDICHTER 0.0" on WPL13E, and hid real values such as the manager's return temperature.
 - Short CAN frames dereferenced an unset member.
+- Bool fields carrying other bits ("?") are no longer published to binary sensors (HA rejected
+  them with a warning per poll). WPL13E `ABTAUUNGAKTIV` reads 0x0200 while the compressor runs.
+- WPL13E refrigerant pressures (`ANZEIGE_HOCHDRUCK/NIEDERDRUCK`) are hundredths of bar.
 - `make test` did not rebuild objects after header changes (stale `ElsterTable.h` in tests).
 
 ---

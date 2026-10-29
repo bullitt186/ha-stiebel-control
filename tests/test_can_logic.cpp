@@ -1262,3 +1262,13 @@ TEST_CASE("summer: published once automatic, threshold and outside temperature a
     CHECK(mqttFindPayload("calculated/sommerbetrieb_aktiv/state") == "off");
     summer = SummerState{};
 }
+
+TEST_CASE("updateSensor: bool fields with unknown bits ('?') are not published", "[mqtt]") {
+    resetDiscoveryState();
+    const ElsterIndex* ei = GetElsterIndex("ABTAUUNGAKTIV");
+    REQUIRE(ei != nullptr);
+    updateSensor(CanMembers[cm_heizmodul], ei, "?");
+    CHECK(mqtt_client_instance().messages.empty());
+    updateSensor(CanMembers[cm_heizmodul], ei, "off");
+    CHECK(mqttFindPayload("HEIZMODUL/ABTAUUNGAKTIV/state") == "off");
+}

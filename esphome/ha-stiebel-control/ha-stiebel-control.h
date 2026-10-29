@@ -2243,6 +2243,10 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
         return;
     }
     if (isIgnoredOnWpl13e(cm, ei->Name)) return;
+    // Bool fields carrying other bits decode to "?"; HA rejects that payload for a
+    // binary sensor (log warning per poll) and keeps the last state anyway. Seen on
+    // WPL13E: ABTAUUNGAKTIV = 0x0200 while the compressor runs (no defrost).
+    if (value == "?" && (ei->Type == et_bool || ei->Type == et_little_bool)) return;
 
     // -255 = the device does not provide this value: count it for the poll
     // back-off and create no HA entity until a real value has been seen.
