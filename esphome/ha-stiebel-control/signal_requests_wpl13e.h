@@ -56,6 +56,16 @@ extern const SignalRequest signalRequests[] = {
     {"FEHLERMELDUNG",              FREQ_1MIN,  cm_heizmodul},
     {"GEBAEUDEART",                FREQ_10MIN, cm_manager},
     {"SOMMERBETRIEB_TEMP",         FREQ_30MIN, cm_manager},  // summer-mode threshold
+    // Settings and totals found by a bus scan of the manager (WPMW II)
+    {"BIVALENTPARALLELTEMPERATUR_HZG",   FREQ_60MIN, cm_manager},
+    {"BIVALENTPARALLELTEMPERATUR_WW",    FREQ_60MIN, cm_manager},
+    {"BIVALENZALTERNATIVTEMPERATUR_HZG", FREQ_60MIN, cm_manager},
+    {"BIVALENZALTERNATIVTEMPERATUR_WW",  FREQ_60MIN, cm_manager},
+    {"MAX_HEIZUNG_TEMP",                 FREQ_60MIN, cm_manager},
+    {"MAX_TEMP_KESSEL",                  FREQ_60MIN, cm_manager},
+    {"AUSSEN_FROSTTEMP",                 FREQ_60MIN, cm_manager},
+    {"LAUFZEIT_WP1",                     FREQ_30MIN, cm_manager},  // compressor total = heat + DHW
+    {"LAUFZEIT_2WE",                     FREQ_30MIN, cm_manager},  // electric booster total
 
     // ========================================================================
     // ENERGY: SUM_MWH (base) is whole MWh only; the kWh remainder and the
@@ -76,6 +86,11 @@ extern const SignalRequest signalRequests[] = {
     // Refrigerant pressures in bar (et_cent_val for WPL13E, see ElsterTable.h)
     // ========================================================================
     {"HEISSGAS_TEMP",              FREQ_1MIN,  cm_heizmodul},
+    {"SOLLWERT_UEBERHITZUNG",            FREQ_10MIN, cm_heizmodul},
+    {"ISTWERT_UEBERHITZUNG_VERDAMPFER",  FREQ_1MIN,  cm_heizmodul},
+    {"STARTS_ABTAUUNG",                  FREQ_30MIN, cm_heizmodul},
+    {"ZEITDAUER_LETZTE_ABTAUUNG",        FREQ_10MIN, cm_heizmodul},
+    {"VORLAUFSOLLTEMP",                  FREQ_1MIN,  cm_kessel},
     {"ANZEIGE_HOCHDRUCK",          FREQ_1MIN,  cm_heizmodul},
     {"ANZEIGE_NIEDERDRUCK",        FREQ_1MIN,  cm_heizmodul},
     {"LAUFZEIT_DHC1",              FREQ_60MIN, cm_heizmodul},

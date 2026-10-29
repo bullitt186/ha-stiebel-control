@@ -146,7 +146,7 @@ static const ElsterIndex ElsterTable[] =
   // Kuehlkreispumpe:     0x0800
   { "KESSELSOLLTEMP", 0x0002, et_dec_val, LNAME_KESSELSOLLTEMP, "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL, false, true },
   { "SPEICHERSOLLTEMP", 0x0003, et_dec_val, LNAME_SPEICHERSOLLTEMP, "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL, false, true },
-  { "VORLAUFSOLLTEMP", 0x0004, et_dec_val, "Vorlauf Soll Temperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "VORLAUFSOLLTEMP", 0x0004, et_dec_val, "Vorlauf Soll Temperatur", "sensor", "temperature", "°C", "measurement", "mdi:thermometer-chevron-up", NULL, NULL, false, true },
   { "RAUMSOLLTEMP_I", 0x0005, et_dec_val, LNAME_RAUMSOLLTEMP_I, "sensor", "temperature", "°C", "measurement", "mdi:home-thermometer", NULL, NULL, false, true },
   { "RAUMSOLLTEMP_II", 0x0006, et_dec_val, LNAME_RAUMSOLLTEMP_II, "sensor", "temperature", "°C", "measurement", "mdi:home-thermometer", NULL, NULL, false, true },
   { "RAUMSOLLTEMP_III", 0x0007, et_dec_val, LNAME_RAUMSOLLTEMP_III, "sensor", "temperature", "°C", "measurement", "mdi:home-thermometer", NULL, NULL, false, true },
@@ -173,7 +173,7 @@ static const ElsterIndex ElsterTable[] =
   { "ANFAHRTEMP", 0x0021, et_dec_val, "Anfahr Temperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "MAX_HYSTERESE", 0x0023, et_little_endian, "Maximum Hysterese", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "SPEICHERSPERRE", 0x0025, 0, "Speicher Sperre", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "MAX_TEMP_KESSEL", 0x0028, et_dec_val, "Maximum Temperatur Kessel", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "MAX_TEMP_KESSEL", 0x0028, et_dec_val, "Max. Rücklauftemperatur", "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL, false, true },
   { "MAX_TEMP_HZK", 0x0029, et_dec_val, "Maximum Temperatur Hzk", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "MISCHERLAUFZEIT", 0x002c, 0, "Mischer Laufzeit", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "KESSELUEBERHOEHUNG_WW", 0x002e, 0, "Kessel Überhöhung Warmwasser", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
@@ -437,10 +437,10 @@ static const ElsterIndex ElsterTable[] =
   { "EINGANG_SPANNUNG", 0x01a9, 0, "Eingang Spannung", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "EINGANG_STROM", 0x01aa, 0, "Eingang Strom", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "DONGLE_NR", 0x01ab, 0, "Dongle Nr", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "BIVALENTPARALLELTEMPERATUR_HZG", 0x01ac, et_dec_val, "Bivalent Parallel Temperatur Heizung", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "BIVALENTPARALLELTEMPERATUR_WW", 0x01ad, et_dec_val, "Bivalent Parallel Temperatur Warmwasser", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "BIVALENZALTERNATIVTEMPERATUR_HZG", 0x01ae, et_dec_val, "Bivalenzalternativ Temperatur Heizung", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "BIVALENZALTERNATIVTEMPERATUR_WW", 0x01af, et_dec_val, "Bivalenzalternativ Temperatur Warmwasser", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "BIVALENTPARALLELTEMPERATUR_HZG", 0x01ac, et_dec_val, "Bivalenzpunkt Heizung", "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL, false, true },
+  { "BIVALENTPARALLELTEMPERATUR_WW", 0x01ad, et_dec_val, "Bivalenzpunkt Warmwasser", "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL, false, true },
+  { "BIVALENZALTERNATIVTEMPERATUR_HZG", 0x01ae, et_dec_val, "Einsatzgrenze Wärmepumpe Heizung", "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL, false, true },
+  { "BIVALENZALTERNATIVTEMPERATUR_WW", 0x01af, et_dec_val, "Einsatzgrenze Wärmepumpe Warmwasser", "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL, false, true },
   { "QUELLENSOLLTEMPERATUR", 0x01b0, et_dec_val, "Quellen Soll Temperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "SOLLTEMP_ANZEIGE_0_1", 0x01b1, 0, "Soll Temperatur Anzeige 0 1", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "SOLLTEMP_ANZEIGE_0_2", 0x01b2, 0, "Soll Temperatur Anzeige 0 2", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
@@ -465,14 +465,14 @@ static const ElsterIndex ElsterTable[] =
   { "FEHLERART"                                   , 0x01f2, 0               ,                                                             NULL,            NULL,          NULL,  NULL,               NULL,                    NULL, NULL, NULL, false, false },
   { "ZUFALLSZAHL"                                 , 0x01f3, 0               ,                                                             NULL,            NULL,          NULL,  NULL,               NULL,                    NULL, NULL, NULL, false, false },
   { "GESAMTERTRAG_MWATT", 0x01c3, 0, "Gesamt Ertrag Megawatt", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "LAUFZEIT_WP1", 0x01c4, 0, "Laufzeit Wärmepumpe 1", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "LAUFZEIT_WP1", 0x01c4, 0, "Laufzeit Verdichter gesamt", "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL, false, true },
   { "LAUFZEIT_WP2", 0x01c5, 0, "Laufzeit Wärmepumpe 2", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "LAUFZEIT_WP3", 0x01c6, 0, "Laufzeit Wärmepumpe 3", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "LAUFZEIT_WP4", 0x01c7, 0, "Laufzeit Wärmepumpe 4", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "LAUFZEIT_WP5", 0x01c8, 0, "Laufzeit Wärmepumpe 5", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "LAUFZEIT_WP6", 0x01c9, 0, "Laufzeit Wärmepumpe 6", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "LAUFZEIT_SOLAR", 0x01ca, 0, "Laufzeit Solar", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "LAUFZEIT_2WE", 0x01cb, 0, "Laufzeit 2 We", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "LAUFZEIT_2WE", 0x01cb, 0, "Laufzeit Nacherwärmung gesamt", "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL, false, true },
   { "STILLSTANDZEIT_0", 0x01cc, 0, "Stillstandzeit 0", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "STILLSTANDZEIT_1", 0x01cd, 0, "Stillstandzeit 1", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "STILLSTANDZEIT_2", 0x01ce, 0, "Stillstandzeit 2", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
@@ -498,7 +498,7 @@ static const ElsterIndex ElsterTable[] =
   { "K_OS_START_PWM", 0x01e5, 0, "K Os Start PWM", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "GEBLAESEREGLER_P_ANTEIL", 0x01e6, 0, "Gebläse Regler P Anteil", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "GEBLAESEREGLER_I_ANTEIL", 0x01e7, 0, "Gebläse Regler I Anteil", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "MAX_HEIZUNG_TEMP", 0x01e8, et_dec_val, "Maximum Heizung Temperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "MAX_HEIZUNG_TEMP", 0x01e8, et_dec_val, "Max. Vorlauftemperatur Heizung", "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL, false, true },
   { "MAX_POS_GEBLAESEANSTIEG", 0x01e9, 0, "Maximum Pos Gebläse Anstieg", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "MAX_NEG_GEBLAESEANSTIEG", 0x01ea, 0, "Maximum Neg Gebläse Anstieg", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "STEP_dT_REGELUNG", 0x01eb, 0, "Step dT Regelung", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
@@ -2004,7 +2004,12 @@ static const ElsterIndex ElsterTable[] =
   { "ZEIT_WAECHTER_ABWEICHUNG_V_KENNLINIE", 0x07ea, 0, "Zeit Wächter Abweichung V Kennlinie", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "MINIMALER_GRENZWERT_UEBERHITZUNG", 0x07eb, 0, "Minimaler Grenzwert Überhitzung", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "LZ_VERD_1_HEIZBETRIEB"                       , 0x07fc, et_mil_val      , LNAME_LZ_VERD_1_HEIZBETRIEB,       NULL,          NULL,  NULL,               NULL,                    NULL, NULL, NULL,  false, true  },
+#ifdef HA_MODEL_wpl13e
+  // WPL13E: plain hours - verified: 1029 h heating + 4546 h DHW = LAUFZEIT_WP1 5576 h
+  { "LZ_VERD_2_HEIZBETRIEB", 0x07fd, 0, "Laufzeit Verdichter Heizen", "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL, false, true },
+#else
   { "LZ_VERD_2_HEIZBETRIEB"                       , 0x07fd, et_mil_val      , LNAME_LZ_VERD_2_HEIZBETRIEB,       NULL,          NULL,  NULL,               NULL,                    NULL, NULL, NULL,  false, true  },
+#endif
   { "LZ_VERD_1_2_HEIZBETRIEB"                     , 0x07fe, et_mil_val      , LNAME_LZ_VERD_1_2_HEIZBETRIEB,     NULL,          NULL,  NULL,               NULL,                    NULL, NULL, NULL,  false, true  },
   { "LZ_VERD_1_KUEHLBETRIEB"                      , 0x07ff, et_mil_val      , LNAME_LZ_VERD_1_KUEHLBETRIEB,       NULL,          NULL,  NULL,               NULL,                    NULL, NULL, NULL,  false, true  },
   { "LZ_VERD_2_KUEHLBETRIEB"                      , 0x0800, et_mil_val      , LNAME_LZ_VERD_2_KUEHLBETRIEB,       NULL,          NULL,  NULL,               NULL,                    NULL, NULL, NULL,  false, true  },
@@ -2022,8 +2027,18 @@ static const ElsterIndex ElsterTable[] =
   { "HD_EVE_FUNKTION", 0x07f0, 0, "Hd Eve Funktion", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "HD_EVE_GRENZWERT_VHD", 0x07f1, 0, "Hd Eve Grenzwert Vhd", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "BETRIEBSART_WP", 0x07f2, 0, LNAME_BETRIEBSART_WP, "sensor", "", "", "", "mdi:hvac", NULL, NULL, true, true },
+#ifdef HA_MODEL_wpl13e
+  // WPL13E: tenths of K (setpoint 56 = 5.6 K)
+  { "SOLLWERT_UEBERHITZUNG", 0x07f3, et_dec_val, "Überhitzung Soll", "sensor", "temperature", "K", "measurement", "mdi:thermometer-alert", NULL, NULL, false, true },
+#else
   { "SOLLWERT_UEBERHITZUNG", 0x07f3, 0, "Sollwert Überhitzung", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+#endif
+#ifdef HA_MODEL_wpl13e
+  // WPL13E: tenths of K (setpoint 56 = 5.6 K)
+  { "ISTWERT_UEBERHITZUNG_VERDAMPFER", 0x07f4, et_dec_val, "Überhitzung Ist", "sensor", "temperature", "K", "measurement", "mdi:thermometer-alert", NULL, NULL, false, true },
+#else
   { "ISTWERT_UEBERHITZUNG_VERDAMPFER", 0x07f4, 0, "Istwert Überhitzung Verdampfer", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+#endif
   { "ISTWERT_UEBERHITZUNG_REKUPERATOR_KUEHLEN", 0x07f5, 0, "Istwert Überhitzung Rekuperator Kühlen", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "VORSTEUER_OEFFNUNGSGRAD", 0x07f6, 0, "Vorsteuer Öffnungsgrad", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "P_ANTEIL_EXV", 0x07f7, 0, "P Anteil Exv", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
@@ -2032,8 +2047,9 @@ static const ElsterIndex ElsterTable[] =
   { "PENDELN_RELATIV", 0x07fa, 0, "Pendeln Elektrisch N R Elektrisch Aktiv", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "FAKTOR_REGELDYNAMIK", 0x07fb, 0, "Faktor Regel Dynamik", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "LZ_DHC12", 0x0805, 0, "Laufzeit Nacherwärmung Stufe 1+2", "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL, false, true },
-  { "STARTS_ABTAUUNG", 0x0806, 0, "Starts Abtauung", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "ZEITDAUER_LETZTE_ABTAUUNG", 0x0807, 0, "Zeitdauer Letzte Abtauung", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "STARTS_ABTAUUNG", 0x0806, 0, "Abtauungen gesamt", "sensor", "", "", "total_increasing", "mdi:snowflake-melt", NULL, NULL, false, true },
+  // seconds: 708 = 11.8 min on a WPL13E (plausible defrost duration; verify during a defrost)
+  { "ZEITDAUER_LETZTE_ABTAUUNG", 0x0807, 0, "Dauer letzte Abtauung", "sensor", "duration", "s", "measurement", "mdi:timer-snowflake", NULL, NULL, false, true },
   { "ABTAUZEIT_VERD1", 0x0808, 0, "Abtauzeit Verdichter 1", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "ABTAUZEIT_VERD2", 0x0809, 0, "Abtauzeit Verdichter 2", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "TAUPUNKTTEMPERATUR_REFERENZ", 0x080a, 0, "Taupunkt Temperatur Referenz", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
@@ -2429,7 +2445,7 @@ static const ElsterIndex ElsterTable[] =
   { "ABREGELTEMPERATUR", 0x09fd, 0, "Abregeltemperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "FOLGEWECHSEL_IN_STD", 0x09fe, 0, "Folgewechsel In Std", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "SONDERNIVEAU_TEMPERATUR", 0x09ff, 0, "Sonderniveau Temperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
-  { "AUSSEN_FROSTTEMP", 0x0a00, et_dec_val, "Außen Frost Temperatur", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
+  { "AUSSEN_FROSTTEMP", 0x0a00, et_dec_val, "Anlagenfrostschutz Temperatur", "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL, false, true },
   { "BRENNER1LAUFZEIT", 0x0a02, 0, "Brenner 1 Laufzeit", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "BRENNER2LAUFZEIT", 0x0a04, 0, "Brenner 2 Laufzeit", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
   { "EINSTELL_SPEICHERSOLLTEMP2", 0x0a06, et_dec_val, LNAME_EINSTELL_SPEICHERSOLLTEMP2, "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL, false, true },
