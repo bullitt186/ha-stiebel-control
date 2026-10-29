@@ -25,6 +25,12 @@ aly-fly/Stiebel-Eltron_heat_pump_monitor, VasekCZ81/stiebel-can-service), verifi
   current temperature on first boot and is kept in NVS afterwards.
 - **`read_only` mode** — never writes to the heat pump; CI compiles this variant.
 - **Dashboards** — standard Lovelace dashboard and a system schema with own SVGs (`dashboards/`).
+- **Fault history** — the manager's stored fault list (display parameter 48, 20 entries,
+  `FEHLERFELD_0..139`) is read every 30 min into one sensor "Fehlerliste": state is the newest
+  fault, attributes hold time, remedy, count and all entries (dashboard renders it as a table).
+- **WPL13E signals from full bus scans** — bivalence points and heat-pump limits per heating/DHW,
+  max. flow/return temperature, frost protection, booster total runtime (`LAUFZEIT_2WE`),
+  defrost count and duration of the last defrost, superheat actual/target, flow setpoint.
 - **Register names** — 32 `TEST_OBJEKT_*` rows named, 115 indices added for WPM3-generation
   models only (`helperscripts/import_signal_names.py`; facts only).
 
@@ -42,6 +48,11 @@ aly-fly/Stiebel-Eltron_heat_pump_monitor, VasekCZ81/stiebel-can-service), verifi
 - Bool fields carrying other bits ("?") are no longer published to binary sensors (HA rejected
   them with a warning per poll). WPL13E `ABTAUUNGAKTIV` reads 0x0200 while the compressor runs.
 - WPL13E refrigerant pressures (`ANZEIGE_HOCHDRUCK/NIEDERDRUCK`) are hundredths of bar.
+- WPL13E `LZ_VERD_2_HEIZBETRIEB` is plain hours ("Laufzeit Verdichter Heizen"); heating +
+  DHW now add up to the total compressor runtime.
+- Remedy text for `HD-SENSOR-MAX` named a sensor fault; it is the high-pressure limit
+  (heating flow too low or room temperature / heating curve too high).
+- WPL13E no longer polls `LAUFZEIT_WP1`: the manager fills it only on demand (read 0 otherwise).
 - `make test` did not rebuild objects after header changes (stale `ElsterTable.h` in tests).
 
 ---

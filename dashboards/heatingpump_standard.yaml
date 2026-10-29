@@ -95,6 +95,8 @@ views:
                 name: Luftansaugung
               - entity: sensor.kessel_vorlauf_ist_temperatur
                 name: Vorlauf
+              - entity: sensor.kessel_vorlauf_soll_temperatur
+                name: Vorlauf Soll
               - entity: sensor.kessel_rucklauf_ist_temperatur
                 name: Rücklauf
               - entity: sensor.kessel_speicher_ist_temperatur
@@ -160,12 +162,39 @@ views:
     type: sections
     sections:
       - type: grid
+        column_span: 2
+        cards:
+          - type: tile
+            entity: sensor.stiebel_eltron_warmepumpe_fehlerliste
+            name: Letzter Fehler
+          - type: markdown
+            title: Fehlerliste (Display, Parameter 48)
+            content: |-
+              {% set e = state_attr('sensor.stiebel_eltron_warmepumpe_fehlerliste', 'eintraege') or [] %}
+              {% if e %}
+              | Zeitpunkt | Fehler |
+              |---|---|
+              {% for x in e %}| {{ x.zeit }} | {{ x.fehler }} |
+              {% endfor %}
+              {% else %}Keine Einträge gelesen.{% endif %}
+          - type: entities
+            title: Einstellungen
+            entities:
+              - entity: sensor.manager_bivalenzpunkt_heizung
+              - entity: sensor.manager_bivalenzpunkt_warmwasser
+              - entity: sensor.manager_einsatzgrenze_warmepumpe_heizung
+              - entity: sensor.manager_einsatzgrenze_warmepumpe_warmwasser
+              - entity: sensor.manager_max_vorlauftemperatur_heizung
+              - entity: sensor.manager_max_rucklauftemperatur
+              - entity: sensor.manager_anlagenfrostschutz_temperatur
+      - type: grid
         cards:
           - type: entities
             title: Laufzeiten
             entities:
+              - entity: sensor.heizmodul_laufzeit_verdichter_heizen
               - entity: sensor.heizmodul_laufzeit_verdichter_warmwasser
-              - entity: sensor.heizmodul_laufzeit_verdichter_2_heizung_betrieb
+              - entity: sensor.manager_laufzeit_nacherwarmung_gesamt
               - entity: sensor.heizmodul_laufzeit_nacherwarmung_stufe_1
               - entity: sensor.heizmodul_laufzeit_nacherwarmung_stufe_2
               - entity: sensor.heizmodul_laufzeit_nacherwarmung_stufe_1_2
@@ -176,6 +205,10 @@ views:
               - entity: sensor.heizmodul_niederdruck
               - entity: sensor.heizmodul_heissgastemperatur
               - entity: sensor.heizmodul_verdampfer_temperatur
+              - entity: sensor.heizmodul_uberhitzung_ist
+              - entity: sensor.heizmodul_uberhitzung_soll
+              - entity: sensor.heizmodul_abtauungen_gesamt
+              - entity: sensor.heizmodul_dauer_letzte_abtauung
           - type: entities
             title: Regelung
             entities:
