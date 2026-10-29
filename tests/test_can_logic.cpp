@@ -1273,3 +1273,48 @@ TEST_CASE("updateSensor: bool fields with unknown bits ('?') are not published",
     updateSensor(CanMembers[cm_heizmodul], ei, "off");
     CHECK(mqttFindPayload("HEIZMODUL/ABTAUUNGAKTIV/state") == "off");
 }
+
+// ============================================================================
+// Fault list (FEHLERFELD_0..139), real WPL13E data matching the display
+// ============================================================================
+
+TEST_CASE("fault list: decodes 20 entries newest first", "[fault]") {
+    uint16_t raw[FAULT_FIELD_COUNT] = {18,15,27,7,25,0,29,14,9,31,7,25,0,29,0,13,2,8,25,0,29,34,16,3,8,25,0,29,32,7,12,8,25,0,29,13,18,12,8,25,0,29,24,10,13,8,25,0,29,26,13,14,8,25,0,29,55,10,16,8,25,0,29,31,11,21,8,25,0,29,22,14,25,8,25,0,29,4,16,27,8,25,0,29,27,16,27,8,25,0,29,12,15,5,10,25,0,29,59,15,24,10,25,0,29,24,12,26,10,25,0,29,49,13,10,11,25,0,29,55,13,18,11,25,0,29,48,12,19,11,25,0,4,10,13,19,11,25,0,29};
+    bool seen[FAULT_FIELD_COUNT];
+    for (bool& b : seen) b = true;
+    std::vector<FaultEntry> e = decodeFaultList(raw, seen);
+    REQUIRE(e.size() == 20);
+    // display entry 01: 19.11.25 13:10 HD-SENSOR-MAX, 02: 12:48 Hochdruck, 03: 18.11.25 13:55
+    CHECK((e[0].year == 2025 && e[0].month == 11 && e[0].day == 19 && e[0].hour == 13 && e[0].minute == 10));
+    CHECK(faultText(e[0].code) == "HD-SENSOR-MAX");
+    CHECK(faultText(e[1].code) == "Hochdruck");
+    CHECK((e[2].day == 18 && e[2].hour == 13 && e[2].minute == 55));
+    CHECK((e[19].month == 7 && e[19].day == 27));
+}
+
+TEST_CASE("fault list: unread or invalid entries are skipped, publish writes state+attributes", "[fault]") {
+    resetDiscoveryState();
+    faultList = FaultListState{};
+    uint16_t raw[FAULT_FIELD_COUNT] = {18,15,27,7,25,0,29,14,9,31,7,25,0,29,0,13,2,8,25,0,29,34,16,3,8,25,0,29,32,7,12,8,25,0,29,13,18,12,8,25,0,29,24,10,13,8,25,0,29,26,13,14,8,25,0,29,55,10,16,8,25,0,29,31,11,21,8,25,0,29,22,14,25,8,25,0,29,4,16,27,8,25,0,29,27,16,27,8,25,0,29,12,15,5,10,25,0,29,59,15,24,10,25,0,29,24,12,26,10,25,0,29,49,13,10,11,25,0,29,55,13,18,11,25,0,29,48,12,19,11,25,0,4,10,13,19,11,25,0,29};
+    for (int i = 0; i < FAULT_FIELD_COUNT; i++) { faultList.raw[i] = raw[i]; faultList.seen[i] = i >= 7; }  // entry 0 unread
+    faultList.raw[13] = 0x8000;                                                                          // entry 1 invalid
+    CHECK(decodeFaultList(faultList.raw, faultList.seen).size() == 18);
+    publishFaultList();
+    CHECK(mqttFindPayload("calculated/fehlerliste/state") == "HD-SENSOR-MAX");
+    std::string attrs = mqttFindPayload("calculated/fehlerliste/attributes");
+    CHECK(attrs.find("\"letzter_fehler_zeit\":\"2025-11-19 13:10\"") != std::string::npos);
+    CHECK(attrs.find("\"anzahl\":18") != std::string::npos);
+    CHECK(attrs.find("Volumenstrom") != std::string::npos);
+    faultList = FaultListState{};
+}
+
+TEST_CASE("fault list: manager answers for 0x0b00..0x0b8b are captured, not published", "[fault]") {
+    resetDiscoveryState();
+    faultList = FaultListState{};
+    // MANAGER answers FEHLERFELD_6 (0x0b06) = 29
+    processAndUpdate(0x480, {0xD2, 0x00, 0xFA, 0x0B, 0x06, 0x00, 0x1D});
+    CHECK(faultList.seen[6]);
+    CHECK(faultList.raw[6] == 29);
+    CHECK(mqtt_client_instance().messages.empty());
+    faultList = FaultListState{};
+}

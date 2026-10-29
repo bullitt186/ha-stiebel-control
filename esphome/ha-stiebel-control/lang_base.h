@@ -134,6 +134,7 @@
 #define LNAME_CALC_EL_LEISTUNG_HEIZ_W           "Aktuelle el. Leistung Heizung"
 #define LNAME_CALC_EL_LEISTUNG_WW_W             "Aktuelle el. Leistung Warmwasser"
 #define LNAME_CALC_SOMMERBETRIEB_AKTIV         "Sommerbetrieb aktiv"
+#define LNAME_CALC_FEHLERLISTE                 "Fehlerliste"
 #define LNAME_CALC_AUSSENTEMP_GEDAEMPFT        "Außentemperatur gedämpft"
 
 // ============================================================================

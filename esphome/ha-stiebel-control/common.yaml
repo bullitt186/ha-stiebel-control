@@ -371,6 +371,11 @@ interval:
       - lambda: |-
           processSignalRequests();
 
+  # Fault list of the manager (20 entries, refreshed every 30 min)
+  - interval: 1s
+    then:
+      - lambda: faultListStep();
+
   # Bus scan (idle unless started via heatingpump/scan/start)
   - interval: 150ms
     then:

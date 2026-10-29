@@ -237,6 +237,8 @@
 #define LNAME_CALC_EL_LEISTUNG_WW_W            "Current Electrical Power DHW"
 #undef  LNAME_CALC_SOMMERBETRIEB_AKTIV
 #define LNAME_CALC_SOMMERBETRIEB_AKTIV         "Summer Mode Active"
+#undef  LNAME_CALC_FEHLERLISTE
+#define LNAME_CALC_FEHLERLISTE                 "Fault History"
 #undef  LNAME_CALC_AUSSENTEMP_GEDAEMPFT
 #define LNAME_CALC_AUSSENTEMP_GEDAEMPFT        "Outside Temperature Damped"
 #undef  LNAME_SOMMERBETRIEB_TEMP
