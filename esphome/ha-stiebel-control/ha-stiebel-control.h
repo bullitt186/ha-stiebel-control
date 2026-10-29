@@ -2227,6 +2227,9 @@ const char* faultRemedy(const std::string& fault) {
     std::transform(up.begin(), up.end(), up.begin(), ::toupper);
     auto has = [&](const char* k) { return up.find(k) != std::string::npos; };
     if (fault == "Keine Stoerung") return "";
+    // Specific entries first (WPMW II manual fault list); "HD-SENSOR-MAX" is the high
+    // pressure limit, not a sensor fault, so it must not fall through to "SENSOR".
+    if (has("HD-SENSOR-MAX")) return "Hochdruck-Grenze erreicht: Heizungs-Volumenstrom zu klein oder Raumtemperatur/Heizkurve zu hoch.";
     if (has("LEISTUNG")) return "Hochdruck baut sich nicht auf: Phasenfolge und Sicherungen pruefen.";
     if (has("ABTAU")) return "Wasservolumenstrom oder Wassertemperatur beim Abtauen zu niedrig.";
     if (has("HEISSGAS")) return "Heissgas zu hoch: Einspritz-/Expansionsventil pruefen (Fachhandwerker).";

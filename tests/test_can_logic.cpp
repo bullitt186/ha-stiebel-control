@@ -1225,6 +1225,7 @@ TEST_CASE("fault: code decoding and remedy attribute", "[fault]") {
     CHECK(mqttFindPayload("homeassistant/sensor/heatingpump/").find("json_attributes_topic") != std::string::npos);
     CHECK(std::string(faultRemedy("Keine Stoerung")).empty());
     CHECK(std::string(faultRemedy("ERR T-VL IWS")).find("Fuehler") != std::string::npos);
+    CHECK(std::string(faultRemedy("HD-SENSOR-MAX")).find("Volumenstrom") != std::string::npos);  // not "Fuehler"
     CHECK(std::string(faultRemedy("ERR 69")).find("Handbuch") != std::string::npos);
 }
 
