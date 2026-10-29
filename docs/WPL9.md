@@ -1,10 +1,14 @@
 # WPL 09 ACS classic / WPM3 / FET
 
-This profile is based on upstream v2.4.2 (`1c6e34f`). The owner built and installed
-it on a WPL 09 ACS classic with WPM3/FET. Live MQTT observation on 2026-10-28
-confirmed both CAN-B DHW setting feedback topics, heating pressure and FET values.
-The owner subsequently confirmed return-temperature updates from MANAGER.
-Write acceptance, persistence and SG Ready boost/restore remain unverified.
+The owner built and installed this profile with ESPHome 2026.10.1. Live MQTT
+observations and Home Assistant checks on 2026-10-29 confirmed fresh valid feedback
+for 44 of 45 periodic requests and three passive sources. ABTAUUNGAKTIV remains
+unresolved (fresh `?`, HA `unknown`); optional HEIZMODUL outside temperature had
+no new message in this window.
+[WPL9_VALIDATION.csv](WPL9_VALIDATION.csv) lists the requests, sources, observed
+values and fresh-message counts from 19:54-20:05 UTC (20:54-21:05 CET). Read-path
+validation does not independently establish register semantics, physical sensor
+locations, measurement accuracy or write acceptance.
 
 ## Configuration
 
@@ -18,93 +22,118 @@ packages:
   sensors: !include ha-stiebel-control/wpl9.yaml
 ```
 
-Use the WPM3 CAN-B/display connection and the normal PC sender (0x680).
-The supplied log shows passive FET room temperature/humidity at member 0x401,
-indices 0x4ec7/0x4ec8. No extra active FET requests or register renaming is added.
+Use the WPM3 CAN-B/display connection with the normal PC sender (0x680).
+FET room temperature/humidity (0x4ec7/0x4ec8, member 0x401) are received passively.
+No extra active FET requests or register renaming is added.
 
-## Explicit routing, not header overrides
+## Read feedback
 
-| Register | Write destination | Immediate readback | Discovery state / periodic polling |
+| Group | Source | Qualification |
+| --- | --- | --- |
+| Outside, DHW actual, heat-pump flow and heating pressure | KESSEL (0x180) | Fresh valid feedback; exact physical measuring points depend on the installation |
+| Kessel/auxiliary targets and effective DHW target | KESSEL (0x180) | Generic target labels are not an exact WPM display mapping |
+| Return, room targets, Kessel target and effective DHW target | MANAGER (0x480) | Fresh feedback; KESSEL return produced invalid -255 |
+| Editable DHW settings 1/2 | KESSEL_CANB (0x201) | Fresh 50/45 degree C feedback; write acceptance has not been tested |
+| Compressor-1 heating/cooling runtime | HEIZMODUL (0x500) | Whole-hour values 6129/2803 reached MQTT and HA; display-label mapping remains to be compared |
+| Electrical/heat energy counters | HEIZMODUL (0x500) | Fresh valid counter responses, including zero; meter accuracy is not independently calibrated |
+| Raw compressor signal | HEIZMODUL (0x500) | Fresh numeric feedback; physical unit and all operating states remain unverified |
+| Defrost active | HEIZMODUL (0x500) | Unresolved: ten fresh `?` responses and HA `unknown`; this is not an inactive-state confirmation |
+| Date/time, operating selector, EVU lock and summer mode | MANAGER (0x480) | Read feedback; command effects and every state transition are not claimed |
+| FET room values and buffer bottom | 0x401 / KESSEL (0x180) | Fresh passive feedback; buffer bottom is not an extra polling-table entry |
+
+Receive counts, rather than value changes or retained presence alone, were used
+to verify freshness. HEIZMODUL outside temperature remains an optional passive
+source. A quiet window is not proof that it is invalid or interchangeable with
+the separate KESSEL outside-temperature signal.
+
+KESSELSOLLTEMP is a generic CAN name. Its 0.1 degree changes are compatible with
+a weather-dependent calculated target; they do not establish an actual-temperature
+measurement. The exact WPM target association remains a separate display check.
+
+## DHW routing and migration
+
+| Register | Write | Immediate readback | Discovery state / polling |
 | --- | --- | --- | --- |
-| EINSTELL_SPEICHERSOLLTEMP (0x0013) | 0x201 | 0x201 | 0x201 |
-| EINSTELL_SPEICHERSOLLTEMP2 (0x0a06) | 0x201 | 0x201 | 0x201 |
+| EINSTELL_SPEICHERSOLLTEMP (0x0013) | 0x201 | 0x201 | 0x201, ten minutes |
+| EINSTELL_SPEICHERSOLLTEMP2 (0x0a06) | 0x201 | 0x201 | 0x201, ten minutes |
 
-Both registers use 0x201 for immediate readback, periodic polling and discovery
-state, with normal generated headers (write 40,01; read 41,01). Polling is every
-ten minutes. During live observation, new MQTT messages arrived for 0x0013
-(50.0 degrees C) and 0x0a06 (45.0 degrees C); these were not merely retained data.
-This confirms the feedback topics, but without a CAN capture does not distinguish
-solicited responses from other bus traffic. Successful writes are not inferred
-from these observations.
+Both use normal generated headers (write 40,01; read 41,01). Fresh responses reach
+the exact CAN-B state topics advertised by discovery. MANAGER, KESSEL_CANB and
+WPL9-only KESSEL command aliases share the route resolver. Other model routes are
+preserved. SG Ready uses this DHW route while preserving room-target handling
+and the adapter's existing readback delay.
 
-The configured SPEICHERSOLLTEMP polling source is MANAGER (0x480), matching the
-local file. This effective target is not assumed to be interchangeable with either
-editable EINSTELL register. DRUCK_HEIZKREIS is polled at KESSEL (0x180).
+No setpoints were changed during validation. Write acceptance, persistence,
+SG Ready boost/restore and cooling control remain untested on hardware. The
+separate SPEICHERSOLLTEMP register is not assumed interchangeable with either
+editable EINSTELL register; KESSEL and MANAGER values are not aliased.
 
-RUECKLAUFISTTEMP (0x0016) polls MANAGER (0x480) every 30 seconds. KESSEL returned
-fresh -255 messages; after switching to MANAGER and flashing, the owner confirmed
-that the existing return-temperature entity updates again.
+Model selection changes the main device identifier from stiebel_eltron_wpl10ac
+to stiebel_eltron_wpl9. Old retained MANAGER/KESSEL discoveries can coexist with
+new CAN-B controls. Inspect consumers and migrate deliberately; this firmware
+does not delete discoveries or rewrite dashboards. Backing up and disabling
+invalid legacy entities preserves their IDs and history.
 
-Cooling is not verified by this profile. KUEHLMODE (0x0287) has no documented
-boolean mapping in ElsterTable. A retained OTHER/KUEHLMODE value of 0 is not
-accepted as verification: OTHER is a fallback for unmapped senders and the current
-processAndUpdate path discards its messages. No cooling-active entity or new
-cooling request is added.
+Both writable discoveries initially appeared only after a requested
+heatingpump/republish_discoveries refresh. Startup discovery completeness remains
+open; old retained entries alone do not establish successful startup discovery.
 
-Writable discovery now uses KESSEL_CANB for WPL9: unique IDs, command topics and
-state topics move together. Old retained KESSEL and MANAGER discovery may remain
-visible as duplicate controls; this draft does not delete those broker entries.
-MANAGER, KESSEL_CANB and WPL9-only KESSEL command aliases share the same resolver.
-Other models keep their existing routes. SG Ready uses the WPL9 route for DHW;
-room targets and its 100 ms readback delay are preserved. Test SG Ready explicitly
-before relying on boost/restore, since the local adapter previously used MANAGER.
+## VD runtime units
 
-## Hardware evidence and remaining limitations
+The six heating/cooling runtime registers 0x07fc through 0x0801 now use et_hours,
+an unsigned whole-hour type. The old et_mil_val conversion divided raw 6129/2803
+by 1000 while discovery advertised hours. They now publish 6129/2803 with the
+same IDs, duration, h and total_increasing metadata. 0x8000 remains unavailable
+(-255); other fractional signals retain their scaling. This shared decoder fix
+applies only to these six entries. Blacklisted WW runtime registers are untouched.
 
-Live MQTT observation on 2026-10-28, 23:27:36–23:31:44 Europe/Berlin:
+CAN-to-MQTT host tests cover metadata, zero, invalid markers and unsigned values
+above 32767. The owner installed the correction and MQTT/HA showed matching
+whole-hour values. Existing history/statistics are not rescaled automatically;
+review the conversion discontinuity separately before using historical sums.
 
-| Signal | Evidence |
-| --- | --- |
-| KESSEL_CANB/EINSTELL_SPEICHERSOLLTEMP | New 50.0 degree C message at 23:31:44 |
-| KESSEL_CANB/EINSTELL_SPEICHERSOLLTEMP2 | New 45.0 degree C message at 23:30:08 |
-| Both writable DHW discoveries | Published with WPL9 device association and CAN-B command/state topics |
-| KESSEL/DRUCK_HEIZKREIS | New messages, last value 1.61 bar |
-| FET 0x401 | New messages, last values 20.2 degrees C and 57.5 percent |
-| CAN diagnostics | Eight new updates per topic; last TEC 0, REC 0 and error counter 0 |
+## Unvalidated candidates retained for investigation
 
-The writable discoveries were absent when observation started and arrived after
-one explicitly requested discovery refresh. Startup discovery completeness still
-needs investigation. Existing KESSEL/HEIZMODUL return/evaporator invalid values
-must not be interpreted as temperatures. VERDAMPFERTEMP at HEIZMODUL and WW_ECO
-at MANAGER remain invalid in the observation; not every inherited polling entry
-has been validated. No setpoints were changed during the MQTT checks.
+HEIZMODUL/VERDAMPFERTEMP and MANAGER/WW_ECO repeatedly returned fresh -255,
+with no valid value in the checked recorder period starting 2026-10-27. Their
+calls remain commented as Not validated on WPL9 so contributors can investigate
+other members, registers or decoding. The evaporator entry is in the model table.
+WW_ECO comes from a template lambda in common.yaml; only WPL9 selects its disabled
+branch. Other models retain their original read. Definitions and passive decoding
+remain available; there is no global blacklist or claim that the physical
+function is absent.
 
-## Before proposing a merge
+After installing this change, 75 seconds of observation saw no new -255 from
+these sources. Their backed-up retained states were cleared; a fresh subscription
+and 70 more seconds found neither topic while healthy traffic continued. Future
+passive CAN traffic can still recreate a topic. HA/broker cleanup is a separate
+installation operation, not an automatic firmware migration.
 
-- Run the added WPL9 ESP32-S3 CI build. The owner has built and installed a local
-  ESPHome 2026.10.x version; this does not replace the upstream CI checks.
-  CI currently pins 2026.5.3, as upstream does.
-- Test each editable register independently: record command, outgoing frame,
-  valid read response, and the actual WPM setting; confirm persistence and restore
-  the starting setting. A sent frame or -255 alone proves no successful write.
-- Confirm the separate SPEICHERSOLLTEMP source; its identity with the editable
-  registers is not assumed.
-- Exercise discovered commands, legacy aliases and SG Ready boost/restore.
-- Check that state updates reach the exact state_topic advertised by discovery.
-- The model smoke baseline lists observed feedback topics and the owner-confirmed
-  MANAGER return topic. Topic presence alone, especially retained data, does not
-  establish fresh feedback or successful control.
-- Review HA migration: device_model changes the main device identifier from
-  stiebel_eltron_wpl10ac to stiebel_eltron_wpl9. Do not automatically delete retained
-  discovery or assume existing automations/devices migrate without review.
+KUEHLMODE (0x0287) has no verified boolean mapping for this installation. OTHER is
+a fallback member dropped by the current decoder path. No cooling-active entity
+or cooling request is added. delta_t_running intentionally pauses when the
+compressor is off. Stored SG Ready settings are not proof of successful control.
 
-## Scope and updates
+ABTAUUNGAKTIV (0x0061, HEIZMODUL) stays visible as an unresolved polling candidate.
+The shared boolean decoder accepts 0x0000, 0x0001 and 0x0100; another raw value
+produces `?`. Capture and compare raw feedback with an actual WPM defrost state
+before changing its source or mapping. Do not convert unknown responses to off.
 
-The proposal adds a WPL9 profile, central routing, host tests, a smoke manifest and
-a CI build. It does not change WPL10AC's polling, global writable-number owners,
-OTA credentials, build flag syntax, payload_reset or time formatting.
+## Validation and remaining checks
 
-The local firmware's build_flags change may still be required with ESPHome
-2026.10.x; evaluate it separately from model support. Keep private settings in the
-top-level local configuration. Once model support is merged and released, select
-the official release and wpl9 profile instead of replaying local-all.patch.
+- Filtered host suites pass for WPL9 and WPL17. The local compiler aborts in the
+  pre-existing invalid-enum test (ElsterType)255; it was excluded locally and
+  remains enabled in GCC CI. The unfiltered local suite is not claimed to pass.
+- The actual WW_ECO lambda sends zero CAN reads under the WPL9 macro and the
+  original read for another model. ESPHome 2026.10.1 source generation passes for
+  WPL9 S3 and the shared S2 entry point. Source generation is not a full firmware
+  build; the firmware build must pass CI.
+- Model smoke manifests support excluded_common_topics. WPL9 excludes its disabled
+  MANAGER/WW_ECO source; other models retain their common requirements. This smoke
+  test checks presence; use eleven minutes to verify fresh ten-minute feedback.
+- Compare remaining labels with the WPM display, then test write acceptance,
+  persistence, legacy aliases and SG Ready before claiming full control support.
+
+Build-flag modernization and encrypted OTA are separate maintenance changes.
+They are not part of this PR. Keep installed keys stable and private settings
+outside the model package.

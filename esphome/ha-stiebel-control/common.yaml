@@ -679,5 +679,11 @@ sensor:
     id: WW_ECO
     internal: true
     lambda: |-
+      #if defined(HA_MODEL_wpl9)
+      // Not validated on WPL9: MANAGER/WW_ECO repeatedly returned -255.
+      // Keep the read for future source/register investigation:
+      // readSignal(&CanMembers[cm_manager], "WW_ECO");
+      #else
       readSignal(&CanMembers[cm_manager], "WW_ECO");
+      #endif
       return {};

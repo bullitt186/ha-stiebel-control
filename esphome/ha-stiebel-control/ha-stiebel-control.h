@@ -474,6 +474,7 @@ inline void getTypeDefaults(ElsterType type, const char*& component, const char*
             component = "sensor"; deviceClass = "temperature"; unit = "°C"; stateClass = "measurement"; icon = "mdi:thermometer";
             break;
         case et_mil_val:
+        case et_hours:
             component = "sensor"; deviceClass = "duration"; unit = "h"; stateClass = "total_increasing"; icon = "mdi:timer";
             break;
         case et_bool:
@@ -1284,6 +1285,7 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
         bool isNumericType = (ei->Type == et_dec_val || 
                               ei->Type == et_cent_val || 
                               ei->Type == et_mil_val || 
+                              ei->Type == et_hours ||
                               ei->Type == et_byte ||
                               ei->Type == et_double_val ||
                               ei->Type == et_triple_val ||

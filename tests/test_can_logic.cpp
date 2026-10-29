@@ -545,6 +545,23 @@ TEST_CASE("publishMqttDiscovery: duration signal has device_class duration and u
 // updateSensor
 // ============================================================================
 
+TEST_CASE("VD CAN feedback publishes whole hours with existing MQTT identity", "[can][mqtt][runtime]") {
+    resetDiscoveryState();
+    // Extended register 0x07fc, raw 0x17f1 = 6129 hours, sender HEIZMODUL.
+    processAndUpdate(0x500, {0xd2, 0x00, 0xfa, 0x07, 0xfc, 0x17, 0xf1});
+    CHECK(mqttFindPayload("heatingpump/HEIZMODUL/LZ_VERD_1_HEIZBETRIEB/state") == "6129");
+    std::string discovery = mqttFindPayload("homeassistant/sensor/heatingpump/stiebel_heizmodul_lz_verd_1_heizbetrieb/config");
+    CHECK(discovery.find("\"unique_id\":\"stiebel_heizmodul_lz_verd_1_heizbetrieb\"") != std::string::npos);
+    CHECK(discovery.find("\"device_class\":\"duration\"") != std::string::npos);
+    CHECK(discovery.find("\"unit_of_measurement\":\"h\"") != std::string::npos);
+    CHECK(discovery.find("\"state_class\":\"total_increasing\"") != std::string::npos);
+    processAndUpdate(0x500, {0xd2, 0x00, 0xfa, 0x07, 0xff, 0x0a, 0xf3});
+    CHECK(mqttFindPayload("heatingpump/HEIZMODUL/LZ_VERD_1_KUEHLBETRIEB/state") == "2803");
+    mqtt_client_instance().clear();
+    processAndUpdate(0x500, {0xd2, 0x00, 0xfa, 0x07, 0xfc, 0x80, 0x00});
+    CHECK(mqttFindPayload("heatingpump/HEIZMODUL/LZ_VERD_1_HEIZBETRIEB/state") == "-255");
+}
+
 TEST_CASE("updateSensor: publishes discovery and state on first call", "[mqtt]") {
     resetDiscoveryState();
     const CanMember& mgr = CanMembers[cm_manager];

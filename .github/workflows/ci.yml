@@ -136,8 +136,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install yamllint
-        run: pip install yamllint
+      - name: Install validation dependencies
+        run: pip install yamllint paho-mqtt
+
+      - name: Validate MQTT model manifests
+        run: python3 -m unittest discover -s tests -p 'test_mqtt_manifest.py'
 
       - name: Validate YAML files
         run: |

@@ -60,8 +60,13 @@ def load_required_topics(model: str) -> tuple[list[str], list[str]]:
               f"Testing common topics only.", file=sys.stderr)
         return common, []
     with open(model_file) as f:
-        model_topics = json.load(f)["required_topics"]
-    return common, model_topics
+        model_config = json.load(f)
+    excluded = set(model_config.get("excluded_common_topics", []))
+    unknown = excluded - set(common)
+    if unknown:
+        raise ValueError(f"Model {model} excludes topics absent from the common baseline: {sorted(unknown)}")
+    model_topics = model_config["required_topics"]
+    return [topic for topic in common if topic not in excluded], model_topics
 
 
 def run_test(args) -> int:
@@ -195,6 +200,12 @@ def run_capture(args) -> int:
         "required_topics": required,
         "observed_topics": {t: observed[t] for t in sorted(observed)},
     }
+    if model_file.exists():
+        with open(model_file) as f:
+            excluded = json.load(f).get("excluded_common_topics", [])
+        if excluded:
+            out["excluded_common_topics"] = excluded
+            out["required_topics"] = [t for t in required if t not in excluded]
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     with open(model_file, "w") as f:
         json.dump(out, f, indent=2)
