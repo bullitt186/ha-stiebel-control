@@ -53,6 +53,10 @@ void SetValueType(char * Val, unsigned char Type, unsigned short Value)
        sprintf(Val, "%.3f", ((double)((signed short)Value)) / 1000.0);
        break;
 
+     case et_hours:
+       sprintf(Val, "%u", static_cast<unsigned>(Value));
+       break;
+
      case et_little_endian:
        sprintf(Val, "%d", (Value >> 8) + 256*(Value & 0xff));
        break;

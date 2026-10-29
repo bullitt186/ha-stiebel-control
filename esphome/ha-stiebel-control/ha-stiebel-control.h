@@ -98,6 +98,31 @@ typedef enum
     cm_other
 } CanMemberType;
 
+// Model-specific register ownership. Requires CanMemberType from the main header.
+#include <cstring>
+
+struct SignalRoute {
+    CanMemberType writeMember;
+    CanMemberType readMember;
+    CanMemberType stateMember;
+};
+
+inline SignalRoute resolveSignalRoute(const char* model, uint16_t index,
+                                     CanMemberType fallback) {
+    if (std::strcmp(model, "wpl9") == 0) {
+        // Test candidate: both DHW registers use CAN-B for writes and feedback.
+        // Valid live replies and actual WPM write acceptance still need capture.
+        if (index == 0x0013 || index == 0x0a06)
+            return {cm_kessel_canb, cm_kessel_canb, cm_kessel_canb};
+    }
+    // Preserve existing WPL17 discovery and MANAGER-topic routing.
+    if (std::strcmp(model, "wpl17") == 0 &&
+        (index == 0x0013 || index == 0x0a06 || index == 0x010e))
+        return {cm_kessel_canb, cm_kessel_canb, cm_kessel_canb};
+    return {fallback, fallback, fallback};
+}
+
+
 // ============================================================================
 // MQTT AUTO-DISCOVERY CONFIGURATION
 // ============================================================================
@@ -206,7 +231,7 @@ static const size_t CALCULATED_SENSOR_COUNT = sizeof(calculatedSensors) / sizeof
 struct WritableNumberConfig {
     const char* signalName;        // CAN signal name like "EINSTELL_SPEICHERSOLLTEMP"
     const char* friendlyName;      // Display name in Home Assistant
-    CanMemberType member;          // Which CAN member to write to
+    CanMemberType member;          // Default owner; model routing may override it
     float min;                     // Minimum value
     float max;                     // Maximum value
     float step;                    // Step size
@@ -449,6 +474,7 @@ inline void getTypeDefaults(ElsterType type, const char*& component, const char*
             component = "sensor"; deviceClass = "temperature"; unit = "°C"; stateClass = "measurement"; icon = "mdi:thermometer";
             break;
         case et_mil_val:
+        case et_hours:
             component = "sensor"; deviceClass = "duration"; unit = "h"; stateClass = "total_increasing"; icon = "mdi:timer";
             break;
         case et_bool:
@@ -671,6 +697,15 @@ void writeSignal(const CanMember *cm, const char *elsterName, const char *str)
     return;
 }
 
+// Use the same route for MQTT commands and the WPL9 SG Ready adapter.
+// Explicit read/writeSignal calls keep their original low-level semantics.
+void writeConfiguredSignal(CanMemberType fallback, const char* name, const char* value) {
+    const ElsterIndex* ei = GetElsterIndex(name);
+    const SignalRoute route = resolveSignalRoute(HA_DEVICE_MODEL_STR, ei->Index, fallback);
+    writeSignal(&CanMembers[route.writeMember], name, value);
+    readSignal(&CanMembers[route.readMember], ei);
+}
+
 // Unified function to publish MQTT discovery for calculated sensors
 void publishCalculatedSensorDiscovery(const CalculatedSensorConfig& config, bool forceRepublish = false) {
     // Check if already published (unless force republish)
@@ -764,20 +799,11 @@ void publishAllCalculatedSensorDiscoveries(bool forceRepublish = false) {
 // MQTT WRITABLE NUMBER (for temperature setpoints, etc.)
 // ============================================================================
 
-// Liefert den effektiven CAN-Member fuer einen writable number Eintrag.
-// Auf WPL17 (CAN-B) liegen EINSTELL_SPEICHERSOLLTEMP / _2 und HEIZKURVE auf dem
-// Kessel (0x201) statt auf dem Manager (0x480). Andere Modelle (CAN-A) behalten
-// den konfigurierten Member. Damit erscheint das HA-Eingabefeld am richtigen
-// Geraet und der Command-/State-Topic passt zum Owner des Registers.
+// Discovery follows state ownership, which may differ from the write target.
 static const CanMember* getWritableNumberMember(const WritableNumberConfig& config) {
-    if (strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0) {
-        if (strcmp(config.signalName, "EINSTELL_SPEICHERSOLLTEMP") == 0 ||
-            strcmp(config.signalName, "EINSTELL_SPEICHERSOLLTEMP2") == 0 ||
-            strcmp(config.signalName, "HEIZKURVE") == 0) {
-            return &CanMembers[cm_kessel_canb];
-        }
-    }
-    return &CanMembers[config.member];
+    const SignalRoute route = resolveSignalRoute(
+        HA_DEVICE_MODEL_STR, GetElsterIndex(config.signalName)->Index, config.member);
+    return &CanMembers[route.stateMember];
 }
 
 // Publish MQTT discovery for a writable number entity
@@ -1259,6 +1285,7 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
         bool isNumericType = (ei->Type == et_dec_val || 
                               ei->Type == et_cent_val || 
                               ei->Type == et_mil_val || 
+                              ei->Type == et_hours ||
                               ei->Type == et_byte ||
                               ei->Type == et_double_val ||
                               ei->Type == et_triple_val ||
@@ -1869,9 +1896,17 @@ public:
     static ESPPreferenceObject nvsActive;
 
     void writeCanSignal(const char* signalName, const char* value) override {
-        writeSignal(&CanMembers[cm_manager], signalName, value);
-        delay(100);
-        readSignal(&CanMembers[cm_manager], signalName);
+        if (strcmp(HA_DEVICE_MODEL_STR, "wpl9") == 0) {
+            const SignalRoute route = resolveSignalRoute(
+                HA_DEVICE_MODEL_STR, GetElsterIndex(signalName)->Index, cm_manager);
+            writeSignal(&CanMembers[route.writeMember], signalName, value);
+            delay(100);
+            readSignal(&CanMembers[route.readMember], signalName);
+        } else {
+            writeSignal(&CanMembers[cm_manager], signalName, value);
+            delay(100);
+            readSignal(&CanMembers[cm_manager], signalName);
+        }
     }
 
     void publishMqtt(const char* topic, const char* value) override {

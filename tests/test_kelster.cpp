@@ -33,6 +33,27 @@ TEST_CASE("SetValueType: et_mil_val formats with 3 decimals", "[kelster]") {
     SetValueType(val, et_mil_val, 1000); // 1.000
     CHECK(std::string(val) == "1.000");
 }
+TEST_CASE("VD runtime counters report whole hours without decimal scaling", "[kelster][runtime]") {
+    char val[32];
+    for (const auto& sample : {std::pair<unsigned short, const char*>{6129, "6129"},
+                              {2803, "2803"}, {0, "0"}, {40000, "40000"}, {65535, "65535"}}) {
+        for (unsigned short index = 0x07fc; index <= 0x0801; ++index) {
+            const ElsterIndex* ei = GetElsterIndex(index);
+            REQUIRE(ei != nullptr);
+            SetValueType(val, ei->Type, sample.first);
+            CHECK(std::string(val) == sample.second);
+        }
+    }
+    // Existing fractional measurements still use their original decoder.
+    SetValueType(val, et_mil_val, 6129);
+    CHECK(std::string(val) == "6.129");
+    CHECK(std::string(ElsterTypeStr[et_hours]) == "et_hours");
+}
+TEST_CASE("VD runtime unavailable marker is preserved", "[kelster][runtime]") {
+    char val[32];
+    SetValueType(val, GetElsterIndex("LZ_VERD_1_HEIZBETRIEB")->Type, 0x8000);
+    CHECK(std::string(val) == "-255");
+}
 TEST_CASE("SetValueType: et_byte signed", "[kelster]") {
     char val[32];
     SetValueType(val, et_byte, 255); // signed char 255 = -1

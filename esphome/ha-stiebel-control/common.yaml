@@ -174,8 +174,7 @@ mqtt:
             ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP (Kessel CANB) command: %s", x.c_str());
             publishWritableNumberDiscovery(writableNumbers[0]);
             const char* value = x.c_str();
-            writeSignal(&CanMembers[cm_kessel_canb], "EINSTELL_SPEICHERSOLLTEMP", value);
-            readSignal(&CanMembers[cm_kessel_canb], "EINSTELL_SPEICHERSOLLTEMP");
+            writeConfiguredSignal(cm_kessel_canb, "EINSTELL_SPEICHERSOLLTEMP", value);
 
     - topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP/set
       then:
@@ -183,9 +182,7 @@ mqtt:
             ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP command: %s", x.c_str());
             publishWritableNumberDiscovery(writableNumbers[0]);
             const char* value = x.c_str();
-            const CanMember* target = (strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0) ? &CanMembers[cm_kessel_canb] : &CanMembers[cm_manager];
-            writeSignal(target, "EINSTELL_SPEICHERSOLLTEMP", value);
-            readSignal(target, "EINSTELL_SPEICHERSOLLTEMP");
+            writeConfiguredSignal(cm_manager, "EINSTELL_SPEICHERSOLLTEMP", value);
 
     - topic: heatingpump/KESSEL_CANB/EINSTELL_SPEICHERSOLLTEMP2/set
       then:
@@ -193,8 +190,7 @@ mqtt:
             ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP2 (Kessel CANB) command: %s", x.c_str());
             publishWritableNumberDiscovery(writableNumbers[1]);
             const char* value = x.c_str();
-            writeSignal(&CanMembers[cm_kessel_canb], "EINSTELL_SPEICHERSOLLTEMP2", value);
-            readSignal(&CanMembers[cm_kessel_canb], "EINSTELL_SPEICHERSOLLTEMP2");
+            writeConfiguredSignal(cm_kessel_canb, "EINSTELL_SPEICHERSOLLTEMP2", value);
 
     - topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP2/set
       then:
@@ -202,9 +198,20 @@ mqtt:
             ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP2 command: %s", x.c_str());
             publishWritableNumberDiscovery(writableNumbers[1]);
             const char* value = x.c_str();
-            const CanMember* target = (strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0) ? &CanMembers[cm_kessel_canb] : &CanMembers[cm_manager];
-            writeSignal(target, "EINSTELL_SPEICHERSOLLTEMP2", value);
-            readSignal(target, "EINSTELL_SPEICHERSOLLTEMP2");
+            writeConfiguredSignal(cm_manager, "EINSTELL_SPEICHERSOLLTEMP2", value);
+
+    # WPL9 compatibility: keep existing KESSEL command topics usable.
+    - topic: heatingpump/KESSEL/EINSTELL_SPEICHERSOLLTEMP/set
+      then:
+        - lambda: |-
+            if (strcmp(HA_DEVICE_MODEL_STR, "wpl9") != 0) return;
+            writeConfiguredSignal(cm_kessel, "EINSTELL_SPEICHERSOLLTEMP", x.c_str());
+
+    - topic: heatingpump/KESSEL/EINSTELL_SPEICHERSOLLTEMP2/set
+      then:
+        - lambda: |-
+            if (strcmp(HA_DEVICE_MODEL_STR, "wpl9") != 0) return;
+            writeConfiguredSignal(cm_kessel, "EINSTELL_SPEICHERSOLLTEMP2", x.c_str());
 
     # Operating mode control
     - topic: heatingpump/MANAGER/PROGRAMMSCHALTER/set
@@ -672,5 +679,11 @@ sensor:
     id: WW_ECO
     internal: true
     lambda: |-
+      #if defined(HA_MODEL_wpl9)
+      // Not validated on WPL9: MANAGER/WW_ECO repeatedly returned -255.
+      // Keep the read for future source/register investigation:
+      // readSignal(&CanMembers[cm_manager], "WW_ECO");
+      #else
       readSignal(&CanMembers[cm_manager], "WW_ECO");
+      #endif
       return {};
