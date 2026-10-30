@@ -181,6 +181,15 @@ TEST_CASE("GetElsterIndex by index: round-trip via HYSTERESEZEIT", "[kelster]") 
     // Both are from the same TU's KElsterTable.cpp, so pointer equality holds here
     CHECK(byIndex == byName);
 }
+TEST_CASE("ElsterTable: one shared copy, lookups point into it (#56)", "[kelster]") {
+    REQUIRE(ElsterTableCount > 3000);
+    const ElsterIndex* ei = GetElsterIndex("HYSTERESEZEIT");
+    CHECK(ei >= &ElsterTable[0]);
+    CHECK(ei < &ElsterTable[0] + ElsterTableCount);
+    CHECK(GetElsterIndex((unsigned short)0xDEAD) == &ElsterTable[0]);
+    CHECK(std::string(ElsterTable[0].Name) == "INDEX_NOT_FOUND");
+    CHECK(BetriebsartListCount == 6);
+}
 TEST_CASE("GetElsterIndex by index: unknown index returns INDEX_NOT_FOUND sentinel", "[kelster]") {
     const ElsterIndex* ei = GetElsterIndex((unsigned short)0xDEAD);
     CHECK(std::string(ei->Name) == "INDEX_NOT_FOUND");

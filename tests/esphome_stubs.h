@@ -57,6 +57,8 @@ struct FakeMqttClient {
     void publish(const std::string& topic, const char* payload, size_t len, int qos, bool retain) {
         publish(topic.c_str(), payload, len, qos, retain);
     }
+    bool connected = true;
+    bool is_connected() const { return connected; }
     void clear() { messages.clear(); }
 };
 inline FakeMqttClient& mqtt_client_instance() { static FakeMqttClient c; return c; }

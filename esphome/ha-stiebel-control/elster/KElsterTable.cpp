@@ -21,6 +21,8 @@
 #include <string.h>
 #include <unordered_map>
 #include <string>
+// This is the one translation unit that holds the Elster tables (see ElsterTable.h).
+#define ELSTER_TABLE_DEFINITIONS
 #include "NUtils.h"
 #include "KElsterTable.h"
 #include "ElsterTable.h"

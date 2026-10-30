@@ -98,6 +98,22 @@ Available automatically on ESP32-S3 / TWAI builds. Not present on MCP2515 builds
 
 TEC/REC above 96 indicates warning level; above 127 the controller enters bus-off.
 
+### ESP Diagnostics (native API, diagnostic category)
+
+| Name | Description |
+|------|-------------|
+| Reset Grund | Reason of the last restart (e.g. brownout, task watchdog, software reset) |
+| Betriebszeit | Uptime |
+| Freier Heap | Free heap in bytes (every 60 s) |
+| Größter freier Block | Largest free heap block in bytes; a falling value with stable free heap means fragmentation |
+| Loop-Zeit | Longest main loop iteration in the last 60 s (ms) |
+
+### Logging
+
+The MQTT log topic `heatingpump/debug` only carries warnings and errors. The API/serial log
+(`esphome logs heatingpump.yaml`) shows INFO. Per-frame CAN logs (`processCanMessage()`,
+`readSignal()`) are DEBUG: set `logger: level: DEBUG` in your top-level YAML to see them.
+
 ### Mode Selects (select entities)
 
 | Entity ID | Options |

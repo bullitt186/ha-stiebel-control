@@ -63,6 +63,21 @@ aly-fly/Stiebel-Eltron_heat_pump_monitor, VasekCZ81/stiebel-can-service), verifi
 
 - Signals answering `-255` (not available) are polled with growing intervals (up to 6 h) and
   create no HA entity until they deliver a real value.
+- **MQTT publishing no longer blocks the main loop** (#54): `mqtt: idf_send_async: true` hands
+  every publish to the esp-mqtt task through a queue. Before, a WiFi/TCP stall could block the
+  loop for up to the 10 s network timeout and trigger a task watchdog reset. When the queue is
+  full, messages are dropped and counted in a `Dropped N messages` warning.
+- **`heatingpump/debug` only carries warnings and errors** (`log_topic` level `WARN`). Per-frame
+  and per-request logs (`processCanMessage()`, `readSignal()`, "Discovery published", periodic
+  date/time, COP and energy logs) are DEBUG now. The API/serial log (`esphome logs`) still shows
+  INFO. About 290 fewer MQTT messages per minute on a WPL13E.
+- **MQTT discovery is no longer re-sent every 15 minutes** (#53, #54). All configs are retained;
+  they are sent again on broker connect, when Home Assistant comes online (birth message
+  `homeassistant/status` = `online`) and on the manual trigger, paced at a few per 250 ms.
+- "SG Ready Aktueller Zustand" refreshes every 60 s instead of 5 s and is published immediately
+  when the state changes.
+- New diagnostic sensors "Freier Heap", "Größter freier Block" and "Loop-Zeit"
+  (`sensor: platform: debug`, every 60 s) to classify future restarts.
 
 ### Fixed
 
@@ -82,6 +97,17 @@ aly-fly/Stiebel-Eltron_heat_pump_monitor, VasekCZ81/stiebel-can-service), verifi
   `VERDAMPFERTEMP` (0x0014) is not a temperature (-30 idle, +58..+76 within minutes of a start);
   `HEIZKURVE` is a slope without unit. All three are published without unit and device class.
 - `make test` did not rebuild objects after header changes (stale `ElsterTable.h` in tests).
+- **Periodic discovery republish dropped nearly all signals** (#53). The blacklist filter took the
+  lowercase uid fragment after the last `_` as signal name, found no table row and treated it as
+  blacklisted: every 15 min 66-69 of ~70 signals were removed from the discovered set and
+  rediscovered over the next minute (a wave of retained payloads; the first run blocked the loop
+  for ~0.8 s). The filter is gone (blacklisted signals never get discovered) and a republish now
+  actually re-sends the raw signal configs too.
+- **`ElsterTable` was compiled into the firmware twice** (#56): the `static` table in
+  `ElsterTable.h` gave main.cpp and `KElsterTable.cpp` one copy each (~159 KB). It is now defined
+  once in `KElsterTable.cpp`; other files see `extern` declarations and use `ElsterTableCount`
+  instead of `High(ElsterTable)`. The 4 MB ESP32 build drops from 98.7 % to 90.0 % of the app
+  partition (-159 KB).
 
 ---
 

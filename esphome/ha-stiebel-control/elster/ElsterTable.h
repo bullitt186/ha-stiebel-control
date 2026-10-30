@@ -37,6 +37,11 @@
 
   #define High(A)     (sizeof(A)/sizeof(A[0]) - 1)
 
+// The tables below are compiled only in KElsterTable.cpp, which defines
+// ELSTER_TABLE_DEFINITIONS before including this header. Every other translation
+// unit (main.cpp, tests) sees the extern declarations further down. A `static`
+// definition here put a full copy (~160 KB) of ElsterTable into each TU.
+#ifdef ELSTER_TABLE_DEFINITIONS
 static const char * ElsterTypeStr[] =
 {
   "et_default",
@@ -57,6 +62,7 @@ static const char * ElsterTypeStr[] =
   "et_err_nr",
   "et_dev_id"
 };
+#endif // ELSTER_TABLE_DEFINITIONS
 
 typedef struct
 {
@@ -107,7 +113,16 @@ typedef struct
   const char * Name;
 } ErrorIndex;
 
-static const ElsterIndex ElsterTable[] =
+// Defined once in KElsterTable.cpp. Use ElsterTableCount instead of High(ElsterTable)
+// outside that file (the array size is not visible through an extern declaration).
+extern const ElsterIndex ElsterTable[];
+extern const unsigned ElsterTableCount;
+extern const ErrorIndex BetriebsartList[];
+extern const unsigned BetriebsartListCount;
+
+#ifdef ELSTER_TABLE_DEFINITIONS
+
+const ElsterIndex ElsterTable[] =
 {
 //  Name                                                 Index   Type
 //  Struktur-Definition in KElsterTable.h 
@@ -3971,6 +3986,7 @@ static const ElsterIndex ElsterTable[] =
   { "OEFFNUNGSGRAD_BYPASSVENT", 0xc2c3, et_dec_val, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, false, false },
 #endif
 };
+const unsigned ElsterTableCount = sizeof(ElsterTable) / sizeof(ElsterTable[0]);
 
 static const ErrorIndex ErrorList[] =
 {
@@ -4025,7 +4041,7 @@ static const ErrorIndex ErrorList[] =
 
 #ifdef HA_MODEL_wpl10ac
 // WPL 10 AC + WPM3 operating mode names
-static const ErrorIndex BetriebsartList[] =
+const ErrorIndex BetriebsartList[] =
 {
   { 0x0000, "Notbetrieb" },
   { 0x0100, "Bereitschaftsbetrieb" },
@@ -4036,7 +4052,7 @@ static const ErrorIndex BetriebsartList[] =
 };
 #else
 // Older WPM2 naming (WPL 13 E etc.)
-static const ErrorIndex BetriebsartList[] =
+const ErrorIndex BetriebsartList[] =
 {
   { 0x0000, "Notbetrieb" },
   { 0x0100, "Bereitschaft" }, 
@@ -4046,6 +4062,9 @@ static const ErrorIndex BetriebsartList[] =
   { 0x0500, "Warmwasser" }
 };
 #endif
+const unsigned BetriebsartListCount = sizeof(BetriebsartList) / sizeof(BetriebsartList[0]);
+
+#endif // ELSTER_TABLE_DEFINITIONS
 
 #endif
 

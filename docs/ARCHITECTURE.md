@@ -180,7 +180,10 @@ Writable entities (numbers, selects) have a matching command topic:
 heatingpump/{CAN_MEMBER}/{SIGNAL_NAME}/set
 ```
 
-Discovery is re-published every 15 minutes for reliability, and can be triggered manually:
+All discovery configs are retained. They are sent again (a few per 250 ms, so the MQTT
+queue never sees a burst) on every broker connect and when Home Assistant publishes its
+birth message (`homeassistant/status` = `online`). There is no periodic republish.
+A republish can also be triggered manually:
 ```bash
 mosquitto_pub -h BROKER -u USER -P PASS -t "heatingpump/republish_discoveries" -m ""
 ```

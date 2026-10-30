@@ -197,7 +197,7 @@ TEST_CASE("processCanMessage: FA extended index frame", "[can]") {
     // be single-byte path. Use UHRZEIT (0x0009). For FA path we need index > 0xFF.
     // Scan for any signal with Index > 0xFF
     const ElsterIndex* ei_test = nullptr;
-    for (int i = 1; i <= (int)(sizeof(ElsterTable)/sizeof(ElsterTable[0]) - 1); i++) {
+    for (int i = 1; i < (int)ElsterTableCount; i++) {
         if (ElsterTable[i].Index > 0xFF && !ElsterTable[i].isBlacklisted) {
             ei_test = &ElsterTable[i];
             break;
@@ -213,7 +213,6 @@ TEST_CASE("processCanMessage: FA extended index frame", "[can]") {
     const CanMember* cm = nullptr;
     const ElsterIndex* ei = processCanMessage(msg, 0x480, val, &cm);
 
-    // Compare by name, not pointer — ElsterTable is static per-TU so pointers differ
     CHECK(std::string(ei->Name) == std::string(ei_test->Name));
     CHECK(std::string(cm->Name) == "MANAGER");
 }
@@ -222,7 +221,7 @@ TEST_CASE("processCanMessage: et_bool signal value 1 → 'on'", "[can]") {
     // UHRZEIT index 0x0009, et_zeit — use any et_bool signal instead
     // Scan for a non-blacklisted et_bool signal
     const ElsterIndex* boolEi = nullptr;
-    for (int i = 1; i <= (int)(sizeof(ElsterTable)/sizeof(ElsterTable[0]) - 1); i++) {
+    for (int i = 1; i < (int)ElsterTableCount; i++) {
         if ((ElsterTable[i].Type == et_bool || ElsterTable[i].Type == et_little_bool)
                 && !ElsterTable[i].isBlacklisted
                 && ElsterTable[i].Index <= 0xFF) {
@@ -1379,4 +1378,85 @@ TEST_CASE("fault list: manager answers for 0x0b00..0x0b8b are captured, not publ
     CHECK(faultList.raw[6] == 29);
     CHECK(mqtt_client_instance().messages.empty());
     faultList = FaultListState{};
+}
+
+// ============================================================================
+// Discovery republish (#53): no signal is dropped, configs go out paced
+// ============================================================================
+
+static size_t countDiscoveryConfigs() {
+    size_t n = 0;
+    for (const auto& m : mqtt_client_instance().messages)
+        if (m.topic.rfind("homeassistant/", 0) == 0) n++;
+    return n;
+}
+
+static void drainDiscoveryRepublish(size_t& steps, size_t& maxPerStep) {
+    steps = 0;
+    maxPerStep = 0;
+    while (discoveryRepublishActive() && steps < 1000) {
+        size_t before = mqtt_client_instance().messages.size();
+        discoveryRepublishStep();
+        maxPerStep = std::max(maxPerStep, mqtt_client_instance().messages.size() - before);
+        steps++;
+    }
+}
+
+TEST_CASE("republishAllDiscoveries: keeps every discovered signal and re-sends its config", "[mqtt][discovery]") {
+    resetDiscoveryState();
+    // Multi-word names: the old filter took the fragment after the last '_' of the
+    // lowercase uid ("temp"), found no table row and dropped the signal.
+    updateSensor(CanMembers[cm_kessel], GetElsterIndex("SPEICHERSOLLTEMP"), "50.0");
+    updateSensor(CanMembers[cm_manager], GetElsterIndex("EINSTELL_SPEICHERSOLLTEMP"), "48.0");
+    updateSensor(CanMembers[cm_manager], GetElsterIndex("HYSTERESEZEIT"), "2.0");
+    REQUIRE(discoveredSignals.size() == 3);
+
+    mqtt_client_instance().clear();
+    republishAllDiscoveries();
+    CHECK(discoveredSignals.size() == 3);
+    CHECK(mqtt_client_instance().messages.empty());   // nothing sent synchronously
+
+    size_t steps = 0, maxPerStep = 0;
+    drainDiscoveryRepublish(steps, maxPerStep);
+    CHECK(!discoveryRepublishActive());
+    CHECK(steps > 1);
+    CHECK(maxPerStep <= 4);   // DISCOVERY_REPUBLISH_BATCH items, climate item = 2 configs
+
+    CHECK(mqttTopicPublished("homeassistant/sensor/heatingpump/stiebel_kessel_speichersolltemp/config"));
+    CHECK(mqttTopicPublished("homeassistant/sensor/heatingpump/stiebel_manager_einstell_speichersolltemp/config"));
+    CHECK(mqttTopicPublished("homeassistant/sensor/heatingpump/stiebel_manager_hysteresezeit/config"));
+    CHECK(mqttTopicPublished("homeassistant/select/heatingpump/"));
+    CHECK(mqttTopicPublished("homeassistant/number/heatingpump/"));
+    CHECK(mqttTopicPublished("homeassistant/climate/heatingpump/"));
+    CHECK(mqttTopicPublished("homeassistant/sensor/heatingpump/stiebel_calculated_"));
+    // only configs, no state topics
+    CHECK(countDiscoveryConfigs() == mqtt_client_instance().messages.size());
+    CHECK(discoveredSignals.size() == 3);
+}
+
+TEST_CASE("republishAllDiscoveries: restart instead of duplicate queue, waits for MQTT", "[mqtt][discovery]") {
+    resetDiscoveryState();
+    updateSensor(CanMembers[cm_kessel], GetElsterIndex("SPEICHERSOLLTEMP"), "50.0");
+    mqtt_client_instance().clear();
+
+    mqtt_client_instance().connected = false;
+    republishAllDiscoveries();
+    discoveryRepublishStep();
+    CHECK(mqtt_client_instance().messages.empty());
+    CHECK(discoveryRepublishActive());
+    mqtt_client_instance().connected = true;
+
+    // HA birth right after connect: second call restarts, does not append
+    republishAllDiscoveries();
+    size_t steps = 0, maxPerStep = 0;
+    drainDiscoveryRepublish(steps, maxPerStep);
+    size_t raw = 0;
+    for (const auto& m : mqtt_client_instance().messages)
+        if (m.topic.find("stiebel_kessel_speichersolltemp/config") != std::string::npos) raw++;
+    CHECK(raw == 1);
+
+    // Idle step publishes nothing
+    mqtt_client_instance().clear();
+    discoveryRepublishStep();
+    CHECK(mqtt_client_instance().messages.empty());
 }

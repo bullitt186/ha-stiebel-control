@@ -346,8 +346,13 @@ static const size_t WRITABLE_SELECT_COUNT = sizeof(writableSelects) / sizeof(Wri
 // The controller is the authoritative source; these are updated via sgReadyStateInt().
 static int currentSgReadyState = 2;
 
-// Track which signals have been discovered
-static std::set<std::string> discoveredSignals;
+// Raw signals whose discovery config has been published: uid -> (member, signal),
+// so republishAllDiscoveries() can send the configs again without waiting for values.
+struct DiscoveredSignal {
+    const CanMember* cm;
+    const ElsterIndex* ei;
+};
+static std::map<std::string, DiscoveredSignal> discoveredSignals;
 
 // Track which calculated sensors have been discovered
 static std::set<std::string> discoveredCalculatedSensors;
@@ -568,8 +573,9 @@ const ElsterIndex *processCanMessage(const std::vector<uint8_t> &msg, uint32_t c
         break;
     }
 
-    uint16_t rawIdx = (msg[2] == 0xfa) ? (uint16_t)(msg[4] + (msg[3] << 8)) : (uint16_t)msg[2];
-    ESP_LOGI("processCanMessage()", "%s (0x%02x):\t%s:\t%s\t(idx=0x%04x, raw=0x%04x, %s)", cm.Name, (unsigned)can_id, ei->Name, charValue, (unsigned)rawIdx, (unsigned)(byte2 + (byte1 << 8)), ElsterTypeStr[ei->Type]);
+    // Per-frame log: DEBUG only (compiled out at the default INFO level)
+    ESP_LOGD("processCanMessage()", "%s (0x%02x):\t%s:\t%s\t(idx=0x%04x, raw=0x%04x, %s)", cm.Name, (unsigned)can_id, ei->Name, charValue,
+             (unsigned)((msg[2] == 0xfa) ? (msg[4] + (msg[3] << 8)) : msg[2]), (unsigned)(byte2 + (byte1 << 8)), ElsterTypeToName(ei->Type));
 
     signalValue = charValue;
     return ei;
@@ -625,7 +631,7 @@ const ElsterIndex *processCanMessageDebug(const std::vector<uint8_t> &msg, uint3
 }
 
 // Read request for a raw Elster index (also indices unknown to ElsterTable, bus scan)
-void readSignalRaw(const CanMember *cm, uint16_t index, const char *name = "?")
+void readSignalRaw(const CanMember *cm, uint16_t index, [[maybe_unused]] const char *name = "?")
 {
     constexpr bool use_extended_id = false; // No use of extended ID
     const uint8_t IndexByte1 = static_cast<uint8_t>(index >> 8);
@@ -654,9 +660,9 @@ void readSignalRaw(const CanMember *cm, uint16_t index, const char *name = "?")
                 0x00};
     }
 
-    char logmsg[160];
-    snprintf(logmsg, sizeof(logmsg), "READ \"%s\" (0x%04x) FROM %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x", name, index, cm->Name, (unsigned)cm->CanId, readId.first, readId.second, data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
-    ESP_LOGI("readSignal()", "%s", logmsg);
+    ESP_LOGD("readSignal()", "READ \"%s\" (0x%04x) FROM %s (0x%02x {0x%02x, 0x%02x}): %02x, %02x, %02x, %02x, %02x, %02x, %02x",
+             name, index, cm->Name, (unsigned)cm->CanId, readId.first, readId.second,
+             data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
 
     id(my_can).send_data(CanMembers[cm_pc].CanId, use_extended_id, data);
 }
@@ -792,7 +798,7 @@ void publishCalculatedSensorDiscovery(const CalculatedSensorConfig& config, bool
     std::string payloadStr = payload.str();
     id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
 
-    ESP_LOGI("MQTT", "Discovery published for calculated sensor: %s", config.name);
+    ESP_LOGD("MQTT", "Discovery published for calculated sensor: %s", config.name);
 }
 
 // Publish all calculated sensor discoveries (used during startup and republish)
@@ -803,7 +809,7 @@ static const size_t FIRST_ON_DEMAND_CALCULATED_SENSOR = 9;
 
 void publishAllCalculatedSensorDiscoveries(bool forceRepublish = false) {
     if (forceRepublish) {
-        ESP_LOGI("MQTT", "Republishing all calculated sensor discoveries");
+        ESP_LOGD("MQTT", "Republishing all calculated sensor discoveries");
     }
 
     for (size_t i = 0; i < CALCULATED_SENSOR_COUNT; i++) {
@@ -930,7 +936,7 @@ void publishWritableNumberDiscovery(const WritableNumberConfig& config, bool for
     std::string payloadStr = payload.str();
     id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
 
-    ESP_LOGI("MQTT", "Discovery published for writable number: %s", config.friendlyName);
+    ESP_LOGD("MQTT", "Discovery published for writable number: %s", config.friendlyName);
 }
 
 // Publish all writable number discoveries
@@ -989,35 +995,37 @@ void publishClimateDiscoveries() {
     }
 }
 
+// Whether the model gets a writable number entity for this signal
+static bool writableNumberApplies(const char* sig) {
+    const bool isWpl17 = (strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0);
+    // WPL17 has only ONE heating circuit (RAUMSOLLTEMP_I). Skip II/III so the
+    // number entities are not created on single-circuit models (-255 only).
+    if ((strcmp(sig, "RAUMSOLLTEMP_II") == 0 || strcmp(sig, "RAUMSOLLTEMP_III") == 0) && isWpl17)
+        return false;
+    // HEIZKURVE is verified writable on WPL17 (KESSEL_CANB) and WPL13E (MANAGER) only.
+    if (strcmp(sig, "HEIZKURVE") == 0 && !isWpl17 && strcmp(HA_DEVICE_MODEL_STR, "wpl13e") != 0)
+        return false;
+    return true;
+}
+
 void publishAllWritableNumberDiscoveries(bool forceRepublish = false) {
     publishClimateDiscoveries();
     if (forceRepublish) {
         discoveredWritableNumbers.clear();
-        ESP_LOGI("MQTT", "Republishing all writable number discoveries");
+        ESP_LOGD("MQTT", "Republishing all writable number discoveries");
     }
     
-    ESP_LOGI("MQTT_DISC", "Publishing %d writable number discoveries", WRITABLE_NUMBER_COUNT);
+    ESP_LOGD("MQTT_DISC", "Publishing %d writable number discoveries", WRITABLE_NUMBER_COUNT);
     for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; i++) {
-        // WPL17 has only ONE heating circuit (RAUMSOLLTEMP_I). Skip II/III so the
-        // number entities are not created on single-circuit models (-255 only).
         const char* sig = writableNumbers[i].signalName;
-        bool isWpl17 = (strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0);
-        // WPL17 has only ONE heating circuit (RAUMSOLLTEMP_I). Skip II/III so the
-        // number entities are not created on single-circuit models (-255 only).
-        if ((strcmp(sig, "RAUMSOLLTEMP_II") == 0 || strcmp(sig, "RAUMSOLLTEMP_III") == 0) && isWpl17) {
-            ESP_LOGI("MQTT_DISC", "Skipping %s on %s (single heating circuit)", sig, HA_DEVICE_MODEL_STR);
+        if (!writableNumberApplies(sig)) {
+            ESP_LOGD("MQTT_DISC", "Skipping %s on %s", sig, HA_DEVICE_MODEL_STR);
             continue;
         }
-        // HEIZKURVE is verified writable on WPL17 (KESSEL_CANB) and WPL13E (MANAGER) only.
-        bool isWpl13e = (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") == 0);
-        if (strcmp(sig, "HEIZKURVE") == 0 && !isWpl17 && !isWpl13e) {
-            ESP_LOGI("MQTT_DISC", "Skipping %s on %s (WPL17/WPL13E only)", sig, HA_DEVICE_MODEL_STR);
-            continue;
-        }
-        ESP_LOGI("MQTT_DISC", "Publishing writable number %d: %s", i, sig);
+        ESP_LOGD("MQTT_DISC", "Publishing writable number %d: %s", i, sig);
         publishWritableNumberDiscovery(writableNumbers[i], forceRepublish);
     }
-    ESP_LOGI("MQTT_DISC", "Completed publishing writable number discoveries");
+    ESP_LOGD("MQTT_DISC", "Completed publishing writable number discoveries");
 }
 
 // ============================================================================
@@ -1110,22 +1118,22 @@ void publishWritableSelectDiscovery(const WritableSelectConfig& config, bool for
     // Mark as discovered
     discoveredWritableSelects.insert(uniqueIdStr);
     
-    ESP_LOGI("MQTT", "Discovery published for writable select: %s", config.friendlyName);
+    ESP_LOGD("MQTT", "Discovery published for writable select: %s", config.friendlyName);
 }
 
 // Publish all writable select discoveries
 void publishAllWritableSelectDiscoveries(bool forceRepublish = false) {
     if (forceRepublish) {
         discoveredWritableSelects.clear();
-        ESP_LOGI("MQTT", "Republishing all writable select discoveries");
+        ESP_LOGD("MQTT", "Republishing all writable select discoveries");
     }
     
-    ESP_LOGI("MQTT_DISC", "Publishing %d writable select discoveries", WRITABLE_SELECT_COUNT);
+    ESP_LOGD("MQTT_DISC", "Publishing %d writable select discoveries", WRITABLE_SELECT_COUNT);
     for (size_t i = 0; i < WRITABLE_SELECT_COUNT; i++) {
-        ESP_LOGI("MQTT_DISC", "Publishing writable select %d: %s", i, writableSelects[i].signalName);
+        ESP_LOGD("MQTT_DISC", "Publishing writable select %d: %s", i, writableSelects[i].signalName);
         publishWritableSelectDiscovery(writableSelects[i], forceRepublish);
     }
-    ESP_LOGI("MQTT_DISC", "Completed publishing writable select discoveries");
+    ESP_LOGD("MQTT_DISC", "Completed publishing writable select discoveries");
 }
 
 // ============================================================================
@@ -1169,7 +1177,7 @@ void publishDate()
     // Publish state to MQTT
     const char* stateTopic = "heatingpump/calculated/date/state";
     id(mqtt_client).publish(stateTopic, datum.c_str(), datum.length(), 0, true);
-    ESP_LOGI("CALC", "Published date: %s (Jahr=%d, Monat=%d, Tag=%d)", datum.c_str(), ijahr, imonat, itag);
+    ESP_LOGD("CALC", "Published date: %s (Jahr=%d, Monat=%d, Tag=%d)", datum.c_str(), ijahr, imonat, itag);
 }
 
 void publishTime()
@@ -1201,12 +1209,13 @@ void publishTime()
     
     // Format time directly without helper function
     char zeit[9];
-    snprintf(zeit, sizeof(zeit), "%02d:%02d:%02d", istunde, iminute, isekunde);
+    // Values are validated above; the % 100 lets the compiler see they fit (-Wformat-truncation)
+    snprintf(zeit, sizeof(zeit), "%02u:%02u:%02u", (unsigned)istunde % 100u, (unsigned)iminute % 100u, (unsigned)isekunde % 100u);
     
     // Publish state to MQTT
     const char* stateTopic = "heatingpump/calculated/time/state";
     id(mqtt_client).publish(stateTopic, zeit, strlen(zeit), 0, true);
-    ESP_LOGI("CALC", "Published time: %s (Stunde=%d, Minute=%d, Sekunde=%d)", zeit, istunde, iminute, isekunde);
+    ESP_LOGD("CALC", "Published time: %s (Stunde=%d, Minute=%d, Sekunde=%d)", zeit, istunde, iminute, isekunde);
 }
 
 // Datetime states are now handled by Home Assistant input_datetime helpers
@@ -1455,52 +1464,83 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
     std::string payloadStr = payload.str();
     id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
     
-    ESP_LOGI("MQTT", "Discovery published for %s", friendlyName);
+    ESP_LOGD("MQTT", "Discovery published for %s", friendlyName);
 }
 
-// Republish all MQTT discoveries (for periodic refresh)
+// ============================================================================
+// DISCOVERY REPUBLISH (MQTT connect, Home Assistant birth message, manual trigger)
+// ============================================================================
+// All discovery configs are retained, so a republish only matters after the broker
+// or HA lost them. republishAllDiscoveries() just (re)starts a cursor; the configs go
+// out a few per call of discoveryRepublishStep() (common.yaml interval), so neither
+// the loop nor the MQTT outbound queue sees a burst of ~100 retained payloads.
+enum DiscoveryRepublishPhase : uint8_t {
+    DR_IDLE = 0, DR_NUMBERS, DR_SELECTS, DR_CLIMATE, DR_CALCULATED, DR_SIGNALS
+};
+static DiscoveryRepublishPhase discoveryRepublishPhase = DR_IDLE;
+static size_t discoveryRepublishPos = 0;
+static std::vector<DiscoveredSignal> discoveryRepublishQueue;
+static bool copDiscoveryPublished = false;
+static constexpr size_t DISCOVERY_REPUBLISH_BATCH = 2;
+
 void republishAllDiscoveries() {
-    ESP_LOGI("MQTT", "Republishing all MQTT discoveries (%d signals)", discoveredSignals.size());
-    
-    // Create a copy of discovered signals to iterate over, filtering out blacklisted signals
-    std::set<std::string> signalsToRepublish;
-    int blacklistedCount = 0;
-    
-    for (const auto& uid : discoveredSignals) {
-        // Extract signal name from UID (format: "can_id_signalName")
-        // Find last underscore to get signal name
-        size_t lastUnderscore = uid.find_last_of('_');
-        if (lastUnderscore != std::string::npos) {
-            std::string signalName = uid.substr(lastUnderscore + 1);
-            
-            // Skip blacklisted signals
-            if (isPermanentlyBlacklisted(signalName.c_str())) {
-                blacklistedCount++;
-                ESP_LOGD("MQTT", "Skipping blacklisted signal during republish: %s", signalName.c_str());
+    // Snapshot: signals discovered after this point publish their own config anyway.
+    discoveryRepublishQueue.clear();
+    discoveryRepublishQueue.reserve(discoveredSignals.size());
+    for (const auto& kv : discoveredSignals) discoveryRepublishQueue.push_back(kv.second);
+    discoveryRepublishPhase = DR_NUMBERS;
+    discoveryRepublishPos = 0;
+    copDiscoveryPublished = false;   // COP configs follow with the next COP update
+    ESP_LOGI("MQTT", "Republishing MQTT discoveries (%u signals)", (unsigned)discoveryRepublishQueue.size());
+}
+
+inline bool discoveryRepublishActive() { return discoveryRepublishPhase != DR_IDLE; }
+
+// Publishes up to DISCOVERY_REPUBLISH_BATCH discovery configs (climate counts as one).
+void discoveryRepublishStep() {
+    if (discoveryRepublishPhase == DR_IDLE || !id(mqtt_client).is_connected()) return;
+    size_t budget = DISCOVERY_REPUBLISH_BATCH;
+    while (budget > 0 && discoveryRepublishPhase != DR_IDLE) {
+        const size_t i = discoveryRepublishPos++;
+        switch (discoveryRepublishPhase) {
+        case DR_NUMBERS:
+            if (i >= WRITABLE_NUMBER_COUNT) { discoveryRepublishPhase = DR_SELECTS; discoveryRepublishPos = 0; continue; }
+            if (!writableNumberApplies(writableNumbers[i].signalName)) continue;
+            publishWritableNumberDiscovery(writableNumbers[i], true);
+            break;
+        case DR_SELECTS:
+            if (i >= WRITABLE_SELECT_COUNT) { discoveryRepublishPhase = DR_CLIMATE; discoveryRepublishPos = 0; continue; }
+            publishWritableSelectDiscovery(writableSelects[i], true);
+            break;
+        case DR_CLIMATE:
+            if (i >= 1) { discoveryRepublishPhase = DR_CALCULATED; discoveryRepublishPos = 0; continue; }
+            publishClimateDiscoveries();
+            break;
+        case DR_CALCULATED:
+            if (i >= CALCULATED_SENSOR_COUNT) { discoveryRepublishPhase = DR_SIGNALS; discoveryRepublishPos = 0; continue; }
+            // Energy/power sensors announce themselves on their first value (see above)
+            if (i >= FIRST_ON_DEMAND_CALCULATED_SENSOR &&
+                discoveredCalculatedSensors.find(calculatedSensors[i].uniqueId) == discoveredCalculatedSensors.end())
+                continue;
+            publishCalculatedSensorDiscovery(calculatedSensors[i], true);
+            break;
+        case DR_SIGNALS:
+            if (i >= discoveryRepublishQueue.size()) {
+                ESP_LOGI("MQTT", "Discovery republish complete");
+                discoveryRepublishPhase = DR_IDLE;
+                discoveryRepublishPos = 0;
+                discoveryRepublishQueue.clear();
+                discoveryRepublishQueue.shrink_to_fit();
                 continue;
             }
+            publishMqttDiscovery(*discoveryRepublishQueue[i].cm, discoveryRepublishQueue[i].ei);
+            break;
+        default:
+            discoveryRepublishPhase = DR_IDLE;
+            continue;
         }
-        
-        signalsToRepublish.insert(uid);
+        budget--;
     }
-    
-    if (blacklistedCount > 0) {
-        ESP_LOGI("MQTT", "Filtered out %d blacklisted signals during republish", blacklistedCount);
-    }
-    
-    // Clear the set and re-add only non-blacklisted signals
-    discoveredSignals = signalsToRepublish;
-    
-    // Force republish by reading all known signals
-    // This will trigger processAndUpdate which calls publishMqttDiscovery
-    for (const auto& signal : signalsToRepublish) {
-        ESP_LOGD("MQTT", "Marked for republish: %s", signal.c_str());
-    }
-    
-    // Republish all calculated sensor discoveries using unified system
-    publishAllCalculatedSensorDiscoveries(true);
-    
-    ESP_LOGI("MQTT", "Discovery refresh complete - will republish as signals are received");
 }
 
 // Publish signal state to MQTT
@@ -1529,8 +1569,7 @@ static std::unordered_map<std::string, float> copEnergyValues;
 
 // Publish MQTT discovery for COP sensors
 void publishCOPDiscovery() {
-    static bool discoveryPublished = false;
-    if (discoveryPublished) return;
+    if (copDiscoveryPublished) return;
     
     // COP WW
     {
@@ -1580,8 +1619,8 @@ void publishCOPDiscovery() {
         id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
     }
     
-    discoveryPublished = true;
-    ESP_LOGI("MQTT", "Discovery published for COP sensors");
+    copDiscoveryPublished = true;
+    ESP_LOGD("MQTT", "Discovery published for COP sensors");
 }
 
 // Store energy value when received for COP calculation
@@ -1661,7 +1700,7 @@ void updateCOPCalculations() {
             snprintf(valueStr, sizeof(valueStr), "%.2f", cop_ww);
             const char* stateTopic = "heatingpump/calculated/cop_ww/state";
             id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
-            ESP_LOGI("COP", "COP WW: %.2f (Wärme: %.3f MWh, El: %.3f MWh)", cop_ww, waerme_ww, el_ww);
+            ESP_LOGD("COP", "COP WW: %.2f (Wärme: %.3f MWh, El: %.3f MWh)", cop_ww, waerme_ww, el_ww);
         }
     }
     
@@ -1679,7 +1718,7 @@ void updateCOPCalculations() {
             snprintf(valueStr, sizeof(valueStr), "%.2f", cop_heiz);
             const char* stateTopic = "heatingpump/calculated/cop_heiz/state";
             id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
-            ESP_LOGI("COP", "COP Heizung: %.2f (Wärme: %.3f MWh, El: %.3f MWh)", cop_heiz, waerme_heiz, el_heiz);
+            ESP_LOGD("COP", "COP Heizung: %.2f (Wärme: %.3f MWh, El: %.3f MWh)", cop_heiz, waerme_heiz, el_heiz);
         }
     }
     
@@ -1701,7 +1740,7 @@ void updateCOPCalculations() {
             snprintf(valueStr, sizeof(valueStr), "%.2f", cop_gesamt);
             const char* stateTopic = "heatingpump/calculated/cop_gesamt/state";
             id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
-            ESP_LOGI("COP", "COP Gesamt: %.2f (Wärme: %.3f MWh, El: %.3f MWh)", cop_gesamt, waerme_total, el_total);
+            ESP_LOGD("COP", "COP Gesamt: %.2f (Wärme: %.3f MWh, El: %.3f MWh)", cop_gesamt, waerme_total, el_total);
         }
     }
 
@@ -1923,7 +1962,7 @@ void publishCombinedEnergySensors() {
         snprintf(valueStr, sizeof(valueStr), "%.3f", total);
         publishCalculatedSensorDiscovery(cfg, false);
         id(mqtt_client).publish(topic, valueStr, strlen(valueStr), 0, true);
-        ESP_LOGI("ENERGIE", "Gesamt (%s): %.3f kWh", key, total);
+        ESP_LOGD("ENERGIE", "Gesamt (%s): %.3f kWh", key, total);
     };
     publishTotal(calculatedSensors[9], "heatingpump/calculated/energie_heiz_total_kwh/state", "combined_energie_heiz", 0,
                  "EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", "EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH",
@@ -2007,7 +2046,7 @@ void publishCombinedEnergySensors() {
             id(mqtt_client).publish("heatingpump/calculated/el_leistung_heiz_w/state", ph, strlen(ph), 0, true);
             publishCalculatedSensorDiscovery(calculatedSensors[20], false);
             id(mqtt_client).publish("heatingpump/calculated/el_leistung_ww_w/state", pw, strlen(pw), 0, true);
-            ESP_LOGI("ENERGIE", "Leistung: %.0f W (Heiz %.0f, WW %.0f) in %.0fs", pHeiz + pWw, pHeiz, pWw, dtSec);
+            ESP_LOGD("ENERGIE", "Leistung: %.0f W (Heiz %.0f, WW %.0f) in %.0fs", pHeiz + pWw, pHeiz, pWw, dtSec);
             accHeizWh = 0.0f; accWwWh = 0.0f; windowStartMs = nowMs;
         }
     }
@@ -2305,7 +2344,9 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
     if (value == "-255") {
         uint8_t& streak = invalidStreak[streakKey];
         if (streak < 255) streak++;
-        if (streak >= 3) ESP_LOGD("BACKOFF", "%s streak=%u", streakKey.c_str(), streak);
+        if (streak >= 3) {
+            ESP_LOGD("BACKOFF", "%s streak=%u", streakKey.c_str(), streak);
+        }
         if (discoveredSignals.find(uid) == discoveredSignals.end()) return;
     } else {
         invalidStreak.erase(streakKey);
@@ -2328,7 +2369,7 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
     
     if (needsDiscovery) {
         // Mark as discovered and publish discovery immediately
-        discoveredSignals.insert(uid);
+        discoveredSignals.emplace(uid, DiscoveredSignal{&cm, ei});
         publishMqttDiscovery(cm, ei);
     }
     
@@ -2674,7 +2715,7 @@ void startScan(const std::string& payload) {
     scanState.cm = cm;
     scanState.table = (n != 3);
     scanState.begin = scanState.pos = scanState.table ? 0 : from;
-    scanState.end = scanState.table ? High(ElsterTable) : to;
+    scanState.end = scanState.table ? ElsterTableCount - 1 : to;
     scanState.startMs = millis();
     ESP_LOGI("SCAN", "Scanning %s (%s), normal polling paused", cm->Name, scanState.table ? "table" : "range");
     publishScanStatus("running");

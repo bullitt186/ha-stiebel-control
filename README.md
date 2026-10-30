@@ -202,7 +202,7 @@ These entities use the ESPHome native API (not MQTT). If they show `unavailable`
 
 - Some signals are not supported by all heat pump models — check your model's signal table
 - Binary sensors showing "Unknown": add `payloadOn`/`payloadOff` to the signal's entry in `ElsterTable.h`
-- Check `heatingpump/debug` MQTT topic for parse errors
+- Check `heatingpump/debug` MQTT topic for warnings and errors; per-frame CAN logs need `logger: level: DEBUG` and `esphome logs`
 
 ---
 
