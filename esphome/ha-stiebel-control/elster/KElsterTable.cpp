@@ -18,18 +18,28 @@
  */
 
 
+#include <stdint.h>
 #include <string.h>
 #include <unordered_map>
-#include <string>
 // This is the one translation unit that holds the Elster tables (see ElsterTable.h).
 #define ELSTER_TABLE_DEFINITIONS
 #include "NUtils.h"
 #include "KElsterTable.h"
 #include "ElsterTable.h"
 
-// Lazy-initialized caches for O(1) lookups after first access
+// Lazy-initialized caches for O(1) lookups after first access. The name cache is
+// keyed by the DJB2 hash of the name (no std::string per lookup); a hit is
+// confirmed with strcmp, so a hash collision only costs a table scan.
 static std::unordered_map<unsigned short, const ElsterIndex*> indexCache;
-static std::unordered_map<std::string, const ElsterIndex*> nameCache;
+static std::unordered_map<uint32_t, const ElsterIndex*> nameCache;
+
+static uint32_t ElsterNameHash(const char * str)
+{
+  uint32_t h = 5381;
+  while (*str)
+    h = ((h << 5) + h) + (uint32_t)(unsigned char)*str++;
+  return h;
+}
 
 
 void SetValueType(char * Val, unsigned char Type, unsigned short Value)
@@ -193,27 +203,29 @@ const ElsterIndex * GetElsterIndex(unsigned short Index)
 
 const ElsterIndex * GetElsterIndex(const char* str)
 {
-  // Convert to std::string for cache key
-  std::string key(str);
-  
-  // Check cache first - O(1) for subsequent lookups
-  auto it = nameCache.find(key);
-  if (it != nameCache.end()) {
+  if (!str)
+    return &ElsterTable[0];
+
+  // Check cache first - O(1) for subsequent lookups, no allocation
+  const uint32_t h = ElsterNameHash(str);
+  auto it = nameCache.find(h);
+  if (it != nameCache.end() && !strcmp(it->second->Name, str)) {
     return it->second;
   }
 
-  // Cache miss - do linear search O(n)
+  // Cache miss - do linear search O(n); the first row with this name wins
   int i;
   for (i = 0; i <= High(ElsterTable); i++) {
     if (!strcmp(ElsterTable[i].Name, str)) {
       const ElsterIndex* result = &ElsterTable[i];
-      nameCache[key] = result;  // Cache for next time
+      if (it == nameCache.end())
+        nameCache.emplace(h, result);  // Cache for next time (a colliding name stays uncached)
       return result;
     }
   }
 
-  // Not found - cache default and return
-  nameCache[key] = &ElsterTable[0];
+  // Not found: unknown names are not cached (only typos/other-model names, looked
+  // up rarely since the request table is resolved once at startup)
   return &ElsterTable[0];
 }
 

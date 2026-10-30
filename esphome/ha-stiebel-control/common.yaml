@@ -141,6 +141,9 @@ mqtt:
         // numbers/selects, climate, calculated sensors and raw signals, paced by
         // discoveryRepublishStep() (interval below).
         republishAllDiscoveries();
+        // States are published only on change (plus a 10 min heartbeat): send every
+        // known value once more, after the discoveries (stateRepublishStep()).
+        republishAllStates();
 
         // Publish current SG Ready state + boost values (retained)
         ESP_LOGI("MQTT_CONN", "Publishing initial SG Ready states...");
@@ -407,10 +410,15 @@ interval:
           publishSgReadyState();
 
   # Sends pending discovery configs (MQTT connect, HA birth, manual trigger) a few
-  # at a time; idle otherwise. There is no periodic republish: configs are retained.
+  # at a time, then the cached states after a (re)connect; idle otherwise. There is
+  # no periodic republish: configs and states are retained. Also sends the delayed
+  # read-back after SG Ready writes (one per call).
   - interval: 250ms
     then:
-      - lambda: discoveryRepublishStep();
+      - lambda: |-
+          discoveryRepublishStep();
+          stateRepublishStep();
+          pendingReadbackStep();
 
 #########################################
 #                                       #

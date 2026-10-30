@@ -211,13 +211,28 @@ static const CalculatedSensorConfig calculatedSensors[] = {
     // switching state directly.
     {"stiebel_calculated_regelabweichung", LNAME_CALC_REGELABWEICHUNG, "heatingpump/calculated/regelabweichung/state",
      "sensor", "temperature", "K", "measurement", "mdi:swap-vertical", "", "", "", true},
+
+    // More CAN/MQTT diagnostics (#55). CAN values come from twai_get_status_info()
+    // and stay silent on MCP2515 builds; the MQTT counter is published on both.
+    {"stiebel_calculated_can_rx_missed",  LNAME_CALC_CAN_RX_MISSED,  "heatingpump/calculated/can_rx_missed/state",
+     "sensor", "", "", "total_increasing", "mdi:message-alert-outline", "", "", "diagnostic", false},
+    {"stiebel_calculated_can_rx_overrun", LNAME_CALC_CAN_RX_OVERRUN, "heatingpump/calculated/can_rx_overrun/state",
+     "sensor", "", "", "total_increasing", "mdi:message-alert", "", "", "diagnostic", false},
+    {"stiebel_calculated_can_rx_queue",   LNAME_CALC_CAN_RX_QUEUE,   "heatingpump/calculated/can_rx_queue/state",
+     "sensor", "", "", "measurement", "mdi:tray-full", "", "", "diagnostic", false},
+    {"stiebel_calculated_mqtt_publish_failures", LNAME_CALC_MQTT_PUBLISH_FAILURES, "heatingpump/calculated/mqtt_publish_failures/state",
+     "sensor", "", "", "total_increasing", "mdi:message-off-outline", "", "", "diagnostic", false},
 };
 
 static const size_t CALCULATED_SENSOR_COUNT = sizeof(calculatedSensors) / sizeof(CalculatedSensorConfig);
-// Index of the control deviation entry (the table is append-only, indices are hardcoded)
+// Indices of entries used by name (the table is append-only, indices are hardcoded)
 static const size_t CALC_IDX_REGELABWEICHUNG = 23;
-static_assert(CALCULATED_SENSOR_COUNT == CALC_IDX_REGELABWEICHUNG + 1,
-              "calculatedSensors changed: update CALC_IDX_REGELABWEICHUNG");
+static const size_t CALC_IDX_CAN_RX_MISSED = 24;
+static const size_t CALC_IDX_CAN_RX_OVERRUN = 25;
+static const size_t CALC_IDX_CAN_RX_QUEUE = 26;
+static const size_t CALC_IDX_MQTT_PUBLISH_FAILURES = 27;
+static_assert(CALCULATED_SENSOR_COUNT == CALC_IDX_MQTT_PUBLISH_FAILURES + 1,
+              "calculatedSensors changed: update the CALC_IDX_* constants");
 
 // ============================================================================
 // WRITABLE NUMBER CONFIGURATION (for MQTT Number entities)
@@ -346,13 +361,31 @@ static const size_t WRITABLE_SELECT_COUNT = sizeof(writableSelects) / sizeof(Wri
 // The controller is the authoritative source; these are updated via sgReadyStateInt().
 static int currentSgReadyState = 2;
 
-// Raw signals whose discovery config has been published: uid -> (member, signal),
+// DJB2 hash of a signal name (same function as hash_runtime() below)
+inline uint32_t elsterNameHash(const char* str) {
+    uint32_t h = 5381;
+    while (*str) h = ((h << 5) + h) + static_cast<uint32_t>(*str++);
+    return h;
+}
+
+// Key of a (CAN member, signal name) pair without building a string: member CAN ID
+// in the upper 32 bits, name hash below. Same identity as the former "MEMBER_SIGNAL"
+// string keys and the stiebel_<member>_<signal> uid (ElsterTable names have no
+// hash collisions, see test "signalKey: ElsterTable names have distinct hashes").
+inline uint64_t signalKey(const CanMember& cm, uint32_t nameHash) {
+    return (static_cast<uint64_t>(cm.CanId) << 32) | nameHash;
+}
+inline uint64_t signalKey(const CanMember& cm, const char* signalName) {
+    return signalKey(cm, elsterNameHash(signalName));
+}
+
+// Raw signals whose discovery config has been published: signalKey -> (member, signal),
 // so republishAllDiscoveries() can send the configs again without waiting for values.
 struct DiscoveredSignal {
     const CanMember* cm;
     const ElsterIndex* ei;
 };
-static std::map<std::string, DiscoveredSignal> discoveredSignals;
+static std::map<uint64_t, DiscoveredSignal> discoveredSignals;
 
 // Track which calculated sensors have been discovered
 static std::set<std::string> discoveredCalculatedSensors;
@@ -363,11 +396,11 @@ static std::set<std::string> discoveredWritableNumbers;
 // Track which writable selects have been discovered
 static std::set<std::string> discoveredWritableSelects;
 
-// Track next scheduled request time per unique signal key (MEMBER_SIGNAL)
-static std::unordered_map<std::string, unsigned long> nextRequestTime;
+// Track next scheduled request time per signalKey (member + signal)
+static std::unordered_map<uint64_t, unsigned long> nextRequestTime;
 
-// Consecutive -255 (0x8000, "not available") answers per key (MEMBER_SIGNAL).
-static std::unordered_map<std::string, uint8_t> invalidStreak;
+// Consecutive -255 (0x8000, "not available") answers per signalKey.
+static std::unordered_map<uint64_t, uint8_t> invalidStreak;
 
 // Back off signals the model does not provide: from the 3rd consecutive -255 the
 // poll interval doubles per answer, capped at 6 h. A valid value resets the streak.
@@ -379,7 +412,7 @@ inline unsigned long nextBackoffMs(unsigned long baseMs, uint8_t streak) {
     return baseMs << shift;
 }
 
-inline unsigned long backoffIntervalMs(const std::string& key, unsigned long baseMs) {
+inline unsigned long backoffIntervalMs(uint64_t key, unsigned long baseMs) {
     auto it = invalidStreak.find(key);
     return nextBackoffMs(baseMs, it == invalidStreak.end() ? 0 : it->second);
 }
@@ -630,6 +663,201 @@ const ElsterIndex *processCanMessageDebug(const std::vector<uint8_t> &msg, uint3
     return ei;
 }
 
+// ============================================================================
+// MQTT PUBLISH: failure counter, publish-on-change state cache (#55)
+// ============================================================================
+
+// Publishes that the MQTT client refused (not connected, or the idf_send_async
+// queue was full). Published as diagnostic sensor mqtt_publish_failures.
+static uint32_t mqttPublishFailures = 0;
+
+inline bool mqttPublish(const char* topic, const char* payload, size_t len, bool retain = true) {
+    bool ok = id(mqtt_client).publish(topic, payload, len, 0, retain);
+    if (!ok) mqttPublishFailures++;
+    return ok;
+}
+
+// One entry per state topic. Raw signals keep member and signal name (the topic
+// heatingpump/<member>/<signal>/state is rebuilt on demand), calculated sensors keep
+// their static topic string in `topic` with `signal` == nullptr. No heap per publish:
+// the value is copied into a fixed buffer, entries are only added for new topics.
+struct StateCacheEntry {
+    uint32_t hash;
+    const char* topic;      // calculated: full topic; raw: member name
+    const char* signal;     // raw: signal name; calculated: nullptr
+    uint32_t lastPublishMs;
+    bool pending;           // newest value not sent yet (new, changed, failed or forced)
+    char value[23];
+};
+static_assert(sizeof(StateCacheEntry::value) >= 16, "state value buffer too small");
+// Sorted by hash (binary search); the republish cursor walks it by position.
+static std::vector<StateCacheEntry> stateCache;
+static bool stateRepublishActive = false;
+static size_t stateRepublishPos = 0;
+static uint32_t stateSuppressedCount = 0;   // unchanged values not sent (debug/tests)
+
+inline uint32_t rawStateHash(const CanMember& cm, const char* signalName) {
+    return elsterNameHash(signalName) ^ (static_cast<uint32_t>(cm.CanId) * 0x9E3779B1u);
+}
+
+inline bool stateEntryMatches(const StateCacheEntry& e, const char* topicOrMember, const char* signal) {
+    if (signal == nullptr || e.signal == nullptr) {
+        return signal == e.signal && (e.topic == topicOrMember || strcmp(e.topic, topicOrMember) == 0);
+    }
+    return (e.signal == signal || strcmp(e.signal, signal) == 0) &&
+           (e.topic == topicOrMember || strcmp(e.topic, topicOrMember) == 0);
+}
+
+inline StateCacheEntry* stateCacheFind(uint32_t hash, const char* topicOrMember, const char* signal,
+                                       size_t* insertPos = nullptr) {
+    auto it = std::lower_bound(stateCache.begin(), stateCache.end(), hash,
+                               [](const StateCacheEntry& e, uint32_t h) { return e.hash < h; });
+    if (insertPos) *insertPos = static_cast<size_t>(it - stateCache.begin());
+    for (; it != stateCache.end() && it->hash == hash; ++it)
+        if (stateEntryMatches(*it, topicOrMember, signal)) return &*it;
+    return nullptr;
+}
+
+inline const char* stateEntryTopic(const StateCacheEntry& e, char* buf, size_t len) {
+    if (!e.signal) return e.topic;
+    snprintf(buf, len, "heatingpump/%s/%s/state", e.topic, e.signal);
+    return buf;
+}
+
+// Publishes `value` on change; an unchanged value goes out again after
+// STATE_HEARTBEAT_MS. topicOrMember/signal must have static lifetime (string
+// literals, ElsterTable/CanMembers names). Returns true if the value was sent.
+inline bool publishStateCached(uint32_t hash, const char* topicOrMember, const char* signal,
+                               const char* topic, const char* value) {
+    const size_t len = strlen(value);
+    const uint32_t now = millis();
+    size_t pos = 0;
+    StateCacheEntry* e = stateCacheFind(hash, topicOrMember, signal, &pos);
+    if (!e) {
+        if (len >= sizeof(e->value) || stateCache.size() >= STATE_CACHE_MAX_ENTRIES) {
+            return id(mqtt_client).is_connected() && mqttPublish(topic, value, len);   // untracked
+        }
+        if (stateCache.capacity() == 0) stateCache.reserve(128);   // typical model: 100-200 topics
+        StateCacheEntry fresh{hash, topicOrMember, signal, now, true, {0}};
+        e = &*stateCache.insert(stateCache.begin() + pos, fresh);
+        if (stateRepublishActive && pos < stateRepublishPos) stateRepublishPos++;
+    }
+    if (len >= sizeof(e->value)) {
+        // value grew beyond the buffer (rare): publish untracked, remember a marker
+        e->value[0] = '\0';
+        e->pending = true;
+        return id(mqtt_client).is_connected() && mqttPublish(topic, value, len);
+    }
+    if (strcmp(e->value, value) != 0) {
+        memcpy(e->value, value, len + 1);
+        e->pending = true;
+    }
+    if (!e->pending && (now - e->lastPublishMs) < STATE_HEARTBEAT_MS) {
+        stateSuppressedCount++;
+        return false;
+    }
+    // While disconnected keep the value pending; republishAllStates() sends it on connect
+    if (!id(mqtt_client).is_connected()) return false;
+    if (mqttPublish(topic, value, len)) {
+        e->pending = false;
+        e->lastPublishMs = now;
+        return true;
+    }
+    return false;
+}
+
+// Calculated sensor state (topic is a string literal / CalculatedSensorConfig field)
+inline bool publishCalculatedState(const char* topic, const char* value) {
+    return publishStateCached(elsterNameHash(topic), topic, nullptr, topic, value);
+}
+
+// The next value of this raw signal is published even if unchanged (write echo:
+// HA expects the read-back after a command, also when the device kept the old value).
+inline void forceNextStatePublish(const CanMember& cm, const ElsterIndex* ei) {
+    if (StateCacheEntry* e = stateCacheFind(rawStateHash(cm, ei->Name), cm.Name, ei->Name)) e->pending = true;
+}
+
+// Called on every MQTT (re)connect: a broker restart without persistence would
+// otherwise leave constant values empty until their heartbeat.
+inline void republishAllStates() {
+    stateRepublishActive = !stateCache.empty();
+    stateRepublishPos = 0;
+}
+
+// Sends up to STATE_REPUBLISH_BATCH cached states (250 ms interval in common.yaml).
+// Waits while MQTT is down and while the discovery republish is still running.
+inline bool discoveryRepublishActive();
+inline void stateRepublishStep() {
+    if (!stateRepublishActive || !id(mqtt_client).is_connected() || discoveryRepublishActive()) return;
+    char buf[128];
+    const uint32_t now = millis();
+    for (int n = 0; n < STATE_REPUBLISH_BATCH && stateRepublishPos < stateCache.size(); n++) {
+        StateCacheEntry& e = stateCache[stateRepublishPos++];
+        if (e.value[0] == '\0') continue;   // untracked long value
+        const char* topic = stateEntryTopic(e, buf, sizeof(buf));
+        if (mqttPublish(topic, e.value, strlen(e.value))) {
+            e.pending = false;
+            e.lastPublishMs = now;
+        }
+    }
+    if (stateRepublishPos >= stateCache.size()) {
+        stateRepublishActive = false;
+        ESP_LOGI("MQTT", "State republish complete (%u topics)", (unsigned)stateCache.size());
+    }
+}
+
+inline void resetStateCache() {
+    stateCache.clear();
+    stateRepublishActive = false;
+    stateRepublishPos = 0;
+    stateSuppressedCount = 0;
+}
+
+// ============================================================================
+// NON-BLOCKING READ-BACK AFTER A WRITE (replaces delay(100) in the SG Ready path)
+// ============================================================================
+struct PendingReadback {
+    const CanMember* cm;
+    const ElsterIndex* ei;
+    uint32_t dueMs;
+};
+static constexpr size_t READBACK_QUEUE_LEN = 8;
+static constexpr uint32_t READBACK_DELAY_MS = 100;
+static PendingReadback pendingReadbacks[READBACK_QUEUE_LEN];
+static size_t pendingReadbackCount = 0;
+
+void readSignal(const CanMember *cm, const ElsterIndex *ei);
+
+// Queues a read request READBACK_DELAY_MS after a write (one entry per signal).
+inline void scheduleReadback(const CanMember* cm, const ElsterIndex* ei) {
+    const uint32_t due = millis() + READBACK_DELAY_MS;
+    for (size_t i = 0; i < pendingReadbackCount; i++) {
+        if (pendingReadbacks[i].cm == cm && pendingReadbacks[i].ei == ei) {
+            pendingReadbacks[i].dueMs = due;
+            return;
+        }
+    }
+    if (pendingReadbackCount == READBACK_QUEUE_LEN) {
+        readSignal(cm, ei);   // queue full (never seen): read at once instead of losing it
+        return;
+    }
+    pendingReadbacks[pendingReadbackCount++] = {cm, ei, due};
+}
+
+// Sends at most one due read-back per call (250 ms interval in common.yaml), so a
+// SG Ready change with three writes does not burst three reads onto the bus.
+inline void pendingReadbackStep() {
+    const uint32_t now = millis();
+    for (size_t i = 0; i < pendingReadbackCount; i++) {
+        if (static_cast<int32_t>(now - pendingReadbacks[i].dueMs) < 0) continue;
+        PendingReadback r = pendingReadbacks[i];
+        for (size_t j = i + 1; j < pendingReadbackCount; j++) pendingReadbacks[j - 1] = pendingReadbacks[j];
+        pendingReadbackCount--;
+        readSignal(r.cm, r.ei);
+        return;
+    }
+}
+
 // Read request for a raw Elster index (also indices unknown to ElsterTable, bus scan)
 void readSignalRaw(const CanMember *cm, uint16_t index, [[maybe_unused]] const char *name = "?")
 {
@@ -723,6 +951,8 @@ void writeSignal(const CanMember *cm, const ElsterIndex *ei, const char *&str)
     ESP_LOGI("writeSignal()", "%s", logmsg);
 
     id(my_can).send_data(CanMembers[cm_pc].CanId, use_extended_id, data);
+    // Command echo: publish the read-back even if the value did not change
+    forceNextStatePublish(*cm, ei);
 }
 
 void writeSignal(const CanMember *cm, const char *elsterName, const char *str)
@@ -796,7 +1026,7 @@ void publishCalculatedSensorDiscovery(const CalculatedSensorConfig& config, bool
 
     // Publish discovery message
     std::string payloadStr = payload.str();
-    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    mqttPublish(discoveryTopic, payloadStr.c_str(), payloadStr.length());
 
     ESP_LOGD("MQTT", "Discovery published for calculated sensor: %s", config.name);
 }
@@ -934,7 +1164,7 @@ void publishWritableNumberDiscovery(const WritableNumberConfig& config, bool for
 
     // Publish discovery message
     std::string payloadStr = payload.str();
-    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    mqttPublish(discoveryTopic, payloadStr.c_str(), payloadStr.length());
 
     ESP_LOGD("MQTT", "Discovery published for writable number: %s", config.friendlyName);
 }
@@ -976,7 +1206,7 @@ void publishClimateDiscoveries() {
           << "\"action_template\":\"{{ 'heating' if value == 'on' else 'idle' }}\","
           << "\"availability_topic\":\"heatingpump/status\",\"icon\":\"mdi:radiator\"," << device << "}";
         std::string s = p.str();
-        id(mqtt_client).publish("homeassistant/climate/heatingpump/stiebel_climate_heizung/config", s.c_str(), s.length(), 0, true);
+        mqttPublish("homeassistant/climate/heatingpump/stiebel_climate_heizung/config", s.c_str(), s.length());
     }
 
     // Hot water: tank actual temperature + DHW setpoint
@@ -991,7 +1221,7 @@ void publishClimateDiscoveries() {
           << "\"current_temperature_topic\":\"heatingpump/" << (wpl17 ? "KESSEL_CANB" : "KESSEL") << "/SPEICHERISTTEMP/state\","
           << "\"availability_topic\":\"heatingpump/status\",\"icon\":\"mdi:water-boiler\"," << device << "}";
         std::string s = p.str();
-        id(mqtt_client).publish("homeassistant/climate/heatingpump/stiebel_climate_warmwasser/config", s.c_str(), s.length(), 0, true);
+        mqttPublish("homeassistant/climate/heatingpump/stiebel_climate_warmwasser/config", s.c_str(), s.length());
     }
 }
 
@@ -1113,7 +1343,7 @@ void publishWritableSelectDiscovery(const WritableSelectConfig& config, bool for
 
     // Publish discovery message
     std::string payloadStr = payload.str();
-    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    mqttPublish(discoveryTopic.c_str(), payloadStr.c_str(), payloadStr.length());
 
     // Mark as discovered
     discoveredWritableSelects.insert(uniqueIdStr);
@@ -1176,7 +1406,7 @@ void publishDate()
     
     // Publish state to MQTT
     const char* stateTopic = "heatingpump/calculated/date/state";
-    id(mqtt_client).publish(stateTopic, datum.c_str(), datum.length(), 0, true);
+    publishCalculatedState(stateTopic, datum.c_str());
     ESP_LOGD("CALC", "Published date: %s (Jahr=%d, Monat=%d, Tag=%d)", datum.c_str(), ijahr, imonat, itag);
 }
 
@@ -1214,7 +1444,7 @@ void publishTime()
     
     // Publish state to MQTT
     const char* stateTopic = "heatingpump/calculated/time/state";
-    id(mqtt_client).publish(stateTopic, zeit, strlen(zeit), 0, true);
+    publishCalculatedState(stateTopic, zeit);
     ESP_LOGD("CALC", "Published time: %s (Stunde=%d, Minute=%d, Sekunde=%d)", zeit, istunde, iminute, isekunde);
 }
 
@@ -1255,7 +1485,7 @@ void publishDeltaTContinuous()
     char value[16];
     snprintf(value, sizeof(value), "%.2f", deltaT);
     const char* stateTopic = "heatingpump/calculated/delta_t_continuous/state";
-    id(mqtt_client).publish(stateTopic, value, strlen(value), 0, true);
+    publishCalculatedState(stateTopic, value);
 }
 
 void publishDeltaTRunning()
@@ -1281,7 +1511,7 @@ void publishDeltaTRunning()
     char value[16];
     snprintf(value, sizeof(value), "%.2f", deltaT);
     const char* stateTopic = "heatingpump/calculated/delta_t_running/state";
-    id(mqtt_client).publish(stateTopic, value, strlen(value), 0, true);
+    publishCalculatedState(stateTopic, value);
 }
 
 void publishCompressorActive()
@@ -1300,7 +1530,7 @@ void publishCompressorActive()
     // Publish state to MQTT
     const char* state = isActive ? "on" : "off";
     const char* stateTopic = "heatingpump/calculated/compressor_active/state";
-    id(mqtt_client).publish(stateTopic, state, strlen(state), 0, true);
+    publishCalculatedState(stateTopic, state);
     // Note: Delta T running is published separately by scheduler
 }
 
@@ -1318,7 +1548,7 @@ void publishRegelabweichung()
     char value[16];
     snprintf(value, sizeof(value), "%.2f", lastKesselRuecklaufIst - lastKesselSollTemp);
     const char* stateTopic = "heatingpump/calculated/regelabweichung/state";
-    id(mqtt_client).publish(stateTopic, value, strlen(value), 0, true);
+    publishCalculatedState(stateTopic, value);
 }
 
 // Helper: Check if pattern appears anywhere in text (case-insensitive substring match)
@@ -1464,7 +1694,7 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
     
     // Publish discovery message with retain flag
     std::string payloadStr = payload.str();
-    id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+    mqttPublish(discoveryTopic, payloadStr.c_str(), payloadStr.length());
     
     ESP_LOGD("MQTT", "Discovery published for %s", friendlyName);
 }
@@ -1545,10 +1775,10 @@ void discoveryRepublishStep() {
     }
 }
 
-// Publish signal state to MQTT
-void publishMqttState(const CanMember &cm, const ElsterIndex *ei, const std::string &value) {
+// Publish signal state to MQTT (retained; on change, unchanged values as heartbeat)
+void publishMqttState(const CanMember &cm, const ElsterIndex *ei, const char *value) {
     // Input validation
-    if (!ei || !ei->Name || value.empty()) {
+    if (!ei || !ei->Name || !value || !*value) {
         ESP_LOGW("MQTT", "Invalid signal data, skipping state publish");
         return;
     }
@@ -1556,12 +1786,15 @@ void publishMqttState(const CanMember &cm, const ElsterIndex *ei, const std::str
     // Build state topic with bounds checking
     char stateTopic[128];
     int written = snprintf(stateTopic, sizeof(stateTopic), "heatingpump/%s/%s/state", cm.Name, ei->Name);
-    if (written >= sizeof(stateTopic)) {
+    if (written >= (int)sizeof(stateTopic)) {
         ESP_LOGW("MQTT", "Topic too long for %s/%s, truncated", cm.Name, ei->Name);
     }
     
-    // Publish state with retain flag
-    id(mqtt_client).publish(stateTopic, value.c_str(), value.length(), 0, true);
+    publishStateCached(rawStateHash(cm, ei->Name), cm.Name, ei->Name, stateTopic, value);
+}
+
+inline void publishMqttState(const CanMember &cm, const ElsterIndex *ei, const std::string &value) {
+    publishMqttState(cm, ei, value.c_str());
 }
 
 // Diagnostics removed for simplification
@@ -1586,7 +1819,7 @@ void publishCOPDiscovery() {
                 << "\"name\":\"Stiebel Eltron Wärmepumpe\","
                 << "\"manufacturer\":\"Stiebel Eltron\"}}";
         std::string payloadStr = payload.str();
-        id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+        mqttPublish(discoveryTopic, payloadStr.c_str(), payloadStr.length());
     }
     
     // COP Heizung
@@ -1602,7 +1835,7 @@ void publishCOPDiscovery() {
                 << "\"name\":\"Stiebel Eltron Wärmepumpe\","
                 << "\"manufacturer\":\"Stiebel Eltron\"}}";
         std::string payloadStr = payload.str();
-        id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+        mqttPublish(discoveryTopic, payloadStr.c_str(), payloadStr.length());
     }
     
     // COP Gesamt
@@ -1618,7 +1851,7 @@ void publishCOPDiscovery() {
                 << "\"name\":\"Stiebel Eltron Wärmepumpe\","
                 << "\"manufacturer\":\"Stiebel Eltron\"}}";
         std::string payloadStr = payload.str();
-        id(mqtt_client).publish(discoveryTopic, payloadStr.c_str(), payloadStr.length(), 0, true);
+        mqttPublish(discoveryTopic, payloadStr.c_str(), payloadStr.length());
     }
     
     copDiscoveryPublished = true;
@@ -1701,7 +1934,7 @@ void updateCOPCalculations() {
             char valueStr[16];
             snprintf(valueStr, sizeof(valueStr), "%.2f", cop_ww);
             const char* stateTopic = "heatingpump/calculated/cop_ww/state";
-            id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
+            publishCalculatedState(stateTopic, valueStr);
             ESP_LOGD("COP", "COP WW: %.2f (Wärme: %.3f MWh, El: %.3f MWh)", cop_ww, waerme_ww, el_ww);
         }
     }
@@ -1719,7 +1952,7 @@ void updateCOPCalculations() {
             char valueStr[16];
             snprintf(valueStr, sizeof(valueStr), "%.2f", cop_heiz);
             const char* stateTopic = "heatingpump/calculated/cop_heiz/state";
-            id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
+            publishCalculatedState(stateTopic, valueStr);
             ESP_LOGD("COP", "COP Heizung: %.2f (Wärme: %.3f MWh, El: %.3f MWh)", cop_heiz, waerme_heiz, el_heiz);
         }
     }
@@ -1741,7 +1974,7 @@ void updateCOPCalculations() {
             char valueStr[16];
             snprintf(valueStr, sizeof(valueStr), "%.2f", cop_gesamt);
             const char* stateTopic = "heatingpump/calculated/cop_gesamt/state";
-            id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
+            publishCalculatedState(stateTopic, valueStr);
             ESP_LOGD("COP", "COP Gesamt: %.2f (Wärme: %.3f MWh, El: %.3f MWh)", cop_gesamt, waerme_total, el_total);
         }
     }
@@ -1963,7 +2196,7 @@ void publishCombinedEnergySensors() {
         char valueStr[32];
         snprintf(valueStr, sizeof(valueStr), "%.3f", total);
         publishCalculatedSensorDiscovery(cfg, false);
-        id(mqtt_client).publish(topic, valueStr, strlen(valueStr), 0, true);
+        publishCalculatedState(topic, valueStr);
         ESP_LOGD("ENERGIE", "Gesamt (%s): %.3f kWh", key, total);
     };
     publishTotal(calculatedSensors[9], "heatingpump/calculated/energie_heiz_total_kwh/state", "combined_energie_heiz", 0,
@@ -2029,7 +2262,7 @@ void publishCombinedEnergySensors() {
             }
             opState = ns;
             publishCalculatedSensorDiscovery(calculatedSensors[14], false);
-            id(mqtt_client).publish("heatingpump/calculated/betriebsstatus/state", opState, strlen(opState), 0, true);
+            publishCalculatedState("heatingpump/calculated/betriebsstatus/state", opState);
             lastStatusMs = nowMs;
         }
 
@@ -2043,11 +2276,11 @@ void publishCombinedEnergySensors() {
             snprintf(ph, sizeof(ph), "%.0f", pHeiz);
             snprintf(pw, sizeof(pw), "%.0f", pWw);
             publishCalculatedSensorDiscovery(calculatedSensors[13], false);
-            id(mqtt_client).publish("heatingpump/calculated/el_leistung_w/state", v, strlen(v), 0, true);
+            publishCalculatedState("heatingpump/calculated/el_leistung_w/state", v);
             publishCalculatedSensorDiscovery(calculatedSensors[19], false);
-            id(mqtt_client).publish("heatingpump/calculated/el_leistung_heiz_w/state", ph, strlen(ph), 0, true);
+            publishCalculatedState("heatingpump/calculated/el_leistung_heiz_w/state", ph);
             publishCalculatedSensorDiscovery(calculatedSensors[20], false);
-            id(mqtt_client).publish("heatingpump/calculated/el_leistung_ww_w/state", pw, strlen(pw), 0, true);
+            publishCalculatedState("heatingpump/calculated/el_leistung_ww_w/state", pw);
             ESP_LOGD("ENERGIE", "Leistung: %.0f W (Heiz %.0f, WW %.0f) in %.0fs", pHeiz + pWw, pHeiz, pWw, dtSec);
             accHeizWh = 0.0f; accWwWh = 0.0f; windowStartMs = nowMs;
         }
@@ -2066,7 +2299,7 @@ void publishCombinedEnergySensors() {
             char s[24];
             snprintf(s, sizeof(s), "%.3f", daily);
             publishCalculatedSensorDiscovery(cfg, false);
-            id(mqtt_client).publish(topic, s, strlen(s), 0, true);
+            publishCalculatedState(topic, s);
         };
         pubDaily("EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", "EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH", calculatedSensors[15], "heatingpump/calculated/energie_heiz_tag_kwh/state");
         pubDaily("EL_AUFNAHMELEISTUNG_WW_TAG_KWH",   "EL_AUFNAHMELEISTUNG_WW_TAG_WH",   calculatedSensors[16], "heatingpump/calculated/energie_ww_tag_kwh/state");
@@ -2090,13 +2323,18 @@ public:
     static ESPPreferenceObject nvsActive;
 
     void writeCanSignal(const char* signalName, const char* value) override {
-        writeSignal(&CanMembers[cm_manager], signalName, value);
-        delay(100);
-        readSignal(&CanMembers[cm_manager], signalName);
+        const CanMember* cm = &CanMembers[cm_manager];
+        const ElsterIndex* ei = GetElsterIndex(signalName);
+        const char* v = value;
+        writeSignal(cm, ei, v);
+        // Read back ~100 ms later from the 250 ms interval (pendingReadbackStep()),
+        // instead of blocking the loop with delay(100) per written signal.
+        scheduleReadback(cm, ei);
     }
 
+    // SG Ready states always go out (not through the publish-on-change cache)
     void publishMqtt(const char* topic, const char* value) override {
-        id(mqtt_client).publish(topic, value, strlen(value), 0, true);
+        mqttPublish(topic, value, strlen(value));
     }
 
     void saveBoostState(float dhw, float room, bool active) override {
@@ -2163,12 +2401,12 @@ inline void publishSgReadyState() {
     int idx = currentSgReadyState - 1;
     if (idx < 0 || idx > 3) idx = 1;  // fall back to "2 - Normal"
     const char* s = sgReadyOptions[idx];
-    id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_STATE/state", s, strlen(s), 0, true);
+    mqttPublish("heatingpump/MANAGER/SG_READY_STATE/state", s, strlen(s));
     char b3[16], b4[16];
     snprintf(b3, sizeof(b3), "%.1f", sgReadyBoostState3Value());
     snprintf(b4, sizeof(b4), "%.1f", sgReadyBoostState4Value());
-    id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_BOOST_STATE3/state", b3, strlen(b3), 0, true);
-    id(mqtt_client).publish("heatingpump/MANAGER/SG_READY_BOOST_STATE4/state", b4, strlen(b4), 0, true);
+    mqttPublish("heatingpump/MANAGER/SG_READY_BOOST_STATE3/state", b3, strlen(b3));
+    mqttPublish("heatingpump/MANAGER/SG_READY_BOOST_STATE4/state", b4, strlen(b4));
 }
 
 // ============================================================================
@@ -2205,6 +2443,7 @@ constexpr uint32_t HASH_WPVORLAUFIST = hash("WPVORLAUFIST");
 constexpr uint32_t HASH_RUECKLAUFISTTEMP = hash("RUECKLAUFISTTEMP");
 constexpr uint32_t HASH_VERDICHTER = hash("VERDICHTER");
 constexpr uint32_t HASH_FEHLERMELDUNG = hash("FEHLERMELDUNG");
+constexpr uint32_t HASH_EVU_SPERRE_AKTIV = hash("EVU_SPERRE_AKTIV");
 constexpr uint32_t HASH_SOMMERBETRIEB = hash("SOMMERBETRIEB");
 constexpr uint32_t HASH_SOMMERBETRIEB_TEMP = hash("SOMMERBETRIEB_TEMP");
 constexpr uint32_t HASH_GEBAEUDEART = hash("GEBAEUDEART");
@@ -2288,10 +2527,10 @@ void publishSummerState() {
     publishCalculatedSensorDiscovery(*active, false);
     publishCalculatedSensorDiscovery(*damped, false);
     const char* st = summer.active ? "on" : "off";
-    id(mqtt_client).publish(active->stateTopic, st, strlen(st), 0, true);
+    publishCalculatedState(active->stateTopic, st);
     char buf[16];
     snprintf(buf, sizeof(buf), "%.1f", summer.ema);
-    id(mqtt_client).publish(damped->stateTopic, buf, strlen(buf), 0, true);
+    publishCalculatedState(damped->stateTopic, buf);
 }
 
 // Outside temperature of the controller's own sensor (KESSEL on WPMW II, not the
@@ -2339,26 +2578,30 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
     // WPL13E: ABTAUUNGAKTIV = 0x0200 while the compressor runs (no defrost).
     if (value == "?" && (ei->Type == et_bool || ei->Type == et_little_bool)) return;
 
+    // Per frame: no std::string temporaries. The name hash drives the member/signal
+    // key (discovery, back-off) and the dispatch switch below.
+    const char* signalName = ei->Name;
+    const uint32_t signalHash = hash_runtime(signalName);
+    const uint64_t key = signalKey(cm, signalHash);
+
     // -255 = the device does not provide this value: count it for the poll
     // back-off and create no HA entity until a real value has been seen.
-    std::string uid = getOrCreateUID(cm, ei->Name);
-    std::string streakKey = std::string(cm.Name) + "_" + ei->Name;
     if (value == "-255") {
-        uint8_t& streak = invalidStreak[streakKey];
+        uint8_t& streak = invalidStreak[key];
         if (streak < 255) streak++;
         if (streak >= 3) {
-            ESP_LOGD("BACKOFF", "%s streak=%u", streakKey.c_str(), streak);
+            ESP_LOGD("BACKOFF", "%s_%s streak=%u", cm.Name, signalName, streak);
         }
-        if (discoveredSignals.find(uid) == discoveredSignals.end()) return;
-    } else {
-        invalidStreak.erase(streakKey);
+        if (discoveredSignals.find(key) == discoveredSignals.end()) return;
+    } else if (!invalidStreak.empty()) {
+        invalidStreak.erase(key);
     }
 
     // Invert boolean logic for EVU_SPERRE_AKTIV signal
     // CAN: 1 = lock inactive (off), 0 = lock active (on)
     // MQTT: "off" = lock inactive, "on" = lock active
-    std::string publishValue = value;
-    if (strcmp(ei->Name, "EVU_SPERRE_AKTIV") == 0) {
+    const char* publishValue = value.c_str();
+    if (signalHash == HASH_EVU_SPERRE_AKTIV && strcmp(signalName, "EVU_SPERRE_AKTIV") == 0) {
         if (value == "on") {
             publishValue = "off";
         } else if (value == "off") {
@@ -2366,21 +2609,16 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
         }
     }
     
-    // Check if discovery is needed
-    bool needsDiscovery = (discoveredSignals.find(uid) == discoveredSignals.end());
-    
-    if (needsDiscovery) {
-        // Mark as discovered and publish discovery immediately
-        discoveredSignals.emplace(uid, DiscoveredSignal{&cm, ei});
+    // Check if discovery is needed: mark as discovered and publish discovery immediately
+    if (discoveredSignals.find(key) == discoveredSignals.end()) {
+        discoveredSignals.emplace(key, DiscoveredSignal{&cm, ei});
         publishMqttDiscovery(cm, ei);
     }
     
-    // Publish state
+    // Publish state (on change / heartbeat)
     publishMqttState(cm, ei, publishValue);
     
     // Fast signal dispatch using compile-time hash (O(1) switch/jump table)
-    const char* signalName = ei->Name;
-    uint32_t signalHash = hash_runtime(signalName);
     
     switch (signalHash) {
         case HASH_JAHR: {
@@ -2507,7 +2745,7 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
             char topic[64], buf[192];
             snprintf(topic, sizeof(topic), "heatingpump/%s/FEHLERMELDUNG/attributes", cm.Name);
             snprintf(buf, sizeof(buf), "{\"abhilfe\":\"%s\"}", faultRemedy(value));
-            id(mqtt_client).publish(topic, buf, strlen(buf), 0, true);
+            mqttPublish(topic, buf, strlen(buf));
             break;
         }
 
@@ -2582,17 +2820,23 @@ void publishCanDiagnostics() {
     publishCalculatedSensorDiscovery(calculatedSensors[6]);
     publishCalculatedSensorDiscovery(calculatedSensors[7]);
     publishCalculatedSensorDiscovery(calculatedSensors[8]);
+    publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_CAN_RX_MISSED]);
+    publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_CAN_RX_OVERRUN]);
+    publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_CAN_RX_QUEUE]);
 
     char buf[16];
-
-    snprintf(buf, sizeof(buf), "%lu", (unsigned long)status.tx_error_counter);
-    id(mqtt_client).publish("heatingpump/calculated/can_tec/state", buf, strlen(buf), 0, true);
-
-    snprintf(buf, sizeof(buf), "%lu", (unsigned long)status.rx_error_counter);
-    id(mqtt_client).publish("heatingpump/calculated/can_rec/state", buf, strlen(buf), 0, true);
-
-    snprintf(buf, sizeof(buf), "%lu", (unsigned long)status.bus_error_count);
-    id(mqtt_client).publish("heatingpump/calculated/can_bus_errors/state", buf, strlen(buf), 0, true);
+    auto pub = [&buf](const char* topic, uint32_t v) {
+        snprintf(buf, sizeof(buf), "%lu", (unsigned long)v);
+        publishCalculatedState(topic, buf);
+    };
+    pub("heatingpump/calculated/can_tec/state", status.tx_error_counter);
+    pub("heatingpump/calculated/can_rec/state", status.rx_error_counter);
+    pub("heatingpump/calculated/can_bus_errors/state", status.bus_error_count);
+    // Frames lost because the RX queue was full / the hardware FIFO overran, and
+    // frames waiting in the RX queue right now (loop latency indicator)
+    pub(calculatedSensors[CALC_IDX_CAN_RX_MISSED].stateTopic, status.rx_missed_count);
+    pub(calculatedSensors[CALC_IDX_CAN_RX_OVERRUN].stateTopic, status.rx_overrun_count);
+    pub(calculatedSensors[CALC_IDX_CAN_RX_QUEUE].stateTopic, status.msgs_to_rx);
 
     const char* stateStr;
     switch (status.state) {
@@ -2602,8 +2846,15 @@ void publishCanDiagnostics() {
         case TWAI_STATE_RECOVERING: stateStr = "Erholung";  break;
         default:                    stateStr = "Unbekannt"; break;
     }
-    id(mqtt_client).publish("heatingpump/calculated/can_state/state",
-                            stateStr, strlen(stateStr), 0, true);
+    publishCalculatedState("heatingpump/calculated/can_state/state", stateStr);
+}
+
+// Failed MQTT publishes since boot (both CAN variants, not tied to TWAI)
+void publishMqttDiagnostics() {
+    publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_MQTT_PUBLISH_FAILURES]);
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%lu", (unsigned long)mqttPublishFailures);
+    publishCalculatedState(calculatedSensors[CALC_IDX_MQTT_PUBLISH_FAILURES].stateTopic, buf);
 }
 
 // Process calculated sensor updates with frequency-based scheduling
@@ -2663,6 +2914,7 @@ void processCalculatedSensors() {
     // Check and publish CAN diagnostic sensors
     if (now >= nextCanDiagUpdate) {
         publishCanDiagnostics();
+        publishMqttDiagnostics();
         nextCanDiagUpdate = now + (CALC_CAN_DIAG_FREQUENCY * 1000UL) + getRandomInRange(0, 1000);
     }
 }
@@ -2697,7 +2949,7 @@ void publishScanStatus(const char* state) {
     snprintf(buf, sizeof(buf), "{\"state\":\"%s\",\"member\":\"%s\",\"done\":%u,\"total\":%u,\"hits\":%u,\"seconds\":%lu}",
              state, scanState.cm ? scanState.cm->Name : "", (unsigned)done, (unsigned)total, scanState.hits,
              (millis() - scanState.startMs) / 1000UL);
-    id(mqtt_client).publish("heatingpump/scan/status", buf, strlen(buf), 0, true);
+    mqttPublish("heatingpump/scan/status", buf, strlen(buf));
 }
 
 // payload: "HEIZMODUL" (all table indices) or "HEIZMODUL 0x0000 0x0fff" (range)
@@ -2758,7 +3010,7 @@ bool handleScanFrame(const CanMember& cm, const ElsterIndex* ei, const std::vect
         snprintf(topic, sizeof(topic), "heatingpump/scan/%s/0x%04x", cm.Name, idx);
         snprintf(buf, sizeof(buf), "{\"name\":\"%s\",\"raw\":%u,\"value\":\"%s\"}",
                  ei->Index == idx ? ei->Name : "", raw, value.c_str());
-        id(mqtt_client).publish(topic, buf, strlen(buf), 0, true);
+        mqttPublish(topic, buf, strlen(buf));
     }
     return true;
 }
@@ -2820,7 +3072,7 @@ void publishFaultList() {
             "\"availability_topic\":\"heatingpump/status\",\"icon\":\"mdi:clipboard-alert-outline\","
             "\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL_STR "\"],"
             "\"name\":\"Stiebel Eltron Wärmepumpe\",\"manufacturer\":\"Stiebel Eltron\"}}";
-        id(mqtt_client).publish("homeassistant/sensor/heatingpump/stiebel_calculated_fehlerliste/config", cfg, strlen(cfg), 0, true);
+        mqttPublish("homeassistant/sensor/heatingpump/stiebel_calculated_fehlerliste/config", cfg, strlen(cfg));
         discovered = true;
     }
     std::ostringstream a;
@@ -2837,8 +3089,8 @@ void publishFaultList() {
     }
     a << "]}";
     std::string attrs = a.str();
-    id(mqtt_client).publish("heatingpump/calculated/fehlerliste/attributes", attrs.c_str(), attrs.length(), 0, true);
-    id(mqtt_client).publish("heatingpump/calculated/fehlerliste/state", newest.c_str(), newest.length(), 0, true);
+    mqttPublish("heatingpump/calculated/fehlerliste/attributes", attrs.c_str(), attrs.length());
+    mqttPublish("heatingpump/calculated/fehlerliste/state", newest.c_str(), newest.length());
 }
 
 // Called every second from common.yaml; pauses during a bus scan.
@@ -2872,6 +3124,35 @@ bool handleFaultListFrame(const CanMember& cm, const std::vector<uint8_t>& msg) 
     return true;
 }
 
+// Request table entries resolved once when the request manager starts: the
+// ElsterIndex pointer (nullptr = unknown/blacklisted, skipped) and the schedule key
+// per member. Avoids two name searches and string keys per entry and second.
+static const CanMemberType REQUEST_ALL_MEMBERS[] = {cm_kessel, cm_manager, cm_heizmodul};
+static constexpr size_t REQUEST_ALL_MEMBER_COUNT = sizeof(REQUEST_ALL_MEMBERS) / sizeof(REQUEST_ALL_MEMBERS[0]);
+struct ResolvedRequest {
+    const ElsterIndex* ei;
+    uint64_t key[REQUEST_ALL_MEMBER_COUNT];   // [0] only for a single member
+};
+static std::vector<ResolvedRequest> resolvedRequests;
+
+void resolveSignalRequests() {
+    resolvedRequests.assign(SIGNAL_REQUEST_COUNT, ResolvedRequest{nullptr, {0, 0, 0}});
+    for (size_t i = 0; i < SIGNAL_REQUEST_COUNT; i++) {
+        const SignalRequest& req = signalRequests[i];
+        const ElsterIndex* ei = GetElsterIndex(req.signalName);
+        if (!ei || ei->Index == 0xFFFF || ei->isBlacklisted) continue;  // unknown or blacklisted
+        ResolvedRequest& r = resolvedRequests[i];
+        r.ei = ei;
+        const uint32_t h = elsterNameHash(ei->Name);
+        if (req.member == cm_other) {
+            for (size_t m = 0; m < REQUEST_ALL_MEMBER_COUNT; m++)
+                r.key[m] = signalKey(CanMembers[REQUEST_ALL_MEMBERS[m]], h);
+        } else {
+            r.key[0] = signalKey(CanMembers[req.member], h);
+        }
+    }
+}
+
 void processSignalRequests() {
     unsigned long now = millis();
     if (scanState.active) return;  // bus scan owns the request slot
@@ -2896,39 +3177,20 @@ void processSignalRequests() {
         requestManagerStarted = true;
         ESP_LOGI("REQUEST_MGR", "Signal request manager active - processing %d signal definitions", 
                  SIGNAL_REQUEST_COUNT);
+        resolveSignalRequests();
         
         // Initialize all signal schedules with random offsets to spread out initial load
         ESP_LOGI("REQUEST_MGR", "Initializing signal schedules with random offsets to prevent burst");
-        for (int i = 0; i < SIGNAL_REQUEST_COUNT; i++) {
+        for (size_t i = 0; i < SIGNAL_REQUEST_COUNT; i++) {
             const SignalRequest& req = signalRequests[i];
-            const ElsterIndex* ei = GetElsterIndex(req.signalName);
-            if (!ei || ei->Index == 0xFFFF) continue;
-            
-            // Skip blacklisted signals during initialization
-            if (isPermanentlyBlacklisted(ei->Name)) continue;
+            const ResolvedRequest& r = resolvedRequests[i];
+            if (!r.ei) continue;   // unknown or blacklisted
             
             unsigned long intervalMs = req.frequency * 1000UL;
-            
-            if (req.member == cm_other) {
-                // Schedule for all members
-                const CanMember* allMembers[] = {
-                    &CanMembers[cm_kessel],
-                    &CanMembers[cm_manager],
-                    &CanMembers[cm_heizmodul]
-                };
-                for (size_t m = 0; m < 3; m++) {
-                    std::string key = std::string(allMembers[m]->Name) + "_" + ei->Name;
-                    // Random offset between 0 and full interval using ESP32 hardware RNG
-                    unsigned long randomOffset = getRandomInRange(0, intervalMs + 1);
-                    nextRequestTime[key] = now + randomOffset;
-                }
-            } else {
-                // Schedule for specific member
-                const CanMember* member = &CanMembers[req.member];
-                std::string key = std::string(member->Name) + "_" + ei->Name;
+            const size_t members = (req.member == cm_other) ? REQUEST_ALL_MEMBER_COUNT : 1;
+            for (size_t m = 0; m < members; m++) {
                 // Random offset between 0 and full interval using ESP32 hardware RNG
-                unsigned long randomOffset = getRandomInRange(0, intervalMs + 1);
-                nextRequestTime[key] = now + randomOffset;
+                nextRequestTime[r.key[m]] = now + getRandomInRange(0, intervalMs + 1);
             }
         }
         ESP_LOGI("REQUEST_MGR", "Initialized %d signal schedules", nextRequestTime.size());
@@ -2943,92 +3205,40 @@ void processSignalRequests() {
     int processedCount = 0;
     int currentIndex = signalProcessingStartIndex;
     
-    while (processedCount < SIGNAL_REQUEST_COUNT && requestsSentThisIteration < MAX_REQUESTS_PER_ITERATION) {
+    while (processedCount < (int)SIGNAL_REQUEST_COUNT && requestsSentThisIteration < MAX_REQUESTS_PER_ITERATION) {
         const SignalRequest& req = signalRequests[currentIndex];
+        const ResolvedRequest& r = resolvedRequests[currentIndex];
         processedCount++;
         
-        const ElsterIndex* ei = GetElsterIndex(req.signalName);
-        if (!ei || ei->Index == 0xFFFF) {
-            // Move to next signal and continue
+        const ElsterIndex* ei = r.ei;
+        if (!ei) {
+            // Unknown or blacklisted: never requested on the CAN bus
             currentIndex = (currentIndex + 1) % SIGNAL_REQUEST_COUNT;
-            continue; // Signal not found in table
-        }
-        
-        // Skip blacklisted signals - don't request them on CAN bus
-        if (isPermanentlyBlacklisted(ei->Name)) {
-            currentIndex = (currentIndex + 1) % SIGNAL_REQUEST_COUNT;
-            continue; // Signal is blacklisted
+            continue;
         }
         
         unsigned long intervalMs = req.frequency * 1000UL;
+        // Calculate next scheduled time with random offset (0 to 5% of interval)
+        // This keeps signals from synchronizing while staying close to target frequency
+        unsigned long maxJitter = (intervalMs / 20); // 5% of interval
+        if (maxJitter < 500) maxJitter = 500; // Minimum 500ms jitter
         
-        // Determine which members to request from
-        if (req.member == cm_other) {
-            // Request from all members (each tracked independently)
-            const CanMember* allMembers[] = {
-                &CanMembers[cm_kessel],
-                &CanMembers[cm_manager],
-                &CanMembers[cm_heizmodul]
-            };
-            
-            // Track how many members we've sent to in this cm_other group to stagger them
-            int sentInThisGroup = 0;
-            
-            for (const auto* member : allMembers) {
-                // Don't break - just skip remaining members for this signal
-                // The outer loop will continue with next signal
-                if (requestsSentThisIteration >= MAX_REQUESTS_PER_ITERATION) {
-                    break; // Hit rate limit for this iteration
-                }
-                
-                // Use ei->Name (from ElsterTable) to match blacklist key format
-                std::string key = std::string(member->Name) + "_" + ei->Name;
-                
-                // Get the next scheduled time for this signal
-                unsigned long nextScheduled = nextRequestTime[key];
-                
-                // Check if this signal is overdue (current time >= scheduled time)
-                if (now >= nextScheduled) {
-                    // For cm_other: only send to ONE member per iteration to prevent bursts
-                    // Other members will be checked in subsequent iterations
-                    if (sentInThisGroup == 0) {
-                        readSignal(member, ei);
-                        requestsSentThisIteration++;
-                        sentInThisGroup++;
-                        
-                        // Calculate next scheduled time with random offset (0 to 5% of interval)
-                        // This keeps signals from synchronizing while staying close to target frequency
-                        unsigned long maxJitter = (intervalMs / 20); // 5% of interval
-                        if (maxJitter < 500) maxJitter = 500; // Minimum 500ms jitter
-                        unsigned long randomDelay = getRandomInRange(0, maxJitter + 1);
-                        nextRequestTime[key] = now + backoffIntervalMs(key, intervalMs) + randomDelay;
-                        
-                        // ESP_LOGD("REQUEST_MGR", "Sent %s, next in %lums", key.c_str(), intervalMs + randomDelay);
-                    }
-                    // Else: skip this member for now, will be checked next iteration
-                }
-            }
-        } else {
-            // Request from specific member
-            const CanMember* member = &CanMembers[req.member];
-            std::string key = std::string(member->Name) + "_" + ei->Name;
-            
-            // Get the next scheduled time for this signal
-            unsigned long nextScheduled = nextRequestTime[key];
+        // Determine which members to request from: cm_other = all members (each
+        // tracked independently), but only ONE of them per iteration to prevent bursts
+        const size_t members = (req.member == cm_other) ? REQUEST_ALL_MEMBER_COUNT : 1;
+        for (size_t m = 0; m < members && requestsSentThisIteration < MAX_REQUESTS_PER_ITERATION; m++) {
+            const CanMember* member = (req.member == cm_other) ? &CanMembers[REQUEST_ALL_MEMBERS[m]]
+                                                               : &CanMembers[req.member];
+            const uint64_t key = r.key[m];
             
             // Check if this signal is overdue (current time >= scheduled time)
-            if (now >= nextScheduled) {
+            if (now >= nextRequestTime[key]) {
                 readSignal(member, ei);
                 requestsSentThisIteration++;
-                
-                // Calculate next scheduled time with random offset (0 to 5% of interval)
-                // This keeps signals from synchronizing while staying close to target frequency
-                unsigned long maxJitter = (intervalMs / 20); // 5% of interval
-                if (maxJitter < 500) maxJitter = 500; // Minimum 500ms jitter
                 unsigned long randomDelay = getRandomInRange(0, maxJitter + 1);
                 nextRequestTime[key] = now + backoffIntervalMs(key, intervalMs) + randomDelay;
-                
-                // ESP_LOGD("REQUEST_MGR", "Sent %s, next in %lums", key.c_str(), intervalMs + randomDelay);
+                // Other members of a cm_other group are checked in later iterations
+                break;
             }
         }
         
@@ -3037,7 +3247,7 @@ void processSignalRequests() {
     }
 }
 
-void processAndUpdate(uint32_t can_id, std::vector<uint8_t> msg)
+void processAndUpdate(uint32_t can_id, const std::vector<uint8_t> &msg)
 {
     // processCanMessage() leaves the member unset for short frames
     if (msg.size() < 7) return;
@@ -3061,8 +3271,8 @@ void processAndUpdate(uint32_t can_id, std::vector<uint8_t> msg)
     if (handleScanFrame(*cm, ei, msg, value)) return;
     if (handleFaultListFrame(*cm, msg)) return;
 
-    // Skip permanently blacklisted signals
-    if (isPermanentlyBlacklisted(ei->Name))
+    // Skip permanently blacklisted signals (flag of the decoded row, no name lookup)
+    if (ei->isBlacklisted)
     {
         return; // Reject before lookup, parsing, formatting, logging
     }

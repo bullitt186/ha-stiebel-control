@@ -137,6 +137,10 @@
 #define LNAME_CALC_FEHLERLISTE                 "Fehlerliste"
 #define LNAME_CALC_AUSSENTEMP_GEDAEMPFT        "Außentemperatur gedämpft"
 #define LNAME_CALC_REGELABWEICHUNG             "Regelabweichung (Rücklauf − Soll)"
+#define LNAME_CALC_CAN_RX_MISSED               "CAN RX verloren (Queue voll)"
+#define LNAME_CALC_CAN_RX_OVERRUN              "CAN RX Überlauf (FIFO)"
+#define LNAME_CALC_CAN_RX_QUEUE                "CAN RX Warteschlange"
+#define LNAME_CALC_MQTT_PUBLISH_FAILURES       "MQTT Sendefehler"
 
 // ============================================================================
 // Writable number friendly names (writableNumbers[])

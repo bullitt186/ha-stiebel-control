@@ -436,6 +436,10 @@ static void resetDiscoveryState() {
     discoveredWritableNumbers.clear();
     discoveredWritableSelects.clear();
     invalidStreak.clear();
+    resetStateCache();
+    fake_millis() = 0;
+    mqtt_client_instance().connected = true;
+    mqtt_client_instance().fail_publish = false;
     mqtt_client_instance().clear();
 }
 
@@ -617,7 +621,7 @@ TEST_CASE("backoff: interval grows from the 3rd -255 and resets on a valid value
     resetDiscoveryState();
     const CanMember& mgr = CanMembers[cm_manager];
     const ElsterIndex* ei = GetElsterIndex("RUECKLAUFISTTEMP");
-    const std::string key = "MANAGER_RUECKLAUFISTTEMP";
+    const uint64_t key = signalKey(mgr, "RUECKLAUFISTTEMP");
     for (int i = 0; i < 2; i++) updateSensor(mgr, ei, "-255");
     CHECK(backoffIntervalMs(key, 60000) == 60000);
     updateSensor(mgr, ei, "-255");
@@ -1317,9 +1321,10 @@ TEST_CASE("summer: published once automatic, threshold and outside temperature a
     updateSensor(mgr, GetElsterIndex("SOMMERBETRIEB"), "on");
     updateSensor(kessel, GetElsterIndex("AUSSENTEMP"), "12.0");
     CHECK(mqttFindPayload("calculated/aussentemp_gedaempft/state") == "12.0");
+    CHECK(mqttFindPayload("calculated/sommerbetrieb_aktiv/state") == "on");
     mqtt_client_instance().clear();
     updateSensor(mgr, GetElsterIndex("SOMMERBETRIEB"), "on");
-    CHECK(mqttFindPayload("calculated/sommerbetrieb_aktiv/state") == "on");
+    CHECK(mqttFindPayload("calculated/sommerbetrieb_aktiv/state").empty());   // unchanged: not re-sent
     mqtt_client_instance().clear();
     updateSensor(mgr, GetElsterIndex("SOMMERBETRIEB"), "off");
     CHECK(mqttFindPayload("calculated/sommerbetrieb_aktiv/state") == "off");
@@ -1460,4 +1465,271 @@ TEST_CASE("republishAllDiscoveries: restart instead of duplicate queue, waits fo
     mqtt_client_instance().clear();
     discoveryRepublishStep();
     CHECK(mqtt_client_instance().messages.empty());
+}
+
+// ============================================================================
+// #55: publish on change + heartbeat, reconnect republish
+// ============================================================================
+
+static size_t countTopic(const std::string& topic) {
+    size_t n = 0;
+    for (const auto& m : mqtt_client_instance().messages)
+        if (m.topic == topic) n++;
+    return n;
+}
+
+TEST_CASE("state cache: unchanged raw value is suppressed, a change is published", "[mqtt][state]") {
+    resetDiscoveryState();
+    const CanMember& kessel = CanMembers[cm_kessel];
+    const ElsterIndex* ei = GetElsterIndex("SPEICHERISTTEMP");
+    const std::string topic = "heatingpump/KESSEL/SPEICHERISTTEMP/state";
+    publishMqttState(kessel, ei, "48.0");
+    CHECK(countTopic(topic) == 1);
+    fake_millis() = 30000;
+    publishMqttState(kessel, ei, "48.0");
+    publishMqttState(kessel, ei, "48.0");
+    CHECK(countTopic(topic) == 1);
+    CHECK(stateSuppressedCount == 2);
+    publishMqttState(kessel, ei, "48.5");
+    CHECK(countTopic(topic) == 2);
+    CHECK(mqtt_client_instance().messages.back().payload == "48.5");
+    // same signal on another member is its own topic
+    publishMqttState(CanMembers[cm_manager], ei, "48.5");
+    CHECK(countTopic("heatingpump/MANAGER/SPEICHERISTTEMP/state") == 1);
+}
+
+TEST_CASE("state cache: heartbeat re-sends an unchanged value after STATE_HEARTBEAT_MS", "[mqtt][state]") {
+    resetDiscoveryState();
+    const CanMember& kessel = CanMembers[cm_kessel];
+    const ElsterIndex* ei = GetElsterIndex("SPEICHERISTTEMP");
+    const std::string topic = "heatingpump/KESSEL/SPEICHERISTTEMP/state";
+    fake_millis() = 1000;
+    publishMqttState(kessel, ei, "48.0");
+    fake_millis() = 1000 + STATE_HEARTBEAT_MS - 1;
+    publishMqttState(kessel, ei, "48.0");
+    CHECK(countTopic(topic) == 1);
+    fake_millis() = 1000 + STATE_HEARTBEAT_MS;
+    publishMqttState(kessel, ei, "48.0");
+    CHECK(countTopic(topic) == 2);
+    // the heartbeat restarts from the last publish
+    fake_millis() = 1000 + STATE_HEARTBEAT_MS + 5000;
+    publishMqttState(kessel, ei, "48.0");
+    CHECK(countTopic(topic) == 2);
+}
+
+TEST_CASE("state cache: calculated sensors are deduplicated too", "[mqtt][state]") {
+    resetDiscoveryState();
+    lastVerdichterValue = 50.0f;
+    publishCompressorActive();
+    publishCompressorActive();
+    CHECK(countTopic("heatingpump/calculated/compressor_active/state") == 1);
+    lastVerdichterValue = 1.0f;
+    publishCompressorActive();
+    CHECK(countTopic("heatingpump/calculated/compressor_active/state") == 2);
+    CHECK(mqttFindPayload("compressor_active/state") == "on");   // first message
+    CHECK(mqtt_client_instance().messages.back().payload == "off");
+    lastVerdichterValue = NAN;
+}
+
+TEST_CASE("state cache: values while disconnected stay pending and go out on reconnect", "[mqtt][state]") {
+    resetDiscoveryState();
+    const CanMember& kessel = CanMembers[cm_kessel];
+    publishMqttState(kessel, GetElsterIndex("SPEICHERISTTEMP"), "48.0");
+    publishCalculatedState("heatingpump/calculated/date/state", "2026-10-30");
+    mqtt_client_instance().connected = false;
+    publishMqttState(kessel, GetElsterIndex("SPEICHERISTTEMP"), "49.0");   // changed while offline
+    for (int i = 0; i < 5; i++) {
+        char v[8];
+        snprintf(v, sizeof(v), "%d.0", 20 + i);
+        publishMqttState(kessel, GetElsterIndex(i % 2 ? "AUSSENTEMP" : "SPEICHERSOLLTEMP"), v);
+    }
+    CHECK(mqttPublishFailures == 0);   // not even attempted while offline
+    mqtt_client_instance().clear();
+
+    // (re)connect: on_connect starts both republish cursors; nothing while offline
+    republishAllStates();
+    stateRepublishStep();
+    CHECK(mqtt_client_instance().messages.empty());
+    mqtt_client_instance().connected = true;
+
+    size_t steps = 0, maxPerStep = 0;
+    while (stateRepublishActive && steps < 100) {
+        size_t before = mqtt_client_instance().messages.size();
+        stateRepublishStep();
+        maxPerStep = std::max(maxPerStep, mqtt_client_instance().messages.size() - before);
+        steps++;
+    }
+    CHECK(!stateRepublishActive);
+    CHECK(maxPerStep <= (size_t)STATE_REPUBLISH_BATCH);
+    CHECK(mqtt_client_instance().messages.size() == stateCache.size());
+    CHECK(countTopic("heatingpump/KESSEL/SPEICHERISTTEMP/state") == 1);
+    CHECK(mqttFindPayload("KESSEL/SPEICHERISTTEMP/state") == "49.0");      // newest value
+    CHECK(mqttFindPayload("calculated/date/state") == "2026-10-30");
+    CHECK(mqttFindPayload("KESSEL/AUSSENTEMP/state") == "23.0");
+
+    // republished values count as sent: no duplicate on the next identical value
+    mqtt_client_instance().clear();
+    publishMqttState(kessel, GetElsterIndex("SPEICHERISTTEMP"), "49.0");
+    CHECK(mqtt_client_instance().messages.empty());
+}
+
+TEST_CASE("state cache: republish waits for the discovery republish", "[mqtt][state]") {
+    resetDiscoveryState();
+    updateSensor(CanMembers[cm_kessel], GetElsterIndex("SPEICHERSOLLTEMP"), "50.0");
+    mqtt_client_instance().clear();
+    republishAllDiscoveries();
+    republishAllStates();
+    stateRepublishStep();
+    CHECK(countTopic("heatingpump/KESSEL/SPEICHERSOLLTEMP/state") == 0);
+    while (discoveryRepublishActive()) discoveryRepublishStep();
+    stateRepublishStep();
+    CHECK(countTopic("heatingpump/KESSEL/SPEICHERSOLLTEMP/state") == 1);
+}
+
+TEST_CASE("state cache: a write forces the next read-back to be published", "[mqtt][state]") {
+    resetDiscoveryState();
+    const CanMember* mgr = &CanMembers[cm_manager];
+    const ElsterIndex* ei = GetElsterIndex("EINSTELL_SPEICHERSOLLTEMP");
+    publishMqttState(*mgr, ei, "48.0");
+    publishMqttState(*mgr, ei, "48.0");
+    CHECK(countTopic("heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP/state") == 1);
+    writeSignal(mgr, "EINSTELL_SPEICHERSOLLTEMP", "50.0");
+    publishMqttState(*mgr, ei, "48.0");   // device kept the old value: HA still gets the echo
+    CHECK(countTopic("heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP/state") == 2);
+}
+
+TEST_CASE("mqttPublish: refused publishes are counted and published as diagnostic", "[mqtt][state]") {
+    resetDiscoveryState();
+    mqttPublishFailures = 0;
+    mqtt_client_instance().fail_publish = true;   // e.g. idf_send_async queue full
+    publishCalculatedState("heatingpump/calculated/time/state", "12:00:00");
+    publishCalculatedState("heatingpump/calculated/time/state", "12:00:00");   // still pending: retried
+    CHECK(mqttPublishFailures == 2);
+    mqtt_client_instance().fail_publish = false;
+    publishMqttDiagnostics();
+    CHECK(mqttFindPayload("calculated/mqtt_publish_failures/state") == "2");
+    CHECK(mqttTopicPublished("homeassistant/sensor/heatingpump/stiebel_calculated_mqtt_publish_failures/config"));
+    mqttPublishFailures = 0;
+}
+
+TEST_CASE("CAN diagnostics: RX missed/overrun/queue from twai_status_info_t", "[can][state]") {
+    resetDiscoveryState();
+    fake_twai_status() = twai_status_info_t{};
+    fake_twai_status().rx_missed_count = 7;
+    fake_twai_status().rx_overrun_count = 2;
+    fake_twai_status().msgs_to_rx = 3;
+    publishCanDiagnostics();
+    CHECK(mqttFindPayload("calculated/can_rx_missed/state") == "7");
+    CHECK(mqttFindPayload("calculated/can_rx_overrun/state") == "2");
+    CHECK(mqttFindPayload("calculated/can_rx_queue/state") == "3");
+    CHECK(mqttFindPayload("calculated/can_tec/state") == "0");
+    fake_twai_status() = twai_status_info_t{};
+}
+
+// ============================================================================
+// #55: allocation-free lookups behave like the old ones for every table row
+// ============================================================================
+
+TEST_CASE("GetElsterIndex(name/index): every row resolves like the old linear search", "[kelster][lookup]") {
+    unsigned checked = 0;
+    for (unsigned i = 0; i < ElsterTableCount; i++) {
+        const ElsterIndex& row = ElsterTable[i];
+        // old behaviour: first row with this name / index
+        const ElsterIndex* firstByName = nullptr;
+        const ElsterIndex* firstByIndex = nullptr;
+        for (unsigned j = 0; j < ElsterTableCount && (!firstByName || !firstByIndex); j++) {
+            if (!firstByName && strcmp(ElsterTable[j].Name, row.Name) == 0) firstByName = &ElsterTable[j];
+            if (!firstByIndex && ElsterTable[j].Index == row.Index) firstByIndex = &ElsterTable[j];
+        }
+        // twice: cache miss, then cache hit
+        CHECK(GetElsterIndex(row.Name) == firstByName);
+        CHECK(GetElsterIndex(row.Name) == firstByName);
+        CHECK(GetElsterIndex(row.Index) == firstByIndex);
+        CHECK(isPermanentlyBlacklisted(row.Name) == firstByName->isBlacklisted);
+        // a copy of the name (other pointer) finds the same row
+        std::string copy(row.Name);
+        CHECK(GetElsterIndex(copy.c_str()) == firstByName);
+        checked++;
+    }
+    CHECK(checked == ElsterTableCount);
+    CHECK(GetElsterIndex("DOES_NOT_EXIST_XYZ") == &ElsterTable[0]);
+    CHECK(GetElsterIndex((const char*)nullptr) == &ElsterTable[0]);
+}
+
+TEST_CASE("signalKey: ElsterTable names have distinct hashes", "[kelster][lookup]") {
+    std::map<uint32_t, const char*> seen;
+    for (unsigned i = 0; i < ElsterTableCount; i++) {
+        uint32_t h = elsterNameHash(ElsterTable[i].Name);
+        auto it = seen.find(h);
+        if (it != seen.end()) CHECK(std::string(it->second) == ElsterTable[i].Name);
+        else seen.emplace(h, ElsterTable[i].Name);
+        CHECK(h == hash_runtime(ElsterTable[i].Name));
+    }
+}
+
+TEST_CASE("request manager: table resolved once, unknown/blacklisted skipped", "[can][lookup]") {
+    static_assert(cm_kessel == 0 && cm_manager == 8 && cm_other == 20, "signal_requests_stub.cpp member values");
+    resolveSignalRequests();
+    REQUIRE(resolvedRequests.size() == 4);
+    CHECK(resolvedRequests[0].ei == GetElsterIndex("AUSSENTEMP"));
+    CHECK(resolvedRequests[0].key[0] == signalKey(CanMembers[cm_kessel], "AUSSENTEMP"));
+    CHECK(resolvedRequests[1].ei == GetElsterIndex("SPEICHERISTTEMP"));
+    CHECK(resolvedRequests[1].key[0] == signalKey(CanMembers[cm_kessel], "SPEICHERISTTEMP"));
+    CHECK(resolvedRequests[1].key[1] == signalKey(CanMembers[cm_manager], "SPEICHERISTTEMP"));
+    CHECK(resolvedRequests[1].key[2] == signalKey(CanMembers[cm_heizmodul], "SPEICHERISTTEMP"));
+    CHECK(resolvedRequests[2].ei == nullptr);
+    CHECK(resolvedRequests[3].ei == nullptr);
+
+    // Startup delay, then one request per call; only the two known signals are polled
+    requestManagerStarted = false;
+    requestManagerStartTime = 0;
+    nextRequestTime.clear();
+    fake_millis() = 1;
+    processSignalRequests();
+    fake_millis() = 1 + STARTUP_DELAY_MS;
+    processSignalRequests();
+    CHECK(nextRequestTime.size() == 4);   // AUSSENTEMP@KESSEL + SPEICHERISTTEMP@3 members
+    fake_can().sent.clear();
+    fake_millis() += 120000;               // everything due
+    for (int i = 0; i < 10; i++) processSignalRequests();
+    CHECK(fake_can().sent.size() == 4);   // each (member, signal) once, unknown/blacklisted never
+    requestManagerStarted = false;
+    requestManagerStartTime = 0;
+    nextRequestTime.clear();
+    fake_millis() = 0;
+}
+
+// ============================================================================
+// #55: SG Ready read-back without delay()
+// ============================================================================
+
+TEST_CASE("SG Ready IO: write is sent at once, read-back ~100 ms later from the step", "[sgready][readback]") {
+    resetDiscoveryState();
+    pendingReadbackCount = 0;
+    fake_can().sent.clear();
+    fake_millis() = 5000;
+    sgReadyIO.writeCanSignal("PROGRAMMSCHALTER", "Automatik");
+    sgReadyIO.writeCanSignal("EINSTELL_SPEICHERSOLLTEMP", "55.0");
+    REQUIRE(fake_can().sent.size() == 2);          // two writes, no read yet
+    CHECK((fake_can().sent[0][0] & 0x0F) == 0);    // telegram type 0 = write
+    CHECK(pendingReadbackCount == 2);
+
+    pendingReadbackStep();                         // not due yet
+    CHECK(fake_can().sent.size() == 2);
+    fake_millis() = 5000 + READBACK_DELAY_MS;
+    pendingReadbackStep();                         // one read per step
+    REQUIRE(fake_can().sent.size() == 3);
+    CHECK((fake_can().sent[2][0] & 0x0F) == 1);    // type 1 = read request
+    pendingReadbackStep();
+    CHECK(fake_can().sent.size() == 4);
+    pendingReadbackStep();
+    CHECK(fake_can().sent.size() == 4);
+    CHECK(pendingReadbackCount == 0);
+
+    // the same signal twice -> one read-back
+    sgReadyIO.writeCanSignal("PROGRAMMSCHALTER", "Automatik");
+    sgReadyIO.writeCanSignal("PROGRAMMSCHALTER", "Bereitschaft");
+    CHECK(pendingReadbackCount == 1);
+    pendingReadbackCount = 0;
+    fake_millis() = 0;
 }

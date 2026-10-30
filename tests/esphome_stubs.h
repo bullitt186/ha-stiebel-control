@@ -29,7 +29,9 @@
 
 // ── Arduino / FreeRTOS / ESP-IDF ─────────────────────────────────────────────
 inline void delay(uint32_t) {}
-inline unsigned long millis() { return 0; }
+// Controllable clock: tests set fake_millis() to step time (default 0)
+inline unsigned long& fake_millis() { static unsigned long v = 0; return v; }
+inline unsigned long millis() { return fake_millis(); }
 inline uint32_t esp_random() { return 42; }
 
 // ── CAN bus stub ─────────────────────────────────────────────────────────────
@@ -51,13 +53,17 @@ struct FakeMqttClient {
     struct Published { std::string topic; std::string payload; };
     std::vector<Published> messages;
     // Overloads for const char* and std::string topics (ha-stiebel-control.h uses both)
-    void publish(const char* topic, const char* payload, size_t /*len*/, int /*qos*/, bool /*retain*/) {
+    // Like the real client: refused (false) while disconnected or when failing
+    bool publish(const char* topic, const char* payload, size_t /*len*/, int /*qos*/, bool /*retain*/) {
+        if (!connected || fail_publish) return false;
         messages.push_back({topic, payload ? payload : ""});
+        return true;
     }
-    void publish(const std::string& topic, const char* payload, size_t len, int qos, bool retain) {
-        publish(topic.c_str(), payload, len, qos, retain);
+    bool publish(const std::string& topic, const char* payload, size_t len, int qos, bool retain) {
+        return publish(topic.c_str(), payload, len, qos, retain);
     }
     bool connected = true;
+    bool fail_publish = false;
     bool is_connected() const { return connected; }
     void clear() { messages.clear(); }
 };

@@ -243,6 +243,14 @@
 #define LNAME_CALC_AUSSENTEMP_GEDAEMPFT        "Outside Temperature Damped"
 #undef  LNAME_CALC_REGELABWEICHUNG
 #define LNAME_CALC_REGELABWEICHUNG             "Control Deviation (Return - Setpoint)"
+#undef  LNAME_CALC_CAN_RX_MISSED
+#define LNAME_CALC_CAN_RX_MISSED               "CAN RX Missed (Queue Full)"
+#undef  LNAME_CALC_CAN_RX_OVERRUN
+#define LNAME_CALC_CAN_RX_OVERRUN              "CAN RX Overrun (FIFO)"
+#undef  LNAME_CALC_CAN_RX_QUEUE
+#define LNAME_CALC_CAN_RX_QUEUE                "CAN RX Queue"
+#undef  LNAME_CALC_MQTT_PUBLISH_FAILURES
+#define LNAME_CALC_MQTT_PUBLISH_FAILURES       "MQTT Publish Failures"
 #undef  LNAME_SOMMERBETRIEB_TEMP
 #define LNAME_SOMMERBETRIEB_TEMP               "Summer Mode Threshold"
 #undef  LNAME_ANZEIGE_HOCHDRUCK
