@@ -56,6 +56,12 @@ aly-fly/Stiebel-Eltron_heat_pump_monitor, VasekCZ81/stiebel-can-service), verifi
 - **WPL13E signals from full bus scans** — bivalence points and heat-pump limits per heating/DHW,
   max. flow/return temperature, frost protection, booster total runtime (`LAUFZEIT_2WE`),
   defrost count and duration of the last defrost, superheat actual/target, flow setpoint.
+- **More diagnostics** (#55, diagnostic category, disabled by default): CAN `RX verloren (Queue
+  voll)` (`rx_missed_count`), `RX Überlauf (FIFO)` (`rx_overrun_count`) and `RX Warteschlange`
+  (`msgs_to_rx`, frames waiting in the RX queue) on TWAI builds; `MQTT Sendefehler` (publishes the
+  MQTT client refused, e.g. full `idf_send_async` queue) on all builds. WiFi disconnect reason
+  was not added: ESPHome's `wifi: on_disconnect` trigger has no reason/BSSID parameter
+  (2026.5 and 2026.10); the current BSSID is already available as `WLAN BSSID`.
 - **Register names** — 32 `TEST_OBJEKT_*` rows named, 115 indices added for WPM3-generation
   models only (`helperscripts/import_signal_names.py`; facts only).
 
@@ -78,6 +84,29 @@ aly-fly/Stiebel-Eltron_heat_pump_monitor, VasekCZ81/stiebel-can-service), verifi
   when the state changes.
 - New diagnostic sensors "Freier Heap", "Größter freier Block" and "Loop-Zeit"
   (`sensor: platform: debug`, every 60 s) to classify future restarts.
+- **States are published only on change, with a 10 min heartbeat** (#55). Raw signal and
+  calculated sensor states went out on every CAN answer although 78 % (raw) and 94 %
+  (calculated) of them repeated the previous value. Now an unchanged value is sent again at most
+  every `STATE_HEARTBEAT_MS` (`config.h`, default 10 min). After every MQTT (re)connect all known
+  values are published once more (a few per 250 ms, after the discovery configs), so a broker
+  restart without persistence does not leave constant values empty until the next heartbeat.
+  Always sent as before: SG Ready state/boost values, bus scan results, fault list and fault
+  remedy attributes, discovery configs. After a write (number/select/SG Ready/clock) the next
+  read-back of that signal is published even if the value did not change.
+- **No heap allocations per CAN frame and per request** (#55): signal lookups by name use a
+  hash cache instead of `std::string` keys, the request table is resolved to `ElsterIndex`
+  pointers once at startup (was up to two name searches per entry and second), member/signal
+  keys for discovery, back-off and scheduling are integers, and the CAN frame is no longer copied
+  per frame.
+- **SG Ready no longer blocks the loop** (#55): the read-back after each write was preceded by
+  `delay(100)` (100-400 ms per state change). It is now queued and sent ~100 ms later from the
+  250 ms interval, one read per step.
+- **ElsterTable rows slimmed down** (#57): rows hold only name, index, type and two flag bits
+  (8 instead of ~44 bytes); the HA metadata of the 120 rows that use it moved to a side table
+  (`ElsterMetaTable`, `GetElsterMeta()`), unused metadata strings of the other rows were dropped.
+  Converted by `tools/elster_table_split.py`, verified row by row for every model and language.
+  Flash: ESP32-S3 20.0 % -> 17.5 %, 4 MB ESP32 build 90.0 % -> 79.0 % of the app partition
+  (-202 KB).
 
 ### Fixed
 

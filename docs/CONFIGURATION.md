@@ -95,8 +95,19 @@ Available automatically on ESP32-S3 / TWAI builds. Not present on MCP2515 builds
 | `sensor.can_rx_fehlerzahler` | RX Error Counter (REC) — rises on receive errors |
 | `sensor.can_bus_fehler` | Total bus error count (cumulative) |
 | `sensor.can_bus_zustand` | Bus state: Läuft / Gestoppt / Bus-Off / Erholung |
+| `sensor.can_rx_verloren_queue_voll` | Frames lost because the RX queue was full (`rx_missed_count`, cumulative) |
+| `sensor.can_rx_uberlauf_fifo` | Frames lost by a hardware RX FIFO overrun (`rx_overrun_count`, cumulative) |
+| `sensor.can_rx_warteschlange` | Frames waiting in the RX queue at the moment of the sample (`msgs_to_rx`) |
 
 TEC/REC above 96 indicates warning level; above 127 the controller enters bus-off.
+Rising "RX verloren" or a queue that does not drain to 0 means the main loop does not keep up
+with the bus traffic. The three RX sensors are disabled by default (enable them in HA).
+
+### MQTT Diagnostics (all builds, diagnostic category)
+
+| Entity ID | Description |
+|-----------|-------------|
+| `sensor.mqtt_sendefehler` | Publishes the MQTT client refused since boot (not connected, or the `idf_send_async` queue was full and the message was dropped). Disabled by default. |
 
 ### ESP Diagnostics (native API, diagnostic category)
 
@@ -162,6 +173,27 @@ Availability:
 ```
 heatingpump/status    → "online" or "offline"
 ```
+
+### Publish on change, heartbeat
+
+All `…/state` topics of raw signals and calculated sensors are retained and published **when the
+value changes**. An unchanged value is sent again at most every 10 minutes (heartbeat), so the
+topic shows the device is alive. The interval is `STATE_HEARTBEAT_MS` in
+`esphome/ha-stiebel-control/config.h`:
+
+```cpp
+#define STATE_HEARTBEAT_MS (10UL * 60UL * 1000UL)   // milliseconds
+```
+
+- A signal is still **polled** at its request frequency; only the MQTT message is skipped.
+  Home Assistant keeps the last value, its history shows a new point only on a change (or the
+  heartbeat). `last_updated` therefore no longer moves with every poll.
+- After every MQTT (re)connect all known values are published once (a few per 250 ms, after the
+  discovery configs). A broker restart without persistence is covered that way.
+- After a write (setpoint, mode, SG Ready, clock) the read-back of that signal is published even
+  if the heat pump kept the old value, so HA always gets an answer to a command.
+- Not affected (always sent): SG Ready state and boost values, bus scan results, the fault list
+  sensor and the fault remedy attribute, discovery configs.
 
 ---
 
