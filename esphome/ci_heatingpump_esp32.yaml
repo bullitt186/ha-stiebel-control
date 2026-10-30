@@ -1,0 +1,19 @@
+# CI-only entry point for the classic ESP32 (esp32dev) / MCP2515 compilation check.
+# Not intended for end-user use — heatingpump.yaml is the user-facing config.
+substitutions:
+  device_name: heatingpump
+  friendly_name: "Stiebel Eltron Wärmepumpe"
+  device_model: "wpl13e"
+  language: "DE"
+  can_clk_pin: GPIO18
+  can_mosi_pin: GPIO23
+  can_miso_pin: GPIO19
+  can_cs_pin: GPIO5
+  can_id_pc: "0x680"
+  can_bit_rate: 20kbps
+
+packages:
+  board: !include ha-stiebel-control/board_esp32.yaml
+  can: !include ha-stiebel-control/can_mcp2515.yaml
+  base: !include ha-stiebel-control/common.yaml
+  sensors: !include ha-stiebel-control/wpl13e.yaml

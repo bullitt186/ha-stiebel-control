@@ -48,8 +48,8 @@ jobs:
       - name: Compile (ESP32-S3, read_only)
         run: esphome -s read_only true compile esphome/ci_heatingpump_s3.yaml
 
-  compile-s2:
-    name: Compile ESP32-S2
+  compile-esp32:
+    name: Compile ESP32 (MCP2515)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -64,12 +64,15 @@ jobs:
       - name: Use CI secrets
         run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
 
-      - name: Compile (ESP32-S2)
-        run: esphome compile esphome/ci_heatingpump_s2.yaml
+      - name: Compile (ESP32 esp32dev + MCP2515)
+        run: esphome compile esphome/ci_heatingpump_esp32.yaml
+
+      - name: Validate deprecated board_esp32s2.yaml alias
+        run: esphome config esphome/ci_heatingpump_s2.yaml > /dev/null
 
   release:
     name: GitHub Release
-    needs: [compile-s3, compile-s2]
+    needs: [compile-s3, compile-esp32]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -90,8 +93,8 @@ jobs:
       - name: Verify S3 firmware compiles
         run: esphome compile esphome/ci_heatingpump_s3.yaml
 
-      - name: Verify S2 firmware compiles
-        run: esphome compile esphome/ci_heatingpump_s2.yaml
+      - name: Verify ESP32 (MCP2515) firmware compiles
+        run: esphome compile esphome/ci_heatingpump_esp32.yaml
 
       - name: Extract release notes
         run: |

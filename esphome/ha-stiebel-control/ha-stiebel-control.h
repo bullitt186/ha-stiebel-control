@@ -26,7 +26,13 @@
 #include "config.h"
 #include "language_select.h"
 #include "sg_ready_controller.h"
+// TWAI status/recovery for the built-in CAN controller (esp32_can). Under ESP-IDF the
+// TWAI driver is only linked when esp32_can is used; MCP2515 builds (classic ESP32)
+// have no <driver/twai.h> and skip the TWAI diagnostics (see publishCanDiagnostics()).
+#if __has_include(<driver/twai.h>)
 #include <driver/twai.h>
+#define HA_HAS_TWAI 1
+#endif
 #include <sstream>
 #include <iomanip>
 #include <set>
@@ -2799,6 +2805,9 @@ unsigned long getRandomInRange(unsigned long min, unsigned long max) {
 }
 
 void publishCanDiagnostics() {
+#ifndef HA_HAS_TWAI
+    return;  // MCP2515 build without the TWAI driver: no TWAI status to report
+#else
     twai_status_info_t status;
     if (twai_get_status_info(&status) != ESP_OK) return;
 
@@ -2847,6 +2856,7 @@ void publishCanDiagnostics() {
         default:                    stateStr = "Unbekannt"; break;
     }
     publishCalculatedState("heatingpump/calculated/can_state/state", stateStr);
+#endif  // HA_HAS_TWAI
 }
 
 // Failed MQTT publishes since boot (both CAN variants, not tied to TWAI)

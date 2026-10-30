@@ -1,4 +1,4 @@
-.PHONY: compile compile-s2 check logs upload config test test-all clean-tests smoke-test capture-baseline
+.PHONY: compile compile-esp32 compile-s2 check logs upload config test test-all clean-tests smoke-test capture-baseline
 
 # Extract model and MQTT credentials from local config files
 DEVICE_MODEL ?= $(shell grep 'device_model:' esphome/heatingpump.yaml | grep -v '^\s*\#' | head -1 | sed 's/.*"\(.*\)".*/\1/')
@@ -35,12 +35,18 @@ TEST_BIN      = tests/run_tests
 compile:
 	cd esphome && esphome compile heatingpump.yaml
 
-# Compile the ESP32-S2 / MCP2515 variant
+# Compile the classic ESP32 (esp32dev, 4 MB) / MCP2515 variant
+compile-esp32:
+	cd esphome && esphome compile ci_heatingpump_esp32.yaml
+
+# Deprecated name: same board via the old board_esp32s2.yaml alias (it was never an ESP32-S2)
 compile-s2:
 	cd esphome && esphome compile ci_heatingpump_s2.yaml
 
-# Full firmware quality gate — both board variants must compile cleanly
-check: test compile compile-s2
+# Full firmware quality gate — both board variants must compile cleanly,
+# and the deprecated board_esp32s2.yaml alias must still resolve
+check: test compile compile-esp32
+	cd esphome && esphome config ci_heatingpump_s2.yaml > /dev/null
 
 # Stream live logs from connected device
 logs:
