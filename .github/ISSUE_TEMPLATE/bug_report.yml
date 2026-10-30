@@ -13,7 +13,7 @@ body:
       label: Hardware / Board
       options:
         - ESP32-S3 with built-in TWAI CAN (Waveshare)
-        - ESP32-S2 with MCP2515 SPI CAN (legacy)
+        - ESP32 (esp32dev) with MCP2515 SPI CAN (legacy)
         - Other (describe below)
     validations:
       required: true

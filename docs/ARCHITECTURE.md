@@ -12,11 +12,14 @@ ha-stiebel-control/
 │   ├── secrets.yaml.example                # Template for new users
 │   ├── ci_secrets.yaml                     # Placeholder credentials for CI
 │   ├── ci_heatingpump_s3.yaml              # CI compile target (ESP32-S3)
-│   ├── ci_heatingpump_s2.yaml              # CI compile target (ESP32-S2)
+│   ├── ci_heatingpump_esp32.yaml           # CI compile target (classic ESP32 + MCP2515)
+│   ├── ci_heatingpump_s2.yaml              # CI config check of the deprecated board_esp32s2.yaml alias
 │   └── ha-stiebel-control/
 │       ├── common.yaml                     # Shared: WiFi, MQTT, API, OTA, sensors, SG Ready
-│       ├── board_esp32s3.yaml              # ESP32-S3 hardware config (16MB flash, OPI PSRAM)
-│       ├── board_esp32s2.yaml              # ESP32-S2 / generic ESP32 hardware config
+│       ├── board_esp32s3.yaml              # ESP32-S3 hardware config (ESP-IDF, 16MB flash, OPI PSRAM)
+│       ├── board_esp32.yaml                # Classic ESP32 (esp32dev, ESP-IDF, 4MB) hardware config
+│       ├── board_esp32s2.yaml              # Deprecated alias of board_esp32.yaml (never was an S2)
+│       ├── no_captive_portal.yaml          # Optional: removes captive portal + fallback hotspot
 │       ├── can_esp32.yaml                  # Built-in TWAI CAN (256 RX / 64 TX queue)
 │       ├── can_mcp2515.yaml                # MCP2515 SPI CAN (legacy)
 │       ├── wpl13e.yaml                     # Model: WPL 13 E — includes signal table
@@ -69,7 +72,7 @@ Heat Pump CAN Bus (Elster Protocol, 20kbps)
 ESP32-S3 (built-in TWAI controller)
   — Waveshare ESP32-S3-RS485-CAN: GPIO15 TX, GPIO16 RX
   — other boards: check schematic
- or ESP32-S2 + MCP2515 (SPI)
+ or classic ESP32 + MCP2515 (SPI)
   — generic DevKit: CLK GPIO18, MOSI GPIO23, MISO GPIO19, CS GPIO5
   — other boards: check schematic
          │

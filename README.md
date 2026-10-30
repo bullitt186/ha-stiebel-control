@@ -47,7 +47,7 @@ For full step-by-step instructions (including remote package installation withou
 | Option | Board | CAN interface | Recommended |
 |--------|-------|---------------|-------------|
 | ESP32-S3 | Waveshare ESP32-S3-RS485-CAN (or similar) | Built-in TWAI | ✅ Yes |
-| ESP32-S2 / ESP32 | Any ESP32 dev board | MCP2515 via SPI | Legacy |
+| ESP32 (classic, `esp32dev`) | Any ESP32 dev board (4 MB flash is enough) | MCP2515 via SPI | Legacy |
 
 > **Pin assignment is board-specific — always verify against your board's schematic.**
 > The Waveshare ESP32-S3-RS485-CAN uses GPIO15 (CAN TX) and GPIO16 (CAN RX);

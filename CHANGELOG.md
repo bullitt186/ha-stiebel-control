@@ -12,6 +12,25 @@ aly-fly/Stiebel-Eltron_heat_pump_monitor, VasekCZ81/stiebel-can-service), verifi
 
 ### Breaking changes
 
+- **Firmware framework switched from Arduino to ESP-IDF** (#58) for both boards
+  (`board_esp32s3.yaml`, `board_esp32.yaml`). ESP-IDF is ESPHome's recommended framework and
+  nothing in this project needs Arduino. Flash: ESP32-S3 17.5 % -> 16.9 %, 4 MB ESP32 79.1 % -> 76.5 % of the
+  app partition (ESPHome 2026.5.3). PSRAM (octal, 80 MHz) and 16 MB flash are unchanged.
+  **Migration:** the first update after 2.5.0 switches the framework.
+  - A normal OTA update works: OTA replaces only the app, both frameworks use the same app slot
+    sizes, and the firmware keeps using the existing partition table and its `nvs` partition, so
+    stored values (SG Ready boost values, energy base, summer-mode damping) are kept.
+  - Clean the build files once (dashboard *Clean Build Files* / `esphome clean heatingpump.yaml`).
+  - Do **not** run `esphome upload --partition-table` afterwards: it moves the NVS partition and
+    the stored values are lost.
+  - If the device does not come back (no API/MQTT, no safe-mode OTA), flash it over USB
+    (`esphome run heatingpump.yaml --device <serial port>`, ESPHome Web or esptool). Note the
+    SG Ready boost values before, a USB flash writes the ESP-IDF partition layout and can lose them.
+  - Own lambdas or packages that use Arduino APIs (`String`, `Serial`, `WiFi`, Arduino
+    libraries) need to be ported; the project code itself needed one change (TWAI diagnostics
+    are compiled only when the TWAI driver is present, i.e. not on MCP2515 builds).
+  - Details: `docs/CONFIGURATION.md` → "Board files and framework".
+
 - **Delta T (`delta_t_continuous`, `delta_t_running`) now uses the heat pump's own sensors.**
   Before, flow and return were taken from whichever bus member published last (IWS, WPM sensors and
   the manager copy were mixed), so the value jumped between two measuring points. Measured on a
@@ -64,6 +83,11 @@ aly-fly/Stiebel-Eltron_heat_pump_monitor, VasekCZ81/stiebel-can-service), verifi
   (2026.5 and 2026.10); the current BSSID is already available as `WLAN BSSID`.
 - **Register names** — 32 `TEST_OBJEKT_*` rows named, 115 indices added for WPM3-generation
   models only (`helperscripts/import_signal_names.py`; facts only).
+- **Optional package `no_captive_portal.yaml`** (#58) — removes `captive_portal:` and the
+  fallback hotspot (`wifi: ap:`); list it after `base`. Saves about 88 KB of flash on the 4 MB
+  ESP32 (76.5 % -> 71.6 % of the app partition). Default unchanged: both stay enabled, existing
+  configs keep working. Without them, Wi-Fi is configured only via `secrets.yaml` (wrong
+  credentials need a USB flash).
 
 ### Changed
 
@@ -71,6 +95,11 @@ aly-fly/Stiebel-Eltron_heat_pump_monitor, VasekCZ81/stiebel-can-service), verifi
   scans all channels every 5 min while RSSI is below -49 dBm; on a stationary heat pump
   controller this only stalled the MQTT connection (write timeouts, disconnects, before
   `idf_send_async` task watchdog resets).
+- **`board_esp32.yaml` replaces `board_esp32s2.yaml`** (#58). The file always configured a
+  classic ESP32 (`esp32dev`), never an ESP32-S2. `board_esp32s2.yaml` stays as a deprecated
+  alias that includes the new file, so existing `!include`s keep working. New CI/Make targets
+  `ci_heatingpump_esp32.yaml` / `make compile-esp32`; `ci_heatingpump_s2.yaml` and
+  `make compile-s2` remain and now test the alias. Comments and docs no longer call it "S2".
 - Signals answering `-255` (not available) are polled with growing intervals (up to 6 h) and
   create no HA entity until they deliver a real value.
 - **MQTT publishing no longer blocks the main loop** (#54): `mqtt: idf_send_async: true` hands

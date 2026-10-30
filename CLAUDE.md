@@ -9,7 +9,8 @@ Run these `make` targets from the repo root:
 | Target | What it does |
 |--------|-------------|
 | `make compile` | Compile the ESP32-S3 variant (default, recommended hardware) |
-| `make compile-s2` | Compile the ESP32-S2/MCP2515 variant |
+| `make compile-esp32` | Compile the classic ESP32 (esp32dev, 4 MB)/MCP2515 variant |
+| `make compile-s2` | Deprecated alias config for the same board (`board_esp32s2.yaml` → `board_esp32.yaml`) |
 | `make check` | Compile both variants — full quality gate |
 | `make logs` | Stream live logs from connected device (ESP32-S3 config) |
 | `make upload` | Compile and OTA-flash to production device (heatingpump.local) |

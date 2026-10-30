@@ -57,6 +57,70 @@ The key must match what HA's ESPHome integration has stored for this device. If 
 
 ---
 
+## Board files and framework
+
+| `board:` package | Chip / board | Flash | Framework |
+|------------------|--------------|-------|-----------|
+| `board_esp32s3.yaml` | ESP32-S3 (`esp32-s3-devkitc-1`, e.g. Waveshare ESP32-S3-RS485-CAN), octal PSRAM @ 80 MHz | 16 MB | ESP-IDF |
+| `board_esp32.yaml` | classic ESP32 (`esp32dev`, e.g. ESP32-WROOM DevKit) + MCP2515 | 4 MB | ESP-IDF |
+| `board_esp32s2.yaml` | **deprecated alias** of `board_esp32.yaml` — it never configured an ESP32-S2 | 4 MB | ESP-IDF |
+
+Since 2.5.0 both boards build with **ESP-IDF** instead of Arduino (ESPHome's recommended
+framework; smaller firmware, nothing in this project needs Arduino).
+
+### Updating an existing device from an Arduino build (≤ 2.4.x)
+
+The first update after 2.5.0 switches the framework. A normal OTA update works:
+
+- **Partition table:** OTA only replaces the app; the partition table on the device stays.
+  ESPHome generates the same app slots for both frameworks (16 MB: `app0`/`app1` 0x7C0000
+  each; 4 MB: 0x1C0000 each). Only the data partitions behind them differ (Arduino:
+  `eeprom`, `spiffs`, `nvs` 0x60000; ESP-IDF: `nvs` 0x70000). The new firmware finds the
+  existing `nvs` partition by name, so the old layout keeps working.
+- **Stored values survive:** ESPHome keeps preferences (SG Ready boost values, energy base,
+  summer-mode damping, restored states) in the NVS namespace `esphome` with the same keys on
+  both frameworks.
+- **Do not** run `esphome upload --partition-table` to "clean up" the old layout: it moves the
+  NVS partition, and ESPHome documents that the data stored there is lost.
+- **Bootloader:** OTA does not replace it. With a bootloader that supports rollback (built with
+  `enable_ota_rollback`, ESPHome's default), a new firmware that crashes before it is marked
+  valid is rolled back to the previous slot automatically. `safe_mode` (enabled in `common.yaml`)
+  boots into an OTA-only mode after repeated failed boots.
+- Clean the build files once after switching (ESPHome dashboard: *Clean Build Files*, CLI:
+  `esphome clean heatingpump.yaml`) so no Arduino objects are reused.
+
+**If the device does not come back** after the update (no API/MQTT after a few minutes, no
+safe-mode OTA), flash it over USB: `esphome run heatingpump.yaml --device /dev/ttyACM0`
+(or ESPHome Web / `esptool.py write_flash`). A USB flash writes bootloader, partition table and
+app in the ESP-IDF layout; values stored in NVS can be lost because the NVS partition moves,
+so note your SG Ready boost values first. Stop every program that holds the serial port before
+flashing.
+
+---
+
+## Optional packages
+
+### `no_captive_portal.yaml` — no captive portal and no fallback hotspot
+
+`common.yaml` keeps `captive_portal:` and the fallback hotspot (`wifi: ap:`) enabled by default,
+so existing configurations behave as before. To drop both (saves flash, mainly interesting on
+the 4 MB classic ESP32), list the package **after** `base`:
+
+```yaml
+packages:
+  board: !include ha-stiebel-control/board_esp32.yaml
+  can: !include ha-stiebel-control/can_mcp2515.yaml
+  base: !include ha-stiebel-control/common.yaml
+  sensors: !include ha-stiebel-control/wpl13e.yaml
+  no_captive_portal: !include ha-stiebel-control/no_captive_portal.yaml
+```
+
+Without it, Wi-Fi is configured only through `secrets.yaml`: if the credentials are wrong or
+the network changes, the ESP stays offline and needs a USB flash. `api:` stays (the date/time
+sync uses Home Assistant text sensors).
+
+---
+
 ## Writable Controls
 
 These entities appear automatically in HA via MQTT discovery:
