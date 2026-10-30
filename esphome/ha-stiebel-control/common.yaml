@@ -69,6 +69,11 @@ logger:
   level: INFO
   baud_rate: 115200
 
+# Reset-reason diagnosis for the ESP restarts seen during DHW charging
+# (brownout vs. watchdog vs. software reset). Read by text_sensor platform: debug.
+debug:
+  update_interval: 60s
+
 
 #########################################
 #                                       #
@@ -424,6 +429,26 @@ text_sensor:
 
   #########################################
   #                                       #
+  #   DIAGNOSE                            #
+  #                                       #
+  #########################################
+  # Why did the ESP restart? (e.g. "Brownout", "Task watchdog", "Software reset")
+  - platform: debug
+    reset_reason:
+      name: "Reset Grund"
+      id: reset_reason_text
+      entity_category: diagnostic
+      icon: "mdi:restart-alert"
+
+  # Which access point is the ESP connected to? (reconnects jump between about -62 and -71 dBm)
+  - platform: wifi_info
+    bssid:
+      name: "WLAN BSSID"
+      entity_category: diagnostic
+      icon: "mdi:router-wireless"
+
+  #########################################
+  #                                       #
   #   BERECHNETE TEXT SENSORS             #
   #                                       #
   #########################################
@@ -581,6 +606,12 @@ sensor:
       return sgReadyBoostState4Value();
 
   # WiFi and system sensors
+  - platform: uptime
+    name: "Betriebszeit"
+    id: uptime_s
+    entity_category: diagnostic
+    icon: "mdi:timer-outline"
+
   - platform: wifi_signal
     name: "WiFi Signal dBm"
     icon: "mdi:wifi"

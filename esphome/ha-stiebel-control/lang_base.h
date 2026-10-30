@@ -136,6 +136,7 @@
 #define LNAME_CALC_SOMMERBETRIEB_AKTIV         "Sommerbetrieb aktiv"
 #define LNAME_CALC_FEHLERLISTE                 "Fehlerliste"
 #define LNAME_CALC_AUSSENTEMP_GEDAEMPFT        "Außentemperatur gedämpft"
+#define LNAME_CALC_REGELABWEICHUNG             "Regelabweichung (Rücklauf − Soll)"
 
 // ============================================================================
 // Writable number friendly names (writableNumbers[])

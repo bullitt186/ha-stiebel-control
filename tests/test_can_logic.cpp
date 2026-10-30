@@ -710,11 +710,73 @@ TEST_CASE("updateSensor: WPVORLAUFIST value updates lastWpVorlaufIst", "[mqtt]")
 TEST_CASE("updateSensor: RUECKLAUFISTTEMP value updates lastRuecklaufIstTemp", "[mqtt]") {
     resetDiscoveryState();
     lastRuecklaufIstTemp = NAN;
-    const CanMember& mgr = CanMembers[cm_manager];
+    const CanMember& heizmodul = CanMembers[cm_heizmodul];
     const ElsterIndex* ei = GetElsterIndex("RUECKLAUFISTTEMP");
     REQUIRE(ei != nullptr);
-    updateSensor(mgr, ei, "28.3");
+    updateSensor(heizmodul, ei, "28.3");
     CHECK(lastRuecklaufIstTemp == Approx(28.3f));
+}
+
+TEST_CASE("updateSensor: Delta T inputs ignore the WPM (KESSEL/MANAGER) sensors", "[mqtt]") {
+    resetDiscoveryState();
+    lastWpVorlaufIst = NAN; lastRuecklaufIstTemp = NAN; lastWpVorlaufKessel = NAN;
+    const ElsterIndex* vl = GetElsterIndex("WPVORLAUFIST");
+    const ElsterIndex* rl = GetElsterIndex("RUECKLAUFISTTEMP");
+    REQUIRE(vl != nullptr);
+    REQUIRE(rl != nullptr);
+
+    updateSensor(CanMembers[cm_kessel], vl, "30.3");
+    updateSensor(CanMembers[cm_kessel], rl, "28.4");
+    updateSensor(CanMembers[cm_manager], rl, "28.4");
+    CHECK(std::isnan(lastWpVorlaufIst));
+    CHECK(std::isnan(lastRuecklaufIstTemp));
+    CHECK(lastWpVorlaufKessel == Approx(30.3f));
+    lastWpVorlaufKessel = NAN;
+}
+
+TEST_CASE("publishDeltaTContinuous: IWS pair wins over the WPM pair", "[calc]") {
+    resetDiscoveryState();
+    lastWpVorlaufIst = 30.4f; lastRuecklaufIstTemp = 27.7f;           // IWS B1 / B2
+    lastWpVorlaufKessel = 30.9f; lastKesselRuecklaufIst = 28.4f;      // WPM X2/2 / X2/3
+    publishDeltaTContinuous();
+    CHECK(mqttFindPayload("delta_t_continuous/state") == "2.70");
+    lastWpVorlaufKessel = NAN; lastKesselRuecklaufIst = NAN;
+}
+
+TEST_CASE("publishDeltaTContinuous: WPM pair only if the IWS delivered nothing", "[calc]") {
+    resetDiscoveryState();
+    lastWpVorlaufIst = NAN; lastRuecklaufIstTemp = NAN;
+    lastWpVorlaufKessel = 30.0f; lastKesselRuecklaufIst = 27.0f;
+    publishDeltaTContinuous();
+    CHECK(mqttFindPayload("delta_t_continuous/state") == "3.00");
+
+    // IWS delivers only one value so far: no mixed pair
+    resetDiscoveryState();
+    lastWpVorlaufIst = 30.4f; lastRuecklaufIstTemp = NAN;
+    publishDeltaTContinuous();
+    CHECK(!mqttTopicPublished("delta_t_continuous/state"));
+    lastWpVorlaufIst = NAN; lastWpVorlaufKessel = NAN; lastKesselRuecklaufIst = NAN;
+}
+
+TEST_CASE("updateSensor: control deviation inputs only come from the KESSEL member", "[mqtt]") {
+    resetDiscoveryState();
+    lastKesselRuecklaufIst = NAN;
+    lastKesselSollTemp = NAN;
+    const ElsterIndex* rl = GetElsterIndex("RUECKLAUFISTTEMP");
+    const ElsterIndex* soll = GetElsterIndex("KESSELSOLLTEMP");
+    REQUIRE(rl != nullptr);
+    REQUIRE(soll != nullptr);
+
+    // IWS (HEIZMODUL) return temperature is a different measuring point (X2/3 vs. IWS B2)
+    updateSensor(CanMembers[cm_heizmodul], rl, "19.1");
+    CHECK(std::isnan(lastKesselRuecklaufIst));
+    updateSensor(CanMembers[cm_manager], soll, "25.5");
+    CHECK(std::isnan(lastKesselSollTemp));
+
+    updateSensor(CanMembers[cm_kessel], rl, "24.8");
+    updateSensor(CanMembers[cm_kessel], soll, "25.6");
+    CHECK(lastKesselRuecklaufIst == Approx(24.8f));
+    CHECK(lastKesselSollTemp == Approx(25.6f));
 }
 
 TEST_CASE("updateSensor: VERDICHTER value updates lastVerdichterValue", "[mqtt]") {

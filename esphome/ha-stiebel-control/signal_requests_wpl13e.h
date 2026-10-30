@@ -86,6 +86,9 @@ extern const SignalRequest signalRequests[] = {
     // DIAGNOSTICS ("INFO IWS" in the WPMW II manual)
     // Refrigerant pressures in bar (et_cent_val for WPL13E, see ElsterTable.h)
     // ========================================================================
+    // Heat pump flow/return (IWS B1/B2): basis of Delta T (the WPM's X2/2 and X2/3 measure elsewhere)
+    {"WPVORLAUFIST",               FREQ_30S,   cm_heizmodul},
+    {"RUECKLAUFISTTEMP",           FREQ_30S,   cm_heizmodul},
     {"HEISSGAS_TEMP",              FREQ_1MIN,  cm_heizmodul},
     {"SOLLWERT_UEBERHITZUNG",            FREQ_10MIN, cm_heizmodul},
     {"ISTWERT_UEBERHITZUNG_VERDAMPFER",  FREQ_1MIN,  cm_heizmodul},
@@ -94,6 +97,12 @@ extern const SignalRequest signalRequests[] = {
     {"VORLAUFSOLLTEMP",                  FREQ_1MIN,  cm_kessel},
     {"ANZEIGE_HOCHDRUCK",          FREQ_1MIN,  cm_heizmodul},
     {"ANZEIGE_NIEDERDRUCK",        FREQ_1MIN,  cm_heizmodul},
+    // Bit fields that change with the compressor (measured on a WPL 13 E, 1/min scan):
+    // KESSELSTATUS 0x0000 -> 0x0100 and PUMPENSTATUS bit 0 flip at start/stop of every
+    // heating run. HEIZKREIS_STATUS changes with the time programs (about 23:00).
+    {"KESSELSTATUS",               FREQ_30S,   cm_kessel},
+    {"PUMPENSTATUS",               FREQ_30S,   cm_kessel},
+    {"HEIZKREIS_STATUS",           FREQ_30S,   cm_kessel},
     {"LAUFZEIT_DHC1",              FREQ_60MIN, cm_heizmodul},
     {"LAUFZEIT_DHC2",              FREQ_60MIN, cm_heizmodul},
     {"LZ_DHC12",                   FREQ_60MIN, cm_heizmodul},

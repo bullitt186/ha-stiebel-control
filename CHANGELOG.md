@@ -10,6 +10,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 Ideas and register facts from related projects (kr0ner/OneESP32ToRuleThemAll,
 aly-fly/Stiebel-Eltron_heat_pump_monitor, VasekCZ81/stiebel-can-service), verified on a WPL13E.
 
+### Breaking changes
+
+- **Delta T (`delta_t_continuous`, `delta_t_running`) now uses the heat pump's own sensors.**
+  Before, flow and return were taken from whichever bus member published last (IWS, WPM sensors and
+  the manager copy were mixed), so the value jumped between two measuring points. Measured on a
+  WPL 13 E: IWS flow minus IWS return is 2-3 K while the compressor runs, but the WPM return sensor
+  X2/3 (control sensor of heating circuit 1, sits in the buffer) reads about 0.6 K higher than the IWS
+  return and holds its value after the compressor stops, which gave wrong and noisy spreads.
+  - New source: `WPVORLAUFIST` and `RUECKLAUFISTTEMP` of the **heat pump module (HEIZMODUL, IWS B1/B2)**.
+  - Fallback for models that deliver no IWS values: the KESSEL pair (`WPVORLAUFIST` X2/2 and
+    `RUECKLAUFISTTEMP` X2/3), never a mix of both sources.
+  - Entities, names and topics are unchanged, **but the values differ** (typically 0.5-1 K lower
+    while running, and no more jumps). Long-term statistics and automations or alerts that use these
+    sensors see a step at the update; thresholds may need adjusting.
+  - `delta_t_continuous` is only meaningful while the pump circulates (the IWS sensors cool down to
+    the pipe temperature in standby); use `delta_t_running` for evaluations.
+  - WPL13E now polls `WPVORLAUFIST` and `RUECKLAUFISTTEMP` from the heat pump module explicitly.
+
 ### Added
 
 - **Bus scan** — ask one CAN member for every signal-table index or a hex range; answers are
@@ -28,6 +46,13 @@ aly-fly/Stiebel-Eltron_heat_pump_monitor, VasekCZ81/stiebel-can-service), verifi
 - **Fault history** — the manager's stored fault list (display parameter 48, 20 entries,
   `FEHLERFELD_0..139`) is read every 30 min into one sensor "Fehlerliste": state is the newest
   fault, attributes hold time, remedy, count and all entries (dashboard renders it as a table).
+- **Control deviation (all models with KESSEL return sensor)** — `Regelabweichung` = KESSEL return
+  sensor (control sensor of heating circuit 1) minus the return setpoint. On a WPL 13 E the
+  compressor starts at about -0.7 K and stops at about +2.6 K (five runs, second resolution).
+- **ESP diagnosis** — `Reset Grund` (debug reset reason: brownout, watchdog, software), `Betriebszeit`
+  (uptime) and `WLAN BSSID` as diagnostic entities, to find out why the ESP restarts during DHW charging.
+- **WPL13E status registers** — `KESSELSTATUS`, `PUMPENSTATUS` and `HEIZKREIS_STATUS` (raw bit fields;
+  the first two flip with every compressor run).
 - **WPL13E signals from full bus scans** — bivalence points and heat-pump limits per heating/DHW,
   max. flow/return temperature, frost protection, booster total runtime (`LAUFZEIT_2WE`),
   defrost count and duration of the last defrost, superheat actual/target, flow setpoint.
@@ -53,6 +78,9 @@ aly-fly/Stiebel-Eltron_heat_pump_monitor, VasekCZ81/stiebel-can-service), verifi
 - Remedy text for `HD-SENSOR-MAX` named a sensor fault; it is the high-pressure limit
   (heating flow too low or room temperature / heating curve too high).
 - WPL13E no longer polls `LAUFZEIT_WP1`: the manager fills it only on demand (read 0 otherwise).
+- WPL13E `VERDICHTER` (0x07a8) is a status word (0x0008 idle, 0x0221/0x0228 running), not a power in W;
+  `VERDAMPFERTEMP` (0x0014) is not a temperature (-30 idle, +58..+76 within minutes of a start);
+  `HEIZKURVE` is a slope without unit. All three are published without unit and device class.
 - `make test` did not rebuild objects after header changes (stale `ElsterTable.h` in tests).
 
 ---

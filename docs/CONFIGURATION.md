@@ -115,8 +115,9 @@ Published to `heatingpump/calculated/` MQTT topics and auto-discovered in HA:
 |--------|-------|-------------|
 | Date | `heatingpump/calculated/date/state` | `YYYY-MM-DD` from heat pump clock |
 | Time | `heatingpump/calculated/time/state` | `HH:MM:SS` from heat pump clock |
-| Delta T (continuous) | `heatingpump/calculated/delta_t_continuous/state` | Flow − return temp, always |
-| Delta T (running) | `heatingpump/calculated/delta_t_running/state` | Flow − return temp, only when compressor active |
+| Delta T (continuous) | `heatingpump/calculated/delta_t_continuous/state` | Heat pump flow − return (IWS sensors B1/B2); meaningful only while the pump circulates |
+| Delta T (running) | `heatingpump/calculated/delta_t_running/state` | Same, only when compressor active |
+| Control deviation | `heatingpump/calculated/regelabweichung/state` | KESSEL return sensor (control sensor HK1) − return setpoint |
 | Compressor active | `heatingpump/calculated/compressor_active/state` | on/off |
 | COP hot water | `heatingpump/calculated/cop_ww/state` | Coefficient of performance (DHW) |
 | COP heating | `heatingpump/calculated/cop_heiz/state` | Coefficient of performance (heating) |

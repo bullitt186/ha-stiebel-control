@@ -204,9 +204,20 @@ static const CalculatedSensorConfig calculatedSensors[] = {
      "binary_sensor", "", "", "", "mdi:weather-sunny", "on", "off", "", true},
     {"stiebel_calculated_aussentemp_gedaempft", LNAME_CALC_AUSSENTEMP_GEDAEMPFT, "heatingpump/calculated/aussentemp_gedaempft/state",
      "sensor", "temperature", "°C", "measurement", "mdi:thermometer-lines", "", "", "", true},
+
+    // Control deviation of the WPM II: KESSEL return sensor (X2/3 = control sensor HK1)
+    // minus the return setpoint. The compressor starts at about -0.7 K and stops at
+    // about +2.6 K (measured on a WPL 13 E, five runs), so the value shows the
+    // switching state directly.
+    {"stiebel_calculated_regelabweichung", LNAME_CALC_REGELABWEICHUNG, "heatingpump/calculated/regelabweichung/state",
+     "sensor", "temperature", "K", "measurement", "mdi:swap-vertical", "", "", "", true},
 };
 
 static const size_t CALCULATED_SENSOR_COUNT = sizeof(calculatedSensors) / sizeof(CalculatedSensorConfig);
+// Index of the control deviation entry (the table is append-only, indices are hardcoded)
+static const size_t CALC_IDX_REGELABWEICHUNG = 23;
+static_assert(CALCULATED_SENSOR_COUNT == CALC_IDX_REGELABWEICHUNG + 1,
+              "calculatedSensors changed: update CALC_IDX_REGELABWEICHUNG");
 
 // ============================================================================
 // WRITABLE NUMBER CONFIGURATION (for MQTT Number entities)
@@ -372,9 +383,16 @@ inline unsigned long backoffIntervalMs(const std::string& key, unsigned long bas
 static int signalProcessingStartIndex = 0;
 
 // Track sensor values for calculated sensors
-static float lastWpVorlaufIst = NAN;
-static float lastRuecklaufIstTemp = NAN;
+// Delta T uses the heat pump's own flow/return sensors (IWS = HEIZMODUL, B1/B2). They sit in the
+// same water circuit; the WPM sensors of the KESSEL member (X2/2, X2/3) measure elsewhere (X2/3 is the
+// heating circuit control sensor in the buffer) and are only a fallback for models without IWS values.
+static float lastWpVorlaufIst = NAN;       // HEIZMODUL WPVORLAUFIST
+static float lastRuecklaufIstTemp = NAN;   // HEIZMODUL RUECKLAUFISTTEMP
+static float lastWpVorlaufKessel = NAN;    // KESSEL WPVORLAUFIST (fallback only)
 static float lastVerdichterValue = NAN;
+// Control deviation inputs: KESSEL member only (X2/3 control sensor and its setpoint)
+static float lastKesselRuecklaufIst = NAN;
+static float lastKesselSollTemp = NAN;
 
 // Track date/time component values
 static int lastJahr = -1;
@@ -1194,22 +1212,35 @@ void publishTime()
 // Datetime states are now handled by Home Assistant input_datetime helpers
 // Read by ESPHome text_sensors and written via button triggers
 
+// Select flow/return for Delta T from ONE measuring circuit, never a mix:
+// 1. IWS pair (HEIZMODUL), 2. WPM pair (KESSEL) only if the IWS delivered neither value.
+static bool deltaTInputs(float& vorlauf, float& ruecklauf)
+{
+    if (!std::isnan(lastWpVorlaufIst) && !std::isnan(lastRuecklaufIstTemp)) {
+        vorlauf = lastWpVorlaufIst;
+        ruecklauf = lastRuecklaufIstTemp;
+    } else if (std::isnan(lastWpVorlaufIst) && std::isnan(lastRuecklaufIstTemp) &&
+               !std::isnan(lastWpVorlaufKessel) && !std::isnan(lastKesselRuecklaufIst)) {
+        vorlauf = lastWpVorlaufKessel;
+        ruecklauf = lastKesselRuecklaufIst;
+    } else {
+        return false;   // not ready, or IWS delivered only one of the two values so far
+    }
+    // -255 marks "no sensor" on the bus
+    return vorlauf >= -50 && ruecklauf >= -50;
+}
+
 void publishDeltaTContinuous()
 {
     // Publish discovery (only once - cached)
     publishCalculatedSensorDiscovery(calculatedSensors[2]);
     
-    // Check if both temperature values are valid
-    if (std::isnan(lastWpVorlaufIst) || std::isnan(lastRuecklaufIstTemp)) {
-        return; // Silently skip if values not ready
+    float vorlauf, ruecklauf;
+    if (!deltaTInputs(vorlauf, ruecklauf)) {
+        return; // Silently skip: values not ready or invalid
     }
     
-    // Validate temperature range (sanity check)
-    if (lastWpVorlaufIst < -50 || lastRuecklaufIstTemp < -50) {
-        return; // Silently skip invalid ranges
-    }
-    
-    float deltaT = lastWpVorlaufIst - lastRuecklaufIstTemp;
+    float deltaT = vorlauf - ruecklauf;
     
     // Publish state to MQTT
     char value[16];
@@ -1230,17 +1261,12 @@ void publishDeltaTRunning()
         return; // Silently skip if compressor not running
     }
     
-    // Check if both temperature values are valid
-    if (std::isnan(lastWpVorlaufIst) || std::isnan(lastRuecklaufIstTemp)) {
-        return; // Silently skip if values not ready
+    float vorlauf, ruecklauf;
+    if (!deltaTInputs(vorlauf, ruecklauf)) {
+        return; // Silently skip: values not ready or invalid
     }
     
-    // Validate temperature range (sanity check)
-    if (lastWpVorlaufIst < -50 || lastRuecklaufIstTemp < -50) {
-        return; // Silently skip invalid ranges
-    }
-    
-    float deltaT = lastWpVorlaufIst - lastRuecklaufIstTemp;
+    float deltaT = vorlauf - ruecklauf;
     
     // Publish state to MQTT
     char value[16];
@@ -1267,6 +1293,23 @@ void publishCompressorActive()
     const char* stateTopic = "heatingpump/calculated/compressor_active/state";
     id(mqtt_client).publish(stateTopic, state, strlen(state), 0, true);
     // Note: Delta T running is published separately by scheduler
+}
+
+void publishRegelabweichung()
+{
+    if (std::isnan(lastKesselRuecklaufIst) || std::isnan(lastKesselSollTemp)) {
+        return;
+    }
+    // Sanity range: -255 marks "no sensor" on the bus
+    if (lastKesselRuecklaufIst < -50 || lastKesselSollTemp < -50) {
+        return;
+    }
+    publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_REGELABWEICHUNG]);
+
+    char value[16];
+    snprintf(value, sizeof(value), "%.2f", lastKesselRuecklaufIst - lastKesselSollTemp);
+    const char* stateTopic = "heatingpump/calculated/regelabweichung/state";
+    id(mqtt_client).publish(stateTopic, value, strlen(value), 0, true);
 }
 
 // Helper: Check if pattern appears anywhere in text (case-insensitive substring match)
@@ -2125,6 +2168,7 @@ constexpr uint32_t HASH_SOMMERBETRIEB = hash("SOMMERBETRIEB");
 constexpr uint32_t HASH_SOMMERBETRIEB_TEMP = hash("SOMMERBETRIEB_TEMP");
 constexpr uint32_t HASH_GEBAEUDEART = hash("GEBAEUDEART");
 constexpr uint32_t HASH_AUSSENTEMP = hash("AUSSENTEMP");
+constexpr uint32_t HASH_KESSELSOLLTEMP = hash("KESSELSOLLTEMP");
 constexpr uint32_t HASH_EL_AUFNAHMELEISTUNG_HEIZ = hash("EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH");
 constexpr uint32_t HASH_EL_AUFNAHMELEISTUNG_WW = hash("EL_AUFNAHMELEISTUNG_WW_SUM_MWH");
 constexpr uint32_t HASH_WAERMEERTRAG_2WE_WW = hash("WAERMEERTRAG_2WE_WW_SUM_MWH");
@@ -2362,7 +2406,9 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
             char* endPtr;
             float floatValue = strtof(value.c_str(), &endPtr);
             if (endPtr != value.c_str() && *endPtr == '\0') {
-                lastWpVorlaufIst = floatValue;
+                // Delta T: only the heat pump's own sensors (IWS); other members are not mixed in
+                if (strcmp(cm.Name, "HEIZMODUL") == 0) lastWpVorlaufIst = floatValue;
+                else if (strcmp(cm.Name, "KESSEL") == 0) lastWpVorlaufKessel = floatValue;
                 // Delta T will be calculated and published by scheduler
             } else {
                 ESP_LOGW("CALC", "Failed to parse WPVORLAUFIST value: %s", value.c_str());
@@ -2374,7 +2420,8 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
             char* endPtr;
             float floatValue = strtof(value.c_str(), &endPtr);
             if (endPtr != value.c_str() && *endPtr == '\0') {
-                lastRuecklaufIstTemp = floatValue;
+                if (strcmp(cm.Name, "HEIZMODUL") == 0) lastRuecklaufIstTemp = floatValue;
+                if (strcmp(cm.Name, "KESSEL") == 0) lastKesselRuecklaufIst = floatValue;
                 // Delta T will be calculated and published by scheduler
             } else {
                 ESP_LOGW("CALC", "Failed to parse RUECKLAUFISTTEMP value: %s", value.c_str());
@@ -2382,6 +2429,15 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
             break;
         }
         
+        case HASH_KESSELSOLLTEMP: {
+            char* endPtr;
+            float floatValue = strtof(value.c_str(), &endPtr);
+            if (strcmp(cm.Name, "KESSEL") == 0 && endPtr != value.c_str() && *endPtr == '\0') {
+                lastKesselSollTemp = floatValue;
+            }
+            break;
+        }
+
         case HASH_SOMMERBETRIEB:
             summer.automatic = (value == "on") ? 1 : (value == "off") ? 0 : -1;
             publishSummerState();
@@ -2544,6 +2600,7 @@ void processCalculatedSensors() {
     if (now >= nextDeltaTUpdate) {
         publishDeltaTContinuous();
         publishDeltaTRunning();
+        publishRegelabweichung();
         nextDeltaTUpdate = now + (CALC_DELTA_T_FREQUENCY * 1000UL) + getRandomInRange(0, 1000);
     }
     
