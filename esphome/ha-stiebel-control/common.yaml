@@ -590,6 +590,8 @@ wifi:
     ssid: "Heatingpump Fallback Hotspot"
     password: "AsBl9n46jlOx"
 
+# Enabled by default. To drop it together with the fallback hotspot (saves flash),
+# add the optional package ha-stiebel-control/no_captive_portal.yaml after this one.
 captive_portal:
 
 #########################################
