@@ -217,6 +217,20 @@ const ElsterIndex * GetElsterIndex(const char* str)
   return &ElsterTable[0];
 }
 
+const ElsterMeta * GetElsterMeta(const ElsterIndex * ei)
+{
+  if (!ei || !ei->hasMetadata)
+    return NULL;
+  // ~110 entries, only read when a discovery config is built
+  for (unsigned i = 0; i < ElsterMetaCount; i++)
+  {
+    const ElsterMeta & m = ElsterMetaTable[i];
+    if (m.Index == ei->Index && (m.Name == ei->Name || !strcmp(m.Name, ei->Name)))
+      return &m;
+  }
+  return NULL;
+}
+
 static bool Get_Time(const char * & str, int & hour, int & min)
 {
   TInt64 h, m;

@@ -1208,8 +1208,9 @@ TEST_CASE("i18n: named ElsterTable signals have non-empty friendlyName via LNAME
     for (const char* name : named) {
         const ElsterIndex* ei = GetElsterIndex(name);
         REQUIRE(ei != nullptr);
-        if (ei->hasMetadata && ei->friendlyName)
-            CHECK(std::string(ei->friendlyName).length() > 0);
+        const ElsterMeta* meta = GetElsterMeta(ei);
+        if (meta && meta->friendlyName)
+            CHECK(std::string(meta->friendlyName).length() > 0);
     }
 }
 

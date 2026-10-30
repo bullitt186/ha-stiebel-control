@@ -1355,8 +1355,10 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
     // Note: Caller is responsible for checking discoveredSignals and inserting uid
     // This function just publishes the MQTT discovery message
     
-    // Get friendly name: use ei->friendlyName or fallback to ei->Name
-    const char* friendlyName = (ei->hasMetadata && ei->friendlyName) ? ei->friendlyName : ei->Name;
+    // HA metadata lives in a side table (#57); NULL for rows without metadata
+    const ElsterMeta* meta = GetElsterMeta(ei);
+    // Get friendly name: use meta->friendlyName or fallback to ei->Name
+    const char* friendlyName = (meta && meta->friendlyName) ? meta->friendlyName : ei->Name;
     // WPMW II manual ("INFO IWS"): the heat pump module's AUSSENTEMP is the air
     // intake temperature at the unit, not the outdoor sensor used for control.
     if (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") == 0 && strcmp(cm.Name, "HEIZMODUL") == 0 &&
@@ -1368,15 +1370,15 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
     const char *component, *deviceClass, *unit, *stateClass, *icon;
     const char *payloadOn = nullptr, *payloadOff = nullptr;
     
-    if (ei->hasMetadata && ei->haComponent) {
-        // Use metadata from ElsterTable
-        component = ei->haComponent;
-        deviceClass = ei->haDeviceClass ? ei->haDeviceClass : "";
-        unit = ei->unit ? ei->unit : "";
-        stateClass = ei->stateClass ? ei->stateClass : "";
-        icon = ei->icon ? ei->icon : "";
-        payloadOn = ei->payloadOn;
-        payloadOff = ei->payloadOff;
+    if (meta && meta->haComponent) {
+        // Use metadata from ElsterMetaTable
+        component = meta->haComponent;
+        deviceClass = meta->haDeviceClass ? meta->haDeviceClass : "";
+        unit = meta->unit ? meta->unit : "";
+        stateClass = meta->stateClass ? meta->stateClass : "";
+        icon = meta->icon ? meta->icon : "";
+        payloadOn = meta->payloadOn;
+        payloadOff = meta->payloadOff;
     } else {
         // Fall back to type-based defaults
         getTypeDefaults((ElsterType)ei->Type, component, deviceClass, unit, stateClass, icon);

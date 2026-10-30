@@ -22,6 +22,7 @@ TEST_SRCS     = tests/catch2/catch_amalgamated.cpp \
 TEST_EXTRA    = tests/test_nutils.cpp \
                 tests/test_kelster.cpp \
                 tests/test_can_logic.cpp \
+                tests/test_elster_split.cpp \
                 tests/signal_requests_stub.cpp
 ELSTER_SRCS   = esphome/ha-stiebel-control/elster/NUtils.cpp \
                 esphome/ha-stiebel-control/elster/KElsterTable.cpp
@@ -65,7 +66,7 @@ test-all: $(TEST_BIN)
 
 TEST_EXTRA_OBJS = $(patsubst tests/%.cpp,tests/%.o,$(TEST_EXTRA))
 # Every object includes these headers (ElsterTable.h is compiled into KElsterTable.o)
-TEST_HDRS = $(wildcard esphome/ha-stiebel-control/*.h esphome/ha-stiebel-control/elster/*.h tests/*.h)
+TEST_HDRS = $(wildcard esphome/ha-stiebel-control/*.h esphome/ha-stiebel-control/elster/*.h tests/*.h tests/*.inc tools/*.h)
 
 tests/%.o: tests/%.cpp $(TEST_HDRS)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
