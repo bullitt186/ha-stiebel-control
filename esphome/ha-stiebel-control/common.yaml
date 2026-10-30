@@ -581,6 +581,10 @@ wifi:
   password: !secret wifi_password
   fast_connect: true
   power_save_mode: none
+  # Stationary device: ESPHome's post-connect roaming scans all channels every
+  # 5 min when RSSI < -49 dBm. The off-channel scan stalls the MQTT TCP stream
+  # (>10 s write timeouts, disconnects) and caused task watchdog resets (#54).
+  post_connect_roaming: false
   reboot_timeout: 5min
   ap:
     ssid: "Heatingpump Fallback Hotspot"

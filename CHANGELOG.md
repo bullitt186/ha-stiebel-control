@@ -67,6 +67,10 @@ aly-fly/Stiebel-Eltron_heat_pump_monitor, VasekCZ81/stiebel-can-service), verifi
 
 ### Changed
 
+- **WiFi post-connect roaming disabled** (#54): `wifi: post_connect_roaming: false`. ESPHome
+  scans all channels every 5 min while RSSI is below -49 dBm; on a stationary heat pump
+  controller this only stalled the MQTT connection (write timeouts, disconnects, before
+  `idf_send_async` task watchdog resets).
 - Signals answering `-255` (not available) are polled with growing intervals (up to 6 h) and
   create no HA entity until they deliver a real value.
 - **MQTT publishing no longer blocks the main loop** (#54): `mqtt: idf_send_async: true` hands
