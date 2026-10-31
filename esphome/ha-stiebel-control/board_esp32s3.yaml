@@ -1,13 +1,15 @@
 #
 #  ESP32-S3 Board Configuration
 #  Waveshare ESP32-S3-RS485-CAN
-#  Flash: 16MB, PSRAM: OPI PSRAM
+#  Flash: 16MB, PSRAM: OPI (octal) PSRAM
+#  Framework: ESP-IDF (since 2.5.0; was Arduino). The first OTA from an
+#  Arduino build switches the framework — see CHANGELOG 2.5.0 / docs/CONFIGURATION.md.
 #
 
 esp32:
   board: esp32-s3-devkitc-1
   framework:
-    type: arduino
+    type: esp-idf
   variant: esp32s3
   flash_size: 16MB
 

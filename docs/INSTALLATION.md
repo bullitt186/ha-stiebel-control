@@ -2,6 +2,9 @@
 
 Two installation paths are supported. Choose the one that fits your workflow.
 
+**Requirements:** ESPHome 2026.7.0 or newer (`esphome version`; the config declares
+`min_version: 2026.7.0` and older versions refuse it). CI builds with ESPHome 2026.10.1.
+
 ---
 
 ## Path A — Git Clone (Recommended)
@@ -70,8 +73,8 @@ packages:
 > **Waveshare ESP32-S3-RS485-CAN** board: `can_tx_pin: GPIO15`, `can_rx_pin: GPIO16`.
 > For any other board, update these values before flashing.
 
-For ESP32-S2 + MCP2515, comment out the S3 block and uncomment the S2 block at the bottom
-of the file. The SPI pins (`can_clk_pin`, `can_mosi_pin`, `can_miso_pin`, `can_cs_pin`) are
+For a classic ESP32 (`esp32dev`) + MCP2515, comment out the S3 block and uncomment the ESP32 block at the bottom
+of the file (`board_esp32.yaml`; the old name `board_esp32s2.yaml` still works). The SPI pins (`can_clk_pin`, `can_mosi_pin`, `can_miso_pin`, `can_cs_pin`) are
 also board-specific. The repo ships with values typical for a generic ESP32 DevKit with a
 standard MCP2515 breakout module (CLK: GPIO18, MOSI: GPIO23, MISO: GPIO19, CS: GPIO5) —
 verify these against your specific board before flashing.

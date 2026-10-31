@@ -1,6 +1,6 @@
 #
 #  MCP2515 SPI CAN Controller Configuration
-#  For ESP32-S2 and other boards using external MCP2515 transceiver
+#  For the classic ESP32 (board_esp32.yaml) and other boards using an external MCP2515
 #
 
 # Default — override in heatingpump.yaml (WPL17/WPL23/WPL10AC need 50kbps, CAN-B)

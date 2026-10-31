@@ -1,16 +1,18 @@
 # ha-stiebel-control AI Assistant Instructions
 
 ## Project Overview
-ESPHome/Home Assistant integration for monitoring and controlling Stiebel Eltron heat pumps via CAN bus interface. Supports two hardware configurations: ESP32-S3 with built-in TWAI CAN (recommended) and ESP32-S2 with MCP2515 SPI CAN transceiver (legacy). Based on the Elster protocol for communication with heat pump components.
+ESPHome/Home Assistant integration for monitoring and controlling Stiebel Eltron heat pumps via CAN bus interface. Supports two hardware configurations: ESP32-S3 with built-in TWAI CAN (recommended) and a classic ESP32 (`esp32dev`) with MCP2515 SPI CAN transceiver (legacy). Both build with the ESP-IDF framework (since 2.5.0). Based on the Elster protocol for communication with heat pump components.
 
 ## Architecture
 
 ### Core Components
 - **ESPHome Firmware** (`esphome/`): ESP32 code interfacing with Stiebel Eltron heat pump via CAN bus
-  - `heatingpump.yaml`: Main entry point with board selection (comment/uncomment blocks for ESP32-S3 or ESP32-S2)
+  - `heatingpump.yaml`: Main entry point with board selection (comment/uncomment blocks for ESP32-S3 or classic ESP32)
   - **Modular Board Configuration** (`ha-stiebel-control/`):
     - `board_esp32s3.yaml`: ESP32-S3 board config (16MB flash, OPI PSRAM @ 80MHz)
-    - `board_esp32s2.yaml`: ESP32-S2/generic ESP32 board config
+    - `board_esp32.yaml`: classic ESP32 (`esp32dev`, 4MB) board config
+    - `board_esp32s2.yaml`: deprecated alias of `board_esp32.yaml` (it never was an ESP32-S2)
+    - `no_captive_portal.yaml`: optional package, removes captive portal + fallback hotspot
     - `can_esp32.yaml`: Built-in TWAI CAN controller (256 RX queue, 64 TX queue, optimized for high traffic)
     - `can_mcp2515.yaml`: MCP2515 SPI-based CAN controller (2 RX buffers, legacy)
     - `common.yaml`: Board-agnostic core (WiFi, MQTT, API, OTA, buttons, text sensors)
@@ -114,7 +116,7 @@ packages:
 
 # OR
 
-# ESP32-S2 Configuration (Legacy)
+# Classic ESP32 Configuration (Legacy)
 substitutions:
   can_clk_pin: GPIO18     # MCP2515 SPI CLK
   can_mosi_pin: GPIO23    # MCP2515 SPI MOSI
@@ -122,7 +124,7 @@ substitutions:
   can_cs_pin: GPIO5       # MCP2515 SPI CS
   can_id_pc: "0x680"
 packages:
-  board: !include ha-stiebel-control/board_esp32s2.yaml
+  board: !include ha-stiebel-control/board_esp32.yaml
   can: !include ha-stiebel-control/can_mcp2515.yaml
   base: !include ha-stiebel-control/common.yaml
   sensors: !include ha-stiebel-control/wpl13e.yaml
@@ -151,7 +153,7 @@ To support additional heat pump models:
 **Follow these rules strictly to maintain architecture:**
 
 - **heatingpump.yaml**: ONLY modify to select board configuration (comment/uncomment blocks). Never add sensors, components, or logic here.
-- **board_esp32s3.yaml / board_esp32s2.yaml**: ONLY board-specific hardware config (flash, PSRAM, framework). Never add WiFi, MQTT, sensors, or CAN config.
+- **board_esp32s3.yaml / board_esp32.yaml**: ONLY board-specific hardware config (flash, PSRAM, framework). Never add WiFi, MQTT, sensors, or CAN config.
 - **can_esp32.yaml / can_mcp2515.yaml**: ONLY CAN platform config. Never add sensors or non-CAN components. Maintain standardized `id: my_mcp2515`.
 - **common.yaml**: MUST remain board-agnostic. Only WiFi, MQTT, API, OTA, buttons, text sensors, intervals. Never add board-specific pins or CAN config.
 - **wpl13e.yaml**: Raw sensor definitions only. Add new heat pump sensors here following template pattern.
@@ -207,7 +209,7 @@ To support additional heat pump models:
 3. Check RAM usage stays under 50%
 4. Test BOTH board configurations if modifying shared files:
    - Uncomment ESP32-S3 block, compile
-   - Uncomment ESP32-S2 block, compile
+   - Uncomment classic ESP32 block, compile
 5. Monitor logs after upload for CAN errors or buffer overflows
 
 ### MQTT Discovery Pattern
@@ -256,7 +258,7 @@ To support additional heat pump models:
 
 ### Testing Mistakes
 - ❌ Only testing one board configuration when modifying shared files
-  ✅ Test both ESP32-S3 and ESP32-S2 configs
+  ✅ Test both ESP32-S3 and classic ESP32 configs
 - ❌ Uploading firmware without checking flash usage
   ✅ Verify flash <50% to allow OTA updates
 - ❌ Ignoring compilation warnings
@@ -319,13 +321,13 @@ To support additional heat pump models:
 - Board: esp32-s3-devkitc-1
 - Flash: 16MB
 - PSRAM: OPI mode @ 80MHz
-- Framework: Arduino
+- Framework: ESP-IDF
 - CAN: Built-in TWAI controller (GPIO15 TX, GPIO16 RX)
 - Buffer sizes: 256 RX queue, 64 TX queue
 
-**ESP32-S2 Configuration (Legacy):**
+**Classic ESP32 Configuration (Legacy):**
 - Board: esp32dev
-- Framework: Arduino
+- Framework: ESP-IDF
 - CAN transceiver: MCP2515 via SPI
 - SPI pins: CLK (GPIO18), MOSI (GPIO23), MISO (GPIO19), CS (GPIO5)
 - Buffer sizes: 2 RX, 3 TX (hardware limited)
@@ -349,7 +351,7 @@ To support additional heat pump models:
 
 ## Key Files Reference
 - Main entry point: [esphome/heatingpump.yaml](esphome/heatingpump.yaml)
-- Board configs: [esphome/ha-stiebel-control/board_esp32s3.yaml](esphome/ha-stiebel-control/board_esp32s3.yaml), [board_esp32s2.yaml](esphome/ha-stiebel-control/board_esp32s2.yaml)
+- Board configs: [esphome/ha-stiebel-control/board_esp32s3.yaml](esphome/ha-stiebel-control/board_esp32s3.yaml), [board_esp32.yaml](esphome/ha-stiebel-control/board_esp32.yaml)
 - CAN configs: [esphome/ha-stiebel-control/can_esp32.yaml](esphome/ha-stiebel-control/can_esp32.yaml), [can_mcp2515.yaml](esphome/ha-stiebel-control/can_mcp2515.yaml)
 - CAN member definitions: [esphome/ha-stiebel-control/ha-stiebel-control.h](esphome/ha-stiebel-control/ha-stiebel-control.h#L30-L51)
 - Signal table: [esphome/ha-stiebel-control/elster/ElsterTable.h](esphome/ha-stiebel-control/elster/ElsterTable.h)
@@ -428,7 +430,7 @@ packages:
 
 `device_model` substitution controls the HA device identifier: `stiebel_eltron_<device_model>`.
 Set it in `heatingpump.yaml`. The `HA_DEVICE_MODEL` C++ string define is injected via
-`platformio_options: build_flags:` in `common.yaml`.
+`esphome: build_flags:` in `common.yaml`.
 
 ### i18n — Display language
 

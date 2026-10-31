@@ -5,6 +5,204 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ---
 
+## [2.5.0] — 2026-10-31
+
+Ideas and register facts from related projects (kr0ner/OneESP32ToRuleThemAll,
+aly-fly/Stiebel-Eltron_heat_pump_monitor, VasekCZ81/stiebel-can-service), verified on a WPL13E.
+
+### Breaking changes
+
+- **ESPHome 2026.7.0 or newer is required** (#44, thanks to hawkeye80). `common.yaml` now
+  declares `esphome: min_version: 2026.7.0`; older ESPHome versions refuse the config. Update
+  ESPHome (dashboard add-on or `pip install -U esphome`) before installing 2.5.0. CI and the release
+  build use ESPHome 2026.10.1.
+
+- **Firmware framework switched from Arduino to ESP-IDF** (#58) for both boards
+  (`board_esp32s3.yaml`, `board_esp32.yaml`). ESP-IDF is ESPHome's recommended framework and
+  nothing in this project needs Arduino. Flash: ESP32-S3 17.5 % -> 16.9 %, 4 MB ESP32 79.1 % -> 76.5 % of the
+  app partition (ESPHome 2026.5.3). PSRAM (octal, 80 MHz) and 16 MB flash are unchanged.
+  **Migration:** the first update after 2.5.0 switches the framework.
+  - A normal OTA update works: OTA replaces only the app, both frameworks use the same app slot
+    sizes, and the firmware keeps using the existing partition table and its `nvs` partition, so
+    stored values (SG Ready boost values, energy base, summer-mode damping) are kept.
+  - Clean the build files once (dashboard *Clean Build Files* / `esphome clean heatingpump.yaml`).
+  - Do **not** run `esphome upload --partition-table` afterwards: it moves the NVS partition and
+    the stored values are lost.
+  - If the device does not come back (no API/MQTT, no safe-mode OTA), flash it over USB
+    (`esphome run heatingpump.yaml --device <serial port>`, ESPHome Web or esptool). Note the
+    SG Ready boost values before, a USB flash writes the ESP-IDF partition layout and can lose them.
+  - Own lambdas or packages that use Arduino APIs (`String`, `Serial`, `WiFi`, Arduino
+    libraries) need to be ported; the project code itself needed one change (TWAI diagnostics
+    are compiled only when the TWAI driver is present, i.e. not on MCP2515 builds).
+  - Details: `docs/CONFIGURATION.md` → "Board files and framework".
+
+- **Delta T (`delta_t_continuous`, `delta_t_running`) now uses the heat pump's own sensors.**
+  Before, flow and return were taken from whichever bus member published last (IWS, WPM sensors and
+  the manager copy were mixed), so the value jumped between two measuring points. Measured on a
+  WPL 13 E: IWS flow minus IWS return is 2-3 K while the compressor runs, but the WPM return sensor
+  X2/3 (control sensor of heating circuit 1, sits in the buffer) reads about 0.6 K higher than the IWS
+  return and holds its value after the compressor stops, which gave wrong and noisy spreads.
+  - New source: `WPVORLAUFIST` and `RUECKLAUFISTTEMP` of the **heat pump module (HEIZMODUL, IWS B1/B2)**.
+  - Fallback for models that deliver no IWS values: the KESSEL pair (`WPVORLAUFIST` X2/2 and
+    `RUECKLAUFISTTEMP` X2/3), never a mix of both sources.
+  - Entities, names and topics are unchanged, **but the values differ** (typically 0.5-1 K lower
+    while running, and no more jumps). Long-term statistics and automations or alerts that use these
+    sensors see a step at the update; thresholds may need adjusting.
+  - `delta_t_continuous` is only meaningful while the pump circulates (the IWS sensors cool down to
+    the pipe temperature in standby); use `delta_t_running` for evaluations.
+  - WPL13E now polls `WPVORLAUFIST` and `RUECKLAUFISTTEMP` from the heat pump module explicitly.
+
+### Added
+
+- **Bus scan** — ask one CAN member for every signal-table index or a hex range; answers are
+  published to `heatingpump/scan/…`, HA buttons "Bus-Scan Manager/Heizmodul/Kessel",
+  `helperscripts/scan_report.py` turns the result into a request block for new models.
+- **Thermostat cards** — MQTT climate entities for heating (room setpoint, operating mode as
+  presets, compressor as action) and hot water. Number/select entities are unchanged.
+- **Fault text** — `FEHLERMELDUNG` decoded to plain text ("Keine Stoerung", "Hochdruck", …)
+  with a remedy attribute; fault list extended by non-conflicting WPM2 codes.
+- **Summer mode (WPL13E)** — threshold `SOMMERBETRIEB_TEMP` (0xfdb5, found by bus scan) and
+  `sommerbetrieb_aktiv`, computed like the WPMW II does it (damped outside temperature over
+  24/48/72 h, 1 K hysteresis), plus the damped temperature itself. The damping starts from the
+  current temperature on first boot and is kept in NVS afterwards.
+- **`read_only` mode** — never writes to the heat pump; CI compiles this variant.
+- **Dashboards** — standard Lovelace dashboard and a system schema with own SVGs (`dashboards/`).
+- **Fault history** — the manager's stored fault list (display parameter 48, 20 entries,
+  `FEHLERFELD_0..139`) is read every 30 min into one sensor "Fehlerliste": state is the newest
+  fault, attributes hold time, remedy, count and all entries (dashboard renders it as a table).
+- **Control deviation (all models with KESSEL return sensor)** — `Regelabweichung` = KESSEL return
+  sensor (control sensor of heating circuit 1) minus the return setpoint. On a WPL 13 E the
+  compressor starts at about -0.7 K and stops at about +2.6 K (five runs, second resolution).
+- **ESP diagnosis** — `Reset Grund` (debug reset reason: brownout, watchdog, software), `Betriebszeit`
+  (uptime) and `WLAN BSSID` as diagnostic entities, to find out why the ESP restarts during DHW charging.
+- **WPL13E status registers** — `KESSELSTATUS`, `PUMPENSTATUS` and `HEIZKREIS_STATUS` (raw bit fields;
+  the first two flip with every compressor run).
+- **WPL13E signals from full bus scans** — bivalence points and heat-pump limits per heating/DHW,
+  max. flow/return temperature, frost protection, booster total runtime (`LAUFZEIT_2WE`),
+  defrost count and duration of the last defrost, superheat actual/target, flow setpoint.
+- **More diagnostics** (#55, diagnostic category, disabled by default): CAN `RX verloren (Queue
+  voll)` (`rx_missed_count`), `RX Überlauf (FIFO)` (`rx_overrun_count`) and `RX Warteschlange`
+  (`msgs_to_rx`, frames waiting in the RX queue) on TWAI builds; `MQTT Sendefehler` (publishes the
+  MQTT client refused, e.g. full `idf_send_async` queue) on all builds. WiFi disconnect reason
+  was not added: ESPHome's `wifi: on_disconnect` trigger has no reason/BSSID parameter
+  (2026.5 and 2026.10); the current BSSID is already available as `WLAN BSSID`.
+- **Register names** — 32 `TEST_OBJEKT_*` rows named, 115 indices added for WPM3-generation
+  models only (`helperscripts/import_signal_names.py`; facts only).
+- **Optional package `no_captive_portal.yaml`** (#58) — removes `captive_portal:` and the
+  fallback hotspot (`wifi: ap:`); list it after `base`. Saves about 88 KB of flash on the 4 MB
+  ESP32 (76.5 % -> 71.6 % of the app partition). Default unchanged: both stay enabled, existing
+  configs keep working. Without them, Wi-Fi is configured only via `secrets.yaml` (wrong
+  credentials need a USB flash).
+
+- **WPL13E: writable heating curve** (`HEIZKURVE` on MANAGER) — previously WPL17 only.
+- **WPL13E: kWh-resolution energy** — `*_SUM_KWH` and daily `*_TAG_KWH` registers. COP now includes
+  the kWh remainder (was whole MWh only) and the combined total/daily energy sensors appear.
+- **WPL13E diagnostics** — hot-gas temperature, compressor DHW runtime, electric booster (DHC)
+  runtimes.
+
+### Changed
+
+- **Build flags moved to `esphome: build_flags`** (#44, thanks to hawkeye80). The five `-DHA_*`
+  defines (`HA_DEVICE_MODEL`, `HA_MODEL_*`, `HA_LANGUAGE_*`, `HA_DISABLE_SG_READY_*`,
+  `HA_READ_ONLY_*`) were set via `platformio_options: build_flags`, which ESPHome deprecates and
+  stops supporting in 2026.12.0 (warning on every build with the ESP-IDF backend). Values and
+  substitutions are unchanged. CI/release ESPHome pin 2026.5.3 -> 2026.10.1.
+- WPL13E: the heat pump module's `AUSSENTEMP` is labelled "Luftansaugtemperatur" (air intake at
+  the unit, per the manual); the controlling outdoor sensor stays "Außen Temperatur".
+- **WiFi post-connect roaming disabled** (#54): `wifi: post_connect_roaming: false`. ESPHome
+  scans all channels every 5 min while RSSI is below -49 dBm; on a stationary heat pump
+  controller this only stalled the MQTT connection (write timeouts, disconnects, before
+  `idf_send_async` task watchdog resets).
+- **`board_esp32.yaml` replaces `board_esp32s2.yaml`** (#58). The file always configured a
+  classic ESP32 (`esp32dev`), never an ESP32-S2. `board_esp32s2.yaml` stays as a deprecated
+  alias that includes the new file, so existing `!include`s keep working. New CI/Make targets
+  `ci_heatingpump_esp32.yaml` / `make compile-esp32`; `ci_heatingpump_s2.yaml` and
+  `make compile-s2` remain and now test the alias. Comments and docs no longer call it "S2".
+- Signals answering `-255` (not available) are polled with growing intervals (up to 6 h) and
+  create no HA entity until they deliver a real value.
+- **MQTT publishing no longer blocks the main loop** (#54): `mqtt: idf_send_async: true` hands
+  every publish to the esp-mqtt task through a queue. Before, a WiFi/TCP stall could block the
+  loop for up to the 10 s network timeout and trigger a task watchdog reset. When the queue is
+  full, messages are dropped and counted in a `Dropped N messages` warning.
+- **`heatingpump/debug` only carries warnings and errors** (`log_topic` level `WARN`). Per-frame
+  and per-request logs (`processCanMessage()`, `readSignal()`, "Discovery published", periodic
+  date/time, COP and energy logs) are DEBUG now. The API/serial log (`esphome logs`) still shows
+  INFO. About 290 fewer MQTT messages per minute on a WPL13E.
+- **MQTT discovery is no longer re-sent every 15 minutes** (#53, #54). All configs are retained;
+  they are sent again on broker connect, when Home Assistant comes online (birth message
+  `homeassistant/status` = `online`) and on the manual trigger, paced at a few per 250 ms.
+- "SG Ready Aktueller Zustand" refreshes every 60 s instead of 5 s and is published immediately
+  when the state changes.
+- New diagnostic sensors "Freier Heap", "Größter freier Block" and "Loop-Zeit"
+  (`sensor: platform: debug`, every 60 s) to classify future restarts.
+- **States are published only on change, with a 10 min heartbeat** (#55). Raw signal and
+  calculated sensor states went out on every CAN answer although 78 % (raw) and 94 %
+  (calculated) of them repeated the previous value. Now an unchanged value is sent again at most
+  every `STATE_HEARTBEAT_MS` (`config.h`, default 10 min). After every MQTT (re)connect all known
+  values are published once more (a few per 250 ms, after the discovery configs), so a broker
+  restart without persistence does not leave constant values empty until the next heartbeat.
+  Always sent as before: SG Ready state/boost values, bus scan results, fault list and fault
+  remedy attributes, discovery configs. After a write (number/select/SG Ready/clock) the next
+  read-back of that signal is published even if the value did not change.
+- **No heap allocations per CAN frame and per request** (#55): signal lookups by name use a
+  hash cache instead of `std::string` keys, the request table is resolved to `ElsterIndex`
+  pointers once at startup (was up to two name searches per entry and second), member/signal
+  keys for discovery, back-off and scheduling are integers, and the CAN frame is no longer copied
+  per frame.
+- **SG Ready no longer blocks the loop** (#55): the read-back after each write was preceded by
+  `delay(100)` (100-400 ms per state change). It is now queued and sent ~100 ms later from the
+  250 ms interval, one read per step.
+- **ElsterTable rows slimmed down** (#57): rows hold only name, index, type and two flag bits
+  (8 instead of ~44 bytes); the HA metadata of the 120 rows that use it moved to a side table
+  (`ElsterMetaTable`, `GetElsterMeta()`), unused metadata strings of the other rows were dropped.
+  Converted by `tools/elster_table_split.py`, verified row by row for every model and language.
+  Flash: ESP32-S3 20.0 % -> 17.5 %, 4 MB ESP32 build 90.0 % -> 79.0 % of the app partition
+  (-202 KB).
+
+### Fixed
+
+- WPL13E: `compressor_active` was driven alternately by the IWS compressor value and a constant
+  0.0 copy from the MANAGER seen on the bus. MANAGER copies of IWS values (and compressor-1 /
+  cooling runtimes the WPMW II polls itself) are now ignored on WPL13E.
+- COP waits until all kWh remainder registers are known (no jumps right after boot).
+- Discovery configs sent during boot, before the MQTT connection was up, were lost until the
+  15-minute refresh (e.g. renamed entities or writable numbers appeared late); they are now sent
+  on every broker (re)connect.
+- **Read requests of other bus nodes were decoded as values** (Elster telegram type was not
+  checked). This produced constant fake `0` readings for the requesting node, e.g. "MANAGER
+  VERDICHTER 0.0" on WPL13E, and hid real values such as the manager's return temperature.
+- Short CAN frames dereferenced an unset member.
+- Bool fields carrying other bits ("?") are no longer published to binary sensors (HA rejected
+  them with a warning per poll). WPL13E `ABTAUUNGAKTIV` reads 0x0200 while the compressor runs.
+- WPL13E refrigerant pressures (`ANZEIGE_HOCHDRUCK/NIEDERDRUCK`) are hundredths of bar.
+- WPL13E `LZ_VERD_2_HEIZBETRIEB` is plain hours ("Laufzeit Verdichter Heizen"); heating +
+  DHW now add up to the total compressor runtime.
+- Remedy text for `HD-SENSOR-MAX` named a sensor fault; it is the high-pressure limit
+  (heating flow too low or room temperature / heating curve too high).
+- WPL13E no longer polls `LAUFZEIT_WP1`: the manager fills it only on demand (read 0 otherwise).
+- WPL13E `VERDICHTER` (0x07a8) is a status word (0x0008 idle, 0x0221/0x0228 running), not a power in W;
+  `VERDAMPFERTEMP` (0x0014) is not a temperature (-30 idle, +58..+76 within minutes of a start);
+  `HEIZKURVE` is a slope without unit. All three are published without unit and device class.
+- `make test` did not rebuild objects after header changes (stale `ElsterTable.h` in tests).
+- **Periodic discovery republish dropped nearly all signals** (#53). The blacklist filter took the
+  lowercase uid fragment after the last `_` as signal name, found no table row and treated it as
+  blacklisted: every 15 min 66-69 of ~70 signals were removed from the discovered set and
+  rediscovered over the next minute (a wave of retained payloads; the first run blocked the loop
+  for ~0.8 s). The filter is gone (blacklisted signals never get discovered) and a republish now
+  actually re-sends the raw signal configs too.
+- **`ElsterTable` was compiled into the firmware twice** (#56): the `static` table in
+  `ElsterTable.h` gave main.cpp and `KElsterTable.cpp` one copy each (~159 KB). It is now defined
+  once in `KElsterTable.cpp`; other files see `extern` declarations and use `ElsterTableCount`
+  instead of `High(ElsterTable)`. The 4 MB ESP32 build drops from 98.7 % to 90.0 % of the app
+  partition (-159 KB).
+
+### Removed (WPL13E — no valid value over 30 days to 11 months of HA history)
+
+- `SAMMLERISTTEMP` (-40 °C, no sensor), `HEIZKURVE` on KESSEL (always 0), `WW_HYSTERSE`,
+  `ANTILEGIONELLEN_ZEITPUNKT` (-255), compressor-1 / cooling / MANAGER runtime counters.
+
+---
+
 ## [2.4.2] — 2026-10-27
 
 ### Fixed

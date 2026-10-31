@@ -37,6 +37,10 @@
 #define LNAME_RAUMSOLLTEMP_NACHT               "Room Target Temperature Night"
 #undef  LNAME_AUSSENTEMP
 #define LNAME_AUSSENTEMP                       "Outside Temperature"
+#undef  LNAME_FEHLERMELDUNG
+#define LNAME_FEHLERMELDUNG                    "Fault"
+#undef  LNAME_LUFTANSAUGTEMP
+#define LNAME_LUFTANSAUGTEMP                   "Air Intake Temperature"
 #undef  LNAME_SAMMLERISTTEMP
 #define LNAME_SAMMLERISTTEMP                   "Collector Actual Temperature"
 #undef  LNAME_SPEICHERISTTEMP
@@ -231,6 +235,28 @@
 #define LNAME_CALC_EL_LEISTUNG_HEIZ_W          "Current Electrical Power Heating"
 #undef  LNAME_CALC_EL_LEISTUNG_WW_W
 #define LNAME_CALC_EL_LEISTUNG_WW_W            "Current Electrical Power DHW"
+#undef  LNAME_CALC_SOMMERBETRIEB_AKTIV
+#define LNAME_CALC_SOMMERBETRIEB_AKTIV         "Summer Mode Active"
+#undef  LNAME_CALC_FEHLERLISTE
+#define LNAME_CALC_FEHLERLISTE                 "Fault History"
+#undef  LNAME_CALC_AUSSENTEMP_GEDAEMPFT
+#define LNAME_CALC_AUSSENTEMP_GEDAEMPFT        "Outside Temperature Damped"
+#undef  LNAME_CALC_REGELABWEICHUNG
+#define LNAME_CALC_REGELABWEICHUNG             "Control Deviation (Return - Setpoint)"
+#undef  LNAME_CALC_CAN_RX_MISSED
+#define LNAME_CALC_CAN_RX_MISSED               "CAN RX Missed (Queue Full)"
+#undef  LNAME_CALC_CAN_RX_OVERRUN
+#define LNAME_CALC_CAN_RX_OVERRUN              "CAN RX Overrun (FIFO)"
+#undef  LNAME_CALC_CAN_RX_QUEUE
+#define LNAME_CALC_CAN_RX_QUEUE                "CAN RX Queue"
+#undef  LNAME_CALC_MQTT_PUBLISH_FAILURES
+#define LNAME_CALC_MQTT_PUBLISH_FAILURES       "MQTT Publish Failures"
+#undef  LNAME_SOMMERBETRIEB_TEMP
+#define LNAME_SOMMERBETRIEB_TEMP               "Summer Mode Threshold"
+#undef  LNAME_ANZEIGE_HOCHDRUCK
+#define LNAME_ANZEIGE_HOCHDRUCK                "High Pressure"
+#undef  LNAME_ANZEIGE_NIEDERDRUCK
+#define LNAME_ANZEIGE_NIEDERDRUCK              "Low Pressure"
 
 // ============================================================================
 // Writable number friendly names
@@ -287,4 +313,8 @@
 #define LNAME_COP_HEIZ                         "COP Heating"
 #undef  LNAME_COP_GESAMT
 #define LNAME_COP_GESAMT                       "COP Total"
+#undef  LNAME_CLIMATE_HEIZUNG
+#define LNAME_CLIMATE_HEIZUNG                  "Heating"
+#undef  LNAME_CLIMATE_WARMWASSER
+#define LNAME_CLIMATE_WARMWASSER               "Hot Water"
 #endif // LANGUAGE_SELECT_ACTIVE

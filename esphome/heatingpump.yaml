@@ -21,15 +21,19 @@ substitutions:
   can_id_pc: "0x680"
   can_bit_rate: 20kbps             # 20kbps = CAN-A (WPL13E/WPF10/WPC7); WPL17/WPL23/WPL10AC need 50kbps (CAN-B)
   # disable_sg_ready: "true"      # hide SG Ready entities in HA (default "false")
+  # read_only: "true"             # never write to the heat pump: no setpoints, modes or clock sync (default "false")
 
 packages:
   board: !include ha-stiebel-control/board_esp32s3.yaml
   can: !include ha-stiebel-control/can_esp32.yaml
   base: !include ha-stiebel-control/common.yaml
   sensors: !include ha-stiebel-control/wpl13e.yaml
+  # Optional: drop the captive portal and fallback hotspot (saves flash, Wi-Fi only via secrets.yaml)
+  # no_captive_portal: !include ha-stiebel-control/no_captive_portal.yaml
 
 # ============================================================================
-# ESP32-S2 with MCP2515 SPI CAN Transceiver (Legacy)
+# Classic ESP32 (esp32dev, e.g. ESP32-WROOM DevKit) with MCP2515 SPI CAN (Legacy)
+# (not an ESP32-S2 — the old board_esp32s2.yaml name still works as an alias)
 # ============================================================================
 # Uncomment this section and comment out ESP32-S3 section above to use MCP2515
 # substitutions:
@@ -44,7 +48,8 @@ packages:
 #   can_id_pc: "0x680"
 #
 # packages:
-#   board: !include ha-stiebel-control/board_esp32s2.yaml
+#   board: !include ha-stiebel-control/board_esp32.yaml
 #   can: !include ha-stiebel-control/can_mcp2515.yaml
 #   base: !include ha-stiebel-control/common.yaml
 #   sensors: !include ha-stiebel-control/wpl13e.yaml
+#   # no_captive_portal: !include ha-stiebel-control/no_captive_portal.yaml

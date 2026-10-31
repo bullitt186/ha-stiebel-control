@@ -18,19 +18,22 @@
 # Defaults — override in your top-level heatingpump.yaml substitutions
 substitutions:
   disable_sg_ready: "false"   # "true" hides all SG Ready entities (e.g. WPC7, which has no SG Ready input)
+  read_only: "false"          # "true": never write to the heat pump (no setpoints/modes/clock; reading and bus scan only)
 
 esphome:
+  min_version: 2026.7.0
   name: heatingpump
   friendly_name: "Heating Pump CAN Interface"
   project:
     name: "bullitt186.ha-stiebel-control"
-    version: "2.4.2"
+    version: "2.5.0"
   on_boot:
     priority: 600
     then:
       - lambda: |-
           initBoostStatePrefs();
           loadBoostState();
+          initSummerPrefs();
   includes:
     - ha-stiebel-control/elster/ElsterTable.h
     - ha-stiebel-control/elster/KElsterTable.h
@@ -49,12 +52,12 @@ esphome:
     - ha-stiebel-control/ha-stiebel-control.h
     - ha-stiebel-control/signal_requests_base.h
     # model-specific signal_requests_*.h is declared by each model yaml package
-  platformio_options:
-    build_flags:
-      - "-DHA_DEVICE_MODEL=${device_model}"
-      - "-DHA_MODEL_${device_model}"
-      - "-DHA_LANGUAGE_${language}"
-      - "-DHA_DISABLE_SG_READY_${disable_sg_ready}"
+  build_flags:
+    - "-DHA_DEVICE_MODEL=${device_model}"
+    - "-DHA_MODEL_${device_model}"
+    - "-DHA_LANGUAGE_${language}"
+    - "-DHA_DISABLE_SG_READY_${disable_sg_ready}"
+    - "-DHA_READ_ONLY_${read_only}"
 
 
 #########################################
@@ -65,6 +68,11 @@ esphome:
 logger:
   level: INFO
   baud_rate: 115200
+
+# Reset-reason diagnosis for the ESP restarts seen during DHW charging
+# (brownout vs. watchdog vs. software reset). Read by text_sensor platform: debug.
+debug:
+  update_interval: 60s
 
 
 #########################################
@@ -109,6 +117,15 @@ mqtt:
     payload: offline
     qos: 1
     retain: true
+  # Publish through a queue to the esp-mqtt task instead of blocking the loop for
+  # up to the 10 s network timeout on a WiFi/TCP stall (task watchdog resets).
+  # Messages are dropped (and counted in a WARN log) when the queue is full.
+  idf_send_async: true
+  # Remote log via MQTT: warnings and errors only. Per-frame CAN logs are DEBUG and
+  # INFO stays on the API/serial log (esphome logs).
+  log_topic:
+    topic: heatingpump/debug
+    level: WARN
   # Keepalive for connection monitoring
   keepalive: 15s
   # Disable reboot on MQTT disconnect - will keep trying to reconnect indefinitely
@@ -119,15 +136,14 @@ mqtt:
         format: "Connected to MQTT broker"
         tag: "MQTT_CONN"
     - lambda: |-
-        ESP_LOGI("MQTT_CONN", "Publishing writable entity discoveries...");
-        // Publish MQTT number discoveries for writable temperature setpoints
-        publishAllWritableNumberDiscoveries();
-        // Publish MQTT select discoveries for operating mode control
-        publishAllWritableSelectDiscoveries();
-        // Publish MQTT calculated sensor discoveries (COP, combined energy totals, etc.)
-        publishAllCalculatedSensorDiscoveries();
-        // Datetime control now handled by Home Assistant input_datetime helpers
-        ESP_LOGI("MQTT_CONN", "Discovery publication complete");
+        // Anything "published" during boot before the broker connection was up
+        // was lost, but is already marked as discovered. Re-sends writable
+        // numbers/selects, climate, calculated sensors and raw signals, paced by
+        // discoveryRepublishStep() (interval below).
+        republishAllDiscoveries();
+        // States are published only on change (plus a 10 min heartbeat): send every
+        // known value once more, after the discoveries (stateRepublishStep()).
+        republishAllStates();
 
         // Publish current SG Ready state + boost values (retained)
         ESP_LOGI("MQTT_CONN", "Publishing initial SG Ready states...");
@@ -152,16 +168,27 @@ mqtt:
       then:
         - logger.log: "Manual reconnect triggered"
 
+    # Home Assistant birth message: HA (re)started, send all discovery configs again.
+    # Replaces the former 15-minute republish (configs are retained on the broker).
+    - topic: homeassistant/status
+      then:
+        - lambda: |-
+            if (x == "online") republishAllDiscoveries();
+
+    # Bus scan: payload "<MEMBER>" (all table indices) or "<MEMBER> 0x0000 0x0fff"
+    - topic: heatingpump/scan/start
+      then:
+        - lambda: startScan(x);
+    - topic: heatingpump/scan/stop
+      then:
+        - lambda: stopScan();
+
     # Force republish all discoveries (including writable entities)
     - topic: heatingpump/republish_discoveries
       then:
         - lambda: |-
             ESP_LOGI("MQTT_CMD", "Manual discovery republish triggered");
             republishAllDiscoveries();
-            publishAllWritableNumberDiscoveries(true);
-            publishAllWritableSelectDiscoveries(true);
-            publishAllCalculatedSensorDiscoveries(true);
-            ESP_LOGI("MQTT_CMD", "All discoveries republished");
 
     # Temperature setpoint controls
     # HINWEIS: EINSTELL_SPEICHERSOLLTEMP wird auf WPL17 (CAN-B) vom KESSEL_CANB
@@ -236,6 +263,8 @@ mqtt:
 
             if (state >= 1 && state <= 4) {
                 applySgReadyState(state);
+                // Publish the new state right away (the sensor polls only every 60 s)
+                id(SG_READY_CURRENT_STATE).update();
             } else {
                 ESP_LOGW("MQTT_CMD", "Invalid SG Ready state received: %s", x.c_str());
             }
@@ -336,6 +365,15 @@ mqtt:
             writeSignal(&CanMembers[cm_kessel_canb], "HEIZKURVE", value);
             readSignal(&CanMembers[cm_kessel_canb], "HEIZKURVE");
 
+    - topic: heatingpump/MANAGER/HEIZKURVE/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received MANAGER HEIZKURVE command: %s", x.c_str());
+            publishWritableNumberDiscovery(writableNumbers[8]);
+            const char* value = x.c_str();
+            writeSignal(&CanMembers[cm_manager], "HEIZKURVE", value);
+            readSignal(&CanMembers[cm_manager], "HEIZKURVE");
+
 
 #########################################
 #                                       #
@@ -349,6 +387,16 @@ interval:
       - lambda: |-
           processSignalRequests();
 
+  # Fault list of the manager (20 entries, refreshed every 30 min)
+  - interval: 1s
+    then:
+      - lambda: faultListStep();
+
+  # Bus scan (idle unless started via heatingpump/scan/start)
+  - interval: 150ms
+    then:
+      - lambda: scanStep();
+
   # Process calculated sensor updates (runs every second)
   - interval: 1s
     then:
@@ -361,13 +409,16 @@ interval:
       - lambda: |-
           publishSgReadyState();
 
-  # Republish MQTT discovery every 15 minutes for reliability
-  - interval: 15min
+  # Sends pending discovery configs (MQTT connect, HA birth, manual trigger) a few
+  # at a time, then the cached states after a (re)connect; idle otherwise. There is
+  # no periodic republish: configs and states are retained. Also sends the delayed
+  # read-back after SG Ready writes (one per call).
+  - interval: 250ms
     then:
       - lambda: |-
-          republishAllDiscoveries();
-          publishAllWritableNumberDiscoveries(true);
-          publishAllWritableSelectDiscoveries(true);
+          discoveryRepublishStep();
+          stateRepublishStep();
+          pendingReadbackStep();
 
 #########################################
 #                                       #
@@ -392,6 +443,26 @@ text_sensor:
 
   #########################################
   #                                       #
+  #   DIAGNOSE                            #
+  #                                       #
+  #########################################
+  # Why did the ESP restart? (e.g. "Brownout", "Task watchdog", "Software reset")
+  - platform: debug
+    reset_reason:
+      name: "Reset Grund"
+      id: reset_reason_text
+      entity_category: diagnostic
+      icon: "mdi:restart-alert"
+
+  # Which access point is the ESP connected to? (reconnects jump between about -62 and -71 dBm)
+  - platform: wifi_info
+    bssid:
+      name: "WLAN BSSID"
+      entity_category: diagnostic
+      icon: "mdi:router-wireless"
+
+  #########################################
+  #                                       #
   #   BERECHNETE TEXT SENSORS             #
   #                                       #
   #########################################
@@ -400,7 +471,9 @@ text_sensor:
     id: SG_READY_CURRENT_STATE
     internal: ${disable_sg_ready}
     icon: "mdi:solar-power"
-    update_interval: 5s
+    # Changes are published immediately by the SG_READY_STATE/set handler;
+    # the interval only refreshes the unchanged value.
+    update_interval: 60s
     lambda: |-
       if (currentSgReadyState == 0) {
         return std::string("Deaktiviert");
@@ -436,6 +509,7 @@ text_sensor:
 button:
   - platform: template
     name: "Update Uhrzeit"
+    internal: ${read_only}
     id: update_uhrzeit
     icon: "mdi:clock-check"
     on_press:
@@ -445,6 +519,7 @@ button:
 
   - platform: template
     name: "Update Datum"
+    internal: ${read_only}
     id: update_datum
     icon: "mdi:calendar-check"
     on_press:
@@ -460,6 +535,33 @@ button:
       then:
         lambda: |-
           republishAllDiscoveries();
+
+  - platform: template
+    name: "Bus-Scan Manager"
+    icon: "mdi:radar"
+    entity_category: diagnostic
+    disabled_by_default: true
+    on_press:
+      then:
+        - lambda: startScan("MANAGER");
+
+  - platform: template
+    name: "Bus-Scan Heizmodul"
+    icon: "mdi:radar"
+    entity_category: diagnostic
+    disabled_by_default: true
+    on_press:
+      then:
+        - lambda: startScan("HEIZMODUL");
+
+  - platform: template
+    name: "Bus-Scan Kessel"
+    icon: "mdi:radar"
+    entity_category: diagnostic
+    disabled_by_default: true
+    on_press:
+      then:
+        - lambda: startScan("KESSEL");
 
   - platform: restart
     name: "Restart"
@@ -479,11 +581,17 @@ wifi:
   password: !secret wifi_password
   fast_connect: true
   power_save_mode: none
+  # Stationary device: ESPHome's post-connect roaming scans all channels every
+  # 5 min when RSSI < -49 dBm. The off-channel scan stalls the MQTT TCP stream
+  # (>10 s write timeouts, disconnects) and caused task watchdog resets (#54).
+  post_connect_roaming: false
   reboot_timeout: 5min
   ap:
     ssid: "Heatingpump Fallback Hotspot"
     password: "AsBl9n46jlOx"
 
+# Enabled by default. To drop it together with the fallback hotspot (saves flash),
+# add the optional package ha-stiebel-control/no_captive_portal.yaml after this one.
 captive_portal:
 
 #########################################
@@ -519,7 +627,28 @@ sensor:
     lambda: |-
       return sgReadyBoostState4Value();
 
+  # Heap and loop diagnostics (classify task watchdog / memory related restarts)
+  - platform: debug
+    free:
+      name: "Freier Heap"
+      entity_category: diagnostic
+      icon: "mdi:memory"
+    block:
+      name: "Größter freier Block"
+      entity_category: diagnostic
+      icon: "mdi:memory"
+    loop_time:
+      name: "Loop-Zeit"
+      entity_category: diagnostic
+      icon: "mdi:timer-sand"
+
   # WiFi and system sensors
+  - platform: uptime
+    name: "Betriebszeit"
+    id: uptime_s
+    entity_category: diagnostic
+    icon: "mdi:timer-outline"
+
   - platform: wifi_signal
     name: "WiFi Signal dBm"
     icon: "mdi:wifi"

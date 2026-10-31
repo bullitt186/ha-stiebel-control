@@ -1,0 +1,65 @@
+# ha-stiebel-control — system schema (picture-elements card)
+#
+# 1. Copy dashboards/www/heatingpump/ to /config/www/heatingpump/ on Home Assistant
+#    (served as /local/heatingpump/...).
+# 2. Add a "Manual" card to any dashboard and paste this card.
+# Entity IDs: see the note in heatingpump_standard.yaml.
+type: picture-elements
+image: /local/heatingpump/schema.svg
+elements:
+  # Overlays, shown while the state is "on"
+  - type: image
+    entity: binary_sensor.stiebel_eltron_warmepumpe_wp_verdichter_aktiv
+    tap_action: {action: more-info}
+    state_image:
+      "on": /local/heatingpump/verdichter.svg
+      "off": /local/heatingpump/transparent.svg
+    style: {top: 50%, left: 50%, width: 100%}
+  - type: image
+    entity: binary_sensor.heizmodul_abtauung_aktiv
+    tap_action: {action: more-info}
+    state_image:
+      "on": /local/heatingpump/abtauen.svg
+      "off": /local/heatingpump/transparent.svg
+    style: {top: 50%, left: 50%, width: 100%}
+  - type: image
+    entity: binary_sensor.manager_evu_sperre_aktiv
+    tap_action: {action: more-info}
+    state_image:
+      "on": /local/heatingpump/evu.svg
+      "off": /local/heatingpump/transparent.svg
+    style: {top: 50%, left: 50%, width: 100%}
+  - type: conditional
+    conditions:
+      - entity: sensor.heizmodul_storung
+        state_not: "Keine Stoerung"
+    elements:
+      - type: image
+        entity: sensor.heizmodul_storung
+        tap_action: {action: more-info}
+        image: /local/heatingpump/stoerung.svg
+        style: {top: 50%, left: 50%, width: 100%}
+
+  # Values
+  - type: state-label
+    entity: sensor.kessel_aussen_temperatur
+    prefix: "Außen "
+    style: {top: 18%, left: 19%, font-size: 15px}
+  - type: state-label
+    entity: sensor.kessel_vorlauf_ist_temperatur
+    prefix: "VL "
+    style: {top: 31%, left: 46%, color: "#d9534f", font-weight: bold}
+  - type: state-label
+    entity: sensor.kessel_rucklauf_ist_temperatur
+    prefix: "RL "
+    style: {top: 67%, left: 46%, color: "#3a7bd5", font-weight: bold}
+  - type: state-label
+    entity: sensor.kessel_speicher_ist_temperatur
+    style: {top: 47%, left: 57.5%, font-size: 18px, font-weight: bold}
+  - type: state-label
+    entity: sensor.stiebel_eltron_warmepumpe_cop_heizung
+    prefix: "COP "
+    style: {top: 82%, left: 19%}
+  - type: state-label
+    entity: select.manager_programmschalter
+    style: {top: 92%, left: 50%, font-size: 14px}

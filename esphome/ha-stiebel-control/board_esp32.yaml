@@ -1,0 +1,14 @@
+#
+#  Classic ESP32 Board Configuration (ESP32-WROOM/-WROVER dev boards, "esp32dev")
+#  Used with an external MCP2515 SPI CAN controller (can_mcp2515.yaml).
+#  Flash: 4MB (default partition layout: two ~1.75MB OTA slots)
+#  Framework: ESP-IDF (since 2.5.0; was Arduino).
+#
+#  Note: this is NOT an ESP32-S2. Up to 2.4.x this file was called
+#  board_esp32s2.yaml; that name still works as a deprecated alias.
+#
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf

@@ -14,5 +14,12 @@ struct SignalRequest {
     int member;
 };
 
-extern const SignalRequest signalRequests[] = {};
-extern const size_t SIGNAL_REQUEST_COUNT_VALUE = 0;
+// Small table for the request manager tests (test_mqtt_state.cpp). Member values
+// are CanMemberType: 0 = cm_kessel, 8 = cm_manager, 20 = cm_other (checked there).
+extern const SignalRequest signalRequests[] = {
+    {"AUSSENTEMP",         30, 0},    // known, one member
+    {"SPEICHERISTTEMP",    60, 20},   // known, all members (KESSEL, MANAGER, HEIZMODUL)
+    {"DOES_NOT_EXIST_XYZ", 30, 8},    // unknown name: never requested
+    {"GERAETE_ID",         30, 8},    // blacklisted: never requested
+};
+extern const size_t SIGNAL_REQUEST_COUNT_VALUE = sizeof(signalRequests) / sizeof(signalRequests[0]);

@@ -40,6 +40,9 @@ The key must match what HA's ESPHome integration has stored for this device. If 
 | `can_mosi_pin` | SPI MOSI (MCP2515 only) | board-specific — see note below |
 | `can_miso_pin` | SPI MISO (MCP2515 only) | board-specific — see note below |
 | `can_cs_pin` | SPI CS (MCP2515 only) | board-specific — see note below |
+| `can_bit_rate` | CAN bus speed: `20kbps` (CAN-A: WPL13E/WPF10/WPC7) or `50kbps` (CAN-B: WPL17/WPL23/WPL10AC) | `20kbps` |
+| `disable_sg_ready` | `"true"` hides all SG Ready entities (models without SG Ready input) | `"false"` |
+| `read_only` | `"true"`: never write to the heat pump — no setpoint/mode/climate entities, clock buttons hidden; reading and bus scan keep working | `"false"` |
 
 > **Pin assignments are board-specific.** Always verify against your board's schematic
 > before wiring. Known working values for common boards:
@@ -51,6 +54,70 @@ The key must match what HA's ESPHome integration has stored for this device. If 
 > `can_clk_pin: GPIO18`, `can_mosi_pin: GPIO23`, `can_miso_pin: GPIO19`, `can_cs_pin: GPIO5`
 >
 > These are the values shipped in `heatingpump.yaml`. Other boards may use different pins.
+
+---
+
+## Board files and framework
+
+| `board:` package | Chip / board | Flash | Framework |
+|------------------|--------------|-------|-----------|
+| `board_esp32s3.yaml` | ESP32-S3 (`esp32-s3-devkitc-1`, e.g. Waveshare ESP32-S3-RS485-CAN), octal PSRAM @ 80 MHz | 16 MB | ESP-IDF |
+| `board_esp32.yaml` | classic ESP32 (`esp32dev`, e.g. ESP32-WROOM DevKit) + MCP2515 | 4 MB | ESP-IDF |
+| `board_esp32s2.yaml` | **deprecated alias** of `board_esp32.yaml` — it never configured an ESP32-S2 | 4 MB | ESP-IDF |
+
+Since 2.5.0 both boards build with **ESP-IDF** instead of Arduino (ESPHome's recommended
+framework; smaller firmware, nothing in this project needs Arduino).
+
+### Updating an existing device from an Arduino build (≤ 2.4.x)
+
+The first update after 2.5.0 switches the framework. A normal OTA update works:
+
+- **Partition table:** OTA only replaces the app; the partition table on the device stays.
+  ESPHome generates the same app slots for both frameworks (16 MB: `app0`/`app1` 0x7C0000
+  each; 4 MB: 0x1C0000 each). Only the data partitions behind them differ (Arduino:
+  `eeprom`, `spiffs`, `nvs` 0x60000; ESP-IDF: `nvs` 0x70000). The new firmware finds the
+  existing `nvs` partition by name, so the old layout keeps working.
+- **Stored values survive:** ESPHome keeps preferences (SG Ready boost values, energy base,
+  summer-mode damping, restored states) in the NVS namespace `esphome` with the same keys on
+  both frameworks.
+- **Do not** run `esphome upload --partition-table` to "clean up" the old layout: it moves the
+  NVS partition, and ESPHome documents that the data stored there is lost.
+- **Bootloader:** OTA does not replace it. With a bootloader that supports rollback (built with
+  `enable_ota_rollback`, ESPHome's default), a new firmware that crashes before it is marked
+  valid is rolled back to the previous slot automatically. `safe_mode` (enabled in `common.yaml`)
+  boots into an OTA-only mode after repeated failed boots.
+- Clean the build files once after switching (ESPHome dashboard: *Clean Build Files*, CLI:
+  `esphome clean heatingpump.yaml`) so no Arduino objects are reused.
+
+**If the device does not come back** after the update (no API/MQTT after a few minutes, no
+safe-mode OTA), flash it over USB: `esphome run heatingpump.yaml --device /dev/ttyACM0`
+(or ESPHome Web / `esptool.py write_flash`). A USB flash writes bootloader, partition table and
+app in the ESP-IDF layout; values stored in NVS can be lost because the NVS partition moves,
+so note your SG Ready boost values first. Stop every program that holds the serial port before
+flashing.
+
+---
+
+## Optional packages
+
+### `no_captive_portal.yaml` — no captive portal and no fallback hotspot
+
+`common.yaml` keeps `captive_portal:` and the fallback hotspot (`wifi: ap:`) enabled by default,
+so existing configurations behave as before. To drop both (saves flash, mainly interesting on
+the 4 MB classic ESP32), list the package **after** `base`:
+
+```yaml
+packages:
+  board: !include ha-stiebel-control/board_esp32.yaml
+  can: !include ha-stiebel-control/can_mcp2515.yaml
+  base: !include ha-stiebel-control/common.yaml
+  sensors: !include ha-stiebel-control/wpl13e.yaml
+  no_captive_portal: !include ha-stiebel-control/no_captive_portal.yaml
+```
+
+Without it, Wi-Fi is configured only through `secrets.yaml`: if the credentials are wrong or
+the network changes, the ESP stays offline and needs a USB flash. `api:` stays (the date/time
+sync uses Home Assistant text sensors).
 
 ---
 
@@ -92,8 +159,35 @@ Available automatically on ESP32-S3 / TWAI builds. Not present on MCP2515 builds
 | `sensor.can_rx_fehlerzahler` | RX Error Counter (REC) — rises on receive errors |
 | `sensor.can_bus_fehler` | Total bus error count (cumulative) |
 | `sensor.can_bus_zustand` | Bus state: Läuft / Gestoppt / Bus-Off / Erholung |
+| `sensor.can_rx_verloren_queue_voll` | Frames lost because the RX queue was full (`rx_missed_count`, cumulative) |
+| `sensor.can_rx_uberlauf_fifo` | Frames lost by a hardware RX FIFO overrun (`rx_overrun_count`, cumulative) |
+| `sensor.can_rx_warteschlange` | Frames waiting in the RX queue at the moment of the sample (`msgs_to_rx`) |
 
 TEC/REC above 96 indicates warning level; above 127 the controller enters bus-off.
+Rising "RX verloren" or a queue that does not drain to 0 means the main loop does not keep up
+with the bus traffic. The three RX sensors are disabled by default (enable them in HA).
+
+### MQTT Diagnostics (all builds, diagnostic category)
+
+| Entity ID | Description |
+|-----------|-------------|
+| `sensor.mqtt_sendefehler` | Publishes the MQTT client refused since boot (not connected, or the `idf_send_async` queue was full and the message was dropped). Disabled by default. |
+
+### ESP Diagnostics (native API, diagnostic category)
+
+| Name | Description |
+|------|-------------|
+| Reset Grund | Reason of the last restart (e.g. brownout, task watchdog, software reset) |
+| Betriebszeit | Uptime |
+| Freier Heap | Free heap in bytes (every 60 s) |
+| Größter freier Block | Largest free heap block in bytes; a falling value with stable free heap means fragmentation |
+| Loop-Zeit | Longest main loop iteration in the last 60 s (ms) |
+
+### Logging
+
+The MQTT log topic `heatingpump/debug` only carries warnings and errors. The API/serial log
+(`esphome logs heatingpump.yaml`) shows INFO. Per-frame CAN logs (`processCanMessage()`,
+`readSignal()`) are DEBUG: set `logger: level: DEBUG` in your top-level YAML to see them.
 
 ### Mode Selects (select entities)
 
@@ -112,8 +206,9 @@ Published to `heatingpump/calculated/` MQTT topics and auto-discovered in HA:
 |--------|-------|-------------|
 | Date | `heatingpump/calculated/date/state` | `YYYY-MM-DD` from heat pump clock |
 | Time | `heatingpump/calculated/time/state` | `HH:MM:SS` from heat pump clock |
-| Delta T (continuous) | `heatingpump/calculated/delta_t_continuous/state` | Flow − return temp, always |
-| Delta T (running) | `heatingpump/calculated/delta_t_running/state` | Flow − return temp, only when compressor active |
+| Delta T (continuous) | `heatingpump/calculated/delta_t_continuous/state` | Heat pump flow − return (IWS sensors B1/B2); meaningful only while the pump circulates |
+| Delta T (running) | `heatingpump/calculated/delta_t_running/state` | Same, only when compressor active |
+| Control deviation | `heatingpump/calculated/regelabweichung/state` | KESSEL return sensor (control sensor HK1) − return setpoint |
 | Compressor active | `heatingpump/calculated/compressor_active/state` | on/off |
 | COP hot water | `heatingpump/calculated/cop_ww/state` | Coefficient of performance (DHW) |
 | COP heating | `heatingpump/calculated/cop_heiz/state` | Coefficient of performance (heating) |
@@ -142,6 +237,27 @@ Availability:
 ```
 heatingpump/status    → "online" or "offline"
 ```
+
+### Publish on change, heartbeat
+
+All `…/state` topics of raw signals and calculated sensors are retained and published **when the
+value changes**. An unchanged value is sent again at most every 10 minutes (heartbeat), so the
+topic shows the device is alive. The interval is `STATE_HEARTBEAT_MS` in
+`esphome/ha-stiebel-control/config.h`:
+
+```cpp
+#define STATE_HEARTBEAT_MS (10UL * 60UL * 1000UL)   // milliseconds
+```
+
+- A signal is still **polled** at its request frequency; only the MQTT message is skipped.
+  Home Assistant keeps the last value, its history shows a new point only on a change (or the
+  heartbeat). `last_updated` therefore no longer moves with every poll.
+- After every MQTT (re)connect all known values are published once (a few per 250 ms, after the
+  discovery configs). A broker restart without persistence is covered that way.
+- After a write (setpoint, mode, SG Ready, clock) the read-back of that signal is published even
+  if the heat pump kept the old value, so HA always gets an answer to a command.
+- Not affected (always sent): SG Ready state and boost values, bus scan results, the fault list
+  sensor and the fault remedy attribute, discovery configs.
 
 ---
 
@@ -185,3 +301,70 @@ in its `ElsterTable.h` entry:
 
 Blacklisted signals are skipped before any processing — they never generate MQTT messages
 or HA entities.
+
+---
+
+## Thermostat (climate) entities
+
+Two MQTT climate entities complement the number/select entities (which stay unchanged):
+
+| Entity | Target temperature | Current temperature | Presets |
+|--------|--------------------|---------------------|---------|
+| `climate.…_heizung` | `RAUMSOLLTEMP_I` (day room setpoint) | — | operating modes of `PROGRAMMSCHALTER` |
+| `climate.…_warmwasser` | `EINSTELL_SPEICHERSOLLTEMP` | `SPEICHERISTTEMP` | — |
+
+They use the same `/set` topics as the number entities, so the CAN member mapping per model applies.
+
+## Fault text
+
+`FEHLERMELDUNG` is decoded via `ErrorList` in `ElsterTable.h` ("Keine Stoerung" when 0). The
+`abhilfe` attribute holds a short remedy (`heatingpump/<MEMBER>/FEHLERMELDUNG/attributes`).
+WPL13E requests the heat pump module (IWS); the WPMW II manager answers a constant 69 on this
+index, which is no known fault code, so it is not requested.
+
+## Bus scan
+
+Asks one CAN member for every index of the signal table (about 3,600, ~9 min at 150 ms per
+request) or for a hex range, and publishes every index that answers with a real value.
+Normal polling pauses during the scan.
+
+| Topic | Payload |
+|-------|---------|
+| `heatingpump/scan/start` | `HEIZMODUL` (table) or `MANAGER 0xfd00 0xfdff` (range) |
+| `heatingpump/scan/stop` | anything |
+| `heatingpump/scan/status` | `{"state":"running|done|stopped","member":…,"done":…,"total":…,"hits":…,"seconds":…}` |
+| `heatingpump/scan/<MEMBER>/0x<idx>` | `{"name":…,"raw":…,"value":…}` (retained) |
+
+The diagnostic buttons "Bus-Scan Manager/Heizmodul/Kessel" (disabled by default) start a table
+scan. Turn the results into a request block and a Markdown table:
+
+```bash
+mosquitto_sub -h BROKER -u USER -P PASS -t 'heatingpump/scan/#' -v -W 5 > scan.txt
+python3 helperscripts/scan_report.py scan.txt
+```
+
+## Polling back-off
+
+A signal answering `-255` (not available on this model) creates no HA entity until it has
+delivered a real value. From the third consecutive `-255` its interval doubles per answer,
+up to 6 h; a real value resets it. See `docs/ARCHITECTURE.md`.
+
+## Dashboards
+
+`dashboards/heatingpump_standard.yaml` is a complete dashboard (overview, energy, diagnostics)
+built from standard cards; `dashboards/heatingpump_schema.yaml` is a picture-elements card
+with a system schema — copy `dashboards/www/heatingpump/` to `/config/www/heatingpump/` first.
+Both use the entity IDs of a fresh install; HA keeps an entity's original ID, so older
+installs may need to adjust a few IDs (e.g. `sensor.heizmodul_luftansaugtemperatur` was
+`sensor.heizmodul_aussen_temperatur`).
+
+## Summer mode (WPL13E)
+
+The WPMW II switches heating off when its *summer automatic* is on (`SOMMERBETRIEB`, parameter
+10) and the damped outside temperature reaches the threshold (`SOMMERBETRIEB_TEMP`, 0xfdb5,
+10–30 °C); it switches back 1 K below. The damping averages the controller's outside sensor
+over 24/48/72 h depending on `GEBAEUDEART` (1/2/3). The firmware reproduces this as
+`binary_sensor.…_sommerbetrieb_aktiv` and publishes the damped value as
+`sensor.…_aussentemperatur_gedampft`. The damped value is an exponential moving average kept
+in NVS; on the very first boot it starts from the current temperature and needs about a day to
+settle. Compare it with the display ("Sommerbetrieb" with the flap closed).
