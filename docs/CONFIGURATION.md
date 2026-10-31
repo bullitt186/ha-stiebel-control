@@ -290,13 +290,12 @@ Available frequency constants:
 
 ## Blacklisting Signals
 
-To permanently suppress a signal (prevent it from appearing in HA), set `isBlacklisted: true`
-in its `ElsterTable.h` entry:
+To permanently suppress a signal (prevent it from appearing in HA), set `isBlacklisted` (4th field)
+to `true` in its `ElsterTable[]` row in `ElsterTable.h`:
 
 ```cpp
-{ "NOISY_SIGNAL", 0x0123, et_default, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-  true,   // ← isBlacklisted
-  false }
+//  Name              Index   Type        isBlacklisted  hasMetadata
+{ "NOISY_SIGNAL"    , 0x0123, et_default, true         , false },
 ```
 
 Blacklisted signals are skipped before any processing — they never generate MQTT messages

@@ -32,7 +32,7 @@ ha-stiebel-control/
 │       ├── sg_ready_controller.h           # SG Ready state machine (pure C++, testable)
 │       ├── config.h                        # Timing constants, limits
 │       └── elster/
-│           ├── ElsterTable.h               # 3800+ signal definitions with HA metadata
+│           ├── ElsterTable.h               # signal table (name, index, type, flags) + ElsterMetaTable (HA metadata)
 │           ├── KElsterTable.cpp/h          # Table lookup, value conversion
 │           └── NUtils.cpp/h, NTypes.h      # Utility functions and types
 ├── packages/
