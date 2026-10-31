@@ -1,5 +1,7 @@
 # ha-stiebel-control
 
+Requires ESPHome 2026.7.0 or newer. CI uses ESPHome 2026.10.1.
+
 ESPHome firmware for monitoring and controlling Stiebel Eltron heat pumps via CAN bus.
 Connects an ESP32 to the heat pump's internal Elster CAN bus and automatically publishes
 3800+ signals to Home Assistant via MQTT discovery — no manual entity configuration needed.

@@ -37,7 +37,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install ESPHome
-        run: pip install esphome==2026.5.3
+        run: pip install esphome==2026.10.1
 
       - name: Use CI secrets
         run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
@@ -59,7 +59,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install ESPHome
-        run: pip install esphome==2026.5.3
+        run: pip install esphome==2026.10.1
 
       - name: Use CI secrets
         run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
@@ -85,7 +85,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install ESPHome
-        run: pip install esphome==2026.5.3
+        run: pip install esphome==2026.10.1
 
       - name: Use CI secrets
         run: cp esphome/ci_secrets.yaml esphome/secrets.yaml

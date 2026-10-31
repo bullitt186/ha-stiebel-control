@@ -21,6 +21,7 @@ substitutions:
   read_only: "false"          # "true": never write to the heat pump (no setpoints/modes/clock; reading and bus scan only)
 
 esphome:
+  min_version: 2026.7.0
   name: heatingpump
   friendly_name: "Heating Pump CAN Interface"
   project:
@@ -51,13 +52,12 @@ esphome:
     - ha-stiebel-control/ha-stiebel-control.h
     - ha-stiebel-control/signal_requests_base.h
     # model-specific signal_requests_*.h is declared by each model yaml package
-  platformio_options:
-    build_flags:
-      - "-DHA_DEVICE_MODEL=${device_model}"
-      - "-DHA_MODEL_${device_model}"
-      - "-DHA_LANGUAGE_${language}"
-      - "-DHA_DISABLE_SG_READY_${disable_sg_ready}"
-      - "-DHA_READ_ONLY_${read_only}"
+  build_flags:
+    - "-DHA_DEVICE_MODEL=${device_model}"
+    - "-DHA_MODEL_${device_model}"
+    - "-DHA_LANGUAGE_${language}"
+    - "-DHA_DISABLE_SG_READY_${disable_sg_ready}"
+    - "-DHA_READ_ONLY_${read_only}"
 
 
 #########################################

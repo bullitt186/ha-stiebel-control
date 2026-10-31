@@ -430,7 +430,7 @@ packages:
 
 `device_model` substitution controls the HA device identifier: `stiebel_eltron_<device_model>`.
 Set it in `heatingpump.yaml`. The `HA_DEVICE_MODEL` C++ string define is injected via
-`platformio_options: build_flags:` in `common.yaml`.
+`esphome: build_flags:` in `common.yaml`.
 
 ### i18n — Display language
 
