@@ -28,6 +28,9 @@ community work by [roberreiters](https://community.home-assistant.io/t/configure
 
 ## Quick Start
 
+Requires ESPHome 2026.7.0 or newer (check with `esphome version`; dashboard add-on users
+update the add-on).
+
 ```bash
 git clone https://github.com/bullitt186/ha-stiebel-control.git
 cd ha-stiebel-control

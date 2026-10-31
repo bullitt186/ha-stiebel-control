@@ -30,7 +30,7 @@ body:
     id: esphome_version
     attributes:
       label: ESPHome Version
-      placeholder: "e.g. 2026.5.3  (run: esphome version)"
+      placeholder: "e.g. 2026.10.1  (run: esphome version)"
     validations:
       required: true
 

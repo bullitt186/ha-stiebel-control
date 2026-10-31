@@ -2,6 +2,9 @@
 
 Two installation paths are supported. Choose the one that fits your workflow.
 
+**Requirements:** ESPHome 2026.7.0 or newer (`esphome version`; the config declares
+`min_version: 2026.7.0` and older versions refuse it). CI builds with ESPHome 2026.10.1.
+
 ---
 
 ## Path A — Git Clone (Recommended)

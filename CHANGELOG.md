@@ -5,12 +5,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ---
 
-## [2.5.0] — unreleased
+## [2.5.0] — 2026-10-31
 
 Ideas and register facts from related projects (kr0ner/OneESP32ToRuleThemAll,
 aly-fly/Stiebel-Eltron_heat_pump_monitor, VasekCZ81/stiebel-can-service), verified on a WPL13E.
 
 ### Breaking changes
+
+- **ESPHome 2026.7.0 or newer is required** (#44, thanks to hawkeye80). `common.yaml` now
+  declares `esphome: min_version: 2026.7.0`; older ESPHome versions refuse the config. Update
+  ESPHome (dashboard add-on or `pip install -U esphome`) before installing 2.5.0. CI and the release
+  build use ESPHome 2026.10.1.
 
 - **Firmware framework switched from Arduino to ESP-IDF** (#58) for both boards
   (`board_esp32s3.yaml`, `board_esp32.yaml`). ESP-IDF is ESPHome's recommended framework and
@@ -89,8 +94,21 @@ aly-fly/Stiebel-Eltron_heat_pump_monitor, VasekCZ81/stiebel-can-service), verifi
   configs keep working. Without them, Wi-Fi is configured only via `secrets.yaml` (wrong
   credentials need a USB flash).
 
+- **WPL13E: writable heating curve** (`HEIZKURVE` on MANAGER) — previously WPL17 only.
+- **WPL13E: kWh-resolution energy** — `*_SUM_KWH` and daily `*_TAG_KWH` registers. COP now includes
+  the kWh remainder (was whole MWh only) and the combined total/daily energy sensors appear.
+- **WPL13E diagnostics** — hot-gas temperature, compressor DHW runtime, electric booster (DHC)
+  runtimes.
+
 ### Changed
 
+- **Build flags moved to `esphome: build_flags`** (#44, thanks to hawkeye80). The five `-DHA_*`
+  defines (`HA_DEVICE_MODEL`, `HA_MODEL_*`, `HA_LANGUAGE_*`, `HA_DISABLE_SG_READY_*`,
+  `HA_READ_ONLY_*`) were set via `platformio_options: build_flags`, which ESPHome deprecates and
+  stops supporting in 2026.12.0 (warning on every build with the ESP-IDF backend). Values and
+  substitutions are unchanged. CI/release ESPHome pin 2026.5.3 -> 2026.10.1.
+- WPL13E: the heat pump module's `AUSSENTEMP` is labelled "Luftansaugtemperatur" (air intake at
+  the unit, per the manual); the controlling outdoor sensor stays "Außen Temperatur".
 - **WiFi post-connect roaming disabled** (#54): `wifi: post_connect_roaming: false`. ESPHome
   scans all channels every 5 min while RSSI is below -49 dBm; on a stationary heat pump
   controller this only stalled the MQTT connection (write timeouts, disconnects, before
@@ -143,6 +161,13 @@ aly-fly/Stiebel-Eltron_heat_pump_monitor, VasekCZ81/stiebel-can-service), verifi
 
 ### Fixed
 
+- WPL13E: `compressor_active` was driven alternately by the IWS compressor value and a constant
+  0.0 copy from the MANAGER seen on the bus. MANAGER copies of IWS values (and compressor-1 /
+  cooling runtimes the WPMW II polls itself) are now ignored on WPL13E.
+- COP waits until all kWh remainder registers are known (no jumps right after boot).
+- Discovery configs sent during boot, before the MQTT connection was up, were lost until the
+  15-minute refresh (e.g. renamed entities or writable numbers appeared late); they are now sent
+  on every broker (re)connect.
 - **Read requests of other bus nodes were decoded as values** (Elster telegram type was not
   checked). This produced constant fake `0` readings for the requesting node, e.g. "MANAGER
   VERDICHTER 0.0" on WPL13E, and hid real values such as the manager's return temperature.
@@ -170,32 +195,6 @@ aly-fly/Stiebel-Eltron_heat_pump_monitor, VasekCZ81/stiebel-can-service), verifi
   once in `KElsterTable.cpp`; other files see `extern` declarations and use `ElsterTableCount`
   instead of `High(ElsterTable)`. The 4 MB ESP32 build drops from 98.7 % to 90.0 % of the app
   partition (-159 KB).
-
----
-
-## [Unreleased]
-
-### Added (WPL13E, verified on real hardware against the WPMW II manual)
-
-- **Writable heating curve** (`HEIZKURVE` on MANAGER) — previously WPL17 only.
-- **kWh-resolution energy**: `*_SUM_KWH` and daily `*_TAG_KWH` registers. COP now includes the
-  kWh remainder (was whole MWh only) and the combined total/daily energy sensors appear.
-- Diagnostics: hot-gas temperature, compressor DHW runtime, electric booster (DHC) runtimes.
-
-### Fixed
-
-- WPL13E: `compressor_active` was driven alternately by the IWS compressor value and a constant
-  0.0 copy from the MANAGER seen on the bus. MANAGER copies of IWS values (and compressor-1 /
-  cooling runtimes the WPMW II polls itself) are now ignored on WPL13E.
-- COP waits until all kWh remainder registers are known (no jumps right after boot).
-- Entities' MQTT discovery is resent on every broker (re)connect. Discoveries sent during boot,
-  before the connection was up, were lost until the 15-minute refresh (e.g. renamed entities
-  or writable numbers appeared late).
-
-### Changed
-
-- WPL13E: the heat pump module's `AUSSENTEMP` is labelled "Luftansaugtemperatur" (air intake at
-  the unit, per the manual); the controlling outdoor sensor stays "Außen Temperatur".
 
 ### Removed (WPL13E — no valid value over 30 days to 11 months of HA history)
 
