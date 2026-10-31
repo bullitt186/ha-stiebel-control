@@ -9,7 +9,7 @@ test writes on a real heat pump.
 | `heatingpump_scan.yaml` | ESPHome config for the diagnostic scan firmware |
 | `scan.yaml` | thin model package that selects the scan request table |
 | `signal_requests_scan.h` | request table (sweeps a signal set across CAN members) |
-| `elster_table_split.py` | one-off converter of `ElsterTable.h` to the slim row + `ElsterMetaTable` layout (#57); `--verify` compares old and new tables for every model and language (`elster_table_dump.cpp`, `elster_row_text.h`) |
+| `elster_table_split.py` | one-off converter of `ElsterTable.h` to the slim row + `ElsterMetaTable` layout (#57); `--verify` compares old and new tables for every model and language (`elster_table_dump.cpp`, `elster_row_text.h`). Kept for reference; the conversion is done, new signals are added by hand (docs/CONTRIBUTING.md "Signal table") |
 
 ## Usage
 

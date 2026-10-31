@@ -5,6 +5,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- Docs describe the split signal table of 2.5.0 (#57): new section "Signal table" in
+  `docs/CONTRIBUTING.md` (adding signals with and without HA metadata, binary sensor payloads,
+  blacklisting); README, CONFIGURATION, ARCHITECTURE and the agent instructions no longer refer
+  to the old 13-field rows.
+- The test that compared every `ElsterTable` row with frozen digests of the pre-2.5.0 table was
+  removed: it guarded the one-off conversion and failed for every new or changed signal. The
+  consistency checks (main/meta table one to one, no hash collisions) stay.
+
+---
+
 ## [2.5.0] — 2026-10-31
 
 Ideas and register facts from related projects (kr0ner/OneESP32ToRuleThemAll,

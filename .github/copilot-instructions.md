@@ -158,7 +158,7 @@ To support additional heat pump models:
 - **common.yaml**: MUST remain board-agnostic. Only WiFi, MQTT, API, OTA, buttons, text sensors, intervals. Never add board-specific pins or CAN config.
 - **wpl13e.yaml**: Raw sensor definitions only. Add new heat pump sensors here following template pattern.
 - **ha-stiebel-control.h**: C++ logic for CAN communication, calculated sensors, write operations. Modify for complex calculations.
-- **ElsterTable.h**: Signal definitions. Modify ONLY to add payloadOn/payloadOff for binary sensors or correct signal parameters.
+- **ElsterTable.h**: Signal definitions in two tables: `ElsterTable[]` (`Name, Index, Type, isBlacklisted, hasMetadata`) and `ElsterMetaTable[]` (HA metadata incl. payloadOn/payloadOff for rows with `hasMetadata = true`, same Index and Name). See docs/CONTRIBUTING.md "Signal table".
 - **packages/ha_stiebel_control.yaml**: Home Assistant input helpers and template sensors. Add HA-side calculations here.
 
 ### Package System Rules
@@ -197,8 +197,8 @@ To support additional heat pump models:
 
 ### Binary Sensor Pattern
 **For binary sensors to work correctly:**
-1. Signal must have `payloadOn` and `payloadOff` in ElsterTable.h (10th and 11th parameters)
-2. Example: `"EVU_SPERRE_AKTIV", ..., "on", "off", ...`
+1. Signal must have `hasMetadata = true` in `ElsterTable[]` and `payloadOn`/`payloadOff` in its `ElsterMetaTable[]` row (last two fields)
+2. Example: `{ 0x0074, "EVU_SPERRE_AKTIV", LNAME_EVU_SPERRE_AKTIV, "binary_sensor", "lock", "", "", "mdi:lock", "on", "off" }`
 3. Without these, sensor shows "Unbekannt" (Unknown) in Home Assistant
 4. Inversion logic (if needed) handled in C++ code, not ElsterTable.h
 
@@ -244,7 +244,7 @@ To support additional heat pump models:
 
 ### Signal Configuration
 - ❌ Adding binary sensor without payloadOn/payloadOff
-  ✅ Add `"on", "off"` to ElsterTable.h signal definition
+  ✅ Add `"on", "off"` to the signal's `ElsterMetaTable` row (and `hasMetadata = true`)
 - ❌ Using wrong CanMember enum (e.g., cm_kessel for manager signal)
   ✅ Consult manuals and ElsterTable.h comments for correct source
 - ❌ Guessing signal names
@@ -447,7 +447,7 @@ The build flag `-DHA_LANGUAGE_${language}` is injected in `common.yaml`.
 - Only `language_select.h` goes in the `esphome: includes:` list — `lang_base.h` and
   `lang_en.h` are copied transitively and must NOT be auto-included by ESPHome
 - Signal protocol names (`TEMP_AUSSEN`, option values like `"Tagbetrieb"` used in CAN writes) stay German regardless of language
-- Only signals with `hasMetadata=true` in `ElsterTable.h` have `LNAME_*` macros; unnamed signals fall back to the raw signal name
+- Only signals with `hasMetadata=true` in `ElsterTable.h` (and a row in `ElsterMetaTable`) have `LNAME_*` macros; unnamed signals fall back to the raw signal name
 
 **Adding a new language:**
 1. Create `lang_XX.h`: `#include "lang_base.h"`, then override desired macros

@@ -206,7 +206,7 @@ These entities use the ESPHome native API (not MQTT). If they show `unavailable`
 ### Wrong values or "Unknown"
 
 - Some signals are not supported by all heat pump models — check your model's signal table
-- Binary sensors showing "Unknown": add `payloadOn`/`payloadOff` to the signal's entry in `ElsterTable.h`
+- Binary sensors showing "Unknown": set `payloadOn`/`payloadOff` in the signal's `ElsterMetaTable` row (see [Signal table](docs/CONTRIBUTING.md#signal-table-elstertableh))
 - Check `heatingpump/debug` MQTT topic for warnings and errors; per-frame CAN logs need `logger: level: DEBUG` and `esphome logs`
 
 ---
@@ -233,7 +233,7 @@ This repo has a fully configured agentic harness. See [docs/AGENTIC_DEVELOPMENT.
 
 ### Other contributions
 
-- Signal metadata (friendly names, units, icons) in `ElsterTable.h`
+- Signal metadata (friendly names, units, icons) in `ElsterMetaTable` — see [Signal table](docs/CONTRIBUTING.md#signal-table-elstertableh)
 - Dashboard examples
 - Documentation improvements
 
