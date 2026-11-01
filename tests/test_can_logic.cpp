@@ -1198,11 +1198,11 @@ TEST_CASE("i18n: all calculatedSensors names are non-empty", "[i18n]") {
 }
 
 TEST_CASE("writableNumbers: WPMW II parameters sit at the indices common.yaml uses", "[writable]") {
-    // common.yaml's /set handlers call publishWritableNumberDiscovery(writableNumbers[9..13]).
-    static const char* expected[] = {"SCHALTWERKDYNAMIKZEIT", "STILLSTANDZEIT", "SOMMERBETRIEB_TEMP",
+    // common.yaml's /set handlers call publishWritableNumberDiscovery(writableNumbers[9..11]).
+    static const char* expected[] = {"SCHALTWERKDYNAMIKZEIT",
                                      "BIVALENTPARALLELTEMPERATUR_HZG", "BIVALENTPARALLELTEMPERATUR_WW"};
-    REQUIRE(WRITABLE_NUMBER_COUNT == 14);
-    for (size_t i = 0; i < 5; ++i) {
+    REQUIRE(WRITABLE_NUMBER_COUNT == 12);
+    for (size_t i = 0; i < 3; ++i) {
         CHECK(std::string(writableNumbers[9 + i].signalName) == expected[i]);
         CHECK(writableNumbers[9 + i].member == cm_manager);
         CHECK(isWpmw2Parameter(expected[i]));

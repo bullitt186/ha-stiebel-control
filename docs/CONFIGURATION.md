@@ -148,8 +148,6 @@ change one at a time and watch starts, run times and room temperatures.
 | Entity ID | WPMW II parameter | Register | Range | Step |
 |-----------|-------------------|----------|-------|------|
 | `number.manager_reglerdynamik_einstellung` | 42 Reglerdynamik (switching distance between compressor stages and the 2nd heat generator) | 0xfdb0 | 1–30 | 1 |
-| `number.manager_stillstandzeit_verdichter_einstellung` | 43 minimum compressor off time | 0xfdb1 | 1–120 min | 1 min |
-| `number.manager_sommerbetrieb_grenztemperatur_einstellung` | 10 summer mode outdoor threshold | 0xfdb5 | 10–30°C | 1°C |
 | `number.manager_bivalenzpunkt_heizung_einstellung` | 27 bivalence point heating (2nd heat generator in parallel below) | 0x01ac | −20–30°C | 0.5°C |
 | `number.manager_bivalenzpunkt_warmwasser_einstellung` | 33 bivalence point hot water | 0x01ad | −20–30°C | 0.5°C |
 

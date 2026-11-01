@@ -312,14 +312,6 @@ static const WritableNumberConfig writableNumbers[] = {
     {"SCHALTWERKDYNAMIKZEIT", LNAME_NUM_REGLERDYNAMIK,
      cm_manager, 1.0, 30.0, 1.0, "", "mdi:tune-vertical", ""},
 
-    // Display parameter 43 "Stillstandzeit nach Ausschalten des Verdichters" (0xfdb1)
-    {"STILLSTANDZEIT", LNAME_NUM_STILLSTANDZEIT,
-     cm_manager, 1.0, 120.0, 1.0, "min", "mdi:timer-sand", "duration"},
-
-    // Display parameter 10 summer-mode outdoor threshold (0xfdb5, whole degrees)
-    {"SOMMERBETRIEB_TEMP", LNAME_NUM_SOMMERBETRIEB_TEMP,
-     cm_manager, 10.0, 30.0, 1.0, "°C", "mdi:sun-thermometer", "temperature"},
-
     // Display parameters 27/33 bivalence point heating / hot water (0x01ac/0x01ad)
     {"BIVALENTPARALLELTEMPERATUR_HZG", LNAME_NUM_BIVALENZ_HZG,
      cm_manager, -20.0, 30.0, 0.5, "°C", "mdi:thermometer-alert", "temperature"},
@@ -330,9 +322,9 @@ static const WritableNumberConfig writableNumbers[] = {
 
 static const size_t WRITABLE_NUMBER_COUNT = sizeof(writableNumbers) / sizeof(WritableNumberConfig);
 
-// WPMW II settings exposed as writable numbers (manager parameters 10, 27, 33, 42, 43)
+// WPMW II settings exposed as writable numbers (manager parameters 27, 33, 42)
 static bool isWpmw2Parameter(const char* sig) {
-    static const char* const params[] = {"SCHALTWERKDYNAMIKZEIT", "STILLSTANDZEIT", "SOMMERBETRIEB_TEMP",
+    static const char* const params[] = {"SCHALTWERKDYNAMIKZEIT",
                                          "BIVALENTPARALLELTEMPERATUR_HZG", "BIVALENTPARALLELTEMPERATUR_WW"};
     for (const char* p : params)
         if (strcmp(sig, p) == 0) return true;

@@ -154,8 +154,6 @@
 #define LNAME_NUM_RAUMSOLLTEMP_III             "Raum Soll Temperatur III Einstellung"
 #define LNAME_NUM_RAUMSOLLTEMP_NACHT           "Raum Soll Temperatur Nacht Einstellung"
 #define LNAME_NUM_REGLERDYNAMIK                "Reglerdynamik Einstellung"
-#define LNAME_NUM_STILLSTANDZEIT               "Stillstandzeit Verdichter Einstellung"
-#define LNAME_NUM_SOMMERBETRIEB_TEMP           "Sommerbetrieb Grenztemperatur Einstellung"
 #define LNAME_NUM_BIVALENZ_HZG                 "Bivalenzpunkt Heizung Einstellung"
 #define LNAME_NUM_BIVALENZ_WW                  "Bivalenzpunkt Warmwasser Einstellung"
 

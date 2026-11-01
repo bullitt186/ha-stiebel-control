@@ -9,11 +9,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Added
 
-- WPL13E: five WPMW II parameters are writable number entities: Reglerdynamik (parameter 42,
-  0xfdb0), compressor minimum off time (43, 0xfdb1), summer mode threshold (10, 0xfdb5) and the
-  bivalence points for heating and hot water (27/33, 0x01ac/0x01ad). Reglerdynamik and the off
-  time are now also read (hourly). Other models do not get these entities; a `/set` for them is
-  ignored with a warning. Indices from a bus scan, ranges from the WPMW II commissioning list.
+- WPL13E: three WPMW II parameters are writable number entities: Reglerdynamik (parameter 42,
+  0xfdb0) and the bivalence points for heating and hot water (27/33, 0x01ac/0x01ad). Reglerdynamik
+  is now also read (hourly). Other models do not get these entities; a `/set` for them is ignored
+  with a warning. Indices from a bus scan, ranges from the WPMW II commissioning list.
 
 ### Changed
 
