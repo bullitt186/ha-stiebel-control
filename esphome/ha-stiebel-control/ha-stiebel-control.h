@@ -473,6 +473,13 @@ static float lastVerdichterValue = NAN;
 // KESSEL PUMPENSTATUS; -1 = not received yet. Bit 0x4000 is the hot water charging pump (WPMW II).
 static int lastPumpenstatus = -1;
 inline bool isHotWaterCharging(int pumpenstatus) { return (pumpenstatus & 0x4000) != 0; }
+// A utility lock cuts power to the WPMW II heat pump module, so VERDICHTER would keep its last
+// value. 0 = no frame yet.
+static uint32_t lastHeizmodulFrameMs = 0;
+static const uint32_t HEIZMODUL_SILENCE_MS = 60000UL;
+inline bool isHeizmodulSilent(uint32_t now, uint32_t lastFrame) {
+    return lastFrame != 0 && (now - lastFrame) > HEIZMODUL_SILENCE_MS;
+}
 // Control deviation inputs: KESSEL member only (X2/3 control sensor and its setpoint)
 static float lastKesselRuecklaufIst = NAN;
 static float lastKesselSollTemp = NAN;
@@ -1566,6 +1573,10 @@ void publishCompressorActive()
 {
     // Publish discovery (only once - cached)
     publishCalculatedSensorDiscovery(calculatedSensors[4]);
+
+    if (isWpmw2Model() && isHeizmodulSilent(millis(), lastHeizmodulFrameMs)) {
+        lastVerdichterValue = 0.0f;
+    }
     
     // Check if compressor value is valid
     if (std::isnan(lastVerdichterValue)) {
@@ -2631,6 +2642,7 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
         return;
     }
     if (isIgnoredOnWpl13e(cm, ei->Name)) return;
+    if (isWpmw2Model() && strcmp(cm.Name, "HEIZMODUL") == 0) lastHeizmodulFrameMs = millis();
     // Bool fields carrying other bits decode to "?"; HA rejects that payload for a
     // binary sensor (log warning per poll) and keeps the last state anyway. Seen on
     // WPL13E: ABTAUUNGAKTIV = 0x0200 while the compressor runs (no defrost).

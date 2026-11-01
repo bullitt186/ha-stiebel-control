@@ -1011,6 +1011,13 @@ TEST_CASE("updateSensor: PUMPENSTATUS is tracked from KESSEL only", "[calc]") {
     CHECK(lastPumpenstatus == 28930);
 }
 
+TEST_CASE("isHeizmodulSilent: only after 60 s without a frame", "[calc]") {
+    CHECK_FALSE(isHeizmodulSilent(500000, 0));   // no frame yet
+    CHECK_FALSE(isHeizmodulSilent(160000, 100000));
+    CHECK(isHeizmodulSilent(160001, 100000));
+    CHECK_FALSE(isHeizmodulSilent(10000, 0xFFFFFFF0u));   // across the millis() wrap
+}
+
 TEST_CASE("publishCompressorActive: value > 2 → on", "[calc]") {
     resetDiscoveryState();
     lastVerdichterValue = 50.0f;

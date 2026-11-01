@@ -28,6 +28,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - WPMW II: `betriebsstatus` tells hot water from heating by the charging pump (`PUMPENSTATUS` bit
   `0x4000`) instead of counter deltas, which step only hourly there. The `el_leistung_*` sensors
   stay off on these models for the same reason (by reniko, #52).
+- WPMW II: `compressor_active` stayed `on` when a utility lock cut power to the heat pump module
+  during a run. It now goes `off` after 60 s without a frame from `HEIZMODUL` (by reniko, #52).
 - `language: EN` did not compile: `lang_en.h` was not copied to the build (#61). It is now listed
   in `includes` and only applies with `HA_LANGUAGE_EN`. CI compiles an English build.
 - Remote packages (`github://...`) failed with "Could not find file" (#41): include paths are now
