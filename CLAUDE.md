@@ -26,7 +26,7 @@ After every `make upload`, run these steps in order:
 
 1. Watch `heatingpump/status` go `offline` → `online` (within ~60s):
    ```bash
-   mosquitto_sub -h 192.168.30.10 -u iotuser \
+   mosquitto_sub -h <mqtt-broker> -u iotuser \
      --pw "$(grep mqtt_password esphome/secrets.yaml | sed 's/mqtt_password: *//')" \
      -t "heatingpump/status" -v
    ```
