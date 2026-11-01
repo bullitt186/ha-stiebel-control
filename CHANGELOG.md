@@ -14,6 +14,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   is now also read (hourly). Other models do not get these entities; a `/set` for them is ignored
   with a warning. Indices from a bus scan, ranges from the WPMW II commissioning list.
 
+### Fixed
+
+- Decode buffer overflow: values such as `not used time domain` (21 bytes) overran the 16-byte
+  buffer in `processCanMessage()` and could reboot the ESP, for example during a bus scan
+  (reported by reniko, #52).
+- `ABTAUUNGAKTIV` stayed `unknown` in Home Assistant because its binary sensor had no
+  `on`/`off` payloads (reported by reniko, #52).
+
 ### Changed
 
 - Docs describe the split signal table of 2.5.0 (#57): new section "Signal table" in

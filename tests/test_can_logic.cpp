@@ -531,15 +531,16 @@ TEST_CASE("publishMqttDiscovery: binary sensor with explicit payloads includes p
     CHECK(payload.find("payload_off") != std::string::npos);
 }
 
-TEST_CASE("publishMqttDiscovery: binary sensor without explicit payloads omits payload fields", "[mqtt]") {
-    // ABTAUUNGAKTIV has NULL payloadOn/Off — no payload_on/off in discovery
+TEST_CASE("publishMqttDiscovery: ABTAUUNGAKTIV discovery carries on/off payloads", "[mqtt]") {
+    // Without them HA expects ON/OFF, rejects the published on/off and stays unknown.
     resetDiscoveryState();
     const CanMember& heizmodul = CanMembers[cm_heizmodul];
     const ElsterIndex* ei = GetElsterIndex("ABTAUUNGAKTIV");
     REQUIRE(ei != nullptr);
     publishMqttDiscovery(heizmodul, ei);
     std::string payload = mqttFindPayload("homeassistant/binary_sensor");
-    CHECK(payload.find("payload_on") == std::string::npos);
+    CHECK(payload.find("\"payload_on\":\"on\"") != std::string::npos);
+    CHECK(payload.find("\"payload_off\":\"off\"") != std::string::npos);
 }
 
 TEST_CASE("publishMqttDiscovery: payload contains availability_topic", "[mqtt]") {
@@ -1195,6 +1196,26 @@ TEST_CASE("i18n: sgReadyOptions contains 4 non-empty entries", "[i18n]") {
 TEST_CASE("i18n: all calculatedSensors names are non-empty", "[i18n]") {
     for (size_t i = 0; i < CALCULATED_SENSOR_COUNT; ++i)
         CHECK(std::string(calculatedSensors[i].name).length() > 0);
+}
+
+TEST_CASE("decode buffer holds the longest SetValueType texts", "[decode]") {
+    char val[ELSTER_VALUE_BUF_SIZE];
+    SetValueType(val, et_time_domain, 0x8080);
+    CHECK(std::string(val) == "not used time domain");
+    CHECK(sizeof(val) > std::string(val).length());
+    SetValueType(val, et_err_nr, 0x0023);
+    CHECK(std::string(val) == "ERR MIN UEBERHITZUNG");
+    CHECK(sizeof(val) > std::string(val).length());
+}
+
+TEST_CASE("ABTAUUNGAKTIV is a binary sensor with on/off payloads", "[meta]") {
+    const ElsterMeta* meta = GetElsterMeta(GetElsterIndex("ABTAUUNGAKTIV"));
+    REQUIRE(meta != nullptr);
+    CHECK(std::string(meta->haComponent) == "binary_sensor");
+    REQUIRE(meta->payloadOn != nullptr);
+    REQUIRE(meta->payloadOff != nullptr);
+    CHECK(std::string(meta->payloadOn) == "on");
+    CHECK(std::string(meta->payloadOff) == "off");
 }
 
 TEST_CASE("writableNumbers: WPMW II parameters sit at the indices common.yaml uses", "[writable]") {

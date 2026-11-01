@@ -240,6 +240,10 @@ static const size_t CALC_IDX_MQTT_PUBLISH_FAILURES = 27;
 static_assert(CALCULATED_SENSOR_COUNT == CALC_IDX_MQTT_PUBLISH_FAILURES + 1,
               "calculatedSensors changed: update the CALC_IDX_* constants");
 
+// Decode buffer for SetValueType(): its longest texts are 20 characters plus the
+// terminator ("not used time domain", "ERR MIN UEBERHITZUNG").
+static constexpr size_t ELSTER_VALUE_BUF_SIZE = 32;
+
 // ============================================================================
 // WRITABLE NUMBER CONFIGURATION (for MQTT Number entities)
 // ============================================================================
@@ -607,7 +611,7 @@ const ElsterIndex *processCanMessage(const std::vector<uint8_t> &msg, uint32_t c
     const ElsterIndex *ei;
     uint8_t byte1;
     uint8_t byte2;
-    char charValue[16];
+    char charValue[ELSTER_VALUE_BUF_SIZE];
 
     if (msg[2] == 0xfa)
     {
@@ -660,7 +664,7 @@ const ElsterIndex *processCanMessageDebug(const std::vector<uint8_t> &msg, uint3
     const ElsterIndex *ei;
     uint8_t byte1;
     uint8_t byte2;
-    char charValue[16];
+    char charValue[ELSTER_VALUE_BUF_SIZE];
 
     if (msg[2] == 0xfa)
     {
