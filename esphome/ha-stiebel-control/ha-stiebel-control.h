@@ -1061,6 +1061,11 @@ void publishAllCalculatedSensorDiscoveries(bool forceRepublish = false) {
 // MQTT WRITABLE NUMBER (for temperature setpoints, etc.)
 // ============================================================================
 
+// Models whose controller is a WPMW II: the heating curve is written on the MANAGER.
+static inline bool isWpmw2Model() {
+    return strcmp(HA_DEVICE_MODEL_STR, "wpl13e") == 0 || strcmp(HA_DEVICE_MODEL_STR, "ttl33") == 0;
+}
+
 // Liefert den effektiven CAN-Member fuer einen writable number Eintrag.
 // Auf WPL17 (CAN-B) liegen EINSTELL_SPEICHERSOLLTEMP / _2 und HEIZKURVE auf dem
 // Kessel (0x201) statt auf dem Manager (0x480). Andere Modelle (CAN-A) behalten
@@ -1074,8 +1079,8 @@ static const CanMember* getWritableNumberMember(const WritableNumberConfig& conf
             return &CanMembers[cm_kessel_canb];
         }
     }
-    // WPL13E (WPMW II): the heating curve lives on the MANAGER, not on KESSEL_CANB
-    if (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") == 0 && strcmp(config.signalName, "HEIZKURVE") == 0) {
+    // WPMW II models (WPL13E, TTL33): the heating curve lives on the MANAGER, not on KESSEL_CANB
+    if (isWpmw2Model() && strcmp(config.signalName, "HEIZKURVE") == 0) {
         return &CanMembers[cm_manager];
     }
     return &CanMembers[config.member];
@@ -1238,8 +1243,8 @@ static bool writableNumberApplies(const char* sig) {
     // number entities are not created on single-circuit models (-255 only).
     if ((strcmp(sig, "RAUMSOLLTEMP_II") == 0 || strcmp(sig, "RAUMSOLLTEMP_III") == 0) && isWpl17)
         return false;
-    // HEIZKURVE is verified writable on WPL17 (KESSEL_CANB) and WPL13E (MANAGER) only.
-    if (strcmp(sig, "HEIZKURVE") == 0 && !isWpl17 && strcmp(HA_DEVICE_MODEL_STR, "wpl13e") != 0)
+    // HEIZKURVE is verified writable on WPL17 (KESSEL_CANB) and WPL13E (MANAGER); TTL33 has the same WPMW II manager.
+    if (strcmp(sig, "HEIZKURVE") == 0 && !isWpl17 && !isWpmw2Model())
         return false;
     return true;
 }
