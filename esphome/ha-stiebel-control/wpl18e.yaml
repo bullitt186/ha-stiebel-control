@@ -1,0 +1,11 @@
+#
+#  WPL18E Heat Pump — Model Package
+#
+#  WPL 18 E with a WPMW II manager. Uses the WPL13E request table: a second WPMW II
+#  system answers the same registers (issue #52, reported by reniko). Not verified
+#  by the maintainer. Writable WPMW II parameters stay limited to the WPL13E.
+#
+
+esphome:
+  includes:
+    - signal_requests_wpl13e.h

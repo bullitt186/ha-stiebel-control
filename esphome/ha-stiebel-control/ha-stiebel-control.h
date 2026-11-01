@@ -2519,8 +2519,8 @@ constexpr uint32_t HASH_WAERMEERTRAG_WW_TAG_KWH = hash("WAERMEERTRAG_WW_TAG_KWH"
 // on the bus although we don't request them. Single-compressor unit without
 // cooling: compressor 1 and cooling counters are only 0 / -255 (HA history).
 // (The former "MANAGER x = 0.0" copies were read requests, filtered in processAndUpdate.)
-static bool isIgnoredOnWpmw2(const CanMember &cm, const char* name) {
-    if (!isWpmw2Model()) return false;
+static bool isIgnoredOnWpl13e(const CanMember &cm, const char* name) {
+    if (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") != 0) return false;
     return strncmp(name, "LZ_VERD_", 8) == 0 && (strstr(name, "VERD_1") || strstr(name, "KUEHL"));
 }
 
@@ -2617,7 +2617,7 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
     if (value.empty()) {
         return;
     }
-    if (isIgnoredOnWpmw2(cm, ei->Name)) return;
+    if (isIgnoredOnWpl13e(cm, ei->Name)) return;
     // Bool fields carrying other bits decode to "?"; HA rejects that payload for a
     // binary sensor (log warning per poll) and keeps the last state anyway. Seen on
     // WPL13E: ABTAUUNGAKTIV = 0x0200 while the compressor runs (no defrost).

@@ -9,6 +9,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Added
 
+- New models with a WPMW II manager: `ttl33` (Tecalor TTL 33, by SolderAndSyntax, #62) and `wpl18e`
+  (WPL 18 E, reported by reniko, #52). Register corrections are shared through `HA_CONTROLLER_WPMW2`.
 - WPL13E: three WPMW II parameters are writable number entities: Reglerdynamik (parameter 42,
   0xfdb0) and the bivalence points for heating and hot water (27/33, 0x01ac/0x01ad). Reglerdynamik
   is now also read (hourly). Other models do not get these entities; a `/set` for them is ignored
