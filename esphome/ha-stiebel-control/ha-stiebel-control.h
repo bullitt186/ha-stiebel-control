@@ -470,6 +470,9 @@ static float lastWpVorlaufIst = NAN;       // HEIZMODUL WPVORLAUFIST
 static float lastRuecklaufIstTemp = NAN;   // HEIZMODUL RUECKLAUFISTTEMP
 static float lastWpVorlaufKessel = NAN;    // KESSEL WPVORLAUFIST (fallback only)
 static float lastVerdichterValue = NAN;
+// KESSEL PUMPENSTATUS; -1 = not received yet. Bit 0x4000 is the hot water charging pump (WPMW II).
+static int lastPumpenstatus = -1;
+inline bool isHotWaterCharging(int pumpenstatus) { return (pumpenstatus & 0x4000) != 0; }
 // Control deviation inputs: KESSEL member only (X2/3 control sensor and its setpoint)
 static float lastKesselRuecklaufIst = NAN;
 static float lastKesselSollTemp = NAN;
@@ -2298,6 +2301,10 @@ void publishCombinedEnergySensors() {
             } else if (copEnergyValues.find("KUEHLZUSTAND") != copEnergyValues.end() &&
                        copEnergyValues["KUEHLZUSTAND"] > 0.5f) {
                 ns = "Kuehlen";
+            } else if (isWpmw2Model() && lastPumpenstatus >= 0) {
+                // WPMW II: die TAG_WH-Zaehler springen nur stuendlich, die Ladepumpe zeigt
+                // den Warmwasserbetrieb sofort an.
+                ns = isHotWaterCharging(lastPumpenstatus) ? "Warmwasser" : "Heizen";
             } else if (sum > 0.0f && accWwWh > accHeizWh) {
                 ns = "Warmwasser";
             } else if (sum > 0.0f) {
@@ -2311,8 +2318,9 @@ void publishCombinedEnergySensors() {
             lastStatusMs = nowMs;
         }
 
-        // Leistung als 5-Minuten-Mittel (die TAG-Zaehler springen grob)
-        if (nowMs - windowStartMs >= 300000UL) {
+        // Leistung als 5-Minuten-Mittel (die TAG-Zaehler springen grob). Auf dem WPMW II
+        // stehen sie waehrend eines Laufs still, eine Live-Leistung waere dort falsch.
+        if (!isWpmw2Model() && nowMs - windowStartMs >= 300000UL) {
             float dtSec = (nowMs - windowStartMs) / 1000.0f;
             float pHeiz = running ? accHeizWh / dtSec * 3600.0f : 0.0f;
             float pWw   = running ? accWwWh   / dtSec * 3600.0f : 0.0f;
@@ -2487,6 +2495,7 @@ constexpr uint32_t HASH_SEKUNDE = hash("SEKUNDE");
 constexpr uint32_t HASH_WPVORLAUFIST = hash("WPVORLAUFIST");
 constexpr uint32_t HASH_RUECKLAUFISTTEMP = hash("RUECKLAUFISTTEMP");
 constexpr uint32_t HASH_VERDICHTER = hash("VERDICHTER");
+constexpr uint32_t HASH_PUMPENSTATUS = hash("PUMPENSTATUS");
 constexpr uint32_t HASH_FEHLERMELDUNG = hash("FEHLERMELDUNG");
 constexpr uint32_t HASH_EVU_SPERRE_AKTIV = hash("EVU_SPERRE_AKTIV");
 constexpr uint32_t HASH_SOMMERBETRIEB = hash("SOMMERBETRIEB");
@@ -2793,6 +2802,10 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
             mqttPublish(topic, buf, strlen(buf));
             break;
         }
+
+        case HASH_PUMPENSTATUS:
+            if (strcmp(cm.Name, "KESSEL") == 0 && value != "-255") lastPumpenstatus = atoi(value.c_str());
+            break;
 
         case HASH_VERDICHTER: {
             char* endPtr;

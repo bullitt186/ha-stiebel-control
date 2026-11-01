@@ -951,6 +951,26 @@ TEST_CASE("publishDeltaTRunning: skips when vorlauf NaN even with compressor run
 // publishCompressorActive
 // ============================================================================
 
+TEST_CASE("isHotWaterCharging: PUMPENSTATUS values seen on a WPL13E", "[calc]") {
+    CHECK(isHotWaterCharging(28930));    // 0x7102 during a hot water charge
+    CHECK_FALSE(isHotWaterCharging(12546));   // 0x3102 heating
+    CHECK_FALSE(isHotWaterCharging(12290));   // 0x3002 stopped
+    CHECK_FALSE(isHotWaterCharging(45058));   // 0xB002 short pulse while stopped
+}
+
+TEST_CASE("updateSensor: PUMPENSTATUS is tracked from KESSEL only", "[calc]") {
+    resetDiscoveryState();
+    lastPumpenstatus = -1;
+    const ElsterIndex* ei = GetElsterIndex("PUMPENSTATUS");
+    REQUIRE(ei != nullptr);
+    updateSensor(CanMembers[cm_manager], ei, "28930");
+    CHECK(lastPumpenstatus == -1);
+    updateSensor(CanMembers[cm_kessel], ei, "28930");
+    CHECK(lastPumpenstatus == 28930);
+    updateSensor(CanMembers[cm_kessel], ei, "-255");
+    CHECK(lastPumpenstatus == 28930);
+}
+
 TEST_CASE("publishCompressorActive: value > 2 → on", "[calc]") {
     resetDiscoveryState();
     lastVerdichterValue = 50.0f;
