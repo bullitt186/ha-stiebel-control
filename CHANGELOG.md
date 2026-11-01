@@ -16,6 +16,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   is now also read (hourly). Other models do not get these entities; a `/set` for them is ignored
   with a warning. Indices from a bus scan, ranges from the WPMW II commissioning list.
 
+- Optional deadband for measured temperatures, `STATE_DEADBAND_TENTHS` in `config.h`, off by default
+  (proposed by SolderAndSyntax, #64).
+
 ### Fixed
 
 - Decode buffer overflow: values such as `not used time domain` (21 bytes) overran the 16-byte

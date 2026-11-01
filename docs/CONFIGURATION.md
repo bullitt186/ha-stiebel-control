@@ -262,6 +262,11 @@ topic shows the device is alive. The interval is `STATE_HEARTBEAT_MS` in
 #define STATE_HEARTBEAT_MS (10UL * 60UL * 1000UL)   // milliseconds
 ```
 
+- Measured temperatures that jitter can be held back with an optional deadband. Set for example
+  `#define STATE_DEADBAND_TENTHS 3` (0.3 K, default 0 = off) in `config.h`. It applies to
+  `AUSSENTEMP`, `SPEICHERISTTEMP`, `RUECKLAUFISTTEMP`, `VORLAUFISTTEMP` and `WPVORLAUFIST`: a smaller
+  change than this against the last published value waits for the heartbeat, which sends the newest
+  value.
 - A signal is still **polled** at its request frequency; only the MQTT message is skipped.
   Home Assistant keeps the last value, its history shows a new point only on a change (or the
   heartbeat). `last_updated` therefore no longer moves with every poll.

@@ -776,6 +776,26 @@ inline const char* stateEntryTopic(const StateCacheEntry& e, char* buf, size_t l
     return buf;
 }
 
+static int stateDeadbandTenths = STATE_DEADBAND_TENTHS;   // variable for the tests
+
+// True if `value` of a measured temperature is too close to the last published one
+inline bool withinDeadband(const char* signal, const char* published, const char* value) {
+    static const char* const kDeadbandSignals[] = {
+        "AUSSENTEMP", "SPEICHERISTTEMP", "RUECKLAUFISTTEMP", "VORLAUFISTTEMP", "WPVORLAUFIST"};
+    if (stateDeadbandTenths <= 0 || !signal || !published[0]) return false;
+    bool listed = false;
+    for (const char* name : kDeadbandSignals) {
+        if (strcmp(signal, name) == 0) { listed = true; break; }
+    }
+    if (!listed) return false;
+    char* endPublished;
+    char* endValue;
+    const float a = strtof(published, &endPublished);
+    const float b = strtof(value, &endValue);
+    if (endPublished == published || *endPublished || endValue == value || *endValue) return false;
+    return std::lround(std::fabs(a - b) * 10.0f) < stateDeadbandTenths;
+}
+
 // Publishes `value` on change; an unchanged value goes out again after
 // STATE_HEARTBEAT_MS. topicOrMember/signal must have static lifetime (string
 // literals, ElsterTable/CanMembers names). Returns true if the value was sent.
@@ -800,7 +820,7 @@ inline bool publishStateCached(uint32_t hash, const char* topicOrMember, const c
         e->pending = true;
         return id(mqtt_client).is_connected() && mqttPublish(topic, value, len);
     }
-    if (strcmp(e->value, value) != 0) {
+    if (strcmp(e->value, value) != 0 && !withinDeadband(signal, e->value, value)) {
         memcpy(e->value, value, len + 1);
         e->pending = true;
     }
@@ -811,6 +831,7 @@ inline bool publishStateCached(uint32_t hash, const char* topicOrMember, const c
     // While disconnected keep the value pending; republishAllStates() sends it on connect
     if (!id(mqtt_client).is_connected()) return false;
     if (mqttPublish(topic, value, len)) {
+        memcpy(e->value, value, len + 1);   // a heartbeat may carry a value held back by the deadband
         e->pending = false;
         e->lastPublishMs = now;
         return true;

@@ -1649,6 +1649,49 @@ TEST_CASE("state cache: heartbeat re-sends an unchanged value after STATE_HEARTB
     CHECK(countTopic(topic) == 2);
 }
 
+TEST_CASE("state cache: deadband holds back small changes of measured temperatures", "[mqtt][state]") {
+    resetDiscoveryState();
+    stateDeadbandTenths = 3;
+    const CanMember& kessel = CanMembers[cm_kessel];
+    const ElsterIndex* ei = GetElsterIndex("SPEICHERISTTEMP");
+    const std::string topic = "heatingpump/KESSEL/SPEICHERISTTEMP/state";
+    fake_millis() = 1000;
+    publishMqttState(kessel, ei, "48.0");
+    publishMqttState(kessel, ei, "48.2");
+    CHECK(countTopic(topic) == 1);
+    // measured against the last published value, so slow drift still gets through
+    publishMqttState(kessel, ei, "47.7");
+    CHECK(countTopic(topic) == 2);
+    publishMqttState(kessel, ei, "47.9");
+    CHECK(countTopic(topic) == 2);
+    // the heartbeat sends the newest value and the next comparison starts from it
+    fake_millis() = 1000 + STATE_HEARTBEAT_MS;
+    publishMqttState(kessel, ei, "47.9");
+    CHECK(countTopic(topic) == 3);
+    CHECK(mqtt_client_instance().messages.back().payload == "47.9");
+    publishMqttState(kessel, ei, "48.2");
+    CHECK(countTopic(topic) == 4);
+    stateDeadbandTenths = 0;
+}
+
+TEST_CASE("state cache: deadband does not apply to other signals or when off", "[mqtt][state]") {
+    resetDiscoveryState();
+    const CanMember& kessel = CanMembers[cm_kessel];
+    const ElsterIndex* temp = GetElsterIndex("SPEICHERISTTEMP");
+    publishMqttState(kessel, temp, "48.0");
+    publishMqttState(kessel, temp, "48.1");
+    CHECK(countTopic("heatingpump/KESSEL/SPEICHERISTTEMP/state") == 2);   // off by default
+    stateDeadbandTenths = 3;
+    const ElsterIndex* soll = GetElsterIndex("SPEICHERSOLLTEMP");
+    publishMqttState(kessel, soll, "48.0");
+    publishMqttState(kessel, soll, "48.1");
+    CHECK(countTopic("heatingpump/KESSEL/SPEICHERSOLLTEMP/state") == 2);
+    publishMqttState(kessel, temp, "-255");   // leaves the cached number
+    publishMqttState(kessel, temp, "48.1");
+    CHECK(countTopic("heatingpump/KESSEL/SPEICHERISTTEMP/state") == 4);
+    stateDeadbandTenths = 0;
+}
+
 TEST_CASE("state cache: calculated sensors are deduplicated too", "[mqtt][state]") {
     resetDiscoveryState();
     lastVerdichterValue = 50.0f;
