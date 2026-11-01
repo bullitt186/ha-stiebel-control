@@ -35,6 +35,11 @@
   #include <string.h>
   #include "language_select.h"
 
+  // Models with a WPMW II manager share register corrections (same scaling and meaning).
+  #if defined(HA_MODEL_wpl13e) || defined(HA_MODEL_ttl33) || defined(HA_MODEL_wpl18e)
+    #define HA_CONTROLLER_WPMW2
+  #endif
+
   #define High(A)     (sizeof(A)/sizeof(A[0]) - 1)
 
 // The tables below are compiled only in KElsterTable.cpp, which defines
@@ -185,7 +190,7 @@ const ElsterIndex ElsterTable[] =
   { "FEUCHTE"                                     , 0x4ec8, et_dec_val      , false, true  },
   { "VERSTELLTE_RAUMSOLLTEMP"                     , 0x0012, et_dec_val      , false, false },
   { "EINSTELL_SPEICHERSOLLTEMP"                   , 0x0013, et_dec_val      , false, true  },
-#ifdef HA_MODEL_wpl13e
+#ifdef HA_CONTROLLER_WPMW2
   // WPL13E IWS: not an evaporator temperature. Falls to -30 at standstill (outside +5 °C), rises to +58..+76 within
   // minutes of a compressor start, then decays. Meaning unknown; published without unit.
   { "VERDAMPFERTEMP"                              , 0x0014, et_byte         , false, true  },
@@ -1955,19 +1960,19 @@ const ElsterIndex ElsterTable[] =
   { "REKUPERATORISTTEMP"                          , 0x07a3, 0               , false, false },
   { "MESSSTROM_HOCHDRUCK"                         , 0x07a4, 0               , false, false },
   { "MESSSTROM_NIEDERDRUCK"                       , 0x07a5, 0               , false, false },
-#ifdef HA_MODEL_wpl13e
+#ifdef HA_CONTROLLER_WPMW2
   // WPL13E (WPMW II/IWS): hundredths of bar - verified: standstill 7.5 bar, run HP 13.1 / LP 4.1 bar
   { "ANZEIGE_HOCHDRUCK"                           , 0x07a6, et_cent_val     , false, true  },
 #else
   { "ANZEIGE_HOCHDRUCK"                           , 0x07a6, et_dec_val      , false, false },
 #endif
-#ifdef HA_MODEL_wpl13e
+#ifdef HA_CONTROLLER_WPMW2
   // WPL13E (WPMW II/IWS): hundredths of bar - verified: standstill 7.5 bar, run HP 13.1 / LP 4.1 bar
   { "ANZEIGE_NIEDERDRUCK"                         , 0x07a7, et_cent_val     , false, true  },
 #else
   { "ANZEIGE_NIEDERDRUCK"                         , 0x07a7, et_dec_val      , false, false },
 #endif
-#ifdef HA_MODEL_wpl13e
+#ifdef HA_CONTROLLER_WPMW2
   // WPL13E: status word, not a power. Raw 0x0008 at standstill, 0x0221/0x0228 while running (bit 9 = compressor on,
   // same bit as ABTAUUNGAKTIV 0x0200), constant during a DHW charge while the electrical power rose 2.6 -> 3.2 kW.
   // Kept as et_dec_val so compressor_active (> 2) keeps working.
@@ -2043,7 +2048,7 @@ const ElsterIndex ElsterTable[] =
   { "ZEIT_WAECHTER_ABWEICHUNG_V_KENNLINIE"        , 0x07ea, 0               , false, false },
   { "MINIMALER_GRENZWERT_UEBERHITZUNG"            , 0x07eb, 0               , false, false },
   { "LZ_VERD_1_HEIZBETRIEB"                       , 0x07fc, et_mil_val      , false, true  },
-#ifdef HA_MODEL_wpl13e
+#ifdef HA_CONTROLLER_WPMW2
   // WPL13E: plain hours - verified: 1029 h heating + 4546 h DHW = LAUFZEIT_WP1 5576 h
   { "LZ_VERD_2_HEIZBETRIEB"                       , 0x07fd, 0               , false, true  },
 #else
@@ -2066,13 +2071,13 @@ const ElsterIndex ElsterTable[] =
   { "HD_EVE_FUNKTION"                             , 0x07f0, 0               , false, false },
   { "HD_EVE_GRENZWERT_VHD"                        , 0x07f1, 0               , false, false },
   { "BETRIEBSART_WP"                              , 0x07f2, 0               , true , true  },
-#ifdef HA_MODEL_wpl13e
+#ifdef HA_CONTROLLER_WPMW2
   // WPL13E: tenths of K (setpoint 56 = 5.6 K)
   { "SOLLWERT_UEBERHITZUNG"                       , 0x07f3, et_dec_val      , false, true  },
 #else
   { "SOLLWERT_UEBERHITZUNG"                       , 0x07f3, 0               , false, false },
 #endif
-#ifdef HA_MODEL_wpl13e
+#ifdef HA_CONTROLLER_WPMW2
   // WPL13E: tenths of K (setpoint 56 = 5.6 K)
   { "ISTWERT_UEBERHITZUNG_VERDAMPFER"             , 0x07f4, et_dec_val      , false, true  },
 #else
@@ -4019,7 +4024,7 @@ const ElsterMeta ElsterMetaTable[] =
   { 0x4ec7, "RAUMISTTEMP", "Raum Ist Temperatur", "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL },
   { 0x4ec8, "FEUCHTE", "Feuchte", "sensor", "humidity", "%", "measurement", "mdi:water-percent", NULL, NULL },
   { 0x0013, "EINSTELL_SPEICHERSOLLTEMP", LNAME_EINSTELL_SPEICHERSOLLTEMP, "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL },
-#ifdef HA_MODEL_wpl13e
+#ifdef HA_CONTROLLER_WPMW2
   { 0x0014, "VERDAMPFERTEMP", LNAME_VERDAMPFERTEMP, "sensor", NULL, NULL, "measurement", "mdi:help-circle-outline", NULL, NULL },
 #else
   { 0x0014, "VERDAMPFERTEMP", LNAME_VERDAMPFERTEMP, "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL },
@@ -4076,21 +4081,21 @@ const ElsterMeta ElsterMetaTable[] =
   { 0x070c, "LEISTUNG_SOLEPUMPE", "Leistung Solepumpe", "sensor", "", "%", "measurement", "mdi:water-percent", NULL, NULL },
   { 0x070e, "EINPHASIGER_BETRIEB", "Einphasiger Betrieb", "binary_sensor", "", "", "", "mdi:flash", "on", "off" },
   { 0x071d, "VERDICHTER_STARTS", "Verdichter Starts", "sensor", "", "", "total_increasing", "mdi:counter", NULL, NULL },
-#ifdef HA_MODEL_wpl13e
+#ifdef HA_CONTROLLER_WPMW2
   { 0x07a6, "ANZEIGE_HOCHDRUCK", LNAME_ANZEIGE_HOCHDRUCK, "sensor", "pressure", "bar", "measurement", "mdi:gauge", NULL, NULL },
 #else
 #endif
-#ifdef HA_MODEL_wpl13e
+#ifdef HA_CONTROLLER_WPMW2
   { 0x07a7, "ANZEIGE_NIEDERDRUCK", LNAME_ANZEIGE_NIEDERDRUCK, "sensor", "pressure", "bar", "measurement", "mdi:gauge", NULL, NULL },
 #else
 #endif
-#ifdef HA_MODEL_wpl13e
+#ifdef HA_CONTROLLER_WPMW2
   { 0x07a8, "VERDICHTER", LNAME_VERDICHTER, "sensor", NULL, NULL, "measurement", "mdi:pump", NULL, NULL },
 #else
   { 0x07a8, "VERDICHTER", LNAME_VERDICHTER, "sensor", "power", "W", "measurement", "mdi:pump", NULL, NULL },
 #endif
   { 0x07fc, "LZ_VERD_1_HEIZBETRIEB", LNAME_LZ_VERD_1_HEIZBETRIEB, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
-#ifdef HA_MODEL_wpl13e
+#ifdef HA_CONTROLLER_WPMW2
   { 0x07fd, "LZ_VERD_2_HEIZBETRIEB", "Laufzeit Verdichter Heizen", "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL },
 #else
   { 0x07fd, "LZ_VERD_2_HEIZBETRIEB", LNAME_LZ_VERD_2_HEIZBETRIEB, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
@@ -4101,11 +4106,11 @@ const ElsterMeta ElsterMetaTable[] =
   { 0x0801, "LZ_VERD_1_2_KUEHLBETRIEB", LNAME_LZ_VERD_1_2_KUEHLBETRIEB, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
   { 0x0803, "LZ_VERD_2_WW_BETRIEB", "Laufzeit Verdichter Warmwasser", "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL },
   { 0x07f2, "BETRIEBSART_WP", LNAME_BETRIEBSART_WP, "sensor", "", "", "", "mdi:hvac", NULL, NULL },
-#ifdef HA_MODEL_wpl13e
+#ifdef HA_CONTROLLER_WPMW2
   { 0x07f3, "SOLLWERT_UEBERHITZUNG", "Überhitzung Soll", "sensor", "temperature", "K", "measurement", "mdi:thermometer-alert", NULL, NULL },
 #else
 #endif
-#ifdef HA_MODEL_wpl13e
+#ifdef HA_CONTROLLER_WPMW2
   { 0x07f4, "ISTWERT_UEBERHITZUNG_VERDAMPFER", "Überhitzung Ist", "sensor", "temperature", "K", "measurement", "mdi:thermometer-alert", NULL, NULL },
 #else
 #endif

@@ -326,6 +326,15 @@ static const WritableNumberConfig writableNumbers[] = {
 
 static const size_t WRITABLE_NUMBER_COUNT = sizeof(writableNumbers) / sizeof(WritableNumberConfig);
 
+// Models with a WPMW II manager. Writes stay limited per model in writableNumberApplies().
+static constexpr bool isWpmw2Model() {
+#ifdef HA_CONTROLLER_WPMW2
+    return true;
+#else
+    return false;
+#endif
+}
+
 // WPMW II settings exposed as writable numbers (manager parameters 27, 33, 42)
 static bool isWpmw2Parameter(const char* sig) {
     static const char* const params[] = {"SCHALTWERKDYNAMIKZEIT",
@@ -1101,8 +1110,8 @@ static const CanMember* getWritableNumberMember(const WritableNumberConfig& conf
             return &CanMembers[cm_kessel_canb];
         }
     }
-    // WPL13E (WPMW II): the heating curve lives on the MANAGER, not on KESSEL_CANB
-    if (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") == 0 && strcmp(config.signalName, "HEIZKURVE") == 0) {
+    // WPMW II: the heating curve lives on the MANAGER, not on KESSEL_CANB
+    if (isWpmw2Model() && strcmp(config.signalName, "HEIZKURVE") == 0) {
         return &CanMembers[cm_manager];
     }
     return &CanMembers[config.member];
@@ -1627,7 +1636,7 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
     const char* friendlyName = (meta && meta->friendlyName) ? meta->friendlyName : ei->Name;
     // WPMW II manual ("INFO IWS"): the heat pump module's AUSSENTEMP is the air
     // intake temperature at the unit, not the outdoor sensor used for control.
-    if (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") == 0 && strcmp(cm.Name, "HEIZMODUL") == 0 &&
+    if (isWpmw2Model() && strcmp(cm.Name, "HEIZMODUL") == 0 &&
         strcmp(ei->Name, "AUSSENTEMP") == 0) {
         friendlyName = LNAME_LUFTANSAUGTEMP;
     }
@@ -2510,8 +2519,8 @@ constexpr uint32_t HASH_WAERMEERTRAG_WW_TAG_KWH = hash("WAERMEERTRAG_WW_TAG_KWH"
 // on the bus although we don't request them. Single-compressor unit without
 // cooling: compressor 1 and cooling counters are only 0 / -255 (HA history).
 // (The former "MANAGER x = 0.0" copies were read requests, filtered in processAndUpdate.)
-static bool isIgnoredOnWpl13e(const CanMember &cm, const char* name) {
-    if (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") != 0) return false;
+static bool isIgnoredOnWpmw2(const CanMember &cm, const char* name) {
+    if (!isWpmw2Model()) return false;
     return strncmp(name, "LZ_VERD_", 8) == 0 && (strstr(name, "VERD_1") || strstr(name, "KUEHL"));
 }
 
@@ -2608,7 +2617,7 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
     if (value.empty()) {
         return;
     }
-    if (isIgnoredOnWpl13e(cm, ei->Name)) return;
+    if (isIgnoredOnWpmw2(cm, ei->Name)) return;
     // Bool fields carrying other bits decode to "?"; HA rejects that payload for a
     // binary sensor (log warning per poll) and keeps the last state anyway. Seen on
     // WPL13E: ABTAUUNGAKTIV = 0x0200 while the compressor runs (no defrost).
