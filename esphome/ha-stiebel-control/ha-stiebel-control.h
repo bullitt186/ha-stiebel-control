@@ -2167,6 +2167,9 @@ static float energyTagLast[4]   = {0.0f, 0.0f, 0.0f, 0.0f};   // letzter Tagesan
 static float energyTagFolded[4] = {0.0f, 0.0f, 0.0f, 0.0f};   // in SUM bereits enthaltener Anteil
 static bool  energyTagValid[4]  = {false, false, false, false};
 
+// Member mit den Energiezaehlern: WPL17 0x514, WPMW II 0x500.
+inline const char* energyMemberName() { return isWpmw2Model() ? "HEIZMODUL" : "HEIZMODUL_WPL"; }
+
 // slot: 0=EL Heizung, 1=EL Warmwasser, 2=Waerme Heizung, 3=Waerme Warmwasser
 inline bool wplBaseTotal(int slot, const char* sumMwh, const char* sumKwh,
                          const char* tagKwh, const char* tagWh, float& out) {
@@ -2175,8 +2178,9 @@ inline bool wplBaseTotal(int slot, const char* sumMwh, const char* sumKwh,
 
     // Tagesanteil (TAG_KWH + TAG_WH/1000) lesen. Er ist innerhalb eines Tages
     // monoton und faellt nur beim Tageswechsel (~23:51) auf 0 zurueck.
-    bool haveTag = getEnergyForMember("HEIZMODUL_WPL", tagKwh, tk) &&
-                   getEnergyForMember("HEIZMODUL_WPL", tagWh, tw);
+    const char* member = energyMemberName();
+    bool haveTag = getEnergyForMember(member, tagKwh, tk) &&
+                   getEnergyForMember(member, tagWh, tw);
     float tag = haveTag ? (tk + tw / 1000.0f) : 0.0f;
 
     // Tageswechsel erkannt -> der gefaltete Anteil ist abgegolten.
@@ -2196,7 +2200,7 @@ inline bool wplBaseTotal(int slot, const char* sumMwh, const char* sumKwh,
     // SUM-Sockel (MWh*1000 + kWh) lesen. Bei Aenderung (naechtlicher Rollover)
     // ist der aktuelle Tagesanteil in SUM bereits enthalten -> merken, damit er
     // nicht doppelt addiert wird.
-    if (getEnergyForMember("HEIZMODUL_WPL", sumMwh, sm) && getEnergyForMember("HEIZMODUL_WPL", sumKwh, sk)) {
+    if (getEnergyForMember(member, sumMwh, sm) && getEnergyForMember(member, sumKwh, sk)) {
         float base = sm * 1000.0f + sk;
         if (base > 0.0f && base != energyBase.v[slot]) {   // nur bei Aenderung schreiben (NVS-Schonung)
             if (energyBase.v[slot] > 0.0f && haveTag) energyTagFolded[slot] = tag;

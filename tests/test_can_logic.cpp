@@ -951,6 +951,46 @@ TEST_CASE("publishDeltaTRunning: skips when vorlauf NaN even with compressor run
 // publishCompressorActive
 // ============================================================================
 
+static void setEnergy(const char* sum, float mwh, float kwh, float tagKwh, float tagWh) {
+    const std::string name(sum);
+    const char* m = energyMemberName();
+    storeCOPEnergyValueMember(m, (name + "_SUM_MWH").c_str(), std::to_string(mwh));
+    storeCOPEnergyValueMember(m, (name + "_SUM_KWH").c_str(), std::to_string(kwh));
+    storeCOPEnergyValueMember(m, (name + "_TAG_KWH").c_str(), std::to_string(tagKwh));
+    storeCOPEnergyValueMember(m, (name + "_TAG_WH").c_str(), std::to_string(tagWh));
+}
+
+static float slidingTotal(int slot, const std::string& name) {
+    float out = -1.0f;
+    REQUIRE(wplBaseTotal(slot, (name + "_SUM_MWH").c_str(), (name + "_SUM_KWH").c_str(),
+                         (name + "_TAG_KWH").c_str(), (name + "_TAG_WH").c_str(), out));
+    return out;
+}
+
+TEST_CASE("wplBaseTotal: day counter resets before the total steps", "[calc]") {
+    const std::string n = "TEST_ROLLOVER_A";
+    setEnergy(n.c_str(), 24, 738, 3, 500);
+    CHECK(slidingTotal(2, n) == Approx(24741.5f));
+    setEnergy(n.c_str(), 24, 738, 0, 0);    // order seen on a WPL13E at midnight
+    slidingTotal(2, n);                     // lower value is held back by sanitizeEnergyTotal()
+    setEnergy(n.c_str(), 24, 742, 0, 0);
+    CHECK(slidingTotal(2, n) == Approx(24742.0f));
+    setEnergy(n.c_str(), 24, 742, 1, 0);
+    CHECK(slidingTotal(2, n) == Approx(24743.0f));
+}
+
+TEST_CASE("wplBaseTotal: total steps before the day counter resets", "[calc]") {
+    const std::string n = "TEST_ROLLOVER_B";
+    setEnergy(n.c_str(), 24, 738, 3, 500);
+    CHECK(slidingTotal(3, n) == Approx(24741.5f));
+    setEnergy(n.c_str(), 24, 742, 3, 500);  // the new total already holds the day
+    CHECK(slidingTotal(3, n) == Approx(24742.0f));
+    setEnergy(n.c_str(), 24, 742, 0, 0);
+    CHECK(slidingTotal(3, n) == Approx(24742.0f));
+    setEnergy(n.c_str(), 24, 742, 1, 0);
+    CHECK(slidingTotal(3, n) == Approx(24743.0f));
+}
+
 TEST_CASE("isHotWaterCharging: PUMPENSTATUS values seen on a WPL13E", "[calc]") {
     CHECK(isHotWaterCharging(28930));    // 0x7102 during a hot water charge
     CHECK_FALSE(isHotWaterCharging(12546));   // 0x3102 heating
