@@ -10,4 +10,4 @@
 
 esphome:
   includes:
-    - ha-stiebel-control/signal_requests_wpl13e.h
+    - signal_requests_wpl13e.h

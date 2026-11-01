@@ -21,6 +21,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   (reported by reniko, #52).
 - `ABTAUUNGAKTIV` stayed `unknown` in Home Assistant because its binary sensor had no
   `on`/`off` payloads (reported by reniko, #52).
+- `language: EN` did not compile: `lang_en.h` was not copied to the build (#61). It is now listed
+  in `includes` and only applies with `HA_LANGUAGE_EN`. CI compiles an English build.
+- Remote packages (`github://...`) failed with "Could not find file" (#41): include paths are now
+  relative to the package files. A leftover local `ha-stiebel-control` folder no longer shadows
+  newer package files. CI checks the layout without a local folder.
 
 ### Changed
 

@@ -34,23 +34,23 @@ esphome:
           initBoostStatePrefs();
           loadBoostState();
           initSummerPrefs();
+  # Paths are relative to this file, so local copies and remote packages both resolve them.
   includes:
-    - ha-stiebel-control/elster/ElsterTable.h
-    - ha-stiebel-control/elster/KElsterTable.h
-    - ha-stiebel-control/elster/KElsterTable.cpp
-    - ha-stiebel-control/elster/NUtils.h
-    - ha-stiebel-control/elster/NUtils.cpp
-    - ha-stiebel-control/elster/NTypes.h
-    - ha-stiebel-control/config.h
+    - elster/ElsterTable.h
+    - elster/KElsterTable.h
+    - elster/KElsterTable.cpp
+    - elster/NUtils.h
+    - elster/NUtils.cpp
+    - elster/NTypes.h
+    - config.h
     # language_select.h picks the language (lang_base.h for DE, lang_en.h for EN).
-    # lang_en.h must NOT be listed here: ESPHome auto-includes every listed file,
-    # so listing it would apply the EN overrides even when language_select.h
-    # selected lang_base.h (LANGUAGE_SELECT_ACTIVE is always defined).
-    - ha-stiebel-control/language_select.h
-    - ha-stiebel-control/lang_base.h
-    - ha-stiebel-control/sg_ready_controller.h
-    - ha-stiebel-control/ha-stiebel-control.h
-    - ha-stiebel-control/signal_requests_base.h
+    # lang_en.h must be listed so ESPHome copies it; its overrides only apply with HA_LANGUAGE_EN.
+    - language_select.h
+    - lang_base.h
+    - lang_en.h
+    - sg_ready_controller.h
+    - ha-stiebel-control.h
+    - signal_requests_base.h
     # model-specific signal_requests_*.h is declared by each model yaml package
   build_flags:
     - "-DHA_DEVICE_MODEL=${device_model}"

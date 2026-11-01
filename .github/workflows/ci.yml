@@ -45,6 +45,17 @@ jobs:
       - name: Compile (ESP32-S3)
         run: esphome compile esphome/ci_heatingpump_s3.yaml
 
+      - name: Compile (ESP32-S3, English)
+        run: esphome -s language EN compile esphome/ci_heatingpump_s3.yaml
+
+      - name: Check package layout (includes resolve without a local ha-stiebel-control folder)
+        run: |
+          mkdir -p /tmp/layout/config
+          cp -r esphome/ha-stiebel-control /tmp/layout/pkg
+          cp esphome/ci_secrets.yaml /tmp/layout/config/secrets.yaml
+          sed 's#!include ha-stiebel-control/#!include ../pkg/#' esphome/ci_heatingpump_s3.yaml > /tmp/layout/config/layout.yaml
+          esphome config /tmp/layout/config/layout.yaml > /dev/null
+
       - name: Compile (ESP32-S3, read_only)
         run: esphome -s read_only true compile esphome/ci_heatingpump_s3.yaml
 

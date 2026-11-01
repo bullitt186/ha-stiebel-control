@@ -13,6 +13,7 @@
 // ha-stiebel-control.h pulls in all elster headers and signal_requests_wpl13e.h
 // via its own includes. The elster .cpp files are compiled as separate objects.
 #include "../esphome/ha-stiebel-control/ha-stiebel-control.h"
+#include "../esphome/ha-stiebel-control/lang_en.h"
 
 // ============================================================================
 // generate_read_id / generate_write_id
@@ -1254,6 +1255,11 @@ TEST_CASE("writableNumbers: WPMW II values encode like the bus scan read them", 
     CHECK(TranslateString(v, et_little_endian) == 0x0f00);
     v = "-8.0";
     CHECK(TranslateString(v, et_dec_val) == 65456);
+}
+
+TEST_CASE("i18n: including lang_en.h does not override a German build", "[i18n]") {
+    // ESPHome includes every listed file from main.cpp, so lang_en.h is always included.
+    CHECK(std::string(LNAME_ABTAUUNGAKTIV) == "Abtauung Aktiv");
 }
 
 TEST_CASE("i18n: all writableNumbers friendlyNames are non-empty", "[i18n]") {
