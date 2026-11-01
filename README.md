@@ -90,6 +90,7 @@ pump provides its own termination).
 |------------|-----------|--------|
 | `wpl10ac.yaml` | WPL 10 AC (air-source, WPM3) | ✅ Verified — requires tapping the WPM3's **CAN B** connection at **50 kbps** (DHW/boiler temperature and setpoints are only exposed there) |
 | `wpl13e.yaml` | WPL 13 E (air-source, 3 heating circuits) | ✅ Verified |
+| `ttl33.yaml` | Tecalor TTL 33 with WPMW II (air-source, 2 heating circuits, no IWS values) | ✅ Verified read-only — circuit 2 on `MISCHERMODUL_3` (0x602) |
 | `wpf10.yaml` | WPF 10 / WPF 10M (ground-source) | ⚠️ Community — signals may need adjustment |
 | `wpl17.yaml` | WPL 17 ICS classic (air-source, 1 heating circuit) | ✅ Verified on CAN-B (X1.2, 50 kbps) |
 

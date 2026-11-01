@@ -1,0 +1,16 @@
+#
+#  Tecalor TTL 33 with WPMW II manager — Model Package
+#
+#  Selects the TTL 33 signal request table (SIGNAL_REQUESTS_BASE + TTL 33-specific signals).
+#  All universal sensors live in common.yaml.
+#
+#  VERIFIED ON REAL HARDWARE (read-only, 20 kbps on the WPMW II CAN bus). See the
+#  signal_requests_ttl33.h header for the CAN members and what was left out.
+#
+#  To add a new model, create signal_requests_yourmodel.h and a thin yourmodel.yaml
+#  following this pattern. See CONTRIBUTING.md for full instructions.
+#
+
+esphome:
+  includes:
+    - ha-stiebel-control/signal_requests_ttl33.h
