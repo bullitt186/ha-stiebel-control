@@ -303,10 +303,41 @@ static const WritableNumberConfig writableNumbers[] = {
     // Heizkurve (Steigung), et_cent_val -> 0.40 wird als roh 40 geschrieben.
     // Liegt auf KESSEL_CANB (0x201) — dort ist der schreibbare Wert.
     {"HEIZKURVE", LNAME_NUM_HEIZKURVE,
-     cm_kessel_canb, 0.0, 2.0, 0.05, "", "mdi:chart-line", ""}
+     cm_kessel_canb, 0.0, 2.0, 0.05, "", "mdi:chart-line", ""},
+
+    // WPMW II parameters (WPL13E only, see writableNumberApplies). Indices found by a
+    // bus scan of the manager; ranges from the WPMW II commissioning list.
+    // Display parameter 42 "Reglerdynamik" (0xfdb0). The table resolves the index to
+    // its first name, SCHALTWERKDYNAMIKZEIT, so the state topic uses that name.
+    {"SCHALTWERKDYNAMIKZEIT", LNAME_NUM_REGLERDYNAMIK,
+     cm_manager, 1.0, 30.0, 1.0, "", "mdi:tune-vertical", ""},
+
+    // Display parameter 43 "Stillstandzeit nach Ausschalten des Verdichters" (0xfdb1)
+    {"STILLSTANDZEIT", LNAME_NUM_STILLSTANDZEIT,
+     cm_manager, 1.0, 120.0, 1.0, "min", "mdi:timer-sand", "duration"},
+
+    // Display parameter 10 summer-mode outdoor threshold (0xfdb5, whole degrees)
+    {"SOMMERBETRIEB_TEMP", LNAME_NUM_SOMMERBETRIEB_TEMP,
+     cm_manager, 10.0, 30.0, 1.0, "°C", "mdi:sun-thermometer", "temperature"},
+
+    // Display parameters 27/33 bivalence point heating / hot water (0x01ac/0x01ad)
+    {"BIVALENTPARALLELTEMPERATUR_HZG", LNAME_NUM_BIVALENZ_HZG,
+     cm_manager, -20.0, 30.0, 0.5, "°C", "mdi:thermometer-alert", "temperature"},
+
+    {"BIVALENTPARALLELTEMPERATUR_WW", LNAME_NUM_BIVALENZ_WW,
+     cm_manager, -20.0, 30.0, 0.5, "°C", "mdi:thermometer-alert", "temperature"}
 };
 
 static const size_t WRITABLE_NUMBER_COUNT = sizeof(writableNumbers) / sizeof(WritableNumberConfig);
+
+// WPMW II settings exposed as writable numbers (manager parameters 10, 27, 33, 42, 43)
+static bool isWpmw2Parameter(const char* sig) {
+    static const char* const params[] = {"SCHALTWERKDYNAMIKZEIT", "STILLSTANDZEIT", "SOMMERBETRIEB_TEMP",
+                                         "BIVALENTPARALLELTEMPERATUR_HZG", "BIVALENTPARALLELTEMPERATUR_WW"};
+    for (const char* p : params)
+        if (strcmp(sig, p) == 0) return true;
+    return false;
+}
 
 // ============================================================================
 // WRITABLE SELECT CONFIGURATION (for MQTT Select entities)
@@ -1092,10 +1123,10 @@ void publishWritableNumberDiscovery(const WritableNumberConfig& config, bool for
     // Get CanMember for building topics (modellabhaengig fuer WPL17)
     const CanMember* cm = getWritableNumberMember(config);
     
-    // Build unique ID. HEIZKURVE gets a "_set" suffix so it never collides with the
-    // read-only HEIZKURVE signal sensor of the same name (sensor.kessel_canb_heizkurve).
+    // Build unique ID. HEIZKURVE and the WPMW II parameters get a "_set" suffix so they
+    // never collide with the read-only signal sensor of the same name.
     char uniqueId[128];
-    if (strcmp(config.signalName, "HEIZKURVE") == 0) {
+    if (strcmp(config.signalName, "HEIZKURVE") == 0 || isWpmw2Parameter(config.signalName)) {
         snprintf(uniqueId, sizeof(uniqueId), "stiebel_%s_%s_set", cm->Name, config.signalName);
     } else {
         snprintf(uniqueId, sizeof(uniqueId), "stiebel_%s_%s", cm->Name, config.signalName);
@@ -1240,6 +1271,9 @@ static bool writableNumberApplies(const char* sig) {
         return false;
     // HEIZKURVE is verified writable on WPL17 (KESSEL_CANB) and WPL13E (MANAGER) only.
     if (strcmp(sig, "HEIZKURVE") == 0 && !isWpl17 && strcmp(HA_DEVICE_MODEL_STR, "wpl13e") != 0)
+        return false;
+    // WPMW II parameters: indices verified by a bus scan on a WPL13E only.
+    if (isWpmw2Parameter(sig) && strcmp(HA_DEVICE_MODEL_STR, "wpl13e") != 0)
         return false;
     return true;
 }

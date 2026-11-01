@@ -138,6 +138,21 @@ These entities appear automatically in HA via MQTT discovery:
 | `number.manager_sg_ready_boost_zustand_3` | SG Ready DHW boost for state 3 | 0–10°C | 0.5°C |
 | `number.manager_sg_ready_boost_zustand_4` | SG Ready DHW boost for state 4 | 0–15°C | 0.5°C |
 
+### WPMW II Parameters (WPL13E only, number entities)
+
+Display parameters of the WPMW II manager, written to the MANAGER over CAN. The register
+indices were found by a bus scan on a WPL13E; other models do not get these entities. Ranges
+follow the WPMW II commissioning list. The values change the heat pump's control behaviour:
+change one at a time and watch starts, run times and room temperatures.
+
+| Entity ID | WPMW II parameter | Register | Range | Step |
+|-----------|-------------------|----------|-------|------|
+| `number.manager_reglerdynamik_einstellung` | 42 Reglerdynamik (switching distance between compressor stages and the 2nd heat generator) | 0xfdb0 | 1–30 | 1 |
+| `number.manager_stillstandzeit_verdichter_einstellung` | 43 minimum compressor off time | 0xfdb1 | 1–120 min | 1 min |
+| `number.manager_sommerbetrieb_grenztemperatur_einstellung` | 10 summer mode outdoor threshold | 0xfdb5 | 10–30°C | 1°C |
+| `number.manager_bivalenzpunkt_heizung_einstellung` | 27 bivalence point heating (2nd heat generator in parallel below) | 0x01ac | −20–30°C | 0.5°C |
+| `number.manager_bivalenzpunkt_warmwasser_einstellung` | 33 bivalence point hot water | 0x01ad | −20–30°C | 0.5°C |
+
 ### Compressor Runtime Counters (WPL13E, sensor entities)
 
 | Entity ID | Description | Unit |

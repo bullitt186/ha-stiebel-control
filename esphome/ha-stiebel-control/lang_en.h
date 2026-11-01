@@ -277,6 +277,16 @@
 #define LNAME_NUM_RAUMSOLLTEMP_III             "Room Target Temperature III Setting"
 #undef  LNAME_NUM_RAUMSOLLTEMP_NACHT
 #define LNAME_NUM_RAUMSOLLTEMP_NACHT           "Room Target Temperature Night Setting"
+#undef  LNAME_NUM_REGLERDYNAMIK
+#define LNAME_NUM_REGLERDYNAMIK                "Controller Dynamics Setting"
+#undef  LNAME_NUM_STILLSTANDZEIT
+#define LNAME_NUM_STILLSTANDZEIT               "Compressor Minimum Off Time Setting"
+#undef  LNAME_NUM_SOMMERBETRIEB_TEMP
+#define LNAME_NUM_SOMMERBETRIEB_TEMP           "Summer Mode Threshold Setting"
+#undef  LNAME_NUM_BIVALENZ_HZG
+#define LNAME_NUM_BIVALENZ_HZG                 "Bivalence Point Heating Setting"
+#undef  LNAME_NUM_BIVALENZ_WW
+#define LNAME_NUM_BIVALENZ_WW                  "Bivalence Point Hot Water Setting"
 
 // ============================================================================
 // Writable select friendly names

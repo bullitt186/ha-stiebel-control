@@ -374,6 +374,72 @@ mqtt:
             writeSignal(&CanMembers[cm_manager], "HEIZKURVE", value);
             readSignal(&CanMembers[cm_manager], "HEIZKURVE");
 
+    # WPMW II parameters (WPL13E only; see writableNumberApplies)
+    - topic: heatingpump/MANAGER/SCHALTWERKDYNAMIKZEIT/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received SCHALTWERKDYNAMIKZEIT command: %s", x.c_str());
+            if (!writableNumberApplies("SCHALTWERKDYNAMIKZEIT")) {
+              ESP_LOGW("MQTT_CMD", "SCHALTWERKDYNAMIKZEIT is not writable on %s", HA_DEVICE_MODEL_STR);
+              return;
+            }
+            publishWritableNumberDiscovery(writableNumbers[9]);
+            const char* value = x.c_str();
+            writeSignal(&CanMembers[cm_manager], "SCHALTWERKDYNAMIKZEIT", value);
+            readSignal(&CanMembers[cm_manager], "SCHALTWERKDYNAMIKZEIT");
+
+    - topic: heatingpump/MANAGER/STILLSTANDZEIT/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received STILLSTANDZEIT command: %s", x.c_str());
+            if (!writableNumberApplies("STILLSTANDZEIT")) {
+              ESP_LOGW("MQTT_CMD", "STILLSTANDZEIT is not writable on %s", HA_DEVICE_MODEL_STR);
+              return;
+            }
+            publishWritableNumberDiscovery(writableNumbers[10]);
+            const char* value = x.c_str();
+            writeSignal(&CanMembers[cm_manager], "STILLSTANDZEIT", value);
+            readSignal(&CanMembers[cm_manager], "STILLSTANDZEIT");
+
+    - topic: heatingpump/MANAGER/SOMMERBETRIEB_TEMP/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received SOMMERBETRIEB_TEMP command: %s", x.c_str());
+            if (!writableNumberApplies("SOMMERBETRIEB_TEMP")) {
+              ESP_LOGW("MQTT_CMD", "SOMMERBETRIEB_TEMP is not writable on %s", HA_DEVICE_MODEL_STR);
+              return;
+            }
+            publishWritableNumberDiscovery(writableNumbers[11]);
+            const char* value = x.c_str();
+            writeSignal(&CanMembers[cm_manager], "SOMMERBETRIEB_TEMP", value);
+            readSignal(&CanMembers[cm_manager], "SOMMERBETRIEB_TEMP");
+
+    - topic: heatingpump/MANAGER/BIVALENTPARALLELTEMPERATUR_HZG/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received BIVALENTPARALLELTEMPERATUR_HZG command: %s", x.c_str());
+            if (!writableNumberApplies("BIVALENTPARALLELTEMPERATUR_HZG")) {
+              ESP_LOGW("MQTT_CMD", "BIVALENTPARALLELTEMPERATUR_HZG is not writable on %s", HA_DEVICE_MODEL_STR);
+              return;
+            }
+            publishWritableNumberDiscovery(writableNumbers[12]);
+            const char* value = x.c_str();
+            writeSignal(&CanMembers[cm_manager], "BIVALENTPARALLELTEMPERATUR_HZG", value);
+            readSignal(&CanMembers[cm_manager], "BIVALENTPARALLELTEMPERATUR_HZG");
+
+    - topic: heatingpump/MANAGER/BIVALENTPARALLELTEMPERATUR_WW/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received BIVALENTPARALLELTEMPERATUR_WW command: %s", x.c_str());
+            if (!writableNumberApplies("BIVALENTPARALLELTEMPERATUR_WW")) {
+              ESP_LOGW("MQTT_CMD", "BIVALENTPARALLELTEMPERATUR_WW is not writable on %s", HA_DEVICE_MODEL_STR);
+              return;
+            }
+            publishWritableNumberDiscovery(writableNumbers[13]);
+            const char* value = x.c_str();
+            writeSignal(&CanMembers[cm_manager], "BIVALENTPARALLELTEMPERATUR_WW", value);
+            readSignal(&CanMembers[cm_manager], "BIVALENTPARALLELTEMPERATUR_WW");
+
 
 #########################################
 #                                       #

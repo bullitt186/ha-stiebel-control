@@ -56,6 +56,10 @@ extern const SignalRequest signalRequests[] = {
     {"FEHLERMELDUNG",              FREQ_1MIN,  cm_heizmodul},
     {"GEBAEUDEART",                FREQ_10MIN, cm_manager},
     {"SOMMERBETRIEB_TEMP",         FREQ_30MIN, cm_manager},  // summer-mode threshold
+    // Display parameters 42 (Reglerdynamik) and 43 (compressor minimum off time);
+    // the table names these indices SCHALTWERKDYNAMIKZEIT and STILLSTANDZEIT.
+    {"SCHALTWERKDYNAMIKZEIT",      FREQ_60MIN, cm_manager},
+    {"STILLSTANDZEIT",             FREQ_60MIN, cm_manager},
     // Settings and totals found by a bus scan of the manager (WPMW II)
     {"BIVALENTPARALLELTEMPERATUR_HZG",   FREQ_60MIN, cm_manager},
     {"BIVALENTPARALLELTEMPERATUR_WW",    FREQ_60MIN, cm_manager},

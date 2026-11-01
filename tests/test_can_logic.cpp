@@ -1197,6 +1197,44 @@ TEST_CASE("i18n: all calculatedSensors names are non-empty", "[i18n]") {
         CHECK(std::string(calculatedSensors[i].name).length() > 0);
 }
 
+TEST_CASE("writableNumbers: WPMW II parameters sit at the indices common.yaml uses", "[writable]") {
+    // common.yaml's /set handlers call publishWritableNumberDiscovery(writableNumbers[9..13]).
+    static const char* expected[] = {"SCHALTWERKDYNAMIKZEIT", "STILLSTANDZEIT", "SOMMERBETRIEB_TEMP",
+                                     "BIVALENTPARALLELTEMPERATUR_HZG", "BIVALENTPARALLELTEMPERATUR_WW"};
+    REQUIRE(WRITABLE_NUMBER_COUNT == 14);
+    for (size_t i = 0; i < 5; ++i) {
+        CHECK(std::string(writableNumbers[9 + i].signalName) == expected[i]);
+        CHECK(writableNumbers[9 + i].member == cm_manager);
+        CHECK(isWpmw2Parameter(expected[i]));
+    }
+    CHECK_FALSE(isWpmw2Parameter("HEIZKURVE"));
+}
+
+TEST_CASE("writableNumbers: WPMW II parameters are only offered on wpl13e", "[writable]") {
+    // The test build has no real model, so the parameters must stay hidden.
+    REQUIRE(std::string(HA_DEVICE_MODEL_STR) != "wpl13e");
+    CHECK_FALSE(writableNumberApplies("SCHALTWERKDYNAMIKZEIT"));
+    CHECK_FALSE(writableNumberApplies("BIVALENTPARALLELTEMPERATUR_HZG"));
+    CHECK(writableNumberApplies("EINSTELL_SPEICHERSOLLTEMP"));
+}
+
+TEST_CASE("writableNumbers: 0xfdb0/0xfdb1 resolve to the names used in the state topics", "[writable]") {
+    // The table also lists REGLERDYNAMIK/VERDICHTER_STILLSTAND for these indices; incoming
+    // frames are named after the first entry, so the number entities must use those names.
+    CHECK(std::string(GetElsterIndex((unsigned short)0xfdb0)->Name) == "SCHALTWERKDYNAMIKZEIT");
+    CHECK(std::string(GetElsterIndex((unsigned short)0xfdb1)->Name) == "STILLSTANDZEIT");
+}
+
+TEST_CASE("writableNumbers: WPMW II values encode like the bus scan read them", "[writable]") {
+    // Scan of a WPL13E: Reglerdynamik 10 = raw 2560 (0x0a00), bivalence -8.0 = raw 65456.
+    const char* v = "10";
+    CHECK(TranslateString(v, et_little_endian) == 0x0a00);
+    v = "15";
+    CHECK(TranslateString(v, et_little_endian) == 0x0f00);
+    v = "-8.0";
+    CHECK(TranslateString(v, et_dec_val) == 65456);
+}
+
 TEST_CASE("i18n: all writableNumbers friendlyNames are non-empty", "[i18n]") {
     for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; ++i)
         CHECK(std::string(writableNumbers[i].friendlyName).length() > 0);
