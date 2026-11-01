@@ -967,6 +967,21 @@ static float slidingTotal(int slot, const std::string& name) {
     return out;
 }
 
+TEST_CASE("sanitizeEnergyTotal: small drops at the day change never go backwards", "[calc]") {
+    fake_millis() = 1000;
+    float out = 0.0f;
+    REQUIRE(sanitizeEnergyTotal("test_drop", 24746.283f, out));
+    // SUM holds whole kWh only, so the Wh part of the old day is gone for a moment
+    REQUIRE(sanitizeEnergyTotal("test_drop", 24746.0f, out));
+    CHECK(out == Approx(24746.283f));
+    REQUIRE(sanitizeEnergyTotal("test_drop", 24746.1f, out));
+    CHECK(out == Approx(24746.283f));
+    REQUIRE(sanitizeEnergyTotal("test_drop", 24746.5f, out));
+    CHECK(out == Approx(24746.5f));
+    REQUIRE(sanitizeEnergyTotal("test_drop", 24745.6f, out));   // also held, no 15 min candidate
+    CHECK(out == Approx(24746.5f));
+}
+
 TEST_CASE("wplBaseTotal: day counter resets before the total steps", "[calc]") {
     const std::string n = "TEST_ROLLOVER_A";
     setEnergy(n.c_str(), 24, 738, 3, 500);

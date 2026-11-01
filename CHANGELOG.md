@@ -27,7 +27,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - `ABTAUUNGAKTIV` stayed `unknown` in Home Assistant because its binary sensor had no
   `on`/`off` payloads (reported by reniko, #52).
 - WPMW II: the energy totals only moved once a night. They are now read from `HEIZMODUL` (0x500)
-  and follow the day counters, which the `wpl13e` table polls now (by reniko, #52).
+  and follow the day counters, which the `wpl13e` table polls now (by reniko, #52). A total no
+  longer steps back by up to 1 kWh at the day change, when the whole-kWh `SUM` replaces the day value.
 - WPMW II: `betriebsstatus` tells hot water from heating by the charging pump (`PUMPENSTATUS` bit
   `0x4000`) instead of counter deltas, which step only hourly there. The `el_leistung_*` sensors
   stay off on these models for the same reason (by reniko, #52).
