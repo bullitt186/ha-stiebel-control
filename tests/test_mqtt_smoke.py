@@ -11,11 +11,11 @@ tests/models/<model>_smoke.json.  The test requires the union of both.
 Usage:
   # Run regression test (exits 0=pass, 1=fail):
   python3 tests/test_mqtt_smoke.py --model wpl13e --broker 192.168.1.10 \\
-      --user iotuser --password secret --window 120
+      --user mqtt_user --password secret --window 120
 
   # Capture a new baseline for a model (overwrites <model>_smoke.json):
   python3 tests/test_mqtt_smoke.py --model wpl13e --broker 192.168.1.10 \\
-      --user iotuser --password secret --window 300 --capture-baseline
+      --user mqtt_user --password secret --window 300 --capture-baseline
 
 Environment variables (override CLI flags):
   MQTT_BROKER, MQTT_USER, MQTT_PASS, MQTT_WINDOW, DEVICE_MODEL
