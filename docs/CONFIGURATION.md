@@ -11,7 +11,7 @@ All keys are required unless marked optional.
 | `wifi_ssid` | Wi-Fi network name | `"MyNetwork"` |
 | `wifi_password` | Wi-Fi password | `"MyPassword"` |
 | `mqtt_broker` | MQTT broker IP or hostname | `192.168.1.10` |
-| `mqtt_username` | MQTT username | `"iotuser"` |
+| `mqtt_username` | MQTT username | `"mqtt_user"` |
 | `mqtt_password` | MQTT password | `"secret"` |
 | `api_encryption_key` | 32-byte base64 key for ESPHome native API | `"abc...=="` |
 | `ota_password` | OTA update password | `"change_me"` |
