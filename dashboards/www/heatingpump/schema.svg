@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" font-family="sans-serif">
+  <rect width="800" height="450" fill="#f4f6f8"/>
+  <!-- outdoor unit -->
+  <rect x="40" y="110" width="220" height="200" rx="14" fill="#ffffff" stroke="#8a96a3" stroke-width="3"/>
+  <circle cx="110" cy="210" r="52" fill="none" stroke="#8a96a3" stroke-width="3"/>
+  <path d="M110 162 q18 40 0 48 q-18 8 -45 -10 M110 258 q-18 -40 0 -48 q18 -8 45 10" fill="none" stroke="#8a96a3" stroke-width="3"/>
+  <rect x="185" y="185" width="50" height="50" rx="8" fill="#e8edf2" stroke="#8a96a3" stroke-width="3"/>
+  <text x="210" y="252" font-size="12" text-anchor="middle" fill="#56616d">Verdichter</text>
+  <text x="150" y="335" font-size="16" text-anchor="middle" fill="#3b4652">Wärmepumpe</text>
+  <!-- flow (red) and return (blue) -->
+  <path d="M260 160 H460 V140" fill="none" stroke="#d9534f" stroke-width="6"/>
+  <path d="M460 300 V280 M260 280 H460" fill="none" stroke="#3a7bd5" stroke-width="6"/>
+  <path d="M460 160 V120 H620" fill="none" stroke="#d9534f" stroke-width="6"/>
+  <path d="M460 280 V330 H620" fill="none" stroke="#3a7bd5" stroke-width="6"/>
+  <!-- DHW tank -->
+  <rect x="420" y="140" width="80" height="140" rx="30" fill="#ffffff" stroke="#8a96a3" stroke-width="3"/>
+  <text x="412" y="215" font-size="14" text-anchor="end" fill="#3b4652">Speicher</text>
+  <!-- radiator -->
+  <g fill="#ffffff" stroke="#8a96a3" stroke-width="3">
+    <rect x="620" y="110" width="22" height="230" rx="6"/><rect x="652" y="110" width="22" height="230" rx="6"/>
+    <rect x="684" y="110" width="22" height="230" rx="6"/><rect x="716" y="110" width="22" height="230" rx="6"/>
+  </g>
+  <text x="680" y="370" font-size="14" text-anchor="middle" fill="#3b4652">Heizkreis</text>
+</svg>

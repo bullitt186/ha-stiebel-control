@@ -64,13 +64,27 @@ TEST_CASE("WPL9 discovery uses subscribed CAN-B command and state topics", "[rou
 TEST_CASE("WPL9 SG Ready adapter shares DHW destinations and keeps room writes", "[routes][can]") {
     if (std::strcmp(HA_DEVICE_MODEL_STR, "wpl9") != 0) return;
     EspHomeSgReadyIO adapter;
+    pendingReadbackCount = 0;
+    fake_millis() = 1000;
     fake_can().sent.clear();
     adapter.writeCanSignal("EINSTELL_SPEICHERSOLLTEMP", "49");
+    REQUIRE(fake_can().sent.size() == 1);
+    REQUIRE(pendingReadbackCount == 1);
+    pendingReadbackStep();
+    CHECK(fake_can().sent.size() == 1);
+    fake_millis() += READBACK_DELAY_MS;
+    pendingReadbackStep();
     REQUIRE(fake_can().sent.size() == 2);
     CHECK(fake_can().sent[0] == std::vector<uint8_t>{0x40, 1, 0x13, 1, 0xea, 0, 0});
     CHECK(fake_can().sent[1] == std::vector<uint8_t>{0x41, 1, 0x13, 0, 0, 0, 0});
     fake_can().sent.clear();
     adapter.writeCanSignal("RAUMSOLLTEMP_I", "20");
+    REQUIRE(fake_can().sent.size() == 1);
+    fake_millis() += READBACK_DELAY_MS;
+    pendingReadbackStep();
     REQUIRE(fake_can().sent.size() == 2);
     CHECK(fake_can().sent[0][0] == 0x90);
+    CHECK(fake_can().sent[1][0] == 0x91);
+    pendingReadbackCount = 0;
+    fake_millis() = 0;
 }

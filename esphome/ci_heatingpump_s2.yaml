@@ -1,5 +1,6 @@
-# CI-only entry point for ESP32-S2 / MCP2515 compilation check.
-# Not intended for end-user use — heatingpump.yaml is the user-facing config.
+# CI-only entry point, kept for compatibility: classic ESP32 (esp32dev) / MCP2515.
+# Uses the deprecated board_esp32s2.yaml alias on purpose so the alias stays tested.
+# Prefer ci_heatingpump_esp32.yaml. Not intended for end-user use.
 substitutions:
   device_name: heatingpump
   friendly_name: "Stiebel Eltron Wärmepumpe"

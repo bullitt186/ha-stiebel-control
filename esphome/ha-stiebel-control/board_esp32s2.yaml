@@ -1,9 +1,11 @@
 #
-#  ESP32-S2 Board Configuration
-#  Generic ESP32-S2 Development Board
+#  DEPRECATED alias — use board_esp32.yaml.
+#
+#  This file never configured an ESP32-S2: it has always been a classic ESP32
+#  ("esp32dev") with an external MCP2515. It is kept so existing configs with
+#    board: !include ha-stiebel-control/board_esp32s2.yaml
+#  keep working, and may be removed in a future major release.
 #
 
-esp32:
-  board: esp32dev
-  framework:
-    type: arduino
+packages:
+  board_esp32: !include board_esp32.yaml

@@ -116,6 +116,48 @@ Include:
 
 ---
 
+## Signal table (`ElsterTable.h`)
+
+Since v2.5.0 (#57) a signal lives in up to two tables in
+`esphome/ha-stiebel-control/elster/ElsterTable.h`:
+
+| Table | One row per | Fields |
+|-------|-------------|--------|
+| `ElsterTable[]` | every known Elster signal | `Name`, `Index`, `Type`, `isBlacklisted`, `hasMetadata` |
+| `ElsterMetaTable[]` | signals with Home Assistant metadata (`hasMetadata = true`) | `Index`, `Name`, `friendlyName`, `haComponent`, `haDeviceClass`, `unit`, `stateClass`, `icon`, `payloadOn`, `payloadOff` |
+
+**Add a plain signal** (entity name = signal name, unit/device class/icon derived from the type):
+
+```cpp
+// ElsterTable[]
+{ "MY_SIGNAL"                                   , 0x1234, et_dec_val      , false, false },
+```
+
+**Add a signal with HA metadata** (friendly name, unit, icon, binary sensor):
+
+1. Main row with `hasMetadata = true`:
+   ```cpp
+   { "MY_SWITCH"                                   , 0x1235, et_bool         , false, true  },
+   ```
+2. A row with the **same `Index` and `Name`** in `ElsterMetaTable[]` (`NULL` = derive from the type,
+   `""` = leave empty). Binary sensors need `payloadOn`/`payloadOff`, otherwise HA shows "Unknown":
+   ```cpp
+   { 0x1235, "MY_SWITCH", LNAME_MY_SWITCH, "binary_sensor", "running", "", "", "mdi:power", "on", "off" },
+   ```
+3. Define `LNAME_MY_SWITCH` in `lang_base.h` (German) and override it in `lang_en.h`
+   (see [Adding a New Display Language](#adding-a-new-display-language)).
+
+**Suppress a signal:** set `isBlacklisted` to `true` in its `ElsterTable[]` row
+(see `docs/CONFIGURATION.md`, "Blacklisting Signals").
+
+Rules:
+- Signal names stay German and must be unique; the same `Index` may appear under several names.
+- Every `hasMetadata = true` row needs exactly one `ElsterMetaTable` row and vice versa.
+  `make test` checks this and that no two names share a lookup hash.
+- Keep the type (`et_*`) exact; it controls decoding and the default unit.
+
+---
+
 ## Adding a New Display Language
 
 Entity names in Home Assistant are compile-time translated via `LNAME_*` macros. German is the
@@ -205,7 +247,7 @@ translated and which intentionally keep the German default.
 
 ## Other Contributions
 
-- **Signal metadata** — add `friendlyName`, `unit`, `deviceClass`, `icon` to entries in `ElsterTable.h`
+- **Signal metadata** — friendly names, units, device classes, icons in `ElsterMetaTable` (see [Signal table](#signal-table-elstertableh))
 - **Dashboard examples** — add to `packages/` or link from the docs
 - **SG Ready automations** — see `packages/sg_ready_automation_example.yaml` as a template
 - **Documentation fixes** — edit files in `docs/` or `README.md`

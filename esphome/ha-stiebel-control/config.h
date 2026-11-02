@@ -68,6 +68,25 @@
 #define CALC_CAN_DIAG_FREQUENCY FREQ_30S
 
 // ============================================================================
+// MQTT STATE PUBLISHING (publish on change + heartbeat, #55)
+// ============================================================================
+
+// Raw signal and calculated sensor states are published when the value changes.
+// An unchanged value is sent again at most this often (milliseconds), so HA sees
+// the device alive and a broker without persistence gets the value back.
+#ifndef STATE_HEARTBEAT_MS
+#define STATE_HEARTBEAT_MS (10UL * 60UL * 1000UL)
+#endif
+
+// After every MQTT (re)connect all cached states are published once again,
+// this many per stateRepublishStep() call (250 ms interval in common.yaml).
+#define STATE_REPUBLISH_BATCH 4
+
+// Upper bound of the per-topic state cache (one entry per raw signal/member and
+// calculated sensor). Topics beyond it are published without change detection.
+#define STATE_CACHE_MAX_ENTRIES 400
+
+// ============================================================================
 // COP CALCULATION SETTINGS
 // ============================================================================
 

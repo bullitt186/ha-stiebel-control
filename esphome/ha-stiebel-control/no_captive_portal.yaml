@@ -1,0 +1,19 @@
+#
+#  Optional package: disable the captive portal and the fallback hotspot.
+#
+#  Saves flash (web server + captive portal page) — mainly useful for the
+#  4 MB classic ESP32 build. Without it, Wi-Fi can only be configured through
+#  secrets.yaml; if the credentials are wrong the ESP stays offline and has to
+#  be re-flashed over USB.
+#
+#  Usage — list it AFTER the base package in heatingpump.yaml:
+#    packages:
+#      ...
+#      base: !include ha-stiebel-control/common.yaml
+#      no_captive_portal: !include ha-stiebel-control/no_captive_portal.yaml
+#
+
+captive_portal: !remove
+
+wifi:
+  ap: !remove

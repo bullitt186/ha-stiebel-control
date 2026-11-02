@@ -37,7 +37,7 @@ than raw commands:
 | Target | What it does |
 |--------|-------------|
 | `make compile` | Compile ESP32-S3 variant |
-| `make compile-s2` | Compile ESP32-S2/MCP2515 variant |
+| `make compile-esp32` | Compile classic ESP32 (esp32dev)/MCP2515 variant |
 | `make check` | Compile both variants — full quality gate |
 | `make test` | Run native Catch2 unit tests (no hardware) |
 | `make logs` | Stream live device logs |
@@ -142,7 +142,7 @@ Every push/PR to `main` runs:
 |-----|---------------|
 | `unit-tests` | Native Catch2 suite (138 tests, no hardware) |
 | `compile-s3` | Full ESP32-S3 firmware compile |
-| `compile-s2` | Full ESP32-S2/MCP2515 firmware compile |
+| `compile-esp32` | Full classic ESP32 (esp32dev)/MCP2515 firmware compile + config check of the deprecated `board_esp32s2.yaml` alias |
 | `validate-yaml` | YAML lint on all package files |
 
 On `v*` tags, a `release` job additionally:

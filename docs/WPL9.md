@@ -121,19 +121,30 @@ before changing its source or mapping. Do not convert unknown responses to off.
 
 ## Validation and remaining checks
 
-- Filtered host suites pass for WPL9 and WPL17. The local compiler aborts in the
+- Updated to upstream `0186db2` (v2.5.0 plus the signal-table documentation fix).
+  The split main/metadata tables, WPL13E exclusions, read-only mode and delayed
+  SG Ready readback are retained. WPL9 DHW readback uses the same CAN-B member
+  after the upstream non-blocking delay; MQTT commands still read back directly.
+- Filtered host suites pass for WPL9, WPL17, WPL13E, WPL10AC, WPF10 and test_model
+  (258 cases per model). The local compiler aborts in the
   pre-existing invalid-enum test (ElsterType)255; it was excluded locally and
   remains enabled in GCC CI. The unfiltered local suite is not claimed to pass.
 - The actual WW_ECO lambda sends zero CAN reads under the WPL9 macro and the
   original read for another model. ESPHome 2026.10.1 source generation passes for
-  WPL9 S3 and the shared S2 entry point. Source generation is not a full firmware
+  WPL9 S3, WPL13E S3, read-only S3 and ESP32/MCP2515; the deprecated S2-named board
+  alias still validates. Source generation is not a full firmware
   build; the firmware build must pass CI.
 - Model smoke manifests support excluded_common_topics. WPL9 excludes its disabled
   MANAGER/WW_ECO source; other models retain their common requirements. This smoke
   test checks presence; use eleven minutes to verify fresh ten-minute feedback.
 - Compare remaining labels with the WPM display, then test write acceptance,
   persistence, legacy aliases and SG Ready before claiming full control support.
+- The upstream 2.5.0 Delta T calculation requires a matching HEIZMODUL pair or
+  a matching KESSEL pair. The validated WPL9 return is on MANAGER and the KESSEL
+  return was invalid; that MANAGER value is not silently mixed into the new
+  calculation. Delta T availability on WPL9 needs separate hardware validation.
 
-Build-flag modernization and encrypted OTA are separate maintenance changes.
-They are not part of this PR. Keep installed keys stable and private settings
-outside the model package.
+Build-flag modernization is now part of the upstream 2.5.0 baseline (PR #44).
+Encrypted OTA remains a separate maintenance change. Keep installed keys stable
+and private settings outside the model package. Follow the upstream 2.5.0
+ESP-IDF migration instructions before deploying firmware.
