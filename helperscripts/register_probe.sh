@@ -4,12 +4,14 @@
 # Each round pauses normal polling for ~14 s. Never writes to the heat pump.
 #
 # Usage: MQTT_PASSWORD=... helperscripts/register_probe.sh <outfile> [rounds] [broker] [user]
+# Broker falls back to MQTT_BROKER, then to mqtt_broker from esphome/secrets.yaml.
 set -euo pipefail
 OUT=${1:?outfile}
 N=${2:-360}
-BROKER=${3:-192.168.30.10}
-USER_=${4:-iotuser}
 HERE=$(cd "$(dirname "$0")/.." && pwd)
+BROKER=${3:-${MQTT_BROKER:-$(grep '^mqtt_broker:' "$HERE/esphome/secrets.yaml" | sed 's/mqtt_broker: *//; s/ *#.*//' | tr -d '"' || true)}}
+: "${BROKER:?no broker: pass it as an argument, set MQTT_BROKER or add mqtt_broker to esphome/secrets.yaml}"
+USER_=${4:-iotuser}
 PW=${MQTT_PASSWORD:-$(grep mqtt_password "$HERE/esphome/secrets.yaml" | sed 's/mqtt_password: *//' | tr -d '"')}
 H=(-h "$BROKER" -u "$USER_" --pw "$PW")
 mosquitto_sub "${H[@]}" -t 'heatingpump/scan/#' -R -F '%I %t %p' >> "$OUT" &
