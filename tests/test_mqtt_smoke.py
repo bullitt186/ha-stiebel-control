@@ -10,11 +10,11 @@ tests/models/<model>_smoke.json.  The test requires the union of both.
 
 Usage:
   # Run regression test (exits 0=pass, 1=fail):
-  python3 tests/test_mqtt_smoke.py --model wpl13e --broker 192.168.30.10 \\
+  python3 tests/test_mqtt_smoke.py --model wpl13e --broker 192.168.1.10 \\
       --user iotuser --password secret --window 120
 
   # Capture a new baseline for a model (overwrites <model>_smoke.json):
-  python3 tests/test_mqtt_smoke.py --model wpl13e --broker 192.168.30.10 \\
+  python3 tests/test_mqtt_smoke.py --model wpl13e --broker 192.168.1.10 \\
       --user iotuser --password secret --window 300 --capture-baseline
 
 Environment variables (override CLI flags):
@@ -209,7 +209,7 @@ def run_capture(args) -> int:
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--broker",   default=os.getenv("MQTT_BROKER", "192.168.30.10"))
+    p.add_argument("--broker",   default=os.getenv("MQTT_BROKER", ""))
     p.add_argument("--port",     type=int, default=1883)
     p.add_argument("--user",     default=os.getenv("MQTT_USER", ""))
     p.add_argument("--password", default=os.getenv("MQTT_PASS", ""))
@@ -222,6 +222,8 @@ def main():
     p.add_argument("--verbose",  action="store_true",
                    help="Show extra (non-required) observed topics")
     args = p.parse_args()
+    if not args.broker:
+        p.error("no broker: pass --broker or set MQTT_BROKER")
 
     if args.capture_baseline:
         sys.exit(run_capture(args))
