@@ -580,6 +580,31 @@ TEST_CASE("publishMqttDiscovery: duration signal has device_class duration and u
 // updateSensor
 // ============================================================================
 
+TEST_CASE("VD CAN feedback publishes whole hours with existing MQTT identity", "[can][mqtt][runtime]") {
+    resetDiscoveryState();
+    // Extended register 0x07fc, raw 0x17f1 = 6129 hours, sender HEIZMODUL.
+    processAndUpdate(0x500, {0xd2, 0x00, 0xfa, 0x07, 0xfc, 0x17, 0xf1});
+    if (std::strcmp(HA_DEVICE_MODEL_STR, "wpl13e") == 0) {
+        // Upstream intentionally suppresses this model's invalid compressor-1
+        // and cooling counters; WPL9 support must preserve that exclusion.
+        CHECK_FALSE(mqttTopicPublished("heatingpump/HEIZMODUL/LZ_VERD_1_HEIZBETRIEB/state"));
+        processAndUpdate(0x500, {0xd2, 0x00, 0xfa, 0x07, 0xff, 0x0a, 0xf3});
+        CHECK_FALSE(mqttTopicPublished("heatingpump/HEIZMODUL/LZ_VERD_1_KUEHLBETRIEB/state"));
+        return;
+    }
+    CHECK(mqttFindPayload("heatingpump/HEIZMODUL/LZ_VERD_1_HEIZBETRIEB/state") == "6129");
+    std::string discovery = mqttFindPayload("homeassistant/sensor/heatingpump/stiebel_heizmodul_lz_verd_1_heizbetrieb/config");
+    CHECK(discovery.find("\"unique_id\":\"stiebel_heizmodul_lz_verd_1_heizbetrieb\"") != std::string::npos);
+    CHECK(discovery.find("\"device_class\":\"duration\"") != std::string::npos);
+    CHECK(discovery.find("\"unit_of_measurement\":\"h\"") != std::string::npos);
+    CHECK(discovery.find("\"state_class\":\"total_increasing\"") != std::string::npos);
+    processAndUpdate(0x500, {0xd2, 0x00, 0xfa, 0x07, 0xff, 0x0a, 0xf3});
+    CHECK(mqttFindPayload("heatingpump/HEIZMODUL/LZ_VERD_1_KUEHLBETRIEB/state") == "2803");
+    mqtt_client_instance().clear();
+    processAndUpdate(0x500, {0xd2, 0x00, 0xfa, 0x07, 0xfc, 0x80, 0x00});
+    CHECK(mqttFindPayload("heatingpump/HEIZMODUL/LZ_VERD_1_HEIZBETRIEB/state") == "-255");
+}
+
 TEST_CASE("updateSensor: publishes discovery and state on first call", "[mqtt]") {
     resetDiscoveryState();
     const CanMember& mgr = CanMembers[cm_manager];
@@ -1316,10 +1341,12 @@ TEST_CASE("writableNumbers: WPMW II parameters sit at the indices common.yaml us
 }
 
 TEST_CASE("writableNumbers: WPMW II parameters are only offered on wpl13e", "[writable]") {
-    // The test build has no real model, so the parameters must stay hidden.
-    REQUIRE(std::string(HA_DEVICE_MODEL_STR) != "wpl13e");
-    CHECK_FALSE(writableNumberApplies("SCHALTWERKDYNAMIKZEIT"));
-    CHECK_FALSE(writableNumberApplies("BIVALENTPARALLELTEMPERATUR_HZG"));
+    // CI also builds the tests per model (MODEL_TEST_FLAGS), so both cases are checked.
+    const bool wpl13e = std::string(HA_DEVICE_MODEL_STR) == "wpl13e";
+    for (const char* sig : {"SCHALTWERKDYNAMIKZEIT", "BIVALENTPARALLELTEMPERATUR_HZG",
+                            "STILLSTANDZEIT", "SW_AUSSENTEMP"}) {
+        CHECK(writableNumberApplies(sig) == wpl13e);
+    }
     CHECK(writableNumberApplies("EINSTELL_SPEICHERSOLLTEMP"));
 }
 
@@ -1420,7 +1447,14 @@ TEST_CASE("climate: heating and hot water discoveries reuse the number /set topi
     CHECK(heat.find("PROGRAMMSCHALTER/set") != std::string::npos);
     CHECK(heat.find("\"Tagbetrieb\"") != std::string::npos);
     CHECK(dhw.find("EINSTELL_SPEICHERSOLLTEMP/set") != std::string::npos);
-    CHECK(dhw.find("KESSEL/SPEICHERISTTEMP/state") != std::string::npos);
+    const bool wpl17 = std::strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0;
+    const bool canbSetpoint = wpl17 || std::strcmp(HA_DEVICE_MODEL_STR, "wpl9") == 0;
+    const std::string current = std::string("heatingpump/") +
+        (wpl17 ? "KESSEL_CANB" : "KESSEL") + "/SPEICHERISTTEMP/state";
+    const std::string command = std::string("heatingpump/") +
+        (canbSetpoint ? "KESSEL_CANB" : "MANAGER") + "/EINSTELL_SPEICHERSOLLTEMP/set";
+    CHECK(dhw.find(current) != std::string::npos);
+    CHECK(dhw.find(command) != std::string::npos);
 }
 
 // ============================================================================
@@ -1927,3 +1961,5 @@ TEST_CASE("SG Ready IO: write is sent at once, read-back ~100 ms later from the 
     pendingReadbackCount = 0;
     fake_millis() = 0;
 }
+
+#include "wpl9_cases.inc"

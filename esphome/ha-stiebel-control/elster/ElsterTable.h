@@ -65,7 +65,8 @@ static const char * ElsterTypeStr[] =
   "et_time_domain",
   "et_dev_nr",
   "et_err_nr",
-  "et_dev_id"
+  "et_dev_id",
+  "et_hours"
 };
 #endif // ELSTER_TABLE_DEFINITIONS
 
@@ -117,7 +118,8 @@ typedef enum
   et_time_domain,
   et_dev_nr,
   et_err_nr,
-  et_dev_id
+  et_dev_id,
+  et_hours         // unsigned whole-hour counter; 0x8000 remains unavailable
 } ElsterType;
 
 typedef struct
@@ -2047,17 +2049,17 @@ const ElsterIndex ElsterTable[] =
   { "GRENZWERT_ABWEICHUNG_V_KENNLINIE"            , 0x07e9, 0               , false, false },
   { "ZEIT_WAECHTER_ABWEICHUNG_V_KENNLINIE"        , 0x07ea, 0               , false, false },
   { "MINIMALER_GRENZWERT_UEBERHITZUNG"            , 0x07eb, 0               , false, false },
-  { "LZ_VERD_1_HEIZBETRIEB"                       , 0x07fc, et_mil_val      , false, true  },
+  { "LZ_VERD_1_HEIZBETRIEB"                       , 0x07fc, et_hours        , false, true  },
 #ifdef HA_CONTROLLER_WPMW2
   // WPL13E: plain hours - verified: 1029 h heating + 4546 h DHW = LAUFZEIT_WP1 5576 h
   { "LZ_VERD_2_HEIZBETRIEB"                       , 0x07fd, 0               , false, true  },
 #else
-  { "LZ_VERD_2_HEIZBETRIEB"                       , 0x07fd, et_mil_val      , false, true  },
+  { "LZ_VERD_2_HEIZBETRIEB"                       , 0x07fd, et_hours        , false, true  },
 #endif
-  { "LZ_VERD_1_2_HEIZBETRIEB"                     , 0x07fe, et_mil_val      , false, true  },
-  { "LZ_VERD_1_KUEHLBETRIEB"                      , 0x07ff, et_mil_val      , false, true  },
-  { "LZ_VERD_2_KUEHLBETRIEB"                      , 0x0800, et_mil_val      , false, true  },
-  { "LZ_VERD_1_2_KUEHLBETRIEB"                    , 0x0801, et_mil_val      , false, true  },
+  { "LZ_VERD_1_2_HEIZBETRIEB"                     , 0x07fe, et_hours        , false, true  },
+  { "LZ_VERD_1_KUEHLBETRIEB"                      , 0x07ff, et_hours        , false, true  },
+  { "LZ_VERD_2_KUEHLBETRIEB"                      , 0x0800, et_hours        , false, true  },
+  { "LZ_VERD_1_2_KUEHLBETRIEB"                    , 0x0801, et_hours        , false, true  },
   { "LZ_VERD_1_WW_BETRIEB"                        , 0x0802, 0               , true , false },
   { "LZ_VERD_2_WW_BETRIEB"                        , 0x0803, 0               , false, true  },
   { "LZ_VERD_1_2_WW_BETRIEB"                      , 0x0804, 0               , true , false },
