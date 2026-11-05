@@ -9,6 +9,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Added
 
+- New model `wpl9` (WPL 09 ACS classic with WPM3/FET) with both DHW settings routed through
+  CAN-B, by hawkeye80 (#43). Live-checked by its author on the previous firmware; see
+  `docs/WPL9.md` for what is and is not validated.
 - New models with a WPMW II manager: `ttl33` (Tecalor TTL 33, by SolderAndSyntax, #62) and `wpl18e`
   (WPL 18 E, reported by reniko, #52). Register corrections are shared through `HA_CONTROLLER_WPMW2`.
 - WPL13E: five WPMW II parameters are writable number entities: Reglerdynamik (parameter 42,
@@ -22,6 +25,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Fixed
 
+- Compressor runtime registers `0x07fc`–`0x0801` are plain hours (`et_hours`); values such as 6129 h
+  showed as 6.129 h (by hawkeye80, #43). The WPL13E keeps its own row for `0x07fd`.
 - Summer mode used `SOMMERBETRIEB_TEMP` (0xfdb5) as threshold, which reads 10 °C while the display
   shows 20 °C. The threshold is `SW_AUSSENTEMP` (0x01bf), as SolderAndSyntax found on a TTL 33 (#62),
   and the sensor "Sommerbetrieb Grenztemperatur" now shows that register.
