@@ -1302,11 +1302,12 @@ TEST_CASE("ABTAUUNGAKTIV is a binary sensor with on/off payloads", "[meta]") {
 }
 
 TEST_CASE("writableNumbers: WPMW II parameters sit at the indices common.yaml uses", "[writable]") {
-    // common.yaml's /set handlers call publishWritableNumberDiscovery(writableNumbers[9..11]).
+    // common.yaml's /set handlers call publishWritableNumberDiscovery(writableNumbers[9..13]).
     static const char* expected[] = {"SCHALTWERKDYNAMIKZEIT",
-                                     "BIVALENTPARALLELTEMPERATUR_HZG", "BIVALENTPARALLELTEMPERATUR_WW"};
-    REQUIRE(WRITABLE_NUMBER_COUNT == 12);
-    for (size_t i = 0; i < 3; ++i) {
+                                     "BIVALENTPARALLELTEMPERATUR_HZG", "BIVALENTPARALLELTEMPERATUR_WW",
+                                     "STILLSTANDZEIT", "SW_AUSSENTEMP"};
+    REQUIRE(WRITABLE_NUMBER_COUNT == 14);
+    for (size_t i = 0; i < 5; ++i) {
         CHECK(std::string(writableNumbers[9 + i].signalName) == expected[i]);
         CHECK(writableNumbers[9 + i].member == cm_manager);
         CHECK(isWpmw2Parameter(expected[i]));
@@ -1464,7 +1465,10 @@ TEST_CASE("summer: published once automatic, threshold and outside temperature a
     const CanMember& kessel = CanMembers[cm_kessel];
     updateSensor(kessel, GetElsterIndex("AUSSENTEMP"), "12.0");      // threshold unknown: ignored
     CHECK(mqttFindPayload("calculated/sommerbetrieb_aktiv/state").empty());
-    updateSensor(mgr, GetElsterIndex("SOMMERBETRIEB_TEMP"), "10");
+    updateSensor(mgr, GetElsterIndex("SOMMERBETRIEB_TEMP"), "10");   // not the threshold: ignored
+    updateSensor(kessel, GetElsterIndex("AUSSENTEMP"), "12.0");
+    CHECK(mqttFindPayload("calculated/sommerbetrieb_aktiv/state").empty());
+    updateSensor(mgr, GetElsterIndex("SW_AUSSENTEMP"), "10.0");
     updateSensor(mgr, GetElsterIndex("SOMMERBETRIEB"), "on");
     updateSensor(kessel, GetElsterIndex("AUSSENTEMP"), "12.0");
     CHECK(mqttFindPayload("calculated/aussentemp_gedaempft/state") == "12.0");

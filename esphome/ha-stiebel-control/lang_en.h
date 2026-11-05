@@ -282,6 +282,10 @@
 #define LNAME_NUM_BIVALENZ_HZG                 "Bivalence Point Heating Setting"
 #undef  LNAME_NUM_BIVALENZ_WW
 #define LNAME_NUM_BIVALENZ_WW                  "Bivalence Point Hot Water Setting"
+#undef  LNAME_NUM_STILLSTANDZEIT
+#define LNAME_NUM_STILLSTANDZEIT               "Compressor Minimum Off Time Setting"
+#undef  LNAME_NUM_SOMMERBETRIEB_TEMP
+#define LNAME_NUM_SOMMERBETRIEB_TEMP           "Summer Mode Threshold Setting"
 
 // ============================================================================
 // Writable select friendly names

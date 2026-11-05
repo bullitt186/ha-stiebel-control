@@ -414,6 +414,32 @@ mqtt:
             writeSignal(&CanMembers[cm_manager], "BIVALENTPARALLELTEMPERATUR_WW", value);
             readSignal(&CanMembers[cm_manager], "BIVALENTPARALLELTEMPERATUR_WW");
 
+    - topic: heatingpump/MANAGER/STILLSTANDZEIT/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received STILLSTANDZEIT command: %s", x.c_str());
+            if (!writableNumberApplies("STILLSTANDZEIT")) {
+              ESP_LOGW("MQTT_CMD", "STILLSTANDZEIT is not writable on %s", HA_DEVICE_MODEL_STR);
+              return;
+            }
+            publishWritableNumberDiscovery(writableNumbers[12]);
+            const char* value = x.c_str();
+            writeSignal(&CanMembers[cm_manager], "STILLSTANDZEIT", value);
+            readSignal(&CanMembers[cm_manager], "STILLSTANDZEIT");
+
+    - topic: heatingpump/MANAGER/SW_AUSSENTEMP/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received SW_AUSSENTEMP command: %s", x.c_str());
+            if (!writableNumberApplies("SW_AUSSENTEMP")) {
+              ESP_LOGW("MQTT_CMD", "SW_AUSSENTEMP is not writable on %s", HA_DEVICE_MODEL_STR);
+              return;
+            }
+            publishWritableNumberDiscovery(writableNumbers[13]);
+            const char* value = x.c_str();
+            writeSignal(&CanMembers[cm_manager], "SW_AUSSENTEMP", value);
+            readSignal(&CanMembers[cm_manager], "SW_AUSSENTEMP");
+
 
 #########################################
 #                                       #

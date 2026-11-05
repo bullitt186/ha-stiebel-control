@@ -150,6 +150,11 @@ change one at a time and watch starts, run times and room temperatures.
 | `number.manager_reglerdynamik_einstellung` | 42 Reglerdynamik (switching distance between compressor stages and the 2nd heat generator) | 0xfdb0 | 1–30 | 1 |
 | `number.manager_bivalenzpunkt_heizung_einstellung` | 27 bivalence point heating (2nd heat generator in parallel below) | 0x01ac | −20–30°C | 0.5°C |
 | `number.manager_bivalenzpunkt_warmwasser_einstellung` | 33 bivalence point hot water | 0x01ad | −20–30°C | 0.5°C |
+| `number.manager_stillstandzeit_verdichter_einstellung` | 43 minimum compressor off time (the manual forbids less than 20 min in normal operation) | 0xfdb1 | 20–120 min | 1 min |
+| `number.manager_sommerbetrieb_grenztemperatur_einstellung` | 10 summer mode, AUSSENTEMP threshold | 0x01bf | 10–30°C | 0.5°C |
+
+Parameters 10 and 43 were confirmed by changing them on the display and reading the bus. On
+the WPMW II, `SOMMERBETRIEB_TEMP` (0xfdb5) and `SPERRZEIT` (0x0026) did not follow the display.
 
 ### Compressor Runtime Counters (WPL13E, sensor entities)
 
@@ -378,8 +383,8 @@ installs may need to adjust a few IDs (e.g. `sensor.heizmodul_luftansaugtemperat
 ## Summer mode (WPL13E)
 
 The WPMW II switches heating off when its *summer automatic* is on (`SOMMERBETRIEB`, parameter
-10) and the damped outside temperature reaches the threshold (`SOMMERBETRIEB_TEMP`, 0xfdb5,
-10–30 °C); it switches back 1 K below. The damping averages the controller's outside sensor
+10) and the damped outside temperature reaches the threshold (`SW_AUSSENTEMP`, 0x01bf,
+display "AUSSENTEMP"); it switches back 1 K below. The damping averages the controller's outside sensor
 over 24/48/72 h depending on `GEBAEUDEART` (1/2/3). The firmware reproduces this as
 `binary_sensor.…_sommerbetrieb_aktiv` and publishes the damped value as
 `sensor.…_aussentemperatur_gedampft`. The damped value is an exponential moving average kept

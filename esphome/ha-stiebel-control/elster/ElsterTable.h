@@ -492,7 +492,7 @@ const ElsterIndex ElsterTable[] =
   { "ESTRICH_HALTEN_SOCKELTEMPERATUR"             , 0x01bc, 0               , false, false },
   { "ESTRICH_MAX_TEMPERATUR"                      , 0x01bd, et_dec_val      , false, false },
   { "ESTRICH_HALTEN_MAX_TEMPERATUR"               , 0x01be, 0               , false, false },
-  { "SW_AUSSENTEMP"                               , 0x01bf, et_dec_val      , false, false },
+  { "SW_AUSSENTEMP"                               , 0x01bf, et_dec_val      , false, true  },
   { "GESAMTERTRAG_WATT"                           , 0x01c1, 0               , false, false },
   { "GESAMTERTRAG_KWATT"                          , 0x01c2, 0               , false, false },
   { "EVU"                                         , 0x01d3, 0               , false, false },
@@ -3881,7 +3881,7 @@ const ElsterIndex ElsterTable[] =
   { "VERDICHTER_STILLSTAND"                       , 0xfdb1, et_little_endian, false, false },
   // WPMW II parameter 10 "SOMMERBETRIEB / AUSSENTEMP" (10..30 degC), found by bus scan
   // on a WPL13E next to SOMMERBETRIEB (0xfdb4) and GEBAEUDEART (0xfdb3); raw 2560 = 10 degC.
-  { "SOMMERBETRIEB_TEMP"                          , 0xfdb5, et_little_endian, false, true  },
+  { "SOMMERBETRIEB_TEMP"                          , 0xfdb5, et_little_endian, false, false },
   // kr0ner/OneESP32ToRuleThemAll index facts (WPM3 generation)
 #if defined(HA_MODEL_wpl17) || defined(HA_MODEL_wpl23) || defined(HA_MODEL_wpl10ac) || defined(HA_MODEL_wpc7)
   { "UNTERK_COND"                                 , 0x0aff, et_dec_val      , false, false },
@@ -4053,6 +4053,7 @@ const ElsterMeta ElsterMetaTable[] =
   { 0x01ad, "BIVALENTPARALLELTEMPERATUR_WW", "Bivalenzpunkt Warmwasser", "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL },
   { 0x01ae, "BIVALENZALTERNATIVTEMPERATUR_HZG", "Einsatzgrenze Wärmepumpe Heizung", "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL },
   { 0x01af, "BIVALENZALTERNATIVTEMPERATUR_WW", "Einsatzgrenze Wärmepumpe Warmwasser", "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL },
+  { 0x01bf, "SW_AUSSENTEMP", LNAME_SOMMERBETRIEB_TEMP, "sensor", "temperature", "°C", "measurement", "mdi:sun-thermometer", NULL, NULL },
   { 0x01c4, "LAUFZEIT_WP1", "Laufzeit Verdichter gesamt", "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL },
   { 0x01cb, "LAUFZEIT_2WE", "Laufzeit Nacherwärmung gesamt", "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL },
   { 0x01d6, "WPVORLAUFIST", LNAME_WPVORLAUFIST, "sensor", "temperature", "°C", "measurement", "mdi:thermometer-lines", NULL, NULL },
@@ -4148,7 +4149,6 @@ const ElsterMeta ElsterMetaTable[] =
   { 0xfdb4, "SOMMERBETRIEB", LNAME_SOMMERBETRIEB, "binary_sensor", "", "", "", "mdi:weather-sunny", "on", "off" },
   { 0xfdf5, "ANTILEGIONELLEN_ZEITPUNKT", LNAME_ANTILEGIONELLEN_ZEITPUNKT, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
   { 0x0075, "RAUMFEUCHTE", "Raumfeuchte", "sensor", "humidity", "%", "measurement", "mdi:water-percent", NULL, NULL },
-  { 0xfdb5, "SOMMERBETRIEB_TEMP", LNAME_SOMMERBETRIEB_TEMP, "sensor", "temperature", "°C", "measurement", "mdi:sun-thermometer", NULL, NULL },
 #if defined(HA_MODEL_wpl17) || defined(HA_MODEL_wpl23) || defined(HA_MODEL_wpl10ac) || defined(HA_MODEL_wpc7)
 #endif
 };

@@ -321,7 +321,17 @@ static const WritableNumberConfig writableNumbers[] = {
      cm_manager, -20.0, 30.0, 0.5, "°C", "mdi:thermometer-alert", "temperature"},
 
     {"BIVALENTPARALLELTEMPERATUR_WW", LNAME_NUM_BIVALENZ_WW,
-     cm_manager, -20.0, 30.0, 0.5, "°C", "mdi:thermometer-alert", "temperature"}
+     cm_manager, -20.0, 30.0, 0.5, "°C", "mdi:thermometer-alert", "temperature"},
+
+    // Display parameter 43 "Stillstandzeit" (0xfdb1), confirmed by a change on the display.
+    // The manual allows 1-120 min but no less than 20 min in normal operation.
+    {"STILLSTANDZEIT", LNAME_NUM_STILLSTANDZEIT,
+     cm_manager, 20.0, 120.0, 1.0, "min", "mdi:timer-sand", "duration"},
+
+    // Display parameter 10, summer mode AUSSENTEMP (0x01bf), confirmed by a change on the
+    // display; 0xfdb5 SOMMERBETRIEB_TEMP did not move.
+    {"SW_AUSSENTEMP", LNAME_NUM_SOMMERBETRIEB_TEMP,
+     cm_manager, 10.0, 30.0, 0.5, "°C", "mdi:sun-thermometer", "temperature"}
 };
 
 static const size_t WRITABLE_NUMBER_COUNT = sizeof(writableNumbers) / sizeof(WritableNumberConfig);
@@ -335,10 +345,11 @@ static constexpr bool isWpmw2Model() {
 #endif
 }
 
-// WPMW II settings exposed as writable numbers (manager parameters 27, 33, 42)
+// WPMW II settings exposed as writable numbers (manager parameters 10, 27, 33, 42, 43)
 static bool isWpmw2Parameter(const char* sig) {
     static const char* const params[] = {"SCHALTWERKDYNAMIKZEIT",
-                                         "BIVALENTPARALLELTEMPERATUR_HZG", "BIVALENTPARALLELTEMPERATUR_WW"};
+                                         "BIVALENTPARALLELTEMPERATUR_HZG", "BIVALENTPARALLELTEMPERATUR_WW",
+                                         "STILLSTANDZEIT", "SW_AUSSENTEMP"};
     for (const char* p : params)
         if (strcmp(sig, p) == 0) return true;
     return false;
@@ -2538,7 +2549,7 @@ constexpr uint32_t HASH_PUMPENSTATUS = hash("PUMPENSTATUS");
 constexpr uint32_t HASH_FEHLERMELDUNG = hash("FEHLERMELDUNG");
 constexpr uint32_t HASH_EVU_SPERRE_AKTIV = hash("EVU_SPERRE_AKTIV");
 constexpr uint32_t HASH_SOMMERBETRIEB = hash("SOMMERBETRIEB");
-constexpr uint32_t HASH_SOMMERBETRIEB_TEMP = hash("SOMMERBETRIEB_TEMP");
+constexpr uint32_t HASH_SW_AUSSENTEMP = hash("SW_AUSSENTEMP");
 constexpr uint32_t HASH_GEBAEUDEART = hash("GEBAEUDEART");
 constexpr uint32_t HASH_AUSSENTEMP = hash("AUSSENTEMP");
 constexpr uint32_t HASH_KESSELSOLLTEMP = hash("KESSELSOLLTEMP");
@@ -2818,7 +2829,7 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
             publishSummerState();
             break;
 
-        case HASH_SOMMERBETRIEB_TEMP: {
+        case HASH_SW_AUSSENTEMP: {   // threshold, display parameter 10 AUSSENTEMP
             float v = strtof(value.c_str(), nullptr);
             if (v >= 5.0f && v <= 35.0f) { summer.threshold = v; publishSummerState(); }
             break;

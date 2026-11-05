@@ -156,6 +156,8 @@
 #define LNAME_NUM_REGLERDYNAMIK                "Reglerdynamik Einstellung"
 #define LNAME_NUM_BIVALENZ_HZG                 "Bivalenzpunkt Heizung Einstellung"
 #define LNAME_NUM_BIVALENZ_WW                  "Bivalenzpunkt Warmwasser Einstellung"
+#define LNAME_NUM_STILLSTANDZEIT               "Stillstandzeit Verdichter Einstellung"
+#define LNAME_NUM_SOMMERBETRIEB_TEMP           "Sommerbetrieb Grenztemperatur Einstellung"
 
 // ============================================================================
 // Writable select friendly names (writableSelects[])

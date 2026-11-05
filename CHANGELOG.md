@@ -11,9 +11,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 - New models with a WPMW II manager: `ttl33` (Tecalor TTL 33, by SolderAndSyntax, #62) and `wpl18e`
   (WPL 18 E, reported by reniko, #52). Register corrections are shared through `HA_CONTROLLER_WPMW2`.
-- WPL13E: three WPMW II parameters are writable number entities: Reglerdynamik (parameter 42,
-  0xfdb0) and the bivalence points for heating and hot water (27/33, 0x01ac/0x01ad). Reglerdynamik
-  is now also read (hourly). Other models do not get these entities; a `/set` for them is ignored
+- WPL13E: five WPMW II parameters are writable number entities: Reglerdynamik (parameter 42,
+  0xfdb0), compressor minimum off time (43, 0xfdb1, at least 20 min), the summer mode threshold
+  (10, 0x01bf) and the bivalence points for heating and hot water (27/33, 0x01ac/0x01ad). Parameters
+  10, 42 and 43 were confirmed by a change on the display; 38 WW-Hysterese (0x0022) is read. Other models do not get these entities; a `/set` for them is ignored
   with a warning. Indices from a bus scan, ranges from the WPMW II commissioning list.
 
 - Optional deadband for measured temperatures, `STATE_DEADBAND_TENTHS` in `config.h`, off by default
@@ -21,6 +22,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Fixed
 
+- Summer mode used `SOMMERBETRIEB_TEMP` (0xfdb5) as threshold, which reads 10 °C while the display
+  shows 20 °C. The threshold is `SW_AUSSENTEMP` (0x01bf), as SolderAndSyntax found on a TTL 33 (#62),
+  and the sensor "Sommerbetrieb Grenztemperatur" now shows that register.
 - Decode buffer overflow: values such as `not used time domain` (21 bytes) overran the 16-byte
   buffer in `processCanMessage()` and could reboot the ESP, for example during a bus scan
   (reported by reniko, #52).
