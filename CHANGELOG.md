@@ -25,6 +25,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Fixed
 
+- `EVU_SPERRE_AKTIV` used HA's `lock` device class, which shows `on` as "unlocked", so an active
+  utility lock read "Entsperrt". The sensor has no device class now; `on` still means lock active.
 - Compressor runtime registers `0x07fc`–`0x0801` are plain hours (`et_hours`); values such as 6129 h
   showed as 6.129 h (by hawkeye80, #43). The WPL13E keeps its own row for `0x07fd`.
 - Summer mode used `SOMMERBETRIEB_TEMP` (0xfdb5) as threshold, which reads 10 °C while the display

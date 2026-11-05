@@ -4034,7 +4034,7 @@ const ElsterMeta ElsterMetaTable[] =
   { 0x0016, "RUECKLAUFISTTEMP", LNAME_RUECKLAUFISTTEMP, "sensor", "temperature", "°C", "measurement", "mdi:thermometer-lines", NULL, NULL },
   { 0x0028, "MAX_TEMP_KESSEL", "Max. Rücklauftemperatur", "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL },
   { 0x0061, "ABTAUUNGAKTIV", LNAME_ABTAUUNGAKTIV, "binary_sensor", "", "", "", "mdi:snowflake-melt", "on", "off" },
-  { 0x0074, "EVU_SPERRE_AKTIV", LNAME_EVU_SPERRE_AKTIV, "binary_sensor", "lock", "", "", "mdi:lock", "on", "off" },
+  { 0x0074, "EVU_SPERRE_AKTIV", LNAME_EVU_SPERRE_AKTIV, "binary_sensor", "", "", "", "mdi:lock", "on", "off" },
   { 0x0084, "SOLAR_AKT_LEISTUNG_W", LNAME_SOLAR_AKT_LEISTUNG_W, "sensor", "power", "W", "measurement", "mdi:solar-power", NULL, NULL },
   { 0x0085, "SOLAR_TAGESERTRAG_WH", LNAME_SOLAR_TAGESERTRAG_WH, "sensor", "energy", "Wh", "total_increasing", "mdi:solar-power", NULL, NULL },
   { 0x0086, "SOLAR_TAGESERTRAG_KWH", LNAME_SOLAR_TAGESERTRAG_KWH, "sensor", "energy", "kWh", "total_increasing", "mdi:solar-power", NULL, NULL },

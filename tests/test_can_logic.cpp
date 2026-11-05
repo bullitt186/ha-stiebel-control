@@ -530,6 +530,8 @@ TEST_CASE("publishMqttDiscovery: binary sensor with explicit payloads includes p
     std::string payload = mqttFindPayload("homeassistant/binary_sensor");
     CHECK(payload.find("payload_on") != std::string::npos);
     CHECK(payload.find("payload_off") != std::string::npos);
+    // HA's "lock" class reads on as unlocked, the opposite of "EVU lock active"
+    CHECK(payload.find("\"device_class\":\"lock\"") == std::string::npos);
 }
 
 TEST_CASE("publishMqttDiscovery: ABTAUUNGAKTIV discovery carries on/off payloads", "[mqtt]") {
