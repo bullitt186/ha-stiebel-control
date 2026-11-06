@@ -125,10 +125,12 @@ jobs:
       - name: Extract release notes
         run: |
           python3 - <<'EOF'
-          import re, sys
+          import os, re, sys
           text = open("CHANGELOG.md").read()
-          # Extract content between first ## heading and the next ## heading
-          m = re.search(r'(## \[.*?\].*?)(?=\n## \[|\Z)', text, re.DOTALL)
+          # The section of the tagged version, up to the next ## heading
+          # (an empty "## [Unreleased]" above it is skipped).
+          version = re.escape(os.environ["GITHUB_REF_NAME"].lstrip("v"))
+          m = re.search(r'(## \[' + version + r'\].*?)(?=\n## \[|\Z)', text, re.DOTALL)
           if not m:
               print("Could not extract release notes", file=sys.stderr)
               sys.exit(1)
