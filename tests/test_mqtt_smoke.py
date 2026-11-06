@@ -10,12 +10,12 @@ tests/models/<model>_smoke.json.  The test requires the union of both.
 
 Usage:
   # Run regression test (exits 0=pass, 1=fail):
-  python3 tests/test_mqtt_smoke.py --model wpl13e --broker 192.168.30.10 \\
-      --user iotuser --password secret --window 120
+  python3 tests/test_mqtt_smoke.py --model wpl13e --broker 192.168.1.10 \\
+      --user mqtt_user --password secret --window 120
 
   # Capture a new baseline for a model (overwrites <model>_smoke.json):
-  python3 tests/test_mqtt_smoke.py --model wpl13e --broker 192.168.30.10 \\
-      --user iotuser --password secret --window 300 --capture-baseline
+  python3 tests/test_mqtt_smoke.py --model wpl13e --broker 192.168.1.10 \\
+      --user mqtt_user --password secret --window 300 --capture-baseline
 
 Environment variables (override CLI flags):
   MQTT_BROKER, MQTT_USER, MQTT_PASS, MQTT_WINDOW, DEVICE_MODEL
@@ -60,8 +60,13 @@ def load_required_topics(model: str) -> tuple[list[str], list[str]]:
               f"Testing common topics only.", file=sys.stderr)
         return common, []
     with open(model_file) as f:
-        model_topics = json.load(f)["required_topics"]
-    return common, model_topics
+        model_config = json.load(f)
+    excluded = set(model_config.get("excluded_common_topics", []))
+    unknown = excluded - set(common)
+    if unknown:
+        raise ValueError(f"Model {model} excludes topics absent from the common baseline: {sorted(unknown)}")
+    model_topics = model_config["required_topics"]
+    return [topic for topic in common if topic not in excluded], model_topics
 
 
 def run_test(args) -> int:
@@ -195,6 +200,12 @@ def run_capture(args) -> int:
         "required_topics": required,
         "observed_topics": {t: observed[t] for t in sorted(observed)},
     }
+    if model_file.exists():
+        with open(model_file) as f:
+            excluded = json.load(f).get("excluded_common_topics", [])
+        if excluded:
+            out["excluded_common_topics"] = excluded
+            out["required_topics"] = [t for t in required if t not in excluded]
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     with open(model_file, "w") as f:
         json.dump(out, f, indent=2)
@@ -209,7 +220,7 @@ def run_capture(args) -> int:
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--broker",   default=os.getenv("MQTT_BROKER", "192.168.30.10"))
+    p.add_argument("--broker",   default=os.getenv("MQTT_BROKER", ""))
     p.add_argument("--port",     type=int, default=1883)
     p.add_argument("--user",     default=os.getenv("MQTT_USER", ""))
     p.add_argument("--password", default=os.getenv("MQTT_PASS", ""))
@@ -222,6 +233,8 @@ def main():
     p.add_argument("--verbose",  action="store_true",
                    help="Show extra (non-required) observed topics")
     args = p.parse_args()
+    if not args.broker:
+        p.error("no broker: pass --broker or set MQTT_BROKER")
 
     if args.capture_baseline:
         sys.exit(run_capture(args))

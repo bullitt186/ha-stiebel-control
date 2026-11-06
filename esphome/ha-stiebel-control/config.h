@@ -78,6 +78,12 @@
 #define STATE_HEARTBEAT_MS (10UL * 60UL * 1000UL)
 #endif
 
+// Optional deadband for measured temperatures, in 0.1 K. Smaller changes wait for
+// the heartbeat. 0 = off, every change is published.
+#ifndef STATE_DEADBAND_TENTHS
+#define STATE_DEADBAND_TENTHS 0
+#endif
+
 // After every MQTT (re)connect all cached states are published once again,
 // this many per stateRepublishStep() call (250 ms interval in common.yaml).
 #define STATE_REPUBLISH_BATCH 4

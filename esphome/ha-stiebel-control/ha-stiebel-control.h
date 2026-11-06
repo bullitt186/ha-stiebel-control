@@ -107,6 +107,31 @@ typedef enum
     cm_other
 } CanMemberType;
 
+// Model-specific register ownership. Requires CanMemberType from the main header.
+#include <cstring>
+
+struct SignalRoute {
+    CanMemberType writeMember;
+    CanMemberType readMember;
+    CanMemberType stateMember;
+};
+
+inline SignalRoute resolveSignalRoute(const char* model, uint16_t index,
+                                     CanMemberType fallback) {
+    if (std::strcmp(model, "wpl9") == 0) {
+        // Test candidate: both DHW registers use CAN-B for writes and feedback.
+        // Valid live replies and actual WPM write acceptance still need capture.
+        if (index == 0x0013 || index == 0x0a06)
+            return {cm_kessel_canb, cm_kessel_canb, cm_kessel_canb};
+    }
+    // Preserve existing WPL17 discovery and MANAGER-topic routing.
+    if (std::strcmp(model, "wpl17") == 0 &&
+        (index == 0x0013 || index == 0x0a06 || index == 0x010e))
+        return {cm_kessel_canb, cm_kessel_canb, cm_kessel_canb};
+    return {fallback, fallback, fallback};
+}
+
+
 // ============================================================================
 // MQTT AUTO-DISCOVERY CONFIGURATION
 // ============================================================================
@@ -240,6 +265,10 @@ static const size_t CALC_IDX_MQTT_PUBLISH_FAILURES = 27;
 static_assert(CALCULATED_SENSOR_COUNT == CALC_IDX_MQTT_PUBLISH_FAILURES + 1,
               "calculatedSensors changed: update the CALC_IDX_* constants");
 
+// Decode buffer for SetValueType(): its longest texts are 20 characters plus the
+// terminator ("not used time domain", "ERR MIN UEBERHITZUNG").
+static constexpr size_t ELSTER_VALUE_BUF_SIZE = 32;
+
 // ============================================================================
 // WRITABLE NUMBER CONFIGURATION (for MQTT Number entities)
 // ============================================================================
@@ -247,7 +276,7 @@ static_assert(CALCULATED_SENSOR_COUNT == CALC_IDX_MQTT_PUBLISH_FAILURES + 1,
 struct WritableNumberConfig {
     const char* signalName;        // CAN signal name like "EINSTELL_SPEICHERSOLLTEMP"
     const char* friendlyName;      // Display name in Home Assistant
-    CanMemberType member;          // Which CAN member to write to
+    CanMemberType member;          // Default owner; model routing may override it
     float min;                     // Minimum value
     float max;                     // Maximum value
     float step;                    // Step size
@@ -303,10 +332,53 @@ static const WritableNumberConfig writableNumbers[] = {
     // Heizkurve (Steigung), et_cent_val -> 0.40 wird als roh 40 geschrieben.
     // Liegt auf KESSEL_CANB (0x201) — dort ist der schreibbare Wert.
     {"HEIZKURVE", LNAME_NUM_HEIZKURVE,
-     cm_kessel_canb, 0.0, 2.0, 0.05, "", "mdi:chart-line", ""}
+     cm_kessel_canb, 0.0, 2.0, 0.05, "", "mdi:chart-line", ""},
+
+    // WPMW II parameters (WPL13E only, see writableNumberApplies). Indices found by a
+    // bus scan of the manager; ranges from the WPMW II commissioning list.
+    // Display parameter 42 "Reglerdynamik" (0xfdb0). The table resolves the index to
+    // its first name, SCHALTWERKDYNAMIKZEIT, so the state topic uses that name.
+    {"SCHALTWERKDYNAMIKZEIT", LNAME_NUM_REGLERDYNAMIK,
+     cm_manager, 1.0, 30.0, 1.0, "", "mdi:tune-vertical", ""},
+
+    // Display parameters 27/33 bivalence point heating / hot water (0x01ac/0x01ad)
+    {"BIVALENTPARALLELTEMPERATUR_HZG", LNAME_NUM_BIVALENZ_HZG,
+     cm_manager, -20.0, 30.0, 0.5, "°C", "mdi:thermometer-alert", "temperature"},
+
+    {"BIVALENTPARALLELTEMPERATUR_WW", LNAME_NUM_BIVALENZ_WW,
+     cm_manager, -20.0, 30.0, 0.5, "°C", "mdi:thermometer-alert", "temperature"},
+
+    // Display parameter 43 "Stillstandzeit" (0xfdb1), confirmed by a change on the display.
+    // The manual allows 1-120 min but no less than 20 min in normal operation.
+    {"STILLSTANDZEIT", LNAME_NUM_STILLSTANDZEIT,
+     cm_manager, 20.0, 120.0, 1.0, "min", "mdi:timer-sand", "duration"},
+
+    // Display parameter 10, summer mode AUSSENTEMP (0x01bf), confirmed by a change on the
+    // display; 0xfdb5 SOMMERBETRIEB_TEMP did not move.
+    {"SW_AUSSENTEMP", LNAME_NUM_SOMMERBETRIEB_TEMP,
+     cm_manager, 10.0, 30.0, 0.5, "°C", "mdi:sun-thermometer", "temperature"}
 };
 
 static const size_t WRITABLE_NUMBER_COUNT = sizeof(writableNumbers) / sizeof(WritableNumberConfig);
+
+// Models with a WPMW II manager. Writes stay limited per model in writableNumberApplies().
+static constexpr bool isWpmw2Model() {
+#ifdef HA_CONTROLLER_WPMW2
+    return true;
+#else
+    return false;
+#endif
+}
+
+// WPMW II settings exposed as writable numbers (manager parameters 10, 27, 33, 42, 43)
+static bool isWpmw2Parameter(const char* sig) {
+    static const char* const params[] = {"SCHALTWERKDYNAMIKZEIT",
+                                         "BIVALENTPARALLELTEMPERATUR_HZG", "BIVALENTPARALLELTEMPERATUR_WW",
+                                         "STILLSTANDZEIT", "SW_AUSSENTEMP"};
+    for (const char* p : params)
+        if (strcmp(sig, p) == 0) return true;
+    return false;
+}
 
 // ============================================================================
 // WRITABLE SELECT CONFIGURATION (for MQTT Select entities)
@@ -434,6 +506,16 @@ static float lastWpVorlaufIst = NAN;       // HEIZMODUL WPVORLAUFIST
 static float lastRuecklaufIstTemp = NAN;   // HEIZMODUL RUECKLAUFISTTEMP
 static float lastWpVorlaufKessel = NAN;    // KESSEL WPVORLAUFIST (fallback only)
 static float lastVerdichterValue = NAN;
+// KESSEL PUMPENSTATUS; -1 = not received yet. Bit 0x4000 is the hot water charging pump (WPMW II).
+static int lastPumpenstatus = -1;
+inline bool isHotWaterCharging(int pumpenstatus) { return (pumpenstatus & 0x4000) != 0; }
+// A utility lock cuts power to the WPMW II heat pump module, so VERDICHTER would keep its last
+// value. 0 = no frame yet.
+static uint32_t lastHeizmodulFrameMs = 0;
+static const uint32_t HEIZMODUL_SILENCE_MS = 60000UL;
+inline bool isHeizmodulSilent(uint32_t now, uint32_t lastFrame) {
+    return lastFrame != 0 && (now - lastFrame) > HEIZMODUL_SILENCE_MS;
+}
 // Control deviation inputs: KESSEL member only (X2/3 control sensor and its setpoint)
 static float lastKesselRuecklaufIst = NAN;
 static float lastKesselSollTemp = NAN;
@@ -538,6 +620,7 @@ inline void getTypeDefaults(ElsterType type, const char*& component, const char*
             component = "sensor"; deviceClass = "temperature"; unit = "°C"; stateClass = "measurement"; icon = "mdi:thermometer";
             break;
         case et_mil_val:
+        case et_hours:
             component = "sensor"; deviceClass = "duration"; unit = "h"; stateClass = "total_increasing"; icon = "mdi:timer";
             break;
         case et_bool:
@@ -584,7 +667,7 @@ const ElsterIndex *processCanMessage(const std::vector<uint8_t> &msg, uint32_t c
     const ElsterIndex *ei;
     uint8_t byte1;
     uint8_t byte2;
-    char charValue[16];
+    char charValue[ELSTER_VALUE_BUF_SIZE];
 
     if (msg[2] == 0xfa)
     {
@@ -637,7 +720,7 @@ const ElsterIndex *processCanMessageDebug(const std::vector<uint8_t> &msg, uint3
     const ElsterIndex *ei;
     uint8_t byte1;
     uint8_t byte2;
-    char charValue[16];
+    char charValue[ELSTER_VALUE_BUF_SIZE];
 
     if (msg[2] == 0xfa)
     {
@@ -730,6 +813,26 @@ inline const char* stateEntryTopic(const StateCacheEntry& e, char* buf, size_t l
     return buf;
 }
 
+static int stateDeadbandTenths = STATE_DEADBAND_TENTHS;   // variable for the tests
+
+// True if `value` of a measured temperature is too close to the last published one
+inline bool withinDeadband(const char* signal, const char* published, const char* value) {
+    static const char* const kDeadbandSignals[] = {
+        "AUSSENTEMP", "SPEICHERISTTEMP", "RUECKLAUFISTTEMP", "VORLAUFISTTEMP", "WPVORLAUFIST"};
+    if (stateDeadbandTenths <= 0 || !signal || !published[0]) return false;
+    bool listed = false;
+    for (const char* name : kDeadbandSignals) {
+        if (strcmp(signal, name) == 0) { listed = true; break; }
+    }
+    if (!listed) return false;
+    char* endPublished;
+    char* endValue;
+    const float a = strtof(published, &endPublished);
+    const float b = strtof(value, &endValue);
+    if (endPublished == published || *endPublished || endValue == value || *endValue) return false;
+    return std::lround(std::fabs(a - b) * 10.0f) < stateDeadbandTenths;
+}
+
 // Publishes `value` on change; an unchanged value goes out again after
 // STATE_HEARTBEAT_MS. topicOrMember/signal must have static lifetime (string
 // literals, ElsterTable/CanMembers names). Returns true if the value was sent.
@@ -754,7 +857,7 @@ inline bool publishStateCached(uint32_t hash, const char* topicOrMember, const c
         e->pending = true;
         return id(mqtt_client).is_connected() && mqttPublish(topic, value, len);
     }
-    if (strcmp(e->value, value) != 0) {
+    if (strcmp(e->value, value) != 0 && !withinDeadband(signal, e->value, value)) {
         memcpy(e->value, value, len + 1);
         e->pending = true;
     }
@@ -765,6 +868,7 @@ inline bool publishStateCached(uint32_t hash, const char* topicOrMember, const c
     // While disconnected keep the value pending; republishAllStates() sends it on connect
     if (!id(mqtt_client).is_connected()) return false;
     if (mqttPublish(topic, value, len)) {
+        memcpy(e->value, value, len + 1);   // a heartbeat may carry a value held back by the deadband
         e->pending = false;
         e->lastPublishMs = now;
         return true;
@@ -968,6 +1072,15 @@ void writeSignal(const CanMember *cm, const char *elsterName, const char *str)
     return;
 }
 
+// Use the same route for MQTT commands and the WPL9 SG Ready adapter.
+// Explicit read/writeSignal calls keep their original low-level semantics.
+void writeConfiguredSignal(CanMemberType fallback, const char* name, const char* value) {
+    const ElsterIndex* ei = GetElsterIndex(name);
+    const SignalRoute route = resolveSignalRoute(HA_DEVICE_MODEL_STR, ei->Index, fallback);
+    writeSignal(&CanMembers[route.writeMember], name, value);
+    readSignal(&CanMembers[route.readMember], ei);
+}
+
 // Unified function to publish MQTT discovery for calculated sensors
 void publishCalculatedSensorDiscovery(const CalculatedSensorConfig& config, bool forceRepublish = false) {
     // Check if already published (unless force republish)
@@ -1061,24 +1174,14 @@ void publishAllCalculatedSensorDiscoveries(bool forceRepublish = false) {
 // MQTT WRITABLE NUMBER (for temperature setpoints, etc.)
 // ============================================================================
 
-// Liefert den effektiven CAN-Member fuer einen writable number Eintrag.
-// Auf WPL17 (CAN-B) liegen EINSTELL_SPEICHERSOLLTEMP / _2 und HEIZKURVE auf dem
-// Kessel (0x201) statt auf dem Manager (0x480). Andere Modelle (CAN-A) behalten
-// den konfigurierten Member. Damit erscheint das HA-Eingabefeld am richtigen
-// Geraet und der Command-/State-Topic passt zum Owner des Registers.
+// Discovery follows state ownership, which may differ from the write target.
 static const CanMember* getWritableNumberMember(const WritableNumberConfig& config) {
-    if (strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0) {
-        if (strcmp(config.signalName, "EINSTELL_SPEICHERSOLLTEMP") == 0 ||
-            strcmp(config.signalName, "EINSTELL_SPEICHERSOLLTEMP2") == 0 ||
-            strcmp(config.signalName, "HEIZKURVE") == 0) {
-            return &CanMembers[cm_kessel_canb];
-        }
-    }
-    // WPL13E (WPMW II): the heating curve lives on the MANAGER, not on KESSEL_CANB
-    if (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") == 0 && strcmp(config.signalName, "HEIZKURVE") == 0) {
+    // WPMW II: the heating curve lives on the MANAGER, not on KESSEL_CANB
+    if (isWpmw2Model() && strcmp(config.signalName, "HEIZKURVE") == 0)
         return &CanMembers[cm_manager];
-    }
-    return &CanMembers[config.member];
+    const SignalRoute route = resolveSignalRoute(
+        HA_DEVICE_MODEL_STR, GetElsterIndex(config.signalName)->Index, config.member);
+    return &CanMembers[route.stateMember];
 }
 
 // Publish MQTT discovery for a writable number entity
@@ -1092,10 +1195,10 @@ void publishWritableNumberDiscovery(const WritableNumberConfig& config, bool for
     // Get CanMember for building topics (modellabhaengig fuer WPL17)
     const CanMember* cm = getWritableNumberMember(config);
     
-    // Build unique ID. HEIZKURVE gets a "_set" suffix so it never collides with the
-    // read-only HEIZKURVE signal sensor of the same name (sensor.kessel_canb_heizkurve).
+    // Build unique ID. HEIZKURVE and the WPMW II parameters get a "_set" suffix so they
+    // never collide with the read-only signal sensor of the same name.
     char uniqueId[128];
-    if (strcmp(config.signalName, "HEIZKURVE") == 0) {
+    if (strcmp(config.signalName, "HEIZKURVE") == 0 || isWpmw2Parameter(config.signalName)) {
         snprintf(uniqueId, sizeof(uniqueId), "stiebel_%s_%s_set", cm->Name, config.signalName);
     } else {
         snprintf(uniqueId, sizeof(uniqueId), "stiebel_%s_%s", cm->Name, config.signalName);
@@ -1240,6 +1343,9 @@ static bool writableNumberApplies(const char* sig) {
         return false;
     // HEIZKURVE is verified writable on WPL17 (KESSEL_CANB) and WPL13E (MANAGER) only.
     if (strcmp(sig, "HEIZKURVE") == 0 && !isWpl17 && strcmp(HA_DEVICE_MODEL_STR, "wpl13e") != 0)
+        return false;
+    // WPMW II parameters: indices verified by a bus scan on a WPL13E only.
+    if (isWpmw2Parameter(sig) && strcmp(HA_DEVICE_MODEL_STR, "wpl13e") != 0)
         return false;
     return true;
 }
@@ -1524,6 +1630,10 @@ void publishCompressorActive()
 {
     // Publish discovery (only once - cached)
     publishCalculatedSensorDiscovery(calculatedSensors[4]);
+
+    if (isWpmw2Model() && isHeizmodulSilent(millis(), lastHeizmodulFrameMs)) {
+        lastVerdichterValue = 0.0f;
+    }
     
     // Check if compressor value is valid
     if (std::isnan(lastVerdichterValue)) {
@@ -1597,7 +1707,7 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
     const char* friendlyName = (meta && meta->friendlyName) ? meta->friendlyName : ei->Name;
     // WPMW II manual ("INFO IWS"): the heat pump module's AUSSENTEMP is the air
     // intake temperature at the unit, not the outdoor sensor used for control.
-    if (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") == 0 && strcmp(cm.Name, "HEIZMODUL") == 0 &&
+    if (isWpmw2Model() && strcmp(cm.Name, "HEIZMODUL") == 0 &&
         strcmp(ei->Name, "AUSSENTEMP") == 0) {
         friendlyName = LNAME_LUFTANSAUGTEMP;
     }
@@ -1659,6 +1769,7 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
         bool isNumericType = (ei->Type == et_dec_val || 
                               ei->Type == et_cent_val || 
                               ei->Type == et_mil_val || 
+                              ei->Type == et_hours ||
                               ei->Type == et_byte ||
                               ei->Type == et_double_val ||
                               ei->Type == et_triple_val ||
@@ -2008,7 +2119,9 @@ static bool sanitizeEnergyTotal(const char* key, float raw, float& out) {
     static std::unordered_map<std::string, float> pendingValue;   // verdaechtiger Kandidat
     static std::unordered_map<std::string, unsigned long> pendingSince;
 
-    const float TOL_EPS = 0.5f;                 // Toleranz "gleicher Wert"
+    // Toleranz "gleicher Wert": SUM fuehrt nur ganze kWh, beim Tageswechsel faellt
+    // der Wh-Anteil weg. Solche Ruecksprunge bleiben unsichtbar (der Wert bleibt stehen).
+    const float TOL_EPS = 1.0f;
     const float MAX_SMALL_STEP = 20.0f;         // normales Wachstum (kWh), sofort ok
     const float TOL = 25.0f;                    // Naehe eines Kandidaten zu seiner Region
     const unsigned long CONFIRM_MS = 900000UL;  // 15 min stabile Bestaetigung
@@ -2031,10 +2144,11 @@ static bool sanitizeEnergyTotal(const char* key, float raw, float& out) {
 
     // Normales, nicht sinkendes Wachstum -> sofort akzeptieren
     if (raw >= last - TOL_EPS && raw <= last + MAX_SMALL_STEP) {
-        stableValue[key] = raw;
+        const float kept = (raw > last) ? raw : last;
+        stableValue[key] = kept;
         pendingValue.erase(key);
         pendingSince.erase(key);
-        out = raw;
+        out = kept;
         return true;
     }
 
@@ -2125,6 +2239,9 @@ static float energyTagLast[4]   = {0.0f, 0.0f, 0.0f, 0.0f};   // letzter Tagesan
 static float energyTagFolded[4] = {0.0f, 0.0f, 0.0f, 0.0f};   // in SUM bereits enthaltener Anteil
 static bool  energyTagValid[4]  = {false, false, false, false};
 
+// Member mit den Energiezaehlern: WPL17 0x514, WPMW II 0x500.
+inline const char* energyMemberName() { return isWpmw2Model() ? "HEIZMODUL" : "HEIZMODUL_WPL"; }
+
 // slot: 0=EL Heizung, 1=EL Warmwasser, 2=Waerme Heizung, 3=Waerme Warmwasser
 inline bool wplBaseTotal(int slot, const char* sumMwh, const char* sumKwh,
                          const char* tagKwh, const char* tagWh, float& out) {
@@ -2133,8 +2250,9 @@ inline bool wplBaseTotal(int slot, const char* sumMwh, const char* sumKwh,
 
     // Tagesanteil (TAG_KWH + TAG_WH/1000) lesen. Er ist innerhalb eines Tages
     // monoton und faellt nur beim Tageswechsel (~23:51) auf 0 zurueck.
-    bool haveTag = getEnergyForMember("HEIZMODUL_WPL", tagKwh, tk) &&
-                   getEnergyForMember("HEIZMODUL_WPL", tagWh, tw);
+    const char* member = energyMemberName();
+    bool haveTag = getEnergyForMember(member, tagKwh, tk) &&
+                   getEnergyForMember(member, tagWh, tw);
     float tag = haveTag ? (tk + tw / 1000.0f) : 0.0f;
 
     // Tageswechsel erkannt -> der gefaltete Anteil ist abgegolten.
@@ -2154,7 +2272,7 @@ inline bool wplBaseTotal(int slot, const char* sumMwh, const char* sumKwh,
     // SUM-Sockel (MWh*1000 + kWh) lesen. Bei Aenderung (naechtlicher Rollover)
     // ist der aktuelle Tagesanteil in SUM bereits enthalten -> merken, damit er
     // nicht doppelt addiert wird.
-    if (getEnergyForMember("HEIZMODUL_WPL", sumMwh, sm) && getEnergyForMember("HEIZMODUL_WPL", sumKwh, sk)) {
+    if (getEnergyForMember(member, sumMwh, sm) && getEnergyForMember(member, sumKwh, sk)) {
         float base = sm * 1000.0f + sk;
         if (base > 0.0f && base != energyBase.v[slot]) {   // nur bei Aenderung schreiben (NVS-Schonung)
             if (energyBase.v[slot] > 0.0f && haveTag) energyTagFolded[slot] = tag;
@@ -2163,11 +2281,12 @@ inline bool wplBaseTotal(int slot, const char* sumMwh, const char* sumKwh,
         }
     }
     if (energyBase.v[slot] <= 0.0f) return false;
+    // Nach einem Neustart kommt der NVS-Sockel vor dem Tagesanteil: ohne ihn waere der
+    // Wert um den heutigen Verbrauch zu klein (Ruecksprung). Dann lieber nichts senden.
+    if (!haveTag) return false;
     out = energyBase.v[slot];
-    if (haveTag) {
-        float add = tag - energyTagFolded[slot];
-        out += (add > 0.0f) ? add : 0.0f;   // nie negativ -> kein Ruecksprung
-    }
+    float add = tag - energyTagFolded[slot];
+    out += (add > 0.0f) ? add : 0.0f;   // nie negativ -> kein Ruecksprung
     return true;
 }
 
@@ -2191,7 +2310,8 @@ void publishCombinedEnergySensors() {
         float rawTotal; bool have = false;
         if (wplBaseTotal(slot, sumMwh, sumKwh, tagKwh, tagWh, rawTotal)) {
             have = true;   // WPL-Basis (NVS-Sockel + Tagesanteil), sobald SUM bekannt
-        } else if (copEnergyValues.find(sumMwh) != copEnergyValues.end() &&
+        } else if (energyBase.v[slot] <= 0.0f &&   // Geraet ohne Tageszaehler-Sockel
+                   copEnergyValues.find(sumMwh) != copEnergyValues.end() &&
                    copEnergyValues.find(sumKwh) != copEnergyValues.end()) {
             rawTotal = copEnergyValues[sumMwh] * 1000.0f + copEnergyValues[sumKwh];
             have = true;   // Fallback: Geraete-SUM (naechtlich aktualisiert)
@@ -2259,6 +2379,10 @@ void publishCombinedEnergySensors() {
             } else if (copEnergyValues.find("KUEHLZUSTAND") != copEnergyValues.end() &&
                        copEnergyValues["KUEHLZUSTAND"] > 0.5f) {
                 ns = "Kuehlen";
+            } else if (isWpmw2Model() && lastPumpenstatus >= 0) {
+                // WPMW II: die TAG_WH-Zaehler springen nur stuendlich, die Ladepumpe zeigt
+                // den Warmwasserbetrieb sofort an.
+                ns = isHotWaterCharging(lastPumpenstatus) ? "Warmwasser" : "Heizen";
             } else if (sum > 0.0f && accWwWh > accHeizWh) {
                 ns = "Warmwasser";
             } else if (sum > 0.0f) {
@@ -2272,8 +2396,9 @@ void publishCombinedEnergySensors() {
             lastStatusMs = nowMs;
         }
 
-        // Leistung als 5-Minuten-Mittel (die TAG-Zaehler springen grob)
-        if (nowMs - windowStartMs >= 300000UL) {
+        // Leistung als 5-Minuten-Mittel (die TAG-Zaehler springen grob). Auf dem WPMW II
+        // stehen sie waehrend eines Laufs still, eine Live-Leistung waere dort falsch.
+        if (!isWpmw2Model() && nowMs - windowStartMs >= 300000UL) {
             float dtSec = (nowMs - windowStartMs) / 1000.0f;
             float pHeiz = running ? accHeizWh / dtSec * 3600.0f : 0.0f;
             float pWw   = running ? accWwWh   / dtSec * 3600.0f : 0.0f;
@@ -2329,13 +2454,14 @@ public:
     static ESPPreferenceObject nvsActive;
 
     void writeCanSignal(const char* signalName, const char* value) override {
-        const CanMember* cm = &CanMembers[cm_manager];
         const ElsterIndex* ei = GetElsterIndex(signalName);
+        SignalRoute route = {cm_manager, cm_manager, cm_manager};
+        if (strcmp(HA_DEVICE_MODEL_STR, "wpl9") == 0)
+            route = resolveSignalRoute(HA_DEVICE_MODEL_STR, ei->Index, cm_manager);
         const char* v = value;
-        writeSignal(cm, ei, v);
-        // Read back ~100 ms later from the 250 ms interval (pendingReadbackStep()),
-        // instead of blocking the loop with delay(100) per written signal.
-        scheduleReadback(cm, ei);
+        writeSignal(&CanMembers[route.writeMember], ei, v);
+        // Preserve the non-blocking upstream readback and the WPL9 CAN-B route.
+        scheduleReadback(&CanMembers[route.readMember], ei);
     }
 
     // SG Ready states always go out (not through the publish-on-change cache)
@@ -2448,10 +2574,11 @@ constexpr uint32_t HASH_SEKUNDE = hash("SEKUNDE");
 constexpr uint32_t HASH_WPVORLAUFIST = hash("WPVORLAUFIST");
 constexpr uint32_t HASH_RUECKLAUFISTTEMP = hash("RUECKLAUFISTTEMP");
 constexpr uint32_t HASH_VERDICHTER = hash("VERDICHTER");
+constexpr uint32_t HASH_PUMPENSTATUS = hash("PUMPENSTATUS");
 constexpr uint32_t HASH_FEHLERMELDUNG = hash("FEHLERMELDUNG");
 constexpr uint32_t HASH_EVU_SPERRE_AKTIV = hash("EVU_SPERRE_AKTIV");
 constexpr uint32_t HASH_SOMMERBETRIEB = hash("SOMMERBETRIEB");
-constexpr uint32_t HASH_SOMMERBETRIEB_TEMP = hash("SOMMERBETRIEB_TEMP");
+constexpr uint32_t HASH_SW_AUSSENTEMP = hash("SW_AUSSENTEMP");
 constexpr uint32_t HASH_GEBAEUDEART = hash("GEBAEUDEART");
 constexpr uint32_t HASH_AUSSENTEMP = hash("AUSSENTEMP");
 constexpr uint32_t HASH_KESSELSOLLTEMP = hash("KESSELSOLLTEMP");
@@ -2480,7 +2607,7 @@ constexpr uint32_t HASH_WAERMEERTRAG_WW_TAG_KWH = hash("WAERMEERTRAG_WW_TAG_KWH"
 // on the bus although we don't request them. Single-compressor unit without
 // cooling: compressor 1 and cooling counters are only 0 / -255 (HA history).
 // (The former "MANAGER x = 0.0" copies were read requests, filtered in processAndUpdate.)
-static bool isIgnoredOnWpl13e(const CanMember &cm, const char* name) {
+static bool isIgnoredOnWpl13e(const char* name) {
     if (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") != 0) return false;
     return strncmp(name, "LZ_VERD_", 8) == 0 && (strstr(name, "VERD_1") || strstr(name, "KUEHL"));
 }
@@ -2578,7 +2705,8 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
     if (value.empty()) {
         return;
     }
-    if (isIgnoredOnWpl13e(cm, ei->Name)) return;
+    if (isIgnoredOnWpl13e(ei->Name)) return;
+    if (isWpmw2Model() && strcmp(cm.Name, "HEIZMODUL") == 0) lastHeizmodulFrameMs = millis();
     // Bool fields carrying other bits decode to "?"; HA rejects that payload for a
     // binary sensor (log warning per poll) and keeps the last state anyway. Seen on
     // WPL13E: ABTAUUNGAKTIV = 0x0200 while the compressor runs (no defrost).
@@ -2730,7 +2858,7 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
             publishSummerState();
             break;
 
-        case HASH_SOMMERBETRIEB_TEMP: {
+        case HASH_SW_AUSSENTEMP: {   // threshold, display parameter 10 AUSSENTEMP
             float v = strtof(value.c_str(), nullptr);
             if (v >= 5.0f && v <= 35.0f) { summer.threshold = v; publishSummerState(); }
             break;
@@ -2754,6 +2882,10 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
             mqttPublish(topic, buf, strlen(buf));
             break;
         }
+
+        case HASH_PUMPENSTATUS:
+            if (strcmp(cm.Name, "KESSEL") == 0 && value != "-255") lastPumpenstatus = atoi(value.c_str());
+            break;
 
         case HASH_VERDICHTER: {
             char* endPtr;

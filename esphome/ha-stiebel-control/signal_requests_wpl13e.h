@@ -55,7 +55,15 @@ extern const SignalRequest signalRequests[] = {
     // answers a constant 69 on this index (no known fault code) - not requested.
     {"FEHLERMELDUNG",              FREQ_1MIN,  cm_heizmodul},
     {"GEBAEUDEART",                FREQ_10MIN, cm_manager},
-    {"SOMMERBETRIEB_TEMP",         FREQ_30MIN, cm_manager},  // summer-mode threshold
+    // Display parameters compared with the bus. 42 Reglerdynamik (0xfdb0, named
+    // SCHALTWERKDYNAMIKZEIT), 43 Stillstandzeit (0xfdb1) and the summer threshold of
+    // parameter 10 (0x01bf) moved with a change on the display; 38 WW-Hysterese (0x0022)
+    // matches the display. 0xfdb5 SOMMERBETRIEB_TEMP (10) and 0x0026 SPERRZEIT (20) did
+    // not move and are not requested.
+    {"SW_AUSSENTEMP",              FREQ_30MIN, cm_manager},
+    {"SCHALTWERKDYNAMIKZEIT",      FREQ_60MIN, cm_manager},
+    {"STILLSTANDZEIT",             FREQ_60MIN, cm_manager},
+    {"HYSTERESEZEIT",              FREQ_60MIN, cm_manager},
     // Settings and totals found by a bus scan of the manager (WPMW II)
     {"BIVALENTPARALLELTEMPERATUR_HZG",   FREQ_60MIN, cm_manager},
     {"BIVALENTPARALLELTEMPERATUR_WW",    FREQ_60MIN, cm_manager},
@@ -81,6 +89,10 @@ extern const SignalRequest signalRequests[] = {
     {"EL_AUFNAHMELEISTUNG_WW_TAG_KWH",   FREQ_10MIN, cm_heizmodul},
     {"WAERMEERTRAG_HEIZ_TAG_KWH",        FREQ_10MIN, cm_heizmodul},
     {"WAERMEERTRAG_WW_TAG_KWH",          FREQ_10MIN, cm_heizmodul},
+    {"EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH",  FREQ_10MIN, cm_heizmodul},
+    {"EL_AUFNAHMELEISTUNG_WW_TAG_WH",    FREQ_10MIN, cm_heizmodul},
+    {"WAERMEERTRAG_HEIZ_TAG_WH",         FREQ_10MIN, cm_heizmodul},
+    {"WAERMEERTRAG_WW_TAG_WH",           FREQ_10MIN, cm_heizmodul},
 
     // ========================================================================
     // DIAGNOSTICS ("INFO IWS" in the WPMW II manual)

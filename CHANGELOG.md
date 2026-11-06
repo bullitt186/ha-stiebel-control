@@ -7,8 +7,69 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+## [2.6.0] — 2026-11-06
+
+Contributions from reniko, SolderAndSyntax and hawkeye80: three new models, WPMW II fixes and
+parameters checked against the display of a WPL13E.
+
+### Upgrade notes
+
+- The sensor "Sommerbetrieb Grenztemperatur" now reads `SW_AUSSENTEMP` (0x01bf). The old sensor
+  for 0xfdb5 and the `SPERRZEIT` sensor are no longer published; on an existing install they stay
+  in HA as unavailable entities and can be deleted.
+- `EVU_SPERRE_AKTIV` has no device class any more (see Fixed). A local override of the device
+  class can be removed.
+- `make smoke-test` and the helper scripts no longer default to a broker: set `MQTT_BROKER` and
+  `MQTT_USER` (and `MQTT_PASS`).
+
+### Added
+
+- New model `wpl9` (WPL 09 ACS classic with WPM3/FET) with both DHW settings routed through
+  CAN-B, by hawkeye80 (#43). Live-checked by its author on the previous firmware; see
+  `docs/WPL9.md` for what is and is not validated.
+- New models with a WPMW II manager: `ttl33` (Tecalor TTL 33, by SolderAndSyntax, #62) and `wpl18e`
+  (WPL 18 E, reported by reniko, #52). Register corrections are shared through `HA_CONTROLLER_WPMW2`.
+- WPL13E: five WPMW II parameters are writable number entities: Reglerdynamik (parameter 42,
+  0xfdb0), compressor minimum off time (43, 0xfdb1, at least 20 min), the summer mode threshold
+  (10, 0x01bf) and the bivalence points for heating and hot water (27/33, 0x01ac/0x01ad).
+  Parameters 10, 42 and 43 were confirmed by a change on the display; 38 WW-Hysterese (0x0022) is
+  read. Other models do not get these entities; a `/set` for them is ignored with a warning.
+  Indices from a bus scan, ranges from the WPMW II commissioning list.
+- Optional deadband for measured temperatures, `STATE_DEADBAND_TENTHS` in `config.h`, off by default
+  (proposed by SolderAndSyntax, #64).
+
+### Fixed
+
+- `EVU_SPERRE_AKTIV` used HA's `lock` device class, which shows `on` as "unlocked", so an active
+  utility lock read "Entsperrt". The sensor has no device class now; `on` still means lock active.
+- Compressor runtime registers `0x07fc`–`0x0801` are plain hours (`et_hours`); values such as 6129 h
+  showed as 6.129 h (by hawkeye80, #43). The WPL13E keeps its own row for `0x07fd`.
+- Summer mode used `SOMMERBETRIEB_TEMP` (0xfdb5) as threshold, which reads 10 °C while the display
+  shows 20 °C. The threshold is `SW_AUSSENTEMP` (0x01bf), as SolderAndSyntax found on a TTL 33 (#62),
+  and the sensor "Sommerbetrieb Grenztemperatur" now shows that register.
+- Decode buffer overflow: values such as `not used time domain` (21 bytes) overran the 16-byte
+  buffer in `processCanMessage()` and could reboot the ESP, for example during a bus scan
+  (reported by reniko, #52).
+- `ABTAUUNGAKTIV` stayed `unknown` in Home Assistant because its binary sensor had no
+  `on`/`off` payloads (reported by reniko, #52).
+- WPMW II: the energy totals only moved once a night. They are now read from `HEIZMODUL` (0x500)
+  and follow the day counters, which the `wpl13e` table polls now (by reniko, #52). A total no
+  longer steps back by up to 1 kWh at the day change, when the whole-kWh `SUM` replaces the day
+  value. After a reboot the totals wait for the day counters instead of the stored base alone.
+- WPMW II: `betriebsstatus` tells hot water from heating by the charging pump (`PUMPENSTATUS` bit
+  `0x4000`) instead of counter deltas, which step only hourly there. The `el_leistung_*` sensors
+  stay off on these models for the same reason (by reniko, #52).
+- WPMW II: `compressor_active` stayed `on` when a utility lock cut power to the heat pump module
+  during a run. It now goes `off` after 60 s without a frame from `HEIZMODUL` (by reniko, #52).
+- `language: EN` did not compile: `lang_en.h` was not copied to the build (#61). It is now listed
+  in `includes` and only applies with `HA_LANGUAGE_EN`. CI compiles an English build.
+- Remote packages (`github://...`) failed with "Could not find file" (#41): include paths are now
+  relative to the package files. A leftover local `ha-stiebel-control` folder no longer shadows
+  newer package files. CI checks the layout without a local folder.
+
 ### Changed
 
+- Helper scripts, the smoke test and the docs carry no site-specific MQTT broker or user.
 - Docs describe the split signal table of 2.5.0 (#57): new section "Signal table" in
   `docs/CONTRIBUTING.md` (adding signals with and without HA metadata, binary sensor payloads,
   blacklisting); README, CONFIGURATION, ARCHITECTURE and the agent instructions no longer refer

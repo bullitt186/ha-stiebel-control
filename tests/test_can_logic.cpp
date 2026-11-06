@@ -13,6 +13,7 @@
 // ha-stiebel-control.h pulls in all elster headers and signal_requests_wpl13e.h
 // via its own includes. The elster .cpp files are compiled as separate objects.
 #include "../esphome/ha-stiebel-control/ha-stiebel-control.h"
+#include "../esphome/ha-stiebel-control/lang_en.h"
 
 // ============================================================================
 // generate_read_id / generate_write_id
@@ -529,17 +530,20 @@ TEST_CASE("publishMqttDiscovery: binary sensor with explicit payloads includes p
     std::string payload = mqttFindPayload("homeassistant/binary_sensor");
     CHECK(payload.find("payload_on") != std::string::npos);
     CHECK(payload.find("payload_off") != std::string::npos);
+    // HA's "lock" class reads on as unlocked, the opposite of "EVU lock active"
+    CHECK(payload.find("\"device_class\":\"lock\"") == std::string::npos);
 }
 
-TEST_CASE("publishMqttDiscovery: binary sensor without explicit payloads omits payload fields", "[mqtt]") {
-    // ABTAUUNGAKTIV has NULL payloadOn/Off — no payload_on/off in discovery
+TEST_CASE("publishMqttDiscovery: ABTAUUNGAKTIV discovery carries on/off payloads", "[mqtt]") {
+    // Without them HA expects ON/OFF, rejects the published on/off and stays unknown.
     resetDiscoveryState();
     const CanMember& heizmodul = CanMembers[cm_heizmodul];
     const ElsterIndex* ei = GetElsterIndex("ABTAUUNGAKTIV");
     REQUIRE(ei != nullptr);
     publishMqttDiscovery(heizmodul, ei);
     std::string payload = mqttFindPayload("homeassistant/binary_sensor");
-    CHECK(payload.find("payload_on") == std::string::npos);
+    CHECK(payload.find("\"payload_on\":\"on\"") != std::string::npos);
+    CHECK(payload.find("\"payload_off\":\"off\"") != std::string::npos);
 }
 
 TEST_CASE("publishMqttDiscovery: payload contains availability_topic", "[mqtt]") {
@@ -577,6 +581,31 @@ TEST_CASE("publishMqttDiscovery: duration signal has device_class duration and u
 // ============================================================================
 // updateSensor
 // ============================================================================
+
+TEST_CASE("VD CAN feedback publishes whole hours with existing MQTT identity", "[can][mqtt][runtime]") {
+    resetDiscoveryState();
+    // Extended register 0x07fc, raw 0x17f1 = 6129 hours, sender HEIZMODUL.
+    processAndUpdate(0x500, {0xd2, 0x00, 0xfa, 0x07, 0xfc, 0x17, 0xf1});
+    if (std::strcmp(HA_DEVICE_MODEL_STR, "wpl13e") == 0) {
+        // Upstream intentionally suppresses this model's invalid compressor-1
+        // and cooling counters; WPL9 support must preserve that exclusion.
+        CHECK_FALSE(mqttTopicPublished("heatingpump/HEIZMODUL/LZ_VERD_1_HEIZBETRIEB/state"));
+        processAndUpdate(0x500, {0xd2, 0x00, 0xfa, 0x07, 0xff, 0x0a, 0xf3});
+        CHECK_FALSE(mqttTopicPublished("heatingpump/HEIZMODUL/LZ_VERD_1_KUEHLBETRIEB/state"));
+        return;
+    }
+    CHECK(mqttFindPayload("heatingpump/HEIZMODUL/LZ_VERD_1_HEIZBETRIEB/state") == "6129");
+    std::string discovery = mqttFindPayload("homeassistant/sensor/heatingpump/stiebel_heizmodul_lz_verd_1_heizbetrieb/config");
+    CHECK(discovery.find("\"unique_id\":\"stiebel_heizmodul_lz_verd_1_heizbetrieb\"") != std::string::npos);
+    CHECK(discovery.find("\"device_class\":\"duration\"") != std::string::npos);
+    CHECK(discovery.find("\"unit_of_measurement\":\"h\"") != std::string::npos);
+    CHECK(discovery.find("\"state_class\":\"total_increasing\"") != std::string::npos);
+    processAndUpdate(0x500, {0xd2, 0x00, 0xfa, 0x07, 0xff, 0x0a, 0xf3});
+    CHECK(mqttFindPayload("heatingpump/HEIZMODUL/LZ_VERD_1_KUEHLBETRIEB/state") == "2803");
+    mqtt_client_instance().clear();
+    processAndUpdate(0x500, {0xd2, 0x00, 0xfa, 0x07, 0xfc, 0x80, 0x00});
+    CHECK(mqttFindPayload("heatingpump/HEIZMODUL/LZ_VERD_1_HEIZBETRIEB/state") == "-255");
+}
 
 TEST_CASE("updateSensor: publishes discovery and state on first call", "[mqtt]") {
     resetDiscoveryState();
@@ -949,6 +978,104 @@ TEST_CASE("publishDeltaTRunning: skips when vorlauf NaN even with compressor run
 // publishCompressorActive
 // ============================================================================
 
+static void setEnergy(const char* sum, float mwh, float kwh, float tagKwh, float tagWh) {
+    const std::string name(sum);
+    const char* m = energyMemberName();
+    storeCOPEnergyValueMember(m, (name + "_SUM_MWH").c_str(), std::to_string(mwh));
+    storeCOPEnergyValueMember(m, (name + "_SUM_KWH").c_str(), std::to_string(kwh));
+    storeCOPEnergyValueMember(m, (name + "_TAG_KWH").c_str(), std::to_string(tagKwh));
+    storeCOPEnergyValueMember(m, (name + "_TAG_WH").c_str(), std::to_string(tagWh));
+}
+
+static float slidingTotal(int slot, const std::string& name) {
+    float out = -1.0f;
+    REQUIRE(wplBaseTotal(slot, (name + "_SUM_MWH").c_str(), (name + "_SUM_KWH").c_str(),
+                         (name + "_TAG_KWH").c_str(), (name + "_TAG_WH").c_str(), out));
+    return out;
+}
+
+TEST_CASE("sanitizeEnergyTotal: small drops at the day change never go backwards", "[calc]") {
+    fake_millis() = 1000;
+    float out = 0.0f;
+    REQUIRE(sanitizeEnergyTotal("test_drop", 24746.283f, out));
+    // SUM holds whole kWh only, so the Wh part of the old day is gone for a moment
+    REQUIRE(sanitizeEnergyTotal("test_drop", 24746.0f, out));
+    CHECK(out == Approx(24746.283f));
+    REQUIRE(sanitizeEnergyTotal("test_drop", 24746.1f, out));
+    CHECK(out == Approx(24746.283f));
+    REQUIRE(sanitizeEnergyTotal("test_drop", 24746.5f, out));
+    CHECK(out == Approx(24746.5f));
+    REQUIRE(sanitizeEnergyTotal("test_drop", 24745.6f, out));   // also held, no 15 min candidate
+    CHECK(out == Approx(24746.5f));
+}
+
+TEST_CASE("wplBaseTotal: no value until the day counter is known again", "[calc]") {
+    // After a reboot the stored base is there before the first day counter answer
+    const std::string n = "TEST_REBOOT";
+    const char* m = energyMemberName();
+    storeCOPEnergyValueMember(m, (n + "_SUM_MWH").c_str(), "24");
+    storeCOPEnergyValueMember(m, (n + "_SUM_KWH").c_str(), "765");
+    float out = -1.0f;
+    CHECK_FALSE(wplBaseTotal(1, (n + "_SUM_MWH").c_str(), (n + "_SUM_KWH").c_str(),
+                             (n + "_TAG_KWH").c_str(), (n + "_TAG_WH").c_str(), out));
+    storeCOPEnergyValueMember(m, (n + "_TAG_KWH").c_str(), "7");
+    storeCOPEnergyValueMember(m, (n + "_TAG_WH").c_str(), "654");
+    REQUIRE(wplBaseTotal(1, (n + "_SUM_MWH").c_str(), (n + "_SUM_KWH").c_str(),
+                         (n + "_TAG_KWH").c_str(), (n + "_TAG_WH").c_str(), out));
+    CHECK(out == Approx(24772.654f));
+}
+
+TEST_CASE("wplBaseTotal: day counter resets before the total steps", "[calc]") {
+    const std::string n = "TEST_ROLLOVER_A";
+    setEnergy(n.c_str(), 24, 738, 3, 500);
+    CHECK(slidingTotal(2, n) == Approx(24741.5f));
+    setEnergy(n.c_str(), 24, 738, 0, 0);    // order seen on a WPL13E at midnight
+    slidingTotal(2, n);                     // lower value is held back by sanitizeEnergyTotal()
+    setEnergy(n.c_str(), 24, 742, 0, 0);
+    CHECK(slidingTotal(2, n) == Approx(24742.0f));
+    setEnergy(n.c_str(), 24, 742, 1, 0);
+    CHECK(slidingTotal(2, n) == Approx(24743.0f));
+}
+
+TEST_CASE("wplBaseTotal: total steps before the day counter resets", "[calc]") {
+    const std::string n = "TEST_ROLLOVER_B";
+    setEnergy(n.c_str(), 24, 738, 3, 500);
+    CHECK(slidingTotal(3, n) == Approx(24741.5f));
+    setEnergy(n.c_str(), 24, 742, 3, 500);  // the new total already holds the day
+    CHECK(slidingTotal(3, n) == Approx(24742.0f));
+    setEnergy(n.c_str(), 24, 742, 0, 0);
+    CHECK(slidingTotal(3, n) == Approx(24742.0f));
+    setEnergy(n.c_str(), 24, 742, 1, 0);
+    CHECK(slidingTotal(3, n) == Approx(24743.0f));
+}
+
+TEST_CASE("isHotWaterCharging: PUMPENSTATUS values seen on a WPL13E", "[calc]") {
+    CHECK(isHotWaterCharging(28930));    // 0x7102 during a hot water charge
+    CHECK_FALSE(isHotWaterCharging(12546));   // 0x3102 heating
+    CHECK_FALSE(isHotWaterCharging(12290));   // 0x3002 stopped
+    CHECK_FALSE(isHotWaterCharging(45058));   // 0xB002 short pulse while stopped
+}
+
+TEST_CASE("updateSensor: PUMPENSTATUS is tracked from KESSEL only", "[calc]") {
+    resetDiscoveryState();
+    lastPumpenstatus = -1;
+    const ElsterIndex* ei = GetElsterIndex("PUMPENSTATUS");
+    REQUIRE(ei != nullptr);
+    updateSensor(CanMembers[cm_manager], ei, "28930");
+    CHECK(lastPumpenstatus == -1);
+    updateSensor(CanMembers[cm_kessel], ei, "28930");
+    CHECK(lastPumpenstatus == 28930);
+    updateSensor(CanMembers[cm_kessel], ei, "-255");
+    CHECK(lastPumpenstatus == 28930);
+}
+
+TEST_CASE("isHeizmodulSilent: only after 60 s without a frame", "[calc]") {
+    CHECK_FALSE(isHeizmodulSilent(500000, 0));   // no frame yet
+    CHECK_FALSE(isHeizmodulSilent(160000, 100000));
+    CHECK(isHeizmodulSilent(160001, 100000));
+    CHECK_FALSE(isHeizmodulSilent(10000, 0xFFFFFFF0u));   // across the millis() wrap
+}
+
 TEST_CASE("publishCompressorActive: value > 2 → on", "[calc]") {
     resetDiscoveryState();
     lastVerdichterValue = 50.0f;
@@ -1197,6 +1324,72 @@ TEST_CASE("i18n: all calculatedSensors names are non-empty", "[i18n]") {
         CHECK(std::string(calculatedSensors[i].name).length() > 0);
 }
 
+TEST_CASE("decode buffer holds the longest SetValueType texts", "[decode]") {
+    char val[ELSTER_VALUE_BUF_SIZE];
+    SetValueType(val, et_time_domain, 0x8080);
+    CHECK(std::string(val) == "not used time domain");
+    CHECK(sizeof(val) > std::string(val).length());
+    SetValueType(val, et_err_nr, 0x0023);
+    CHECK(std::string(val) == "ERR MIN UEBERHITZUNG");
+    CHECK(sizeof(val) > std::string(val).length());
+}
+
+TEST_CASE("ABTAUUNGAKTIV is a binary sensor with on/off payloads", "[meta]") {
+    const ElsterMeta* meta = GetElsterMeta(GetElsterIndex("ABTAUUNGAKTIV"));
+    REQUIRE(meta != nullptr);
+    CHECK(std::string(meta->haComponent) == "binary_sensor");
+    REQUIRE(meta->payloadOn != nullptr);
+    REQUIRE(meta->payloadOff != nullptr);
+    CHECK(std::string(meta->payloadOn) == "on");
+    CHECK(std::string(meta->payloadOff) == "off");
+}
+
+TEST_CASE("writableNumbers: WPMW II parameters sit at the indices common.yaml uses", "[writable]") {
+    // common.yaml's /set handlers call publishWritableNumberDiscovery(writableNumbers[9..13]).
+    static const char* expected[] = {"SCHALTWERKDYNAMIKZEIT",
+                                     "BIVALENTPARALLELTEMPERATUR_HZG", "BIVALENTPARALLELTEMPERATUR_WW",
+                                     "STILLSTANDZEIT", "SW_AUSSENTEMP"};
+    REQUIRE(WRITABLE_NUMBER_COUNT == 14);
+    for (size_t i = 0; i < 5; ++i) {
+        CHECK(std::string(writableNumbers[9 + i].signalName) == expected[i]);
+        CHECK(writableNumbers[9 + i].member == cm_manager);
+        CHECK(isWpmw2Parameter(expected[i]));
+    }
+    CHECK_FALSE(isWpmw2Parameter("HEIZKURVE"));
+}
+
+TEST_CASE("writableNumbers: WPMW II parameters are only offered on wpl13e", "[writable]") {
+    // CI also builds the tests per model (MODEL_TEST_FLAGS), so both cases are checked.
+    const bool wpl13e = std::string(HA_DEVICE_MODEL_STR) == "wpl13e";
+    for (const char* sig : {"SCHALTWERKDYNAMIKZEIT", "BIVALENTPARALLELTEMPERATUR_HZG",
+                            "STILLSTANDZEIT", "SW_AUSSENTEMP"}) {
+        CHECK(writableNumberApplies(sig) == wpl13e);
+    }
+    CHECK(writableNumberApplies("EINSTELL_SPEICHERSOLLTEMP"));
+}
+
+TEST_CASE("writableNumbers: 0xfdb0/0xfdb1 resolve to the names used in the state topics", "[writable]") {
+    // The table also lists REGLERDYNAMIK/VERDICHTER_STILLSTAND for these indices; incoming
+    // frames are named after the first entry, so the number entities must use those names.
+    CHECK(std::string(GetElsterIndex((unsigned short)0xfdb0)->Name) == "SCHALTWERKDYNAMIKZEIT");
+    CHECK(std::string(GetElsterIndex((unsigned short)0xfdb1)->Name) == "STILLSTANDZEIT");
+}
+
+TEST_CASE("writableNumbers: WPMW II values encode like the bus scan read them", "[writable]") {
+    // Scan of a WPL13E: Reglerdynamik 10 = raw 2560 (0x0a00), bivalence -8.0 = raw 65456.
+    const char* v = "10";
+    CHECK(TranslateString(v, et_little_endian) == 0x0a00);
+    v = "15";
+    CHECK(TranslateString(v, et_little_endian) == 0x0f00);
+    v = "-8.0";
+    CHECK(TranslateString(v, et_dec_val) == 65456);
+}
+
+TEST_CASE("i18n: including lang_en.h does not override a German build", "[i18n]") {
+    // ESPHome includes every listed file from main.cpp, so lang_en.h is always included.
+    CHECK(std::string(LNAME_ABTAUUNGAKTIV) == "Abtauung Aktiv");
+}
+
 TEST_CASE("i18n: all writableNumbers friendlyNames are non-empty", "[i18n]") {
     for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; ++i)
         CHECK(std::string(writableNumbers[i].friendlyName).length() > 0);
@@ -1272,7 +1465,14 @@ TEST_CASE("climate: heating and hot water discoveries reuse the number /set topi
     CHECK(heat.find("PROGRAMMSCHALTER/set") != std::string::npos);
     CHECK(heat.find("\"Tagbetrieb\"") != std::string::npos);
     CHECK(dhw.find("EINSTELL_SPEICHERSOLLTEMP/set") != std::string::npos);
-    CHECK(dhw.find("KESSEL/SPEICHERISTTEMP/state") != std::string::npos);
+    const bool wpl17 = std::strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0;
+    const bool canbSetpoint = wpl17 || std::strcmp(HA_DEVICE_MODEL_STR, "wpl9") == 0;
+    const std::string current = std::string("heatingpump/") +
+        (wpl17 ? "KESSEL_CANB" : "KESSEL") + "/SPEICHERISTTEMP/state";
+    const std::string command = std::string("heatingpump/") +
+        (canbSetpoint ? "KESSEL_CANB" : "MANAGER") + "/EINSTELL_SPEICHERSOLLTEMP/set";
+    CHECK(dhw.find(current) != std::string::npos);
+    CHECK(dhw.find(command) != std::string::npos);
 }
 
 // ============================================================================
@@ -1317,7 +1517,10 @@ TEST_CASE("summer: published once automatic, threshold and outside temperature a
     const CanMember& kessel = CanMembers[cm_kessel];
     updateSensor(kessel, GetElsterIndex("AUSSENTEMP"), "12.0");      // threshold unknown: ignored
     CHECK(mqttFindPayload("calculated/sommerbetrieb_aktiv/state").empty());
-    updateSensor(mgr, GetElsterIndex("SOMMERBETRIEB_TEMP"), "10");
+    updateSensor(mgr, GetElsterIndex("SOMMERBETRIEB_TEMP"), "10");   // not the threshold: ignored
+    updateSensor(kessel, GetElsterIndex("AUSSENTEMP"), "12.0");
+    CHECK(mqttFindPayload("calculated/sommerbetrieb_aktiv/state").empty());
+    updateSensor(mgr, GetElsterIndex("SW_AUSSENTEMP"), "10.0");
     updateSensor(mgr, GetElsterIndex("SOMMERBETRIEB"), "on");
     updateSensor(kessel, GetElsterIndex("AUSSENTEMP"), "12.0");
     CHECK(mqttFindPayload("calculated/aussentemp_gedaempft/state") == "12.0");
@@ -1515,6 +1718,49 @@ TEST_CASE("state cache: heartbeat re-sends an unchanged value after STATE_HEARTB
     fake_millis() = 1000 + STATE_HEARTBEAT_MS + 5000;
     publishMqttState(kessel, ei, "48.0");
     CHECK(countTopic(topic) == 2);
+}
+
+TEST_CASE("state cache: deadband holds back small changes of measured temperatures", "[mqtt][state]") {
+    resetDiscoveryState();
+    stateDeadbandTenths = 3;
+    const CanMember& kessel = CanMembers[cm_kessel];
+    const ElsterIndex* ei = GetElsterIndex("SPEICHERISTTEMP");
+    const std::string topic = "heatingpump/KESSEL/SPEICHERISTTEMP/state";
+    fake_millis() = 1000;
+    publishMqttState(kessel, ei, "48.0");
+    publishMqttState(kessel, ei, "48.2");
+    CHECK(countTopic(topic) == 1);
+    // measured against the last published value, so slow drift still gets through
+    publishMqttState(kessel, ei, "47.7");
+    CHECK(countTopic(topic) == 2);
+    publishMqttState(kessel, ei, "47.9");
+    CHECK(countTopic(topic) == 2);
+    // the heartbeat sends the newest value and the next comparison starts from it
+    fake_millis() = 1000 + STATE_HEARTBEAT_MS;
+    publishMqttState(kessel, ei, "47.9");
+    CHECK(countTopic(topic) == 3);
+    CHECK(mqtt_client_instance().messages.back().payload == "47.9");
+    publishMqttState(kessel, ei, "48.2");
+    CHECK(countTopic(topic) == 4);
+    stateDeadbandTenths = 0;
+}
+
+TEST_CASE("state cache: deadband does not apply to other signals or when off", "[mqtt][state]") {
+    resetDiscoveryState();
+    const CanMember& kessel = CanMembers[cm_kessel];
+    const ElsterIndex* temp = GetElsterIndex("SPEICHERISTTEMP");
+    publishMqttState(kessel, temp, "48.0");
+    publishMqttState(kessel, temp, "48.1");
+    CHECK(countTopic("heatingpump/KESSEL/SPEICHERISTTEMP/state") == 2);   // off by default
+    stateDeadbandTenths = 3;
+    const ElsterIndex* soll = GetElsterIndex("SPEICHERSOLLTEMP");
+    publishMqttState(kessel, soll, "48.0");
+    publishMqttState(kessel, soll, "48.1");
+    CHECK(countTopic("heatingpump/KESSEL/SPEICHERSOLLTEMP/state") == 2);
+    publishMqttState(kessel, temp, "-255");   // leaves the cached number
+    publishMqttState(kessel, temp, "48.1");
+    CHECK(countTopic("heatingpump/KESSEL/SPEICHERISTTEMP/state") == 4);
+    stateDeadbandTenths = 0;
 }
 
 TEST_CASE("state cache: calculated sensors are deduplicated too", "[mqtt][state]") {
@@ -1733,3 +1979,5 @@ TEST_CASE("SG Ready IO: write is sent at once, read-back ~100 ms later from the 
     pendingReadbackCount = 0;
     fake_millis() = 0;
 }
+
+#include "wpl9_cases.inc"

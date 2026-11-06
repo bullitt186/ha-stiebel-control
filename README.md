@@ -88,8 +88,11 @@ pump provides its own termination).
 
 | Model file | Heat pump | Status |
 |------------|-----------|--------|
+| `wpl9.yaml` | WPL 09 ACS classic (WPM3/FET, CAN-B 50 kbps) | Feedback verified; writes/SG Ready unverified — see [validation status](docs/WPL9.md) |
 | `wpl10ac.yaml` | WPL 10 AC (air-source, WPM3) | ✅ Verified — requires tapping the WPM3's **CAN B** connection at **50 kbps** (DHW/boiler temperature and setpoints are only exposed there) |
 | `wpl13e.yaml` | WPL 13 E (air-source, 3 heating circuits) | ✅ Verified |
+| `wpl18e.yaml` | WPL 18 E with WPMW II (same request table as WPL 13 E) | 🧪 Community report, read-only entities for the new parameters |
+| `ttl33.yaml` | Tecalor TTL 33 with WPMW II (air-source, 2 heating circuits, no IWS values) | ✅ Verified read-only — circuit 2 on `MISCHERMODUL_3` (0x602) |
 | `wpf10.yaml` | WPF 10 / WPF 10M (ground-source) | ⚠️ Community — signals may need adjustment |
 | `wpl17.yaml` | WPL 17 ICS classic (air-source, 1 heating circuit) | ✅ Verified on CAN-B (X1.2, 50 kbps) |
 

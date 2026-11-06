@@ -13,13 +13,16 @@ concurrency:
 
 jobs:
   unit-tests:
-    name: Unit Tests (native host)
+    name: Unit Tests (${{ matrix.model }})
+    strategy:
+      matrix:
+        model: [test_model, wpl9, wpl10ac, wpl13e, wpl17, wpf10, ttl33, wpl18e]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
       - name: Build and run tests
-        run: make test
+        run: make test MODEL_TEST_FLAGS=-DHA_DEVICE_MODEL=${{ matrix.model }}
 
       - name: Verify test count (regression guard)
         run: |
@@ -45,8 +48,31 @@ jobs:
       - name: Compile (ESP32-S3)
         run: esphome compile esphome/ci_heatingpump_s3.yaml
 
+      - name: Compile (ESP32-S3, English)
+        run: esphome -s language EN compile esphome/ci_heatingpump_s3.yaml
+
+      - name: Check package layout (includes resolve without a local ha-stiebel-control folder)
+        run: |
+          mkdir -p /tmp/layout/config
+          cp -r esphome/ha-stiebel-control /tmp/layout/pkg
+          cp esphome/ci_secrets.yaml /tmp/layout/config/secrets.yaml
+          sed 's#!include ha-stiebel-control/#!include ../pkg/#' esphome/ci_heatingpump_s3.yaml > /tmp/layout/config/layout.yaml
+          esphome config /tmp/layout/config/layout.yaml > /dev/null
+
       - name: Compile (ESP32-S3, read_only)
         run: esphome -s read_only true compile esphome/ci_heatingpump_s3.yaml
+
+  compile-wpl9:
+    name: Compile WPL9 (ESP32-S3)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install esphome==2026.10.1
+      - run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
+      - run: esphome compile esphome/ci_heatingpump_wpl9.yaml
 
   compile-esp32:
     name: Compile ESP32 (MCP2515)
@@ -127,8 +153,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install yamllint
-        run: pip install yamllint
+      - name: Install validation dependencies
+        run: pip install yamllint paho-mqtt
+
+      - name: Validate MQTT model manifests
+        run: python3 -m unittest discover -s tests -p 'test_mqtt_manifest.py'
 
       - name: Validate YAML files
         run: |

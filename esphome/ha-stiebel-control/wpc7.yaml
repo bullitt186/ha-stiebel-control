@@ -13,4 +13,4 @@
 
 esphome:
   includes:
-    - ha-stiebel-control/signal_requests_wpc7.h
+    - signal_requests_wpc7.h

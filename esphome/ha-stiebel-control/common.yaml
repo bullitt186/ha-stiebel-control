@@ -26,7 +26,7 @@ esphome:
   friendly_name: "Heating Pump CAN Interface"
   project:
     name: "bullitt186.ha-stiebel-control"
-    version: "2.5.0"
+    version: "2.6.0"
   on_boot:
     priority: 600
     then:
@@ -34,23 +34,23 @@ esphome:
           initBoostStatePrefs();
           loadBoostState();
           initSummerPrefs();
+  # Paths are relative to this file, so local copies and remote packages both resolve them.
   includes:
-    - ha-stiebel-control/elster/ElsterTable.h
-    - ha-stiebel-control/elster/KElsterTable.h
-    - ha-stiebel-control/elster/KElsterTable.cpp
-    - ha-stiebel-control/elster/NUtils.h
-    - ha-stiebel-control/elster/NUtils.cpp
-    - ha-stiebel-control/elster/NTypes.h
-    - ha-stiebel-control/config.h
+    - elster/ElsterTable.h
+    - elster/KElsterTable.h
+    - elster/KElsterTable.cpp
+    - elster/NUtils.h
+    - elster/NUtils.cpp
+    - elster/NTypes.h
+    - config.h
     # language_select.h picks the language (lang_base.h for DE, lang_en.h for EN).
-    # lang_en.h must NOT be listed here: ESPHome auto-includes every listed file,
-    # so listing it would apply the EN overrides even when language_select.h
-    # selected lang_base.h (LANGUAGE_SELECT_ACTIVE is always defined).
-    - ha-stiebel-control/language_select.h
-    - ha-stiebel-control/lang_base.h
-    - ha-stiebel-control/sg_ready_controller.h
-    - ha-stiebel-control/ha-stiebel-control.h
-    - ha-stiebel-control/signal_requests_base.h
+    # lang_en.h must be listed so ESPHome copies it; its overrides only apply with HA_LANGUAGE_EN.
+    - language_select.h
+    - lang_base.h
+    - lang_en.h
+    - sg_ready_controller.h
+    - ha-stiebel-control.h
+    - signal_requests_base.h
     # model-specific signal_requests_*.h is declared by each model yaml package
   build_flags:
     - "-DHA_DEVICE_MODEL=${device_model}"
@@ -201,8 +201,7 @@ mqtt:
             ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP (Kessel CANB) command: %s", x.c_str());
             publishWritableNumberDiscovery(writableNumbers[0]);
             const char* value = x.c_str();
-            writeSignal(&CanMembers[cm_kessel_canb], "EINSTELL_SPEICHERSOLLTEMP", value);
-            readSignal(&CanMembers[cm_kessel_canb], "EINSTELL_SPEICHERSOLLTEMP");
+            writeConfiguredSignal(cm_kessel_canb, "EINSTELL_SPEICHERSOLLTEMP", value);
 
     - topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP/set
       then:
@@ -210,9 +209,7 @@ mqtt:
             ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP command: %s", x.c_str());
             publishWritableNumberDiscovery(writableNumbers[0]);
             const char* value = x.c_str();
-            const CanMember* target = (strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0) ? &CanMembers[cm_kessel_canb] : &CanMembers[cm_manager];
-            writeSignal(target, "EINSTELL_SPEICHERSOLLTEMP", value);
-            readSignal(target, "EINSTELL_SPEICHERSOLLTEMP");
+            writeConfiguredSignal(cm_manager, "EINSTELL_SPEICHERSOLLTEMP", value);
 
     - topic: heatingpump/KESSEL_CANB/EINSTELL_SPEICHERSOLLTEMP2/set
       then:
@@ -220,8 +217,7 @@ mqtt:
             ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP2 (Kessel CANB) command: %s", x.c_str());
             publishWritableNumberDiscovery(writableNumbers[1]);
             const char* value = x.c_str();
-            writeSignal(&CanMembers[cm_kessel_canb], "EINSTELL_SPEICHERSOLLTEMP2", value);
-            readSignal(&CanMembers[cm_kessel_canb], "EINSTELL_SPEICHERSOLLTEMP2");
+            writeConfiguredSignal(cm_kessel_canb, "EINSTELL_SPEICHERSOLLTEMP2", value);
 
     - topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP2/set
       then:
@@ -229,9 +225,20 @@ mqtt:
             ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP2 command: %s", x.c_str());
             publishWritableNumberDiscovery(writableNumbers[1]);
             const char* value = x.c_str();
-            const CanMember* target = (strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0) ? &CanMembers[cm_kessel_canb] : &CanMembers[cm_manager];
-            writeSignal(target, "EINSTELL_SPEICHERSOLLTEMP2", value);
-            readSignal(target, "EINSTELL_SPEICHERSOLLTEMP2");
+            writeConfiguredSignal(cm_manager, "EINSTELL_SPEICHERSOLLTEMP2", value);
+
+    # WPL9 compatibility: keep existing KESSEL command topics usable.
+    - topic: heatingpump/KESSEL/EINSTELL_SPEICHERSOLLTEMP/set
+      then:
+        - lambda: |-
+            if (strcmp(HA_DEVICE_MODEL_STR, "wpl9") != 0) return;
+            writeConfiguredSignal(cm_kessel, "EINSTELL_SPEICHERSOLLTEMP", x.c_str());
+
+    - topic: heatingpump/KESSEL/EINSTELL_SPEICHERSOLLTEMP2/set
+      then:
+        - lambda: |-
+            if (strcmp(HA_DEVICE_MODEL_STR, "wpl9") != 0) return;
+            writeConfiguredSignal(cm_kessel, "EINSTELL_SPEICHERSOLLTEMP2", x.c_str());
 
     # Operating mode control
     - topic: heatingpump/MANAGER/PROGRAMMSCHALTER/set
@@ -373,6 +380,72 @@ mqtt:
             const char* value = x.c_str();
             writeSignal(&CanMembers[cm_manager], "HEIZKURVE", value);
             readSignal(&CanMembers[cm_manager], "HEIZKURVE");
+
+    # WPMW II parameters (WPL13E only; see writableNumberApplies)
+    - topic: heatingpump/MANAGER/SCHALTWERKDYNAMIKZEIT/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received SCHALTWERKDYNAMIKZEIT command: %s", x.c_str());
+            if (!writableNumberApplies("SCHALTWERKDYNAMIKZEIT")) {
+              ESP_LOGW("MQTT_CMD", "SCHALTWERKDYNAMIKZEIT is not writable on %s", HA_DEVICE_MODEL_STR);
+              return;
+            }
+            publishWritableNumberDiscovery(writableNumbers[9]);
+            const char* value = x.c_str();
+            writeSignal(&CanMembers[cm_manager], "SCHALTWERKDYNAMIKZEIT", value);
+            readSignal(&CanMembers[cm_manager], "SCHALTWERKDYNAMIKZEIT");
+
+    - topic: heatingpump/MANAGER/BIVALENTPARALLELTEMPERATUR_HZG/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received BIVALENTPARALLELTEMPERATUR_HZG command: %s", x.c_str());
+            if (!writableNumberApplies("BIVALENTPARALLELTEMPERATUR_HZG")) {
+              ESP_LOGW("MQTT_CMD", "BIVALENTPARALLELTEMPERATUR_HZG is not writable on %s", HA_DEVICE_MODEL_STR);
+              return;
+            }
+            publishWritableNumberDiscovery(writableNumbers[10]);
+            const char* value = x.c_str();
+            writeSignal(&CanMembers[cm_manager], "BIVALENTPARALLELTEMPERATUR_HZG", value);
+            readSignal(&CanMembers[cm_manager], "BIVALENTPARALLELTEMPERATUR_HZG");
+
+    - topic: heatingpump/MANAGER/BIVALENTPARALLELTEMPERATUR_WW/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received BIVALENTPARALLELTEMPERATUR_WW command: %s", x.c_str());
+            if (!writableNumberApplies("BIVALENTPARALLELTEMPERATUR_WW")) {
+              ESP_LOGW("MQTT_CMD", "BIVALENTPARALLELTEMPERATUR_WW is not writable on %s", HA_DEVICE_MODEL_STR);
+              return;
+            }
+            publishWritableNumberDiscovery(writableNumbers[11]);
+            const char* value = x.c_str();
+            writeSignal(&CanMembers[cm_manager], "BIVALENTPARALLELTEMPERATUR_WW", value);
+            readSignal(&CanMembers[cm_manager], "BIVALENTPARALLELTEMPERATUR_WW");
+
+    - topic: heatingpump/MANAGER/STILLSTANDZEIT/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received STILLSTANDZEIT command: %s", x.c_str());
+            if (!writableNumberApplies("STILLSTANDZEIT")) {
+              ESP_LOGW("MQTT_CMD", "STILLSTANDZEIT is not writable on %s", HA_DEVICE_MODEL_STR);
+              return;
+            }
+            publishWritableNumberDiscovery(writableNumbers[12]);
+            const char* value = x.c_str();
+            writeSignal(&CanMembers[cm_manager], "STILLSTANDZEIT", value);
+            readSignal(&CanMembers[cm_manager], "STILLSTANDZEIT");
+
+    - topic: heatingpump/MANAGER/SW_AUSSENTEMP/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received SW_AUSSENTEMP command: %s", x.c_str());
+            if (!writableNumberApplies("SW_AUSSENTEMP")) {
+              ESP_LOGW("MQTT_CMD", "SW_AUSSENTEMP is not writable on %s", HA_DEVICE_MODEL_STR);
+              return;
+            }
+            publishWritableNumberDiscovery(writableNumbers[13]);
+            const char* value = x.c_str();
+            writeSignal(&CanMembers[cm_manager], "SW_AUSSENTEMP", value);
+            readSignal(&CanMembers[cm_manager], "SW_AUSSENTEMP");
 
 
 #########################################
@@ -801,5 +874,11 @@ sensor:
     id: WW_ECO
     internal: true
     lambda: |-
+      #if defined(HA_MODEL_wpl9)
+      // Not validated on WPL9: MANAGER/WW_ECO repeatedly returned -255.
+      // Keep the read for future source/register investigation:
+      // readSignal(&CanMembers[cm_manager], "WW_ECO");
+      #else
       readSignal(&CanMembers[cm_manager], "WW_ECO");
+      #endif
       return {};
