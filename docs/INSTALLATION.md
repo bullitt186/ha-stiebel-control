@@ -129,17 +129,17 @@ substitutions:
   can_id_pc: "0x680"
 
 packages:
-  board:   github://bullitt186/ha-stiebel-control/esphome/ha-stiebel-control/board_esp32s3.yaml@v2.5.0
-  can:     github://bullitt186/ha-stiebel-control/esphome/ha-stiebel-control/can_esp32.yaml@v2.5.0
-  base:    github://bullitt186/ha-stiebel-control/esphome/ha-stiebel-control/common.yaml@v2.5.0
-  sensors: github://bullitt186/ha-stiebel-control/esphome/ha-stiebel-control/wpl13e.yaml@v2.5.0
+  board:   github://bullitt186/ha-stiebel-control/esphome/ha-stiebel-control/board_esp32s3.yaml@v2.6.0
+  can:     github://bullitt186/ha-stiebel-control/esphome/ha-stiebel-control/can_esp32.yaml@v2.6.0
+  base:    github://bullitt186/ha-stiebel-control/esphome/ha-stiebel-control/common.yaml@v2.6.0
+  sensors: github://bullitt186/ha-stiebel-control/esphome/ha-stiebel-control/wpl13e.yaml@v2.6.0
 ```
 
 ESPHome will download and cache the package files automatically on first compile.
 
 Create a `secrets.yaml` in the same folder (see section 2 above for required keys).
 
-To upgrade to a new release, change `@v2.5.0` to the new tag and recompile.
+To upgrade to a new release, change `@v2.6.0` to the new tag and recompile.
 
 ---
 

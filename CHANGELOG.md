@@ -7,6 +7,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+## [2.6.0] — 2026-11-06
+
+Contributions from reniko, SolderAndSyntax and hawkeye80: three new models, WPMW II fixes and
+parameters checked against the display of a WPL13E.
+
+### Upgrade notes
+
+- The sensor "Sommerbetrieb Grenztemperatur" now reads `SW_AUSSENTEMP` (0x01bf). The old sensor
+  for 0xfdb5 and the `SPERRZEIT` sensor are no longer published; on an existing install they stay
+  in HA as unavailable entities and can be deleted.
+- `EVU_SPERRE_AKTIV` has no device class any more (see Fixed). A local override of the device
+  class can be removed.
+- `make smoke-test` and the helper scripts no longer default to a broker: set `MQTT_BROKER` and
+  `MQTT_USER` (and `MQTT_PASS`).
+
 ### Added
 
 - New model `wpl9` (WPL 09 ACS classic with WPM3/FET) with both DHW settings routed through
@@ -16,10 +31,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   (WPL 18 E, reported by reniko, #52). Register corrections are shared through `HA_CONTROLLER_WPMW2`.
 - WPL13E: five WPMW II parameters are writable number entities: Reglerdynamik (parameter 42,
   0xfdb0), compressor minimum off time (43, 0xfdb1, at least 20 min), the summer mode threshold
-  (10, 0x01bf) and the bivalence points for heating and hot water (27/33, 0x01ac/0x01ad). Parameters
-  10, 42 and 43 were confirmed by a change on the display; 38 WW-Hysterese (0x0022) is read. Other models do not get these entities; a `/set` for them is ignored
-  with a warning. Indices from a bus scan, ranges from the WPMW II commissioning list.
-
+  (10, 0x01bf) and the bivalence points for heating and hot water (27/33, 0x01ac/0x01ad).
+  Parameters 10, 42 and 43 were confirmed by a change on the display; 38 WW-Hysterese (0x0022) is
+  read. Other models do not get these entities; a `/set` for them is ignored with a warning.
+  Indices from a bus scan, ranges from the WPMW II commissioning list.
 - Optional deadband for measured temperatures, `STATE_DEADBAND_TENTHS` in `config.h`, off by default
   (proposed by SolderAndSyntax, #64).
 
@@ -39,8 +54,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   `on`/`off` payloads (reported by reniko, #52).
 - WPMW II: the energy totals only moved once a night. They are now read from `HEIZMODUL` (0x500)
   and follow the day counters, which the `wpl13e` table polls now (by reniko, #52). A total no
-  longer steps back by up to 1 kWh at the day change, when the whole-kWh `SUM` replaces the day value. After a reboot
-  the totals wait for the day counters instead of falling back to the last whole-kWh value.
+  longer steps back by up to 1 kWh at the day change, when the whole-kWh `SUM` replaces the day
+  value. After a reboot the totals wait for the day counters instead of the stored base alone.
 - WPMW II: `betriebsstatus` tells hot water from heating by the charging pump (`PUMPENSTATUS` bit
   `0x4000`) instead of counter deltas, which step only hourly there. The `el_leistung_*` sensors
   stay off on these models for the same reason (by reniko, #52).
@@ -54,6 +69,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Changed
 
+- Helper scripts, the smoke test and the docs carry no site-specific MQTT broker or user.
 - Docs describe the split signal table of 2.5.0 (#57): new section "Signal table" in
   `docs/CONTRIBUTING.md` (adding signals with and without HA metadata, binary sensor payloads,
   blacklisting); README, CONFIGURATION, ARCHITECTURE and the agent instructions no longer refer
