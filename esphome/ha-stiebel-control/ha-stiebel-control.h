@@ -2281,11 +2281,12 @@ inline bool wplBaseTotal(int slot, const char* sumMwh, const char* sumKwh,
         }
     }
     if (energyBase.v[slot] <= 0.0f) return false;
+    // Nach einem Neustart kommt der NVS-Sockel vor dem Tagesanteil: ohne ihn waere der
+    // Wert um den heutigen Verbrauch zu klein (Ruecksprung). Dann lieber nichts senden.
+    if (!haveTag) return false;
     out = energyBase.v[slot];
-    if (haveTag) {
-        float add = tag - energyTagFolded[slot];
-        out += (add > 0.0f) ? add : 0.0f;   // nie negativ -> kein Ruecksprung
-    }
+    float add = tag - energyTagFolded[slot];
+    out += (add > 0.0f) ? add : 0.0f;   // nie negativ -> kein Ruecksprung
     return true;
 }
 
@@ -2309,7 +2310,8 @@ void publishCombinedEnergySensors() {
         float rawTotal; bool have = false;
         if (wplBaseTotal(slot, sumMwh, sumKwh, tagKwh, tagWh, rawTotal)) {
             have = true;   // WPL-Basis (NVS-Sockel + Tagesanteil), sobald SUM bekannt
-        } else if (copEnergyValues.find(sumMwh) != copEnergyValues.end() &&
+        } else if (energyBase.v[slot] <= 0.0f &&   // Geraet ohne Tageszaehler-Sockel
+                   copEnergyValues.find(sumMwh) != copEnergyValues.end() &&
                    copEnergyValues.find(sumKwh) != copEnergyValues.end()) {
             rawTotal = copEnergyValues[sumMwh] * 1000.0f + copEnergyValues[sumKwh];
             have = true;   // Fallback: Geraete-SUM (naechtlich aktualisiert)

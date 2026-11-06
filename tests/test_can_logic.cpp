@@ -1009,6 +1009,22 @@ TEST_CASE("sanitizeEnergyTotal: small drops at the day change never go backwards
     CHECK(out == Approx(24746.5f));
 }
 
+TEST_CASE("wplBaseTotal: no value until the day counter is known again", "[calc]") {
+    // After a reboot the stored base is there before the first day counter answer
+    const std::string n = "TEST_REBOOT";
+    const char* m = energyMemberName();
+    storeCOPEnergyValueMember(m, (n + "_SUM_MWH").c_str(), "24");
+    storeCOPEnergyValueMember(m, (n + "_SUM_KWH").c_str(), "765");
+    float out = -1.0f;
+    CHECK_FALSE(wplBaseTotal(1, (n + "_SUM_MWH").c_str(), (n + "_SUM_KWH").c_str(),
+                             (n + "_TAG_KWH").c_str(), (n + "_TAG_WH").c_str(), out));
+    storeCOPEnergyValueMember(m, (n + "_TAG_KWH").c_str(), "7");
+    storeCOPEnergyValueMember(m, (n + "_TAG_WH").c_str(), "654");
+    REQUIRE(wplBaseTotal(1, (n + "_SUM_MWH").c_str(), (n + "_SUM_KWH").c_str(),
+                         (n + "_TAG_KWH").c_str(), (n + "_TAG_WH").c_str(), out));
+    CHECK(out == Approx(24772.654f));
+}
+
 TEST_CASE("wplBaseTotal: day counter resets before the total steps", "[calc]") {
     const std::string n = "TEST_ROLLOVER_A";
     setEnergy(n.c_str(), 24, 738, 3, 500);
