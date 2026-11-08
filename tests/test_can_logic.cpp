@@ -1358,13 +1358,16 @@ TEST_CASE("writableNumbers: WPMW II parameters sit at the indices common.yaml us
     CHECK_FALSE(isWpmw2Parameter("HEIZKURVE"));
 }
 
-TEST_CASE("writableNumbers: WPMW II parameters are only offered on wpl13e", "[writable]") {
+TEST_CASE("writableNumbers: WPMW II parameters are only offered on wpl13e and ttl33", "[writable]") {
     // CI also builds the tests per model (MODEL_TEST_FLAGS), so both cases are checked.
-    const bool wpl13e = std::string(HA_DEVICE_MODEL_STR) == "wpl13e";
+    const std::string model = HA_DEVICE_MODEL_STR;
+    const bool verified = model == "wpl13e" || model == "ttl33";
     for (const char* sig : {"SCHALTWERKDYNAMIKZEIT", "BIVALENTPARALLELTEMPERATUR_HZG",
-                            "STILLSTANDZEIT", "SW_AUSSENTEMP"}) {
-        CHECK(writableNumberApplies(sig) == wpl13e);
+                            "BIVALENTPARALLELTEMPERATUR_WW", "STILLSTANDZEIT", "SW_AUSSENTEMP"}) {
+        CHECK(writableNumberApplies(sig) == verified);
     }
+    // The heating curve is also writable on wpl17 (KESSEL_CANB).
+    CHECK(writableNumberApplies("HEIZKURVE") == (verified || model == "wpl17"));
     CHECK(writableNumberApplies("EINSTELL_SPEICHERSOLLTEMP"));
 }
 

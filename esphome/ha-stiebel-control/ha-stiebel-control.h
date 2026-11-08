@@ -1341,11 +1341,15 @@ static bool writableNumberApplies(const char* sig) {
     // number entities are not created on single-circuit models (-255 only).
     if ((strcmp(sig, "RAUMSOLLTEMP_II") == 0 || strcmp(sig, "RAUMSOLLTEMP_III") == 0) && isWpl17)
         return false;
-    // HEIZKURVE is verified writable on WPL17 (KESSEL_CANB) and WPL13E (MANAGER) only.
-    if (strcmp(sig, "HEIZKURVE") == 0 && !isWpl17 && strcmp(HA_DEVICE_MODEL_STR, "wpl13e") != 0)
+    // WPMW II writes verified on the display: WPL13E (bus scan, display) and TTL 33 (each value
+    // changed over CAN and back, checked on the WPMW II display).
+    const bool wpmw2Verified = (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") == 0 ||
+                                strcmp(HA_DEVICE_MODEL_STR, "ttl33") == 0);
+    // HEIZKURVE is verified writable on WPL17 (KESSEL_CANB) and WPL13E/TTL 33 (MANAGER) only.
+    if (strcmp(sig, "HEIZKURVE") == 0 && !isWpl17 && !wpmw2Verified)
         return false;
-    // WPMW II parameters: indices verified by a bus scan on a WPL13E only.
-    if (isWpmw2Parameter(sig) && strcmp(HA_DEVICE_MODEL_STR, "wpl13e") != 0)
+    // WPMW II parameters 10/27/33/42/43 (WPL13E numbering): verified on WPL13E and TTL 33 only.
+    if (isWpmw2Parameter(sig) && !wpmw2Verified)
         return false;
     return true;
 }
