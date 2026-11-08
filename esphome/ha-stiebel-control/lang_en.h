@@ -268,6 +268,10 @@
 #define LNAME_NUM_SG_READY_BOOST3              "SG Ready Boost State 3"
 #undef  LNAME_NUM_SG_READY_BOOST4
 #define LNAME_NUM_SG_READY_BOOST4              "SG Ready Boost State 4"
+#undef  LNAME_NUM_SG_READY_ROOM_BOOST3
+#define LNAME_NUM_SG_READY_ROOM_BOOST3         "SG Ready Room Boost State 3"
+#undef  LNAME_NUM_SG_READY_ROOM_BOOST4
+#define LNAME_NUM_SG_READY_ROOM_BOOST4         "SG Ready Room Boost State 4"
 #undef  LNAME_NUM_RAUMSOLLTEMP_I
 #define LNAME_NUM_RAUMSOLLTEMP_I               "Room Target Temperature I Setting"
 #undef  LNAME_NUM_RAUMSOLLTEMP_II

@@ -7,8 +7,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Added
+
+- SG Ready room setpoint boost is configurable per state (`number.…_sg_ready_raum_boost_zustand_3/4`,
+  0–5 K, defaults 1 K and 2 K as before). With 0 the room setpoint of heating circuit 1 is left
+  alone, so SG Ready no longer shifts the heating curve (#50).
+
 ### Fixed
 
+- SG Ready boost values were lost on a reboot (the docs said they were stored). All four boost
+  values are now kept in NVS.
 - The read-back right after a write often returned the old value on the WPMW II, so HA showed the
   previous setting until the next poll. Every write is now read back a second time about 4 s later
   (reported by SolderAndSyntax, #68).

@@ -356,7 +356,14 @@ static const WritableNumberConfig writableNumbers[] = {
     // Display parameter 10, summer mode AUSSENTEMP (0x01bf), confirmed by a change on the
     // display; 0xfdb5 SOMMERBETRIEB_TEMP did not move.
     {"SW_AUSSENTEMP", LNAME_NUM_SOMMERBETRIEB_TEMP,
-     cm_manager, 10.0, 30.0, 0.5, "°C", "mdi:sun-thermometer", "temperature"}
+     cm_manager, 10.0, 30.0, 0.5, "°C", "mdi:sun-thermometer", "temperature"},
+
+    // SG Ready room setpoint boost of heating circuit 1 (handled internally, 0 = off)
+    {"SG_READY_ROOM_BOOST_STATE3", LNAME_NUM_SG_READY_ROOM_BOOST3,
+     cm_manager, 0.0, 5.0, 0.5, "°C", "mdi:home-thermometer", "temperature"},
+
+    {"SG_READY_ROOM_BOOST_STATE4", LNAME_NUM_SG_READY_ROOM_BOOST4,
+     cm_manager, 0.0, 5.0, 0.5, "°C", "mdi:home-thermometer", "temperature"}
 };
 
 static const size_t WRITABLE_NUMBER_COUNT = sizeof(writableNumbers) / sizeof(WritableNumberConfig);
@@ -2505,11 +2512,30 @@ ESPPreferenceObject EspHomeSgReadyIO::nvsActive;
 static EspHomeSgReadyIO sgReadyIO;
 static SgReadyController sgReadyController(sgReadyIO);
 
+// Configured boost amounts (DHW and room, states 3 and 4), kept across reboots.
+struct SgBoostStorage { uint32_t magic; float v[4]; };
+static constexpr uint32_t SG_BOOST_MAGIC = 0x5B005701u;
+static ESPPreferenceObject sgBoostPref;
+
+inline void saveSgBoosts() {
+    SgBoostStorage s{SG_BOOST_MAGIC, {sgReadyController.boostState3(), sgReadyController.boostState4(),
+                                      sgReadyController.roomBoostState3(), sgReadyController.roomBoostState4()}};
+    sgBoostPref.save(&s);
+}
+
 // Called from on_boot lambda in common.yaml
 void initBoostStatePrefs() {
     EspHomeSgReadyIO::nvsDhw    = global_preferences->make_preference<float>(0xB007BA5E, true);
     EspHomeSgReadyIO::nvsRoom   = global_preferences->make_preference<float>(0xB007BA5F, true);
     EspHomeSgReadyIO::nvsActive = global_preferences->make_preference<bool> (0xB007BA60, true);
+    sgBoostPref = global_preferences->make_preference<SgBoostStorage>(SG_BOOST_MAGIC, true);
+    SgBoostStorage s;
+    if (sgBoostPref.load(&s) && s.magic == SG_BOOST_MAGIC) {
+        sgReadyController.setBoostState3(s.v[0]);
+        sgReadyController.setBoostState4(s.v[1]);
+        sgReadyController.setRoomBoostState3(s.v[2]);
+        sgReadyController.setRoomBoostState4(s.v[3]);
+    }
     ESP_LOGI("NVS", "Boost state preferences initialized");
 }
 
@@ -2533,8 +2559,25 @@ void applySgReadyState(int state) {
 // Accessor helpers used by YAML sensor lambdas and MQTT on_connect block
 inline float sgReadyBoostState3Value() { return sgReadyController.boostState3(); }
 inline float sgReadyBoostState4Value() { return sgReadyController.boostState4(); }
-inline void  setSgReadyBoost3(float v) { sgReadyController.setBoostState3(v); }
-inline void  setSgReadyBoost4(float v) { sgReadyController.setBoostState4(v); }
+inline void  setSgReadyBoost3(float v) { sgReadyController.setBoostState3(v); saveSgBoosts(); }
+inline void  setSgReadyBoost4(float v) { sgReadyController.setBoostState4(v); saveSgBoosts(); }
+
+// Room boost command (heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE<n>/set): range 0-5 K,
+// stored and published back. Returns false for an invalid value.
+inline bool handleSgReadyRoomBoost(int state, const std::string& payload) {
+    char* end;
+    const float v = strtof(payload.c_str(), &end);
+    if (end == payload.c_str() || *end != '\0' || v < 0.0f || v > 5.0f) return false;
+    if (state == 3) sgReadyController.setRoomBoostState3(v);
+    else sgReadyController.setRoomBoostState4(v);
+    saveSgBoosts();
+    char topic[64], value[16];
+    snprintf(topic, sizeof(topic), "heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE%d/state", state);
+    snprintf(value, sizeof(value), "%.1f",
+             state == 3 ? sgReadyController.roomBoostState3() : sgReadyController.roomBoostState4());
+    mqttPublish(topic, value, strlen(value));
+    return true;
+}
 
 // Publishes the current SG Ready state and boost values (retained). Called on
 // boot, on MQTT connect and periodically, so the retained values survive a
@@ -2552,6 +2595,11 @@ inline void publishSgReadyState() {
     snprintf(b4, sizeof(b4), "%.1f", sgReadyBoostState4Value());
     mqttPublish("heatingpump/MANAGER/SG_READY_BOOST_STATE3/state", b3, strlen(b3));
     mqttPublish("heatingpump/MANAGER/SG_READY_BOOST_STATE4/state", b4, strlen(b4));
+    char r3[16], r4[16];
+    snprintf(r3, sizeof(r3), "%.1f", sgReadyController.roomBoostState3());
+    snprintf(r4, sizeof(r4), "%.1f", sgReadyController.roomBoostState4());
+    mqttPublish("heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE3/state", r3, strlen(r3));
+    mqttPublish("heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE4/state", r4, strlen(r4));
 }
 
 // ============================================================================

@@ -1349,13 +1349,31 @@ TEST_CASE("writableNumbers: WPMW II parameters sit at the indices common.yaml us
     static const char* expected[] = {"SCHALTWERKDYNAMIKZEIT",
                                      "BIVALENTPARALLELTEMPERATUR_HZG", "BIVALENTPARALLELTEMPERATUR_WW",
                                      "STILLSTANDZEIT", "SW_AUSSENTEMP"};
-    REQUIRE(WRITABLE_NUMBER_COUNT == 14);
+    REQUIRE(WRITABLE_NUMBER_COUNT == 16);
     for (size_t i = 0; i < 5; ++i) {
         CHECK(std::string(writableNumbers[9 + i].signalName) == expected[i]);
         CHECK(writableNumbers[9 + i].member == cm_manager);
         CHECK(isWpmw2Parameter(expected[i]));
     }
     CHECK_FALSE(isWpmw2Parameter("HEIZKURVE"));
+}
+
+TEST_CASE("writableNumbers: SG Ready room boosts sit at the indices common.yaml uses", "[writable][sgready]") {
+    // common.yaml's room boost /set handlers use writableNumbers[14] and [15].
+    CHECK(std::string(writableNumbers[14].signalName) == "SG_READY_ROOM_BOOST_STATE3");
+    CHECK(std::string(writableNumbers[15].signalName) == "SG_READY_ROOM_BOOST_STATE4");
+    CHECK(writableNumberApplies("SG_READY_ROOM_BOOST_STATE3"));
+}
+
+TEST_CASE("SG Ready room boost command is stored and published back", "[sgready]") {
+    resetDiscoveryState();
+    CHECK(handleSgReadyRoomBoost(3, "0.0"));
+    CHECK(mqttFindPayload("SG_READY_ROOM_BOOST_STATE3/state") == "0.0");
+    CHECK(sgReadyController.roomBoostState3() == Approx(0.0f));
+    CHECK_FALSE(handleSgReadyRoomBoost(4, "7"));
+    CHECK_FALSE(handleSgReadyRoomBoost(4, "abc"));
+    CHECK(sgReadyController.roomBoostState4() == Approx(2.0f));
+    CHECK(handleSgReadyRoomBoost(3, "1.0"));
 }
 
 TEST_CASE("writableNumbers: WPMW II parameters are only offered on wpl13e and ttl33", "[writable]") {

@@ -149,6 +149,8 @@
 #define LNAME_NUM_SPEICHERSOLLTEMP2            "Speicher Soll Temperatur 2 Einstellung"
 #define LNAME_NUM_SG_READY_BOOST3              "SG Ready Boost Zustand 3"
 #define LNAME_NUM_SG_READY_BOOST4              "SG Ready Boost Zustand 4"
+#define LNAME_NUM_SG_READY_ROOM_BOOST3         "SG Ready Raum-Boost Zustand 3"
+#define LNAME_NUM_SG_READY_ROOM_BOOST4         "SG Ready Raum-Boost Zustand 4"
 #define LNAME_NUM_RAUMSOLLTEMP_I               "Raum Soll Temperatur I Einstellung"
 #define LNAME_NUM_RAUMSOLLTEMP_II              "Raum Soll Temperatur II Einstellung"
 #define LNAME_NUM_RAUMSOLLTEMP_III             "Raum Soll Temperatur III Einstellung"

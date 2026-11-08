@@ -137,6 +137,12 @@ These entities appear automatically in HA via MQTT discovery:
 | `number.manager_raum_soll_temperatur_nacht_einstellung` | Room setpoint night/reduced | 10–30°C | 0.5°C |
 | `number.manager_sg_ready_boost_zustand_3` | SG Ready DHW boost for state 3 | 0–10°C | 0.5°C |
 | `number.manager_sg_ready_boost_zustand_4` | SG Ready DHW boost for state 4 | 0–15°C | 0.5°C |
+| `number.manager_sg_ready_raum_boost_zustand_3` | SG Ready room setpoint boost (heating circuit 1) for state 3, default 1 K, 0 = off | 0–5 K | 0.5 K |
+| `number.manager_sg_ready_raum_boost_zustand_4` | SG Ready room setpoint boost (heating circuit 1) for state 4, default 2 K, 0 = off | 0–5 K | 0.5 K |
+
+The room boost raises `RAUMSOLLTEMP_I` and with it the heating curve, which can add compressor
+starts. With 0 the room setpoint is not written at all, neither on entering nor on leaving the
+SG Ready state. All four boost values are stored on the ESP and survive a reboot.
 
 ### WPMW II Parameters (WPL13E and TTL 33, number entities)
 
