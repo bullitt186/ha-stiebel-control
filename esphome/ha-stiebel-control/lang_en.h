@@ -40,6 +40,18 @@
 #define LNAME_FEHLERMELDUNG                    "Fault"
 #undef  LNAME_LUFTANSAUGTEMP
 #define LNAME_LUFTANSAUGTEMP                   "Air Intake Temperature"
+#undef  LNAME_HK1_REGELFUEHLER
+#define LNAME_HK1_REGELFUEHLER                 "Heating Circuit 1 Control Sensor"
+#undef  LNAME_HK1_RUECKLAUF_SOLL
+#define LNAME_HK1_RUECKLAUF_SOLL               "Heating Circuit 1 Return Target"
+#undef  LNAME_HK2_MISCHER_VORLAUF
+#define LNAME_HK2_MISCHER_VORLAUF              "Heating Circuit 2 Mixer Flow"
+#undef  LNAME_WP_VORLAUF_WPM
+#define LNAME_WP_VORLAUF_WPM                   "Heat Pump Flow Sensor WPM"
+#undef  LNAME_WP_VORLAUF_IWS
+#define LNAME_WP_VORLAUF_IWS                   "Heat Pump Flow IWS"
+#undef  LNAME_WP_RUECKLAUF_IWS
+#define LNAME_WP_RUECKLAUF_IWS                 "Heat Pump Return IWS"
 #undef  LNAME_SAMMLERISTTEMP
 #define LNAME_SAMMLERISTTEMP                   "Collector Actual Temperature"
 #undef  LNAME_SPEICHERISTTEMP
@@ -250,6 +262,12 @@
 #define LNAME_CALC_CAN_RX_QUEUE                "CAN RX Queue"
 #undef  LNAME_CALC_MQTT_PUBLISH_FAILURES
 #define LNAME_CALC_MQTT_PUBLISH_FAILURES       "MQTT Publish Failures"
+#undef  LNAME_CALC_VERDICHTER_STARTS_HEUTE
+#define LNAME_CALC_VERDICHTER_STARTS_HEUTE     "Compressor Starts Today"
+#undef  LNAME_CALC_VERDICHTER_LAUFZEIT_HEUTE
+#define LNAME_CALC_VERDICHTER_LAUFZEIT_HEUTE   "Compressor Runtime Today"
+#undef  LNAME_CALC_VERDICHTER_LAUFZEIT_MITTEL
+#define LNAME_CALC_VERDICHTER_LAUFZEIT_MITTEL  "Compressor Runtime per Start Today"
 #undef  LNAME_SOMMERBETRIEB_TEMP
 #define LNAME_SOMMERBETRIEB_TEMP               "Summer Mode Threshold"
 #undef  LNAME_ANZEIGE_HOCHDRUCK
@@ -268,6 +286,10 @@
 #define LNAME_NUM_SG_READY_BOOST3              "SG Ready Boost State 3"
 #undef  LNAME_NUM_SG_READY_BOOST4
 #define LNAME_NUM_SG_READY_BOOST4              "SG Ready Boost State 4"
+#undef  LNAME_NUM_SG_READY_ROOM_BOOST3
+#define LNAME_NUM_SG_READY_ROOM_BOOST3         "SG Ready Room Boost State 3"
+#undef  LNAME_NUM_SG_READY_ROOM_BOOST4
+#define LNAME_NUM_SG_READY_ROOM_BOOST4         "SG Ready Room Boost State 4"
 #undef  LNAME_NUM_RAUMSOLLTEMP_I
 #define LNAME_NUM_RAUMSOLLTEMP_I               "Room Target Temperature I Setting"
 #undef  LNAME_NUM_RAUMSOLLTEMP_II

@@ -447,6 +447,26 @@ mqtt:
             writeSignal(&CanMembers[cm_manager], "SW_AUSSENTEMP", value);
             readSignal(&CanMembers[cm_manager], "SW_AUSSENTEMP");
 
+    # SG Ready room setpoint boost (heating circuit 1) for State 3, 0 = off
+    - topic: heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE3/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received SG_READY_ROOM_BOOST_STATE3 command: %s", x.c_str());
+            publishWritableNumberDiscovery(writableNumbers[14]);
+            if (!handleSgReadyRoomBoost(3, x)) {
+              ESP_LOGW("MQTT_CMD", "Invalid room boost value: %s", x.c_str());
+            }
+
+    # SG Ready room setpoint boost (heating circuit 1) for State 4, 0 = off
+    - topic: heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE4/set
+      then:
+        - lambda: |-
+            ESP_LOGI("MQTT_CMD", "Received SG_READY_ROOM_BOOST_STATE4 command: %s", x.c_str());
+            publishWritableNumberDiscovery(writableNumbers[15]);
+            if (!handleSgReadyRoomBoost(4, x)) {
+              ESP_LOGW("MQTT_CMD", "Invalid room boost value: %s", x.c_str());
+            }
+
 
 #########################################
 #                                       #

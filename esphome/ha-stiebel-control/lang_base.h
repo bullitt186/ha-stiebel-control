@@ -28,6 +28,13 @@
 #define LNAME_AUSSENTEMP                       "Außen Temperatur"
 #define LNAME_FEHLERMELDUNG                    "Störung"
 #define LNAME_LUFTANSAUGTEMP                   "Luftansaugtemperatur"
+// WPMW II: the same signal means different measuring points per bus member (#46)
+#define LNAME_HK1_REGELFUEHLER                 "Heizkreis 1 Regelfühler"
+#define LNAME_HK1_RUECKLAUF_SOLL               "Heizkreis 1 Rücklauf Soll"
+#define LNAME_HK2_MISCHER_VORLAUF              "Heizkreis 2 Mischer Vorlauf"
+#define LNAME_WP_VORLAUF_WPM                   "Wärmepumpe Vorlauf Fühler WPM"
+#define LNAME_WP_VORLAUF_IWS                   "Wärmepumpe Vorlauf IWS"
+#define LNAME_WP_RUECKLAUF_IWS                 "Wärmepumpe Rücklauf IWS"
 #define LNAME_SAMMLERISTTEMP                   "Sammler Ist Temperatur"
 #define LNAME_SPEICHERISTTEMP                  "Speicher Ist Temperatur"
 #define LNAME_VORLAUFISTTEMP                   "Vorlauf Ist Temperatur"
@@ -141,6 +148,9 @@
 #define LNAME_CALC_CAN_RX_OVERRUN              "CAN RX Überlauf (FIFO)"
 #define LNAME_CALC_CAN_RX_QUEUE                "CAN RX Warteschlange"
 #define LNAME_CALC_MQTT_PUBLISH_FAILURES       "MQTT Sendefehler"
+#define LNAME_CALC_VERDICHTER_STARTS_HEUTE     "Verdichterstarts heute"
+#define LNAME_CALC_VERDICHTER_LAUFZEIT_HEUTE   "Verdichterlaufzeit heute"
+#define LNAME_CALC_VERDICHTER_LAUFZEIT_MITTEL  "Verdichterlaufzeit je Start heute"
 
 // ============================================================================
 // Writable number friendly names (writableNumbers[])
@@ -149,6 +159,8 @@
 #define LNAME_NUM_SPEICHERSOLLTEMP2            "Speicher Soll Temperatur 2 Einstellung"
 #define LNAME_NUM_SG_READY_BOOST3              "SG Ready Boost Zustand 3"
 #define LNAME_NUM_SG_READY_BOOST4              "SG Ready Boost Zustand 4"
+#define LNAME_NUM_SG_READY_ROOM_BOOST3         "SG Ready Raum-Boost Zustand 3"
+#define LNAME_NUM_SG_READY_ROOM_BOOST4         "SG Ready Raum-Boost Zustand 4"
 #define LNAME_NUM_RAUMSOLLTEMP_I               "Raum Soll Temperatur I Einstellung"
 #define LNAME_NUM_RAUMSOLLTEMP_II              "Raum Soll Temperatur II Einstellung"
 #define LNAME_NUM_RAUMSOLLTEMP_III             "Raum Soll Temperatur III Einstellung"

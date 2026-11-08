@@ -338,3 +338,56 @@ TEST_CASE("boost state is cleared after state 2", "[sg_ready]") {
 
     CHECK(io.savedActive == false);
 }
+
+// ============================================================================
+// #50: configurable room setpoint boost
+// ============================================================================
+
+TEST_CASE("room boost defaults to 1 K (state 3) and 2 K (state 4)", "[sg_ready]") {
+    FakeIO io;
+    SgReadyController ctrl(io);
+    CHECK(ctrl.roomBoostState3() == Approx(1.0f));
+    CHECK(ctrl.roomBoostState4() == Approx(2.0f));
+}
+
+TEST_CASE("configured room boost is applied", "[sg_ready]") {
+    FakeIO io;
+    SgReadyController ctrl(io);
+    ctrl.setRoomBoostState3(0.5f);
+    ctrl.applyState(SgReadyController::STATE_RECOMMENDED);
+    CHECK(io.lastCan("RAUMSOLLTEMP_I") == "20.5");
+}
+
+TEST_CASE("room boost 0 leaves the room setpoint alone, also on the way back", "[sg_ready]") {
+    FakeIO io;
+    SgReadyController ctrl(io);
+    ctrl.setRoomBoostState3(0.0f);
+    ctrl.applyState(SgReadyController::STATE_RECOMMENDED);
+    CHECK_FALSE(io.hadCan("RAUMSOLLTEMP_I"));
+    CHECK(io.hadCan("EINSTELL_SPEICHERSOLLTEMP"));   // DHW boost still works
+    ctrl.applyState(SgReadyController::STATE_NORMAL);
+    CHECK_FALSE(io.hadCan("RAUMSOLLTEMP_I"));
+}
+
+TEST_CASE("room boost 0 in state 4 restores a room boost left by state 3", "[sg_ready]") {
+    FakeIO io;
+    SgReadyController ctrl(io);
+    ctrl.setRoomBoostState4(0.0f);
+    ctrl.applyState(SgReadyController::STATE_RECOMMENDED);   // room 20 -> 21
+    CHECK(io.lastCan("RAUMSOLLTEMP_I") == "21.0");
+    io.reset();
+    ctrl.applyState(SgReadyController::STATE_FORCED);        // no room boost in state 4
+    CHECK(io.lastCan("RAUMSOLLTEMP_I") == "20.0");
+    io.reset();
+    ctrl.applyState(SgReadyController::STATE_NORMAL);
+    CHECK_FALSE(io.hadCan("RAUMSOLLTEMP_I"));
+}
+
+TEST_CASE("room boost setters reject values outside 0-5 K", "[sg_ready]") {
+    FakeIO io;
+    SgReadyController ctrl(io);
+    ctrl.setRoomBoostState3(-0.5f);
+    ctrl.setRoomBoostState4(6.0f);
+    CHECK(ctrl.roomBoostState3() == Approx(1.0f));
+    CHECK(ctrl.roomBoostState4() == Approx(2.0f));
+}

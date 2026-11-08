@@ -253,6 +253,14 @@ static const CalculatedSensorConfig calculatedSensors[] = {
      "sensor", "", "", "measurement", "mdi:tray-full", "", "", "diagnostic", false},
     {"stiebel_calculated_mqtt_publish_failures", LNAME_CALC_MQTT_PUBLISH_FAILURES, "heatingpump/calculated/mqtt_publish_failures/state",
      "sensor", "", "", "total_increasing", "mdi:message-off-outline", "", "", "diagnostic", false},
+
+    // Compressor starts and runtime today (#49), from compressor_active, debounced
+    {"stiebel_calculated_verdichter_starts_heute", LNAME_CALC_VERDICHTER_STARTS_HEUTE, "heatingpump/calculated/verdichter_starts_heute/state",
+     "sensor", "", "", "total_increasing", "mdi:counter", "", "", "", true},
+    {"stiebel_calculated_verdichter_laufzeit_heute", LNAME_CALC_VERDICHTER_LAUFZEIT_HEUTE, "heatingpump/calculated/verdichter_laufzeit_heute/state",
+     "sensor", "duration", "min", "total_increasing", "mdi:timer-outline", "", "", "", true},
+    {"stiebel_calculated_verdichter_laufzeit_mittel", LNAME_CALC_VERDICHTER_LAUFZEIT_MITTEL, "heatingpump/calculated/verdichter_laufzeit_mittel/state",
+     "sensor", "duration", "min", "measurement", "mdi:timer-sand", "", "", "", true},
 };
 
 static const size_t CALCULATED_SENSOR_COUNT = sizeof(calculatedSensors) / sizeof(CalculatedSensorConfig);
@@ -262,7 +270,10 @@ static const size_t CALC_IDX_CAN_RX_MISSED = 24;
 static const size_t CALC_IDX_CAN_RX_OVERRUN = 25;
 static const size_t CALC_IDX_CAN_RX_QUEUE = 26;
 static const size_t CALC_IDX_MQTT_PUBLISH_FAILURES = 27;
-static_assert(CALCULATED_SENSOR_COUNT == CALC_IDX_MQTT_PUBLISH_FAILURES + 1,
+static const size_t CALC_IDX_VERDICHTER_STARTS = 28;
+static const size_t CALC_IDX_VERDICHTER_LAUFZEIT = 29;
+static const size_t CALC_IDX_VERDICHTER_LAUFZEIT_MITTEL = 30;
+static_assert(CALCULATED_SENSOR_COUNT == CALC_IDX_VERDICHTER_LAUFZEIT_MITTEL + 1,
               "calculatedSensors changed: update the CALC_IDX_* constants");
 
 // Decode buffer for SetValueType(): its longest texts are 20 characters plus the
@@ -356,7 +367,14 @@ static const WritableNumberConfig writableNumbers[] = {
     // Display parameter 10, summer mode AUSSENTEMP (0x01bf), confirmed by a change on the
     // display; 0xfdb5 SOMMERBETRIEB_TEMP did not move.
     {"SW_AUSSENTEMP", LNAME_NUM_SOMMERBETRIEB_TEMP,
-     cm_manager, 10.0, 30.0, 0.5, "°C", "mdi:sun-thermometer", "temperature"}
+     cm_manager, 10.0, 30.0, 0.5, "°C", "mdi:sun-thermometer", "temperature"},
+
+    // SG Ready room setpoint boost of heating circuit 1 (handled internally, 0 = off)
+    {"SG_READY_ROOM_BOOST_STATE3", LNAME_NUM_SG_READY_ROOM_BOOST3,
+     cm_manager, 0.0, 5.0, 0.5, "°C", "mdi:home-thermometer", "temperature"},
+
+    {"SG_READY_ROOM_BOOST_STATE4", LNAME_NUM_SG_READY_ROOM_BOOST4,
+     cm_manager, 0.0, 5.0, 0.5, "°C", "mdi:home-thermometer", "temperature"}
 };
 
 static const size_t WRITABLE_NUMBER_COUNT = sizeof(writableNumbers) / sizeof(WritableNumberConfig);
@@ -368,6 +386,26 @@ static constexpr bool isWpmw2Model() {
 #else
     return false;
 #endif
+}
+
+// WPMW II: the same signal is a different measuring point on the manager side (KESSEL,
+// WPM terminals) and in the heat pump module (HEIZMODUL, IWS) (#46). nullptr = table name.
+static const char* wpmw2MemberName(const char* member, const char* signal) {
+    if (!isWpmw2Model()) return nullptr;
+    struct Entry { const char* member; const char* signal; const char* name; };
+    static const Entry names[] = {
+        // WPMW II manual "INFO IWS": air intake at the unit, not the control outdoor sensor
+        {"HEIZMODUL", "AUSSENTEMP",       LNAME_LUFTANSAUGTEMP},
+        {"HEIZMODUL", "WPVORLAUFIST",     LNAME_WP_VORLAUF_IWS},
+        {"HEIZMODUL", "RUECKLAUFISTTEMP", LNAME_WP_RUECKLAUF_IWS},
+        {"KESSEL",    "WPVORLAUFIST",     LNAME_WP_VORLAUF_WPM},       // terminal X2/2
+        {"KESSEL",    "RUECKLAUFISTTEMP", LNAME_HK1_REGELFUEHLER},     // X2/3, control sensor HC1
+        {"KESSEL",    "VORLAUFISTTEMP",   LNAME_HK2_MISCHER_VORLAUF},  // X2/7, mixer flow HC2
+        {"KESSEL",    "KESSELSOLLTEMP",   LNAME_HK1_RUECKLAUF_SOLL},
+    };
+    for (const Entry& e : names)
+        if (strcmp(member, e.member) == 0 && strcmp(signal, e.signal) == 0) return e.name;
+    return nullptr;
 }
 
 // WPMW II settings exposed as writable numbers (manager parameters 10, 27, 33, 42, 43)
@@ -1639,6 +1677,57 @@ void publishDeltaTRunning()
     publishCalculatedState(stateTopic, value);
 }
 
+// Compressor starts and runtime per day (#49). An off phase shorter than
+// COMPRESSOR_MIN_OFF_MS does not end a run, so a short gap is not a new start.
+// The day is the heat pump's own date (TAG); the counts live in RAM and start
+// from 0 after an ESP reboot.
+static constexpr uint32_t COMPRESSOR_MIN_OFF_MS = 120000UL;
+struct CompressorDayStats {
+    int day = -1;
+    uint32_t starts = 0;
+    uint32_t runtimeMs = 0;
+    bool running = false;          // debounced: true from a start until a long off phase
+    bool lastSampleOn = false;
+    bool haveSample = false;
+    uint32_t lastSampleMs = 0;
+    uint32_t offSinceMs = 0;
+};
+static CompressorDayStats compressorStats;
+
+inline void updateCompressorStats(CompressorDayStats& s, bool on, uint32_t now, int day) {
+    if (day > 0 && s.day > 0 && day != s.day) {   // new day: a run across midnight counts again
+        s.starts = (on && s.running) ? 1 : 0;
+        s.runtimeMs = 0;
+    }
+    if (day > 0) s.day = day;
+    if (s.haveSample && s.lastSampleOn && on) s.runtimeMs += now - s.lastSampleMs;
+    if (on) {
+        if (!s.running) { s.running = true; s.starts++; }
+    } else {
+        if (!s.haveSample || s.lastSampleOn) s.offSinceMs = now;
+        if (s.running && now - s.offSinceMs >= COMPRESSOR_MIN_OFF_MS) s.running = false;
+    }
+    s.lastSampleOn = on;
+    s.lastSampleMs = now;
+    s.haveSample = true;
+}
+
+inline void publishCompressorStats() {
+    char v[16];
+    snprintf(v, sizeof(v), "%u", (unsigned)compressorStats.starts);
+    publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_VERDICHTER_STARTS], false);
+    publishCalculatedState(calculatedSensors[CALC_IDX_VERDICHTER_STARTS].stateTopic, v);
+    const float minutes = compressorStats.runtimeMs / 60000.0f;
+    snprintf(v, sizeof(v), "%.1f", minutes);
+    publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_VERDICHTER_LAUFZEIT], false);
+    publishCalculatedState(calculatedSensors[CALC_IDX_VERDICHTER_LAUFZEIT].stateTopic, v);
+    if (compressorStats.starts > 0) {
+        snprintf(v, sizeof(v), "%.1f", minutes / compressorStats.starts);
+        publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_VERDICHTER_LAUFZEIT_MITTEL], false);
+        publishCalculatedState(calculatedSensors[CALC_IDX_VERDICHTER_LAUFZEIT_MITTEL].stateTopic, v);
+    }
+}
+
 void publishCompressorActive()
 {
     // Publish discovery (only once - cached)
@@ -1661,6 +1750,9 @@ void publishCompressorActive()
     const char* stateTopic = "heatingpump/calculated/compressor_active/state";
     publishCalculatedState(stateTopic, state);
     // Note: Delta T running is published separately by scheduler
+
+    updateCompressorStats(compressorStats, isActive, millis(), lastTag);
+    publishCompressorStats();
 }
 
 void publishRegelabweichung()
@@ -1718,12 +1810,7 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
     const ElsterMeta* meta = GetElsterMeta(ei);
     // Get friendly name: use meta->friendlyName or fallback to ei->Name
     const char* friendlyName = (meta && meta->friendlyName) ? meta->friendlyName : ei->Name;
-    // WPMW II manual ("INFO IWS"): the heat pump module's AUSSENTEMP is the air
-    // intake temperature at the unit, not the outdoor sensor used for control.
-    if (isWpmw2Model() && strcmp(cm.Name, "HEIZMODUL") == 0 &&
-        strcmp(ei->Name, "AUSSENTEMP") == 0) {
-        friendlyName = LNAME_LUFTANSAUGTEMP;
-    }
+    if (const char* perMember = wpmw2MemberName(cm.Name, ei->Name)) friendlyName = perMember;
     
     // Get metadata: use ei fields if available, otherwise fall back to type defaults
     const char *component, *deviceClass, *unit, *stateClass, *icon;
@@ -2505,11 +2592,30 @@ ESPPreferenceObject EspHomeSgReadyIO::nvsActive;
 static EspHomeSgReadyIO sgReadyIO;
 static SgReadyController sgReadyController(sgReadyIO);
 
+// Configured boost amounts (DHW and room, states 3 and 4), kept across reboots.
+struct SgBoostStorage { uint32_t magic; float v[4]; };
+static constexpr uint32_t SG_BOOST_MAGIC = 0x5B005701u;
+static ESPPreferenceObject sgBoostPref;
+
+inline void saveSgBoosts() {
+    SgBoostStorage s{SG_BOOST_MAGIC, {sgReadyController.boostState3(), sgReadyController.boostState4(),
+                                      sgReadyController.roomBoostState3(), sgReadyController.roomBoostState4()}};
+    sgBoostPref.save(&s);
+}
+
 // Called from on_boot lambda in common.yaml
 void initBoostStatePrefs() {
     EspHomeSgReadyIO::nvsDhw    = global_preferences->make_preference<float>(0xB007BA5E, true);
     EspHomeSgReadyIO::nvsRoom   = global_preferences->make_preference<float>(0xB007BA5F, true);
     EspHomeSgReadyIO::nvsActive = global_preferences->make_preference<bool> (0xB007BA60, true);
+    sgBoostPref = global_preferences->make_preference<SgBoostStorage>(SG_BOOST_MAGIC, true);
+    SgBoostStorage s;
+    if (sgBoostPref.load(&s) && s.magic == SG_BOOST_MAGIC) {
+        sgReadyController.setBoostState3(s.v[0]);
+        sgReadyController.setBoostState4(s.v[1]);
+        sgReadyController.setRoomBoostState3(s.v[2]);
+        sgReadyController.setRoomBoostState4(s.v[3]);
+    }
     ESP_LOGI("NVS", "Boost state preferences initialized");
 }
 
@@ -2533,8 +2639,25 @@ void applySgReadyState(int state) {
 // Accessor helpers used by YAML sensor lambdas and MQTT on_connect block
 inline float sgReadyBoostState3Value() { return sgReadyController.boostState3(); }
 inline float sgReadyBoostState4Value() { return sgReadyController.boostState4(); }
-inline void  setSgReadyBoost3(float v) { sgReadyController.setBoostState3(v); }
-inline void  setSgReadyBoost4(float v) { sgReadyController.setBoostState4(v); }
+inline void  setSgReadyBoost3(float v) { sgReadyController.setBoostState3(v); saveSgBoosts(); }
+inline void  setSgReadyBoost4(float v) { sgReadyController.setBoostState4(v); saveSgBoosts(); }
+
+// Room boost command (heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE<n>/set): range 0-5 K,
+// stored and published back. Returns false for an invalid value.
+inline bool handleSgReadyRoomBoost(int state, const std::string& payload) {
+    char* end;
+    const float v = strtof(payload.c_str(), &end);
+    if (end == payload.c_str() || *end != '\0' || v < 0.0f || v > 5.0f) return false;
+    if (state == 3) sgReadyController.setRoomBoostState3(v);
+    else sgReadyController.setRoomBoostState4(v);
+    saveSgBoosts();
+    char topic[64], value[16];
+    snprintf(topic, sizeof(topic), "heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE%d/state", state);
+    snprintf(value, sizeof(value), "%.1f",
+             state == 3 ? sgReadyController.roomBoostState3() : sgReadyController.roomBoostState4());
+    mqttPublish(topic, value, strlen(value));
+    return true;
+}
 
 // Publishes the current SG Ready state and boost values (retained). Called on
 // boot, on MQTT connect and periodically, so the retained values survive a
@@ -2552,6 +2675,11 @@ inline void publishSgReadyState() {
     snprintf(b4, sizeof(b4), "%.1f", sgReadyBoostState4Value());
     mqttPublish("heatingpump/MANAGER/SG_READY_BOOST_STATE3/state", b3, strlen(b3));
     mqttPublish("heatingpump/MANAGER/SG_READY_BOOST_STATE4/state", b4, strlen(b4));
+    char r3[16], r4[16];
+    snprintf(r3, sizeof(r3), "%.1f", sgReadyController.roomBoostState3());
+    snprintf(r4, sizeof(r4), "%.1f", sgReadyController.roomBoostState4());
+    mqttPublish("heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE3/state", r3, strlen(r3));
+    mqttPublish("heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE4/state", r4, strlen(r4));
 }
 
 // ============================================================================

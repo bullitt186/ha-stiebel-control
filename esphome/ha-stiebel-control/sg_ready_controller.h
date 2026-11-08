@@ -58,10 +58,6 @@ public:
     static constexpr float DEFAULT_DHW_TEMP  = 48.0f;
     static constexpr float DEFAULT_ROOM_TEMP = 20.0f;
 
-    // Hardcoded room boost offsets per state
-    static constexpr float ROOM_BOOST_STATE3 = 1.0f;
-    static constexpr float ROOM_BOOST_STATE4 = 2.0f;
-
     // Temperature ceiling for DHW boost
     static constexpr float MAX_DHW_TEMP  = 60.0f;
     static constexpr float MAX_ROOM_TEMP = 25.0f;
@@ -69,6 +65,9 @@ public:
     struct Config {
         float boostState3 = 5.0f;   // DHW boost for state 3 (°C)
         float boostState4 = 8.0f;   // DHW boost for state 4 (°C)
+        // Room setpoint boost of heating circuit 1 (K); 0 = room setpoint untouched
+        float roomBoostState3 = 1.0f;
+        float roomBoostState4 = 2.0f;
     };
 
     struct State {
@@ -126,11 +125,25 @@ public:
         }
     }
 
+    void setRoomBoostState3(float boost) {
+        if (boost >= 0.0f && boost <= 5.0f) {
+            config_.roomBoostState3 = boost;
+        }
+    }
+
+    void setRoomBoostState4(float boost) {
+        if (boost >= 0.0f && boost <= 5.0f) {
+            config_.roomBoostState4 = boost;
+        }
+    }
+
     // Getters for inspection / sensor publishing
     int   currentState()    const { return state_.currentState; }
     bool  isActive()        const { return state_.active; }
     float boostState3()     const { return config_.boostState3; }
     float boostState4()     const { return config_.boostState4; }
+    float roomBoostState3() const { return config_.roomBoostState3; }
+    float roomBoostState4() const { return config_.roomBoostState4; }
     float originalDhwTemp() const { return state_.originalDhwTemp; }
     float originalRoomTemp() const { return state_.originalRoomTemp; }
 
@@ -168,13 +181,27 @@ private:
     Config config_;
     State  state_;
 
-    void captureOriginals() {
+    // The room original is only taken when the room setpoint is boosted, so a
+    // room boost of 0 never writes the room setpoint on the way back either.
+    void captureOriginals(bool boostRoom) {
         if (!state_.active || state_.originalDhwTemp == 0.0f) {
             state_.originalDhwTemp = DEFAULT_DHW_TEMP;
         }
-        if (!state_.active || state_.originalRoomTemp == 0.0f) {
+        if (boostRoom && (!state_.active || state_.originalRoomTemp == 0.0f)) {
             state_.originalRoomTemp = DEFAULT_ROOM_TEMP;
         }
+    }
+
+    void boostRoom(float boost) {
+        if (boost <= 0.05f) {
+            restoreRoom();   // only writes if an earlier state had boosted it
+            return;
+        }
+        float boostedRoom = state_.originalRoomTemp + boost;
+        if (boostedRoom > MAX_ROOM_TEMP) boostedRoom = MAX_ROOM_TEMP;
+        char roomBuf[16];
+        snprintf(roomBuf, sizeof(roomBuf), "%.1f", boostedRoom);
+        io_.writeCanSignal("RAUMSOLLTEMP_I", roomBuf);
     }
 
     void restoreDhw() {
@@ -218,7 +245,7 @@ private:
     }
 
     void applyRecommended() {
-        captureOriginals();
+        captureOriginals(config_.roomBoostState3 > 0.05f);
         state_.active = true;
         persistState();
 
@@ -232,15 +259,11 @@ private:
             io_.writeCanSignal("EINSTELL_SPEICHERSOLLTEMP", buf);
         }
 
-        float boostedRoom = state_.originalRoomTemp + ROOM_BOOST_STATE3;
-        if (boostedRoom > MAX_ROOM_TEMP) boostedRoom = MAX_ROOM_TEMP;
-        char roomBuf[16];
-        snprintf(roomBuf, sizeof(roomBuf), "%.1f", boostedRoom);
-        io_.writeCanSignal("RAUMSOLLTEMP_I", roomBuf);
+        boostRoom(config_.roomBoostState3);
     }
 
     void applyForced() {
-        captureOriginals();
+        captureOriginals(config_.roomBoostState4 > 0.05f);
         state_.active = true;
         persistState();
 
@@ -254,11 +277,7 @@ private:
             io_.writeCanSignal("EINSTELL_SPEICHERSOLLTEMP", buf);
         }
 
-        float boostedRoom = state_.originalRoomTemp + ROOM_BOOST_STATE4;
-        if (boostedRoom > MAX_ROOM_TEMP) boostedRoom = MAX_ROOM_TEMP;
-        char roomBuf[16];
-        snprintf(roomBuf, sizeof(roomBuf), "%.1f", boostedRoom);
-        io_.writeCanSignal("RAUMSOLLTEMP_I", roomBuf);
+        boostRoom(config_.roomBoostState4);
     }
 };
 

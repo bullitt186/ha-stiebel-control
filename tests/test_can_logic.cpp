@@ -1076,6 +1076,62 @@ TEST_CASE("isHeizmodulSilent: only after 60 s without a frame", "[calc]") {
     CHECK_FALSE(isHeizmodulSilent(10000, 0xFFFFFFF0u));   // across the millis() wrap
 }
 
+// #49: compressor starts and runtime per day, sampled every 30 s
+static void feedCompressor(CompressorDayStats& s, uint32_t& t, bool on, int samples, int day = 5) {
+    for (int i = 0; i < samples; ++i) { updateCompressorStats(s, on, t, day); t += 30000; }
+}
+
+TEST_CASE("compressor stats: starts and runtime of separate runs", "[calc][compressor]") {
+    CompressorDayStats s; uint32_t t = 1000;
+    feedCompressor(s, t, false, 4);
+    feedCompressor(s, t, true, 27);    // run of 13 min
+    feedCompressor(s, t, false, 10);   // 5 min off
+    feedCompressor(s, t, true, 21);    // run of 10 min
+    feedCompressor(s, t, false, 2);
+    CHECK(s.starts == 2);
+    CHECK(s.runtimeMs == (26 + 20) * 30000u);   // intervals between two "on" samples
+}
+
+TEST_CASE("compressor stats: an off gap under 2 min is not a new start", "[calc][compressor]") {
+    CompressorDayStats s; uint32_t t = 1000;
+    feedCompressor(s, t, true, 10);
+    feedCompressor(s, t, false, 2);    // 60 s gap (bus hiccup, decode gap)
+    feedCompressor(s, t, true, 10);
+    CHECK(s.starts == 1);
+    feedCompressor(s, t, false, 5);    // 150 s
+    feedCompressor(s, t, true, 2);
+    CHECK(s.starts == 2);
+}
+
+TEST_CASE("compressor stats: reset at the heat pump's day change", "[calc][compressor]") {
+    CompressorDayStats s; uint32_t t = 1000;
+    feedCompressor(s, t, true, 5, 5);
+    feedCompressor(s, t, false, 6, 5);
+    feedCompressor(s, t, true, 5, 5);
+    CHECK(s.starts == 2);
+    feedCompressor(s, t, true, 3, 6);  // still running at midnight: counts for the new day
+    CHECK(s.starts == 1);
+    CHECK(s.runtimeMs == 3 * 30000u);
+    feedCompressor(s, t, false, 6, 6);
+    feedCompressor(s, t, false, 1, -1); // date not known (e.g. after a reboot): no reset
+    CHECK(s.starts == 1);
+}
+
+TEST_CASE("compressor stats are published with the compressor state", "[calc][compressor]") {
+    resetDiscoveryState();
+    compressorStats = CompressorDayStats{};
+    lastTag = 7;
+    lastVerdichterValue = 50.0f;
+    fake_millis() = 1000;
+    publishCompressorActive();
+    CHECK(mqttFindPayload("calculated/verdichter_starts_heute/state") == "1");
+    CHECK(mqttFindPayload("calculated/verdichter_laufzeit_heute/state") == "0.0");
+    CHECK(mqttFindPayload("calculated/verdichter_laufzeit_mittel/state") == "0.0");
+    compressorStats = CompressorDayStats{};
+    lastTag = -1;
+    fake_millis() = 0;
+}
+
 TEST_CASE("publishCompressorActive: value > 2 → on", "[calc]") {
     resetDiscoveryState();
     lastVerdichterValue = 50.0f;
@@ -1349,13 +1405,46 @@ TEST_CASE("writableNumbers: WPMW II parameters sit at the indices common.yaml us
     static const char* expected[] = {"SCHALTWERKDYNAMIKZEIT",
                                      "BIVALENTPARALLELTEMPERATUR_HZG", "BIVALENTPARALLELTEMPERATUR_WW",
                                      "STILLSTANDZEIT", "SW_AUSSENTEMP"};
-    REQUIRE(WRITABLE_NUMBER_COUNT == 14);
+    REQUIRE(WRITABLE_NUMBER_COUNT == 16);
     for (size_t i = 0; i < 5; ++i) {
         CHECK(std::string(writableNumbers[9 + i].signalName) == expected[i]);
         CHECK(writableNumbers[9 + i].member == cm_manager);
         CHECK(isWpmw2Parameter(expected[i]));
     }
     CHECK_FALSE(isWpmw2Parameter("HEIZKURVE"));
+}
+
+TEST_CASE("WPMW II: per-member names tell the measuring points apart (#46)", "[mqtt][names]") {
+    if (!isWpmw2Model()) {
+        CHECK(wpmw2MemberName("KESSEL", "RUECKLAUFISTTEMP") == nullptr);
+        return;
+    }
+    CHECK(std::string(wpmw2MemberName("KESSEL", "RUECKLAUFISTTEMP")) == LNAME_HK1_REGELFUEHLER);
+    CHECK(std::string(wpmw2MemberName("HEIZMODUL", "RUECKLAUFISTTEMP")) == LNAME_WP_RUECKLAUF_IWS);
+    CHECK(std::string(wpmw2MemberName("HEIZMODUL", "AUSSENTEMP")) == LNAME_LUFTANSAUGTEMP);
+    CHECK(wpmw2MemberName("KESSEL", "AUSSENTEMP") == nullptr);   // the control outdoor sensor
+    CHECK(wpmw2MemberName("MANAGER", "RUECKLAUFISTTEMP") == nullptr);
+    resetDiscoveryState();
+    publishMqttDiscovery(CanMembers[cm_kessel], GetElsterIndex("VORLAUFISTTEMP"));
+    CHECK(mqttFindPayload("homeassistant/sensor").find(LNAME_HK2_MISCHER_VORLAUF) != std::string::npos);
+}
+
+TEST_CASE("writableNumbers: SG Ready room boosts sit at the indices common.yaml uses", "[writable][sgready]") {
+    // common.yaml's room boost /set handlers use writableNumbers[14] and [15].
+    CHECK(std::string(writableNumbers[14].signalName) == "SG_READY_ROOM_BOOST_STATE3");
+    CHECK(std::string(writableNumbers[15].signalName) == "SG_READY_ROOM_BOOST_STATE4");
+    CHECK(writableNumberApplies("SG_READY_ROOM_BOOST_STATE3"));
+}
+
+TEST_CASE("SG Ready room boost command is stored and published back", "[sgready]") {
+    resetDiscoveryState();
+    CHECK(handleSgReadyRoomBoost(3, "0.0"));
+    CHECK(mqttFindPayload("SG_READY_ROOM_BOOST_STATE3/state") == "0.0");
+    CHECK(sgReadyController.roomBoostState3() == Approx(0.0f));
+    CHECK_FALSE(handleSgReadyRoomBoost(4, "7"));
+    CHECK_FALSE(handleSgReadyRoomBoost(4, "abc"));
+    CHECK(sgReadyController.roomBoostState4() == Approx(2.0f));
+    CHECK(handleSgReadyRoomBoost(3, "1.0"));
 }
 
 TEST_CASE("writableNumbers: WPMW II parameters are only offered on wpl13e and ttl33", "[writable]") {

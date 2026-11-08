@@ -137,6 +137,12 @@ These entities appear automatically in HA via MQTT discovery:
 | `number.manager_raum_soll_temperatur_nacht_einstellung` | Room setpoint night/reduced | 10–30°C | 0.5°C |
 | `number.manager_sg_ready_boost_zustand_3` | SG Ready DHW boost for state 3 | 0–10°C | 0.5°C |
 | `number.manager_sg_ready_boost_zustand_4` | SG Ready DHW boost for state 4 | 0–15°C | 0.5°C |
+| `number.manager_sg_ready_raum_boost_zustand_3` | SG Ready room setpoint boost (heating circuit 1) for state 3, default 1 K, 0 = off | 0–5 K | 0.5 K |
+| `number.manager_sg_ready_raum_boost_zustand_4` | SG Ready room setpoint boost (heating circuit 1) for state 4, default 2 K, 0 = off | 0–5 K | 0.5 K |
+
+The room boost raises `RAUMSOLLTEMP_I` and with it the heating curve, which can add compressor
+starts. With 0 the room setpoint is not written at all, neither on entering nor on leaving the
+SG Ready state. All four boost values are stored on the ESP and survive a reboot.
 
 ### WPMW II Parameters (WPL13E and TTL 33, number entities)
 
@@ -160,6 +166,23 @@ Reglerdynamik as 40, Stillstandzeit as 41), so go by the title on the display.
 
 Parameters 10 and 43 were confirmed by changing them on the display and reading the bus. On
 the WPMW II, `SOMMERBETRIEB_TEMP` (0xfdb5) and `SPERRZEIT` (0x0026) did not follow the display.
+
+#### Measuring points per bus member (WPMW II)
+
+The same Elster signal is a different sensor on the manager side (KESSEL, WPM terminals) and
+in the heat pump module (HEIZMODUL, IWS). On WPMW II models (`wpl13e`, `wpl18e`, `ttl33`) these
+entities get their own names (#46). Existing installs keep their entity IDs; only the shown
+name changes.
+
+| Signal | Member | Measuring point | Name (DE) |
+|---|---|---|---|
+| `RUECKLAUFISTTEMP` 0x0016 | KESSEL | control sensor heating circuit 1, terminal X2/3 (buffer) | Heizkreis 1 Regelfühler |
+| `RUECKLAUFISTTEMP` 0x0016 | HEIZMODUL | heat pump return inside the unit | Wärmepumpe Rücklauf IWS |
+| `WPVORLAUFIST` 0x01d6 | KESSEL | heat pump flow sensor, terminal X2/2 | Wärmepumpe Vorlauf Fühler WPM |
+| `WPVORLAUFIST` 0x01d6 | HEIZMODUL | heat pump flow inside the unit | Wärmepumpe Vorlauf IWS |
+| `VORLAUFISTTEMP` 0x000f | KESSEL | mixer flow heating circuit 2, terminal X2/7 | Heizkreis 2 Mischer Vorlauf |
+| `KESSELSOLLTEMP` 0x0002 | KESSEL | return setpoint heating circuit 1 | Heizkreis 1 Rücklauf Soll |
+| `AUSSENTEMP` 0x000c | HEIZMODUL | air intake at the unit (not the control outdoor sensor) | Luftansaugtemperatur |
 
 #### More WPMW II settings (display title → register)
 
@@ -257,6 +280,12 @@ Published to `heatingpump/calculated/` MQTT topics and auto-discovered in HA:
 | Delta T (running) | `heatingpump/calculated/delta_t_running/state` | Same, only when compressor active |
 | Control deviation | `heatingpump/calculated/regelabweichung/state` | KESSEL return sensor (control sensor HK1) − return setpoint |
 | Compressor active | `heatingpump/calculated/compressor_active/state` | on/off |
+| Compressor starts today | `heatingpump/calculated/verdichter_starts_heute/state` | Starts since the heat pump's midnight; an off phase under 2 min does not count as a new start |
+| Compressor runtime today | `heatingpump/calculated/verdichter_laufzeit_heute/state` | Minutes the compressor ran today (30 s resolution) |
+| Runtime per start today | `heatingpump/calculated/verdichter_laufzeit_mittel/state` | Runtime today ÷ starts today, in minutes |
+
+The compressor counters use the heat pump's date for the day change and are held on the ESP
+only: after an ESP reboot they start again from 0 (MQTT reconnects do not affect them).
 | COP hot water | `heatingpump/calculated/cop_ww/state` | Coefficient of performance (DHW) |
 | COP heating | `heatingpump/calculated/cop_heiz/state` | Coefficient of performance (heating) |
 | COP total | `heatingpump/calculated/cop_gesamt/state` | Overall coefficient of performance |
