@@ -69,7 +69,7 @@ TEST_CASE("WPL9 SG Ready adapter shares DHW destinations and keeps room writes",
     fake_can().sent.clear();
     adapter.writeCanSignal("EINSTELL_SPEICHERSOLLTEMP", "49");
     REQUIRE(fake_can().sent.size() == 1);
-    REQUIRE(pendingReadbackCount == 1);
+    REQUIRE(pendingReadbackCount == 2);   // early read-back plus the settle read-back
     pendingReadbackStep();
     CHECK(fake_can().sent.size() == 1);
     fake_millis() += READBACK_DELAY_MS;
@@ -77,6 +77,7 @@ TEST_CASE("WPL9 SG Ready adapter shares DHW destinations and keeps room writes",
     REQUIRE(fake_can().sent.size() == 2);
     CHECK(fake_can().sent[0] == std::vector<uint8_t>{0x40, 1, 0x13, 1, 0xea, 0, 0});
     CHECK(fake_can().sent[1] == std::vector<uint8_t>{0x41, 1, 0x13, 0, 0, 0, 0});
+    pendingReadbackCount = 0;   // drop the settle read-back, covered elsewhere
     fake_can().sent.clear();
     adapter.writeCanSignal("RAUMSOLLTEMP_I", "20");
     REQUIRE(fake_can().sent.size() == 1);

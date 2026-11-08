@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Fixed
+
+- The read-back right after a write often returned the old value on the WPMW II, so HA showed the
+  previous setting until the next poll. Every write is now read back a second time about 4 s later
+  (reported by SolderAndSyntax, #68).
+
 ### Changed
 
 - `ttl33`: the heating curve and the WPMW II parameters (Reglerdynamik, Stillstandzeit, summer mode

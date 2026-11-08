@@ -931,18 +931,25 @@ struct PendingReadback {
     const ElsterIndex* ei;
     uint32_t dueMs;
 };
-static constexpr size_t READBACK_QUEUE_LEN = 8;
+static constexpr size_t READBACK_QUEUE_LEN = 16;
 static constexpr uint32_t READBACK_DELAY_MS = 100;
+// Second read after every write: the WPMW II often still answers the old value right
+// after a write, about 4 s later the new one (#68).
+static constexpr uint32_t READBACK_SETTLE_MS = 4000;
 static PendingReadback pendingReadbacks[READBACK_QUEUE_LEN];
 static size_t pendingReadbackCount = 0;
 
 void readSignal(const CanMember *cm, const ElsterIndex *ei);
 
-// Queues a read request READBACK_DELAY_MS after a write (one entry per signal).
-inline void scheduleReadback(const CanMember* cm, const ElsterIndex* ei) {
-    const uint32_t due = millis() + READBACK_DELAY_MS;
+// Queues a read request delayMs after a write. A second request for the same signal
+// within a second replaces the first; the early and the settle read stay separate.
+inline void scheduleReadback(const CanMember* cm, const ElsterIndex* ei,
+                             uint32_t delayMs = READBACK_DELAY_MS) {
+    const uint32_t due = millis() + delayMs;
     for (size_t i = 0; i < pendingReadbackCount; i++) {
-        if (pendingReadbacks[i].cm == cm && pendingReadbacks[i].ei == ei) {
+        const int32_t apart = static_cast<int32_t>(pendingReadbacks[i].dueMs - due);
+        if (pendingReadbacks[i].cm == cm && pendingReadbacks[i].ei == ei &&
+            apart > -1000 && apart < 1000) {
             pendingReadbacks[i].dueMs = due;
             return;
         }
@@ -1063,6 +1070,8 @@ void writeSignal(const CanMember *cm, const ElsterIndex *ei, const char *&str)
     id(my_can).send_data(CanMembers[cm_pc].CanId, use_extended_id, data);
     // Command echo: publish the read-back even if the value did not change
     forceNextStatePublish(*cm, ei);
+    // The immediate read-back may still return the old value; read again once settled
+    scheduleReadback(cm, ei, READBACK_SETTLE_MS);
 }
 
 void writeSignal(const CanMember *cm, const char *elsterName, const char *str)
