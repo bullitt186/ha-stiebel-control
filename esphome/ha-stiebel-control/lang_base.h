@@ -28,6 +28,13 @@
 #define LNAME_AUSSENTEMP                       "Außen Temperatur"
 #define LNAME_FEHLERMELDUNG                    "Störung"
 #define LNAME_LUFTANSAUGTEMP                   "Luftansaugtemperatur"
+// WPMW II: the same signal means different measuring points per bus member (#46)
+#define LNAME_HK1_REGELFUEHLER                 "Heizkreis 1 Regelfühler"
+#define LNAME_HK1_RUECKLAUF_SOLL               "Heizkreis 1 Rücklauf Soll"
+#define LNAME_HK2_MISCHER_VORLAUF              "Heizkreis 2 Mischer Vorlauf"
+#define LNAME_WP_VORLAUF_WPM                   "Wärmepumpe Vorlauf Fühler WPM"
+#define LNAME_WP_VORLAUF_IWS                   "Wärmepumpe Vorlauf IWS"
+#define LNAME_WP_RUECKLAUF_IWS                 "Wärmepumpe Rücklauf IWS"
 #define LNAME_SAMMLERISTTEMP                   "Sammler Ist Temperatur"
 #define LNAME_SPEICHERISTTEMP                  "Speicher Ist Temperatur"
 #define LNAME_VORLAUFISTTEMP                   "Vorlauf Ist Temperatur"

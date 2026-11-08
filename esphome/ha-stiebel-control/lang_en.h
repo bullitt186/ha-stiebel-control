@@ -40,6 +40,18 @@
 #define LNAME_FEHLERMELDUNG                    "Fault"
 #undef  LNAME_LUFTANSAUGTEMP
 #define LNAME_LUFTANSAUGTEMP                   "Air Intake Temperature"
+#undef  LNAME_HK1_REGELFUEHLER
+#define LNAME_HK1_REGELFUEHLER                 "Heating Circuit 1 Control Sensor"
+#undef  LNAME_HK1_RUECKLAUF_SOLL
+#define LNAME_HK1_RUECKLAUF_SOLL               "Heating Circuit 1 Return Target"
+#undef  LNAME_HK2_MISCHER_VORLAUF
+#define LNAME_HK2_MISCHER_VORLAUF              "Heating Circuit 2 Mixer Flow"
+#undef  LNAME_WP_VORLAUF_WPM
+#define LNAME_WP_VORLAUF_WPM                   "Heat Pump Flow Sensor WPM"
+#undef  LNAME_WP_VORLAUF_IWS
+#define LNAME_WP_VORLAUF_IWS                   "Heat Pump Flow IWS"
+#undef  LNAME_WP_RUECKLAUF_IWS
+#define LNAME_WP_RUECKLAUF_IWS                 "Heat Pump Return IWS"
 #undef  LNAME_SAMMLERISTTEMP
 #define LNAME_SAMMLERISTTEMP                   "Collector Actual Temperature"
 #undef  LNAME_SPEICHERISTTEMP

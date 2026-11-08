@@ -377,6 +377,26 @@ static constexpr bool isWpmw2Model() {
 #endif
 }
 
+// WPMW II: the same signal is a different measuring point on the manager side (KESSEL,
+// WPM terminals) and in the heat pump module (HEIZMODUL, IWS) (#46). nullptr = table name.
+static const char* wpmw2MemberName(const char* member, const char* signal) {
+    if (!isWpmw2Model()) return nullptr;
+    struct Entry { const char* member; const char* signal; const char* name; };
+    static const Entry names[] = {
+        // WPMW II manual "INFO IWS": air intake at the unit, not the control outdoor sensor
+        {"HEIZMODUL", "AUSSENTEMP",       LNAME_LUFTANSAUGTEMP},
+        {"HEIZMODUL", "WPVORLAUFIST",     LNAME_WP_VORLAUF_IWS},
+        {"HEIZMODUL", "RUECKLAUFISTTEMP", LNAME_WP_RUECKLAUF_IWS},
+        {"KESSEL",    "WPVORLAUFIST",     LNAME_WP_VORLAUF_WPM},       // terminal X2/2
+        {"KESSEL",    "RUECKLAUFISTTEMP", LNAME_HK1_REGELFUEHLER},     // X2/3, control sensor HC1
+        {"KESSEL",    "VORLAUFISTTEMP",   LNAME_HK2_MISCHER_VORLAUF},  // X2/7, mixer flow HC2
+        {"KESSEL",    "KESSELSOLLTEMP",   LNAME_HK1_RUECKLAUF_SOLL},
+    };
+    for (const Entry& e : names)
+        if (strcmp(member, e.member) == 0 && strcmp(signal, e.signal) == 0) return e.name;
+    return nullptr;
+}
+
 // WPMW II settings exposed as writable numbers (manager parameters 10, 27, 33, 42, 43)
 static bool isWpmw2Parameter(const char* sig) {
     static const char* const params[] = {"SCHALTWERKDYNAMIKZEIT",
@@ -1725,12 +1745,7 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
     const ElsterMeta* meta = GetElsterMeta(ei);
     // Get friendly name: use meta->friendlyName or fallback to ei->Name
     const char* friendlyName = (meta && meta->friendlyName) ? meta->friendlyName : ei->Name;
-    // WPMW II manual ("INFO IWS"): the heat pump module's AUSSENTEMP is the air
-    // intake temperature at the unit, not the outdoor sensor used for control.
-    if (isWpmw2Model() && strcmp(cm.Name, "HEIZMODUL") == 0 &&
-        strcmp(ei->Name, "AUSSENTEMP") == 0) {
-        friendlyName = LNAME_LUFTANSAUGTEMP;
-    }
+    if (const char* perMember = wpmw2MemberName(cm.Name, ei->Name)) friendlyName = perMember;
     
     // Get metadata: use ei fields if available, otherwise fall back to type defaults
     const char *component, *deviceClass, *unit, *stateClass, *icon;

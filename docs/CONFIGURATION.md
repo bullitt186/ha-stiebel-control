@@ -167,6 +167,23 @@ Reglerdynamik as 40, Stillstandzeit as 41), so go by the title on the display.
 Parameters 10 and 43 were confirmed by changing them on the display and reading the bus. On
 the WPMW II, `SOMMERBETRIEB_TEMP` (0xfdb5) and `SPERRZEIT` (0x0026) did not follow the display.
 
+#### Measuring points per bus member (WPMW II)
+
+The same Elster signal is a different sensor on the manager side (KESSEL, WPM terminals) and
+in the heat pump module (HEIZMODUL, IWS). On WPMW II models (`wpl13e`, `wpl18e`, `ttl33`) these
+entities get their own names (#46). Existing installs keep their entity IDs; only the shown
+name changes.
+
+| Signal | Member | Measuring point | Name (DE) |
+|---|---|---|---|
+| `RUECKLAUFISTTEMP` 0x0016 | KESSEL | control sensor heating circuit 1, terminal X2/3 (buffer) | Heizkreis 1 Regelfühler |
+| `RUECKLAUFISTTEMP` 0x0016 | HEIZMODUL | heat pump return inside the unit | Wärmepumpe Rücklauf IWS |
+| `WPVORLAUFIST` 0x01d6 | KESSEL | heat pump flow sensor, terminal X2/2 | Wärmepumpe Vorlauf Fühler WPM |
+| `WPVORLAUFIST` 0x01d6 | HEIZMODUL | heat pump flow inside the unit | Wärmepumpe Vorlauf IWS |
+| `VORLAUFISTTEMP` 0x000f | KESSEL | mixer flow heating circuit 2, terminal X2/7 | Heizkreis 2 Mischer Vorlauf |
+| `KESSELSOLLTEMP` 0x0002 | KESSEL | return setpoint heating circuit 1 | Heizkreis 1 Rücklauf Soll |
+| `AUSSENTEMP` 0x000c | HEIZMODUL | air intake at the unit (not the control outdoor sensor) | Luftansaugtemperatur |
+
 #### More WPMW II settings (display title → register)
 
 Found on a TTL 33 by changing one value on the display and comparing bus scans (#68). The

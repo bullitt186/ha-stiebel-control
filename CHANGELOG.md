@@ -12,6 +12,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - SG Ready room setpoint boost is configurable per state (`number.…_sg_ready_raum_boost_zustand_3/4`,
   0–5 K, defaults 1 K and 2 K as before). With 0 the room setpoint of heating circuit 1 is left
   alone, so SG Ready no longer shifts the heating curve (#50).
+- WPMW II models: sensors that share a signal name but measure different points get their own
+  names per bus member, e.g. KESSEL `RUECKLAUFISTTEMP` is "Heizkreis 1 Regelfühler", HEIZMODUL
+  `RUECKLAUFISTTEMP` is "Wärmepumpe Rücklauf IWS" (#46). Entity IDs of existing installs stay.
 
 ### Fixed
 

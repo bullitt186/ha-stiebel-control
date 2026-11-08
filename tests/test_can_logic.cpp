@@ -1358,6 +1358,21 @@ TEST_CASE("writableNumbers: WPMW II parameters sit at the indices common.yaml us
     CHECK_FALSE(isWpmw2Parameter("HEIZKURVE"));
 }
 
+TEST_CASE("WPMW II: per-member names tell the measuring points apart (#46)", "[mqtt][names]") {
+    if (!isWpmw2Model()) {
+        CHECK(wpmw2MemberName("KESSEL", "RUECKLAUFISTTEMP") == nullptr);
+        return;
+    }
+    CHECK(std::string(wpmw2MemberName("KESSEL", "RUECKLAUFISTTEMP")) == LNAME_HK1_REGELFUEHLER);
+    CHECK(std::string(wpmw2MemberName("HEIZMODUL", "RUECKLAUFISTTEMP")) == LNAME_WP_RUECKLAUF_IWS);
+    CHECK(std::string(wpmw2MemberName("HEIZMODUL", "AUSSENTEMP")) == LNAME_LUFTANSAUGTEMP);
+    CHECK(wpmw2MemberName("KESSEL", "AUSSENTEMP") == nullptr);   // the control outdoor sensor
+    CHECK(wpmw2MemberName("MANAGER", "RUECKLAUFISTTEMP") == nullptr);
+    resetDiscoveryState();
+    publishMqttDiscovery(CanMembers[cm_kessel], GetElsterIndex("VORLAUFISTTEMP"));
+    CHECK(mqttFindPayload("homeassistant/sensor").find(LNAME_HK2_MISCHER_VORLAUF) != std::string::npos);
+}
+
 TEST_CASE("writableNumbers: SG Ready room boosts sit at the indices common.yaml uses", "[writable][sgready]") {
     // common.yaml's room boost /set handlers use writableNumbers[14] and [15].
     CHECK(std::string(writableNumbers[14].signalName) == "SG_READY_ROOM_BOOST_STATE3");
