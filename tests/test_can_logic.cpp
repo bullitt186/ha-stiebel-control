@@ -1961,7 +1961,7 @@ TEST_CASE("SG Ready IO: write is sent at once, read-back ~100 ms later from the 
     sgReadyIO.writeCanSignal("EINSTELL_SPEICHERSOLLTEMP", "55.0");
     REQUIRE(fake_can().sent.size() == 2);          // two writes, no read yet
     CHECK((fake_can().sent[0][0] & 0x0F) == 0);    // telegram type 0 = write
-    CHECK(pendingReadbackCount == 2);
+    CHECK(pendingReadbackCount == 4);              // early and settle read per signal
 
     pendingReadbackStep();                         // not due yet
     CHECK(fake_can().sent.size() == 2);
@@ -1973,13 +1973,37 @@ TEST_CASE("SG Ready IO: write is sent at once, read-back ~100 ms later from the 
     CHECK(fake_can().sent.size() == 4);
     pendingReadbackStep();
     CHECK(fake_can().sent.size() == 4);
+    CHECK(pendingReadbackCount == 2);
+    fake_millis() = 5000 + READBACK_SETTLE_MS;
+    pendingReadbackStep();
+    pendingReadbackStep();
+    CHECK(fake_can().sent.size() == 6);
     CHECK(pendingReadbackCount == 0);
 
-    // the same signal twice -> one read-back
+    // the same signal twice -> one early and one settle read-back
     sgReadyIO.writeCanSignal("PROGRAMMSCHALTER", "Automatik");
     sgReadyIO.writeCanSignal("PROGRAMMSCHALTER", "Bereitschaft");
-    CHECK(pendingReadbackCount == 1);
+    CHECK(pendingReadbackCount == 2);
     pendingReadbackCount = 0;
+    fake_millis() = 0;
+}
+
+TEST_CASE("writeSignal: a second read-back follows once the value has settled", "[readback]") {
+    resetDiscoveryState();
+    pendingReadbackCount = 0;
+    fake_can().sent.clear();
+    fake_millis() = 1000;
+    writeSignal(&CanMembers[cm_manager], "STILLSTANDZEIT", "21");
+    REQUIRE(fake_can().sent.size() == 1);
+    REQUIRE(pendingReadbackCount == 1);
+    fake_millis() = 1000 + READBACK_SETTLE_MS - 1;
+    pendingReadbackStep();
+    CHECK(fake_can().sent.size() == 1);
+    fake_millis() = 1000 + READBACK_SETTLE_MS;
+    pendingReadbackStep();
+    REQUIRE(fake_can().sent.size() == 2);
+    CHECK((fake_can().sent[1][0] & 0x0F) == 1);   // read request to the written member
+    CHECK(pendingReadbackCount == 0);
     fake_millis() = 0;
 }
 

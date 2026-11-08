@@ -138,12 +138,17 @@ These entities appear automatically in HA via MQTT discovery:
 | `number.manager_sg_ready_boost_zustand_3` | SG Ready DHW boost for state 3 | 0–10°C | 0.5°C |
 | `number.manager_sg_ready_boost_zustand_4` | SG Ready DHW boost for state 4 | 0–15°C | 0.5°C |
 
-### WPMW II Parameters (WPL13E only, number entities)
+### WPMW II Parameters (WPL13E and TTL 33, number entities)
 
 Display parameters of the WPMW II manager, written to the MANAGER over CAN. The register
-indices were found by a bus scan on a WPL13E; other models do not get these entities. Ranges
-follow the WPMW II commissioning list. The values change the heat pump's control behaviour:
-change one at a time and watch starts, run times and room temperatures.
+indices were found by bus scans and checked by changing each value on the display of a WPL13E
+and of a TTL 33; other models do not get these entities. Ranges follow the WPMW II
+commissioning list. The values change the heat pump's control behaviour: change one at a time
+and watch starts, run times and room temperatures.
+
+The parameter numbers below are those of the WPL13E manager. Other software versions number
+them differently (a TTL 33 with software 6518 shows Sommerbetrieb as 8, Bivalenzpunkt as 25/31,
+Reglerdynamik as 40, Stillstandzeit as 41), so go by the title on the display.
 
 | Entity ID | WPMW II parameter | Register | Range | Step |
 |-----------|-------------------|----------|-------|------|
@@ -155,6 +160,30 @@ change one at a time and watch starts, run times and room temperatures.
 
 Parameters 10 and 43 were confirmed by changing them on the display and reading the bus. On
 the WPMW II, `SOMMERBETRIEB_TEMP` (0xfdb5) and `SPERRZEIT` (0x0026) did not follow the display.
+
+#### More WPMW II settings (display title → register)
+
+Found on a TTL 33 by changing one value on the display and comparing bus scans (#68). The
+integration has no entities for most of them yet.
+
+| Display | Member | Index | Signal |
+|---|---|---|---|
+| WW-Hysterese | MANAGER | 0x0022 | `HYSTERESEZEIT` |
+| Rücklauf-Max | MANAGER | 0x0028 | `MAX_TEMP_KESSEL` |
+| Mischer-Max (HK2) | MISCHERMODUL_3 | 0x0028 | `MAX_TEMP_KESSEL` |
+| Dynamik-Misch (HK2, 60–240 = 6–24 K) | MISCHERMODUL_3 | 0x002b | `TN` |
+| Einsatzgrenze Heizung / WW | MANAGER | 0x01ae / 0x01af | `BIVALENZALTERNATIVTEMPERATUR_HZG` / `_WW` |
+| Frostschutz | MANAGER | 0x0a00 | `AUSSEN_FROSTTEMP` |
+| Dauerlauf-Pumpe | MANAGER | 0xfdaf | `DAUERLAUF_PUFFERLADEPUMPE` |
+| Pumpenzyklen | MANAGER | 0xfdb2 | `PUMPENZYKLEN` |
+| Gebäudebauart | MANAGER | 0xfdb3 | `GEBAEUDEART` |
+| Sommerbetrieb EIN/AUS | MANAGER | 0xfdb4 | `SOMMERBETRIEB` |
+| WW-Automatik | MANAGER | 0xfdb9 | `AUTOMATIK_WARMWASSER` |
+
+A second heating circuit (HK2) is handled by MISCHERMODUL_3 (0x602): its room targets
+(`RAUMSOLLTEMP_I` / `_NACHT`), heating curve and heating program answer and accept writes
+there. The integration's writable room target and heating curve go to the MANAGER, which is
+heating circuit 1. Abtauzeit-Min was not found on the bus.
 
 ### Compressor Runtime Counters (WPL13E, sensor entities)
 
