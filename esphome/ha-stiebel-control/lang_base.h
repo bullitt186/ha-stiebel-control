@@ -148,6 +148,9 @@
 #define LNAME_CALC_CAN_RX_OVERRUN              "CAN RX Überlauf (FIFO)"
 #define LNAME_CALC_CAN_RX_QUEUE                "CAN RX Warteschlange"
 #define LNAME_CALC_MQTT_PUBLISH_FAILURES       "MQTT Sendefehler"
+#define LNAME_CALC_VERDICHTER_STARTS_HEUTE     "Verdichterstarts heute"
+#define LNAME_CALC_VERDICHTER_LAUFZEIT_HEUTE   "Verdichterlaufzeit heute"
+#define LNAME_CALC_VERDICHTER_LAUFZEIT_MITTEL  "Verdichterlaufzeit je Start heute"
 
 // ============================================================================
 // Writable number friendly names (writableNumbers[])

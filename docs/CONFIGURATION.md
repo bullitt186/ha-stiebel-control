@@ -280,6 +280,12 @@ Published to `heatingpump/calculated/` MQTT topics and auto-discovered in HA:
 | Delta T (running) | `heatingpump/calculated/delta_t_running/state` | Same, only when compressor active |
 | Control deviation | `heatingpump/calculated/regelabweichung/state` | KESSEL return sensor (control sensor HK1) − return setpoint |
 | Compressor active | `heatingpump/calculated/compressor_active/state` | on/off |
+| Compressor starts today | `heatingpump/calculated/verdichter_starts_heute/state` | Starts since the heat pump's midnight; an off phase under 2 min does not count as a new start |
+| Compressor runtime today | `heatingpump/calculated/verdichter_laufzeit_heute/state` | Minutes the compressor ran today (30 s resolution) |
+| Runtime per start today | `heatingpump/calculated/verdichter_laufzeit_mittel/state` | Runtime today ÷ starts today, in minutes |
+
+The compressor counters use the heat pump's date for the day change and are held on the ESP
+only: after an ESP reboot they start again from 0 (MQTT reconnects do not affect them).
 | COP hot water | `heatingpump/calculated/cop_ww/state` | Coefficient of performance (DHW) |
 | COP heating | `heatingpump/calculated/cop_heiz/state` | Coefficient of performance (heating) |
 | COP total | `heatingpump/calculated/cop_gesamt/state` | Overall coefficient of performance |

@@ -253,6 +253,14 @@ static const CalculatedSensorConfig calculatedSensors[] = {
      "sensor", "", "", "measurement", "mdi:tray-full", "", "", "diagnostic", false},
     {"stiebel_calculated_mqtt_publish_failures", LNAME_CALC_MQTT_PUBLISH_FAILURES, "heatingpump/calculated/mqtt_publish_failures/state",
      "sensor", "", "", "total_increasing", "mdi:message-off-outline", "", "", "diagnostic", false},
+
+    // Compressor starts and runtime today (#49), from compressor_active, debounced
+    {"stiebel_calculated_verdichter_starts_heute", LNAME_CALC_VERDICHTER_STARTS_HEUTE, "heatingpump/calculated/verdichter_starts_heute/state",
+     "sensor", "", "", "total_increasing", "mdi:counter", "", "", "", true},
+    {"stiebel_calculated_verdichter_laufzeit_heute", LNAME_CALC_VERDICHTER_LAUFZEIT_HEUTE, "heatingpump/calculated/verdichter_laufzeit_heute/state",
+     "sensor", "duration", "min", "total_increasing", "mdi:timer-outline", "", "", "", true},
+    {"stiebel_calculated_verdichter_laufzeit_mittel", LNAME_CALC_VERDICHTER_LAUFZEIT_MITTEL, "heatingpump/calculated/verdichter_laufzeit_mittel/state",
+     "sensor", "duration", "min", "measurement", "mdi:timer-sand", "", "", "", true},
 };
 
 static const size_t CALCULATED_SENSOR_COUNT = sizeof(calculatedSensors) / sizeof(CalculatedSensorConfig);
@@ -262,7 +270,10 @@ static const size_t CALC_IDX_CAN_RX_MISSED = 24;
 static const size_t CALC_IDX_CAN_RX_OVERRUN = 25;
 static const size_t CALC_IDX_CAN_RX_QUEUE = 26;
 static const size_t CALC_IDX_MQTT_PUBLISH_FAILURES = 27;
-static_assert(CALCULATED_SENSOR_COUNT == CALC_IDX_MQTT_PUBLISH_FAILURES + 1,
+static const size_t CALC_IDX_VERDICHTER_STARTS = 28;
+static const size_t CALC_IDX_VERDICHTER_LAUFZEIT = 29;
+static const size_t CALC_IDX_VERDICHTER_LAUFZEIT_MITTEL = 30;
+static_assert(CALCULATED_SENSOR_COUNT == CALC_IDX_VERDICHTER_LAUFZEIT_MITTEL + 1,
               "calculatedSensors changed: update the CALC_IDX_* constants");
 
 // Decode buffer for SetValueType(): its longest texts are 20 characters plus the
@@ -1666,6 +1677,57 @@ void publishDeltaTRunning()
     publishCalculatedState(stateTopic, value);
 }
 
+// Compressor starts and runtime per day (#49). An off phase shorter than
+// COMPRESSOR_MIN_OFF_MS does not end a run, so a short gap is not a new start.
+// The day is the heat pump's own date (TAG); the counts live in RAM and start
+// from 0 after an ESP reboot.
+static constexpr uint32_t COMPRESSOR_MIN_OFF_MS = 120000UL;
+struct CompressorDayStats {
+    int day = -1;
+    uint32_t starts = 0;
+    uint32_t runtimeMs = 0;
+    bool running = false;          // debounced: true from a start until a long off phase
+    bool lastSampleOn = false;
+    bool haveSample = false;
+    uint32_t lastSampleMs = 0;
+    uint32_t offSinceMs = 0;
+};
+static CompressorDayStats compressorStats;
+
+inline void updateCompressorStats(CompressorDayStats& s, bool on, uint32_t now, int day) {
+    if (day > 0 && s.day > 0 && day != s.day) {   // new day: a run across midnight counts again
+        s.starts = (on && s.running) ? 1 : 0;
+        s.runtimeMs = 0;
+    }
+    if (day > 0) s.day = day;
+    if (s.haveSample && s.lastSampleOn && on) s.runtimeMs += now - s.lastSampleMs;
+    if (on) {
+        if (!s.running) { s.running = true; s.starts++; }
+    } else {
+        if (!s.haveSample || s.lastSampleOn) s.offSinceMs = now;
+        if (s.running && now - s.offSinceMs >= COMPRESSOR_MIN_OFF_MS) s.running = false;
+    }
+    s.lastSampleOn = on;
+    s.lastSampleMs = now;
+    s.haveSample = true;
+}
+
+inline void publishCompressorStats() {
+    char v[16];
+    snprintf(v, sizeof(v), "%u", (unsigned)compressorStats.starts);
+    publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_VERDICHTER_STARTS], false);
+    publishCalculatedState(calculatedSensors[CALC_IDX_VERDICHTER_STARTS].stateTopic, v);
+    const float minutes = compressorStats.runtimeMs / 60000.0f;
+    snprintf(v, sizeof(v), "%.1f", minutes);
+    publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_VERDICHTER_LAUFZEIT], false);
+    publishCalculatedState(calculatedSensors[CALC_IDX_VERDICHTER_LAUFZEIT].stateTopic, v);
+    if (compressorStats.starts > 0) {
+        snprintf(v, sizeof(v), "%.1f", minutes / compressorStats.starts);
+        publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_VERDICHTER_LAUFZEIT_MITTEL], false);
+        publishCalculatedState(calculatedSensors[CALC_IDX_VERDICHTER_LAUFZEIT_MITTEL].stateTopic, v);
+    }
+}
+
 void publishCompressorActive()
 {
     // Publish discovery (only once - cached)
@@ -1688,6 +1750,9 @@ void publishCompressorActive()
     const char* stateTopic = "heatingpump/calculated/compressor_active/state";
     publishCalculatedState(stateTopic, state);
     // Note: Delta T running is published separately by scheduler
+
+    updateCompressorStats(compressorStats, isActive, millis(), lastTag);
+    publishCompressorStats();
 }
 
 void publishRegelabweichung()

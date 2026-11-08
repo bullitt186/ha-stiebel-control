@@ -15,6 +15,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - WPMW II models: sensors that share a signal name but measure different points get their own
   names per bus member, e.g. KESSEL `RUECKLAUFISTTEMP` is "Heizkreis 1 Regelfühler", HEIZMODUL
   `RUECKLAUFISTTEMP` is "Wärmepumpe Rücklauf IWS" (#46). Entity IDs of existing installs stay.
+- Calculated sensors for short-cycling: compressor starts today, runtime today and runtime per start
+  (#49). Off phases under 2 min do not count as a new start; the day follows the heat pump's date.
 
 ### Fixed
 
