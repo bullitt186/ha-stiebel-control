@@ -7,6 +7,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Changed
+
+- `ttl33`: the heating curve and the WPMW II parameters (Reglerdynamik, Stillstandzeit, summer mode
+  threshold, bivalence points heating/hot water) are writable number entities, as on `wpl13e`. Each
+  value was written over CAN on a TTL 33 and checked on the WPMW II display (by SolderAndSyntax).
+- `ttl33` table polls `SCHALTWERKDYNAMIKZEIT` (display "Reglerdynamik"), so its writable entity no
+  longer stays unknown.
+
 ## [2.6.0] — 2026-11-06
 
 Contributions from reniko, SolderAndSyntax and hawkeye80: three new models, WPMW II fixes and

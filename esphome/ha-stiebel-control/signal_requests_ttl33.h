@@ -98,9 +98,10 @@ extern const SignalRequest signalRequests[] = {
     {"SW_AUSSENTEMP",              FREQ_10MIN, cm_manager},  // summer mode, display parameter 8
     {"SOMMERBETRIEB_TEMP",         FREQ_10MIN, cm_manager},  // meaning unclear on this unit
     {"SPERRZEIT",                  FREQ_10MIN, cm_manager},
+    {"SCHALTWERKDYNAMIKZEIT",      FREQ_10MIN, cm_manager},  // display "Reglerdynamik" (writable number)
     {"STILLSTANDZEIT",             FREQ_10MIN, cm_manager},
-    {"HYSTERESEZEIT",              FREQ_10MIN, cm_manager},  // matches the DHW hysteresis (3 K)
-    {"MAX_TEMP_KESSEL",            FREQ_10MIN, cm_manager},
+    {"HYSTERESEZEIT",              FREQ_10MIN, cm_manager},  // display "WW-Hysterese" (changed on the display)
+    {"MAX_TEMP_KESSEL",            FREQ_10MIN, cm_manager},  // display "Ruecklauf-Max" (changed on the display)
     {"BIVALENTPARALLELTEMPERATUR_HZG",   FREQ_10MIN, cm_manager},
     {"BIVALENTPARALLELTEMPERATUR_WW",    FREQ_10MIN, cm_manager},
     {"BIVALENZALTERNATIVTEMPERATUR_HZG", FREQ_10MIN, cm_manager},
