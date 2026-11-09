@@ -1945,6 +1945,10 @@ TEST_CASE("mqttPublish: refused publishes are counted and published as diagnosti
     publishCalculatedState("heatingpump/calculated/time/state", "12:00:00");
     publishCalculatedState("heatingpump/calculated/time/state", "12:00:00");   // still pending: retried
     CHECK(mqttPublishFailures == 2);
+    mqtt_client_instance().connected = false;     // not connected: not a drop
+    mqttPublish("heatingpump/x", "1", 1);
+    CHECK(mqttPublishFailures == 2);
+    mqtt_client_instance().connected = true;
     mqtt_client_instance().fail_publish = false;
     publishMqttDiagnostics();
     CHECK(mqttFindPayload("calculated/mqtt_publish_failures/state") == "2");

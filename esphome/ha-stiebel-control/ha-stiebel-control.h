@@ -794,13 +794,14 @@ const ElsterIndex *processCanMessageDebug(const std::vector<uint8_t> &msg, uint3
 // MQTT PUBLISH: failure counter, publish-on-change state cache (#55)
 // ============================================================================
 
-// Publishes that the MQTT client refused (not connected, or the idf_send_async
-// queue was full). Published as diagnostic sensor mqtt_publish_failures.
+// Publishes the MQTT client refused while connected (idf_send_async queue full).
+// Attempts while disconnected are not counted: they are sent again after the connect.
+// Published as diagnostic sensor mqtt_publish_failures.
 static uint32_t mqttPublishFailures = 0;
 
 inline bool mqttPublish(const char* topic, const char* payload, size_t len, bool retain = true) {
     bool ok = id(mqtt_client).publish(topic, payload, len, 0, retain);
-    if (!ok) mqttPublishFailures++;
+    if (!ok && id(mqtt_client).is_connected()) mqttPublishFailures++;
     return ok;
 }
 
