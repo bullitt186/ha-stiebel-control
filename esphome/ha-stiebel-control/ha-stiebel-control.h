@@ -3556,6 +3556,11 @@ void processSignalRequests() {
         // Move to next signal in round-robin fashion (wrap around at end)
         currentIndex = (currentIndex + 1) % SIGNAL_REQUEST_COUNT;
     }
+
+    // Continue after the last checked signal next time. Without this every call started
+    // at index 0 and, with more due requests than one per second, the end of the table
+    // was never polled.
+    signalProcessingStartIndex = currentIndex;
 }
 
 void processAndUpdate(uint32_t can_id, const std::vector<uint8_t> &msg)

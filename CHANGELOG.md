@@ -20,6 +20,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Fixed
 
+- The request manager started every call at the top of the request table, because
+  `signalProcessingStartIndex` was never updated. With more due requests than one per second
+  (e.g. wpl13e/wpl18e about 68, wpl17 about 63 per minute) the end of the table could starve;
+  it now continues after the last checked entry.
 - Right after an MQTT connect ESPHome queues its subscriptions and native states; its async publish
   queue holds 30 messages, so the SG Ready states and part of the republished discovery configs and
   states were dropped (seen as `mqtt_publish_failures` after a boot). Own republishing now starts
