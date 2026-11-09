@@ -42,6 +42,12 @@ jobs:
       - name: Install ESPHome
         run: pip install esphome==2026.10.1
 
+      - name: Cache PlatformIO toolchains and frameworks
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: platformio-esp32s3-esphome-2026.10.1
+
       - name: Use CI secrets
         run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
 
@@ -71,6 +77,11 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install esphome==2026.10.1
+      - name: Cache PlatformIO toolchains and frameworks
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: platformio-esp32s3-esphome-2026.10.1
       - run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
       - run: esphome compile esphome/ci_heatingpump_wpl9.yaml
 
@@ -86,6 +97,12 @@ jobs:
 
       - name: Install ESPHome
         run: pip install esphome==2026.10.1
+
+      - name: Cache PlatformIO toolchains and frameworks
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: platformio-esp32-esphome-2026.10.1
 
       - name: Use CI secrets
         run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
