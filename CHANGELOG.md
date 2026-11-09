@@ -9,6 +9,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Added
 
+- Network package selectable by the substitution `network_package`: `network_wifi.yaml`
+  (default, WiFi, captive portal and WiFi sensors moved out of `common.yaml` unchanged) or the
+  new `network_ethernet_w5500.yaml` (W5500 SPI Ethernet, DHCP, pin defaults for the Waveshare
+  ESP32-S3-POE-ETH). Existing configurations need no change.
 - SG Ready room setpoint boost is configurable per state (`number.…_sg_ready_raum_boost_zustand_3/4`,
   0–5 K, defaults 1 K and 2 K as before). With 0 the room setpoint of heating circuit 1 is left
   alone, so SG Ready no longer shifts the heating curve (#50).
