@@ -20,6 +20,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Fixed
 
+- Right after an MQTT connect ESPHome queues its subscriptions and native states; its async publish
+  queue holds 30 messages, so the SG Ready states and part of the republished discovery configs and
+  states were dropped (seen as `mqtt_publish_failures` after a boot). Own republishing now starts
+  3 s after the connect, and the SG Ready states are retried until they are queued.
 - SG Ready boost values were lost on a reboot (the docs said they were stored). All four boost
   values are now kept in NVS.
 - The read-back right after a write often returned the old value on the WPMW II, so HA showed the

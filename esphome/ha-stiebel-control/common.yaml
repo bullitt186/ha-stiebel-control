@@ -136,6 +136,7 @@ mqtt:
         format: "Connected to MQTT broker"
         tag: "MQTT_CONN"
     - lambda: |-
+        noteMqttConnected();
         // Anything "published" during boot before the broker connection was up
         // was lost, but is already marked as discovered. Re-sends writable
         // numbers/selects, climate, calculated sensors and raw signals, paced by
@@ -145,9 +146,8 @@ mqtt:
         // known value once more, after the discoveries (stateRepublishStep()).
         republishAllStates();
 
-        // Publish current SG Ready state + boost values (retained)
-        ESP_LOGI("MQTT_CONN", "Publishing initial SG Ready states...");
-        publishSgReadyState();
+        // SG Ready state + boost values (retained), once the connect burst has drained
+        scheduleSgReadyPublish();
         // Update sensors with initial values
         id(sg_ready_boost_state3_sensor).publish_state(sgReadyBoostState3Value());
         id(sg_ready_boost_state4_sensor).publish_state(sgReadyBoostState4Value());
@@ -158,7 +158,6 @@ mqtt:
           currentSgReadyState == 3 ? "3 - Empfohlen" :
           currentSgReadyState == 4 ? "4 - Zwang" : "Unbekannt"
         );
-        ESP_LOGI("MQTT_CONN", "Initial SG Ready states published");
   on_disconnect:
     - logger.log:
         level: WARN
@@ -512,6 +511,7 @@ interval:
           discoveryRepublishStep();
           stateRepublishStep();
           pendingReadbackStep();
+          sgReadyPublishStep();
 
 #########################################
 #                                       #
