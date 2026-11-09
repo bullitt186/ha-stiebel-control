@@ -442,6 +442,8 @@ static void resetDiscoveryState() {
     mqtt_client_instance().connected = true;
     mqtt_client_instance().fail_publish = false;
     mqtt_client_instance().clear();
+    mqttConnectSeen = false;
+    sgReadyPublishPending = false;
 }
 
 // ============================================================================
@@ -1943,6 +1945,10 @@ TEST_CASE("mqttPublish: refused publishes are counted and published as diagnosti
     publishCalculatedState("heatingpump/calculated/time/state", "12:00:00");
     publishCalculatedState("heatingpump/calculated/time/state", "12:00:00");   // still pending: retried
     CHECK(mqttPublishFailures == 2);
+    mqtt_client_instance().connected = false;     // not connected: not a drop
+    mqttPublish("heatingpump/x", "1", 1);
+    CHECK(mqttPublishFailures == 2);
+    mqtt_client_instance().connected = true;
     mqtt_client_instance().fail_publish = false;
     publishMqttDiagnostics();
     CHECK(mqttFindPayload("calculated/mqtt_publish_failures/state") == "2");
@@ -2074,6 +2080,44 @@ TEST_CASE("SG Ready IO: write is sent at once, read-back ~100 ms later from the 
     sgReadyIO.writeCanSignal("PROGRAMMSCHALTER", "Bereitschaft");
     CHECK(pendingReadbackCount == 2);
     pendingReadbackCount = 0;
+    fake_millis() = 0;
+}
+
+TEST_CASE("MQTT connect: own republishing waits until the connect burst has drained", "[mqtt][state]") {
+    resetDiscoveryState();
+    fake_millis() = 10000;
+    publishMqttState(CanMembers[cm_kessel], GetElsterIndex("SPEICHERISTTEMP"), "48.0");
+    mqtt_client_instance().clear();
+    noteMqttConnected();
+    republishAllStates();
+    scheduleSgReadyPublish();
+    stateRepublishStep();
+    sgReadyPublishStep();
+    CHECK(mqtt_client_instance().messages.empty());
+    fake_millis() = 10000 + MQTT_CONNECT_SETTLE_MS;
+    stateRepublishStep();
+    sgReadyPublishStep();
+    CHECK(mqttTopicPublished("heatingpump/KESSEL/SPEICHERISTTEMP/state"));
+    CHECK(mqttTopicPublished("heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE3/state"));
+    CHECK_FALSE(sgReadyPublishPending);
+    fake_millis() = 0;
+}
+
+TEST_CASE("MQTT connect: SG Ready state is retried when the queue was full", "[mqtt][sgready]") {
+    resetDiscoveryState();
+    fake_millis() = 5000;
+    scheduleSgReadyPublish();
+    mqtt_client_instance().fail_publish = true;
+    sgReadyPublishStep();
+    CHECK(sgReadyPublishPending);
+    mqtt_client_instance().fail_publish = false;
+    fake_millis() = 5500;
+    sgReadyPublishStep();                       // retry waits a second
+    CHECK(sgReadyPublishPending);
+    fake_millis() = 6000;
+    sgReadyPublishStep();
+    CHECK_FALSE(sgReadyPublishPending);
+    CHECK(mqttFindPayload("SG_READY_STATE/state").size() > 0);
     fake_millis() = 0;
 }
 

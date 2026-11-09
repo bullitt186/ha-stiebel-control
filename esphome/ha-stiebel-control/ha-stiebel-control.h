@@ -794,13 +794,14 @@ const ElsterIndex *processCanMessageDebug(const std::vector<uint8_t> &msg, uint3
 // MQTT PUBLISH: failure counter, publish-on-change state cache (#55)
 // ============================================================================
 
-// Publishes that the MQTT client refused (not connected, or the idf_send_async
-// queue was full). Published as diagnostic sensor mqtt_publish_failures.
+// Publishes the MQTT client refused while connected (idf_send_async queue full).
+// Attempts while disconnected are not counted: they are sent again after the connect.
+// Published as diagnostic sensor mqtt_publish_failures.
 static uint32_t mqttPublishFailures = 0;
 
 inline bool mqttPublish(const char* topic, const char* payload, size_t len, bool retain = true) {
     bool ok = id(mqtt_client).publish(topic, payload, len, 0, retain);
-    if (!ok) mqttPublishFailures++;
+    if (!ok && id(mqtt_client).is_connected()) mqttPublishFailures++;
     return ok;
 }
 
@@ -927,6 +928,17 @@ inline void forceNextStatePublish(const CanMember& cm, const ElsterIndex* ei) {
 
 // Called on every MQTT (re)connect: a broker restart without persistence would
 // otherwise leave constant values empty until their heartbeat.
+// Right after an MQTT connect ESPHome queues its subscriptions and the states of the
+// native entities. The async publish queue holds only 30 messages, so anything sent
+// in the same moment is dropped. Our own republishing waits until this has drained.
+static constexpr uint32_t MQTT_CONNECT_SETTLE_MS = 3000;
+static uint32_t mqttConnectedAtMs = 0;
+static bool mqttConnectSeen = false;
+inline void noteMqttConnected() { mqttConnectedAtMs = millis(); mqttConnectSeen = true; }
+inline bool mqttSettling() {
+    return mqttConnectSeen && millis() - mqttConnectedAtMs < MQTT_CONNECT_SETTLE_MS;
+}
+
 inline void republishAllStates() {
     stateRepublishActive = !stateCache.empty();
     stateRepublishPos = 0;
@@ -936,7 +948,8 @@ inline void republishAllStates() {
 // Waits while MQTT is down and while the discovery republish is still running.
 inline bool discoveryRepublishActive();
 inline void stateRepublishStep() {
-    if (!stateRepublishActive || !id(mqtt_client).is_connected() || discoveryRepublishActive()) return;
+    if (!stateRepublishActive || !id(mqtt_client).is_connected() || discoveryRepublishActive() ||
+        mqttSettling()) return;
     char buf[128];
     const uint32_t now = millis();
     for (int n = 0; n < STATE_REPUBLISH_BATCH && stateRepublishPos < stateCache.size(); n++) {
@@ -1947,7 +1960,7 @@ inline bool discoveryRepublishActive() { return discoveryRepublishPhase != DR_ID
 
 // Publishes up to DISCOVERY_REPUBLISH_BATCH discovery configs (climate counts as one).
 void discoveryRepublishStep() {
-    if (discoveryRepublishPhase == DR_IDLE || !id(mqtt_client).is_connected()) return;
+    if (discoveryRepublishPhase == DR_IDLE || !id(mqtt_client).is_connected() || mqttSettling()) return;
     size_t budget = DISCOVERY_REPUBLISH_BATCH;
     while (budget > 0 && discoveryRepublishPhase != DR_IDLE) {
         const size_t i = discoveryRepublishPos++;
@@ -2662,24 +2675,39 @@ inline bool handleSgReadyRoomBoost(int state, const std::string& payload) {
 // Publishes the current SG Ready state and boost values (retained). Called on
 // boot, on MQTT connect and periodically, so the retained values survive a
 // broker restart instead of being published only once on connect.
-inline void publishSgReadyState() {
+// Returns false if a message could not be queued (caller retries).
+inline bool publishSgReadyState() {
 #ifdef HA_DISABLE_SG_READY_true
-    return;
+    return true;
 #endif
     int idx = currentSgReadyState - 1;
     if (idx < 0 || idx > 3) idx = 1;  // fall back to "2 - Normal"
     const char* s = sgReadyOptions[idx];
-    mqttPublish("heatingpump/MANAGER/SG_READY_STATE/state", s, strlen(s));
+    bool ok = mqttPublish("heatingpump/MANAGER/SG_READY_STATE/state", s, strlen(s));
     char b3[16], b4[16];
     snprintf(b3, sizeof(b3), "%.1f", sgReadyBoostState3Value());
     snprintf(b4, sizeof(b4), "%.1f", sgReadyBoostState4Value());
-    mqttPublish("heatingpump/MANAGER/SG_READY_BOOST_STATE3/state", b3, strlen(b3));
-    mqttPublish("heatingpump/MANAGER/SG_READY_BOOST_STATE4/state", b4, strlen(b4));
+    ok &= mqttPublish("heatingpump/MANAGER/SG_READY_BOOST_STATE3/state", b3, strlen(b3));
+    ok &= mqttPublish("heatingpump/MANAGER/SG_READY_BOOST_STATE4/state", b4, strlen(b4));
     char r3[16], r4[16];
     snprintf(r3, sizeof(r3), "%.1f", sgReadyController.roomBoostState3());
     snprintf(r4, sizeof(r4), "%.1f", sgReadyController.roomBoostState4());
-    mqttPublish("heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE3/state", r3, strlen(r3));
-    mqttPublish("heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE4/state", r4, strlen(r4));
+    ok &= mqttPublish("heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE3/state", r3, strlen(r3));
+    ok &= mqttPublish("heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE4/state", r4, strlen(r4));
+    return ok;
+}
+
+// SG Ready state after a connect: sent once the connect burst has drained, and
+// again one second later if a message did not fit into the queue.
+static bool sgReadyPublishPending = false;
+static uint32_t sgReadyPublishRetryMs = 0;
+inline void scheduleSgReadyPublish() { sgReadyPublishPending = true; sgReadyPublishRetryMs = 0; }
+inline void sgReadyPublishStep() {
+    if (!sgReadyPublishPending || !id(mqtt_client).is_connected() || mqttSettling()) return;
+    const uint32_t now = millis();
+    if (sgReadyPublishRetryMs != 0 && static_cast<int32_t>(now - sgReadyPublishRetryMs) < 0) return;
+    if (publishSgReadyState()) sgReadyPublishPending = false;
+    else sgReadyPublishRetryMs = now + 1000;
 }
 
 // ============================================================================

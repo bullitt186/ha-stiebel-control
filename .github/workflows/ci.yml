@@ -42,6 +42,13 @@ jobs:
       - name: Install ESPHome
         run: pip install esphome==2026.10.1
 
+      - name: Cache ESP-IDF toolchain and framework
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/esphome
+          key: esphome-idf-esphome-2026.10.1
+          restore-keys: esphome-idf-
+
       - name: Use CI secrets
         run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
 
@@ -71,6 +78,12 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install esphome==2026.10.1
+      - name: Cache ESP-IDF toolchain and framework
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/esphome
+          key: esphome-idf-esphome-2026.10.1
+          restore-keys: esphome-idf-
       - run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
       - run: esphome compile esphome/ci_heatingpump_wpl9.yaml
 
@@ -86,6 +99,13 @@ jobs:
 
       - name: Install ESPHome
         run: pip install esphome==2026.10.1
+
+      - name: Cache ESP-IDF toolchain and framework
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/esphome
+          key: esphome-idf-esphome-2026.10.1
+          restore-keys: esphome-idf-
 
       - name: Use CI secrets
         run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
