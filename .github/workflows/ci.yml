@@ -46,7 +46,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/esphome
-          key: esphome-idf-esp32s3-esphome-2026.10.1
+          key: esphome-idf-esphome-2026.10.1
 
       - name: Use CI secrets
         run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
@@ -81,7 +81,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/esphome
-          key: esphome-idf-esp32s3-esphome-2026.10.1
+          key: esphome-idf-esphome-2026.10.1
       - run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
       - run: esphome compile esphome/ci_heatingpump_wpl9.yaml
 
@@ -102,7 +102,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/esphome
-          key: esphome-idf-esp32-esphome-2026.10.1
+          key: esphome-idf-esphome-2026.10.1
 
       - name: Use CI secrets
         run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
