@@ -9,6 +9,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Added
 
+- WPMW II models: the "Update Uhrzeit" and "Update Datum" buttons write `UHRZEIT` as one value and `DATUM`
+  followed by `JAHR`, the way the WPMW II manager accepts them (#68). The single `STUNDE`/`MINUTE`/`SEKUNDE`
+  writes are ignored there, and `DATUM` alone resets the year to 2000. Other models are unchanged.
+
 - SG Ready room setpoint boost is configurable per state (`number.…_sg_ready_raum_boost_zustand_3/4`,
   0–5 K, defaults 1 K and 2 K as before). With 0 the room setpoint of heating circuit 1 is left
   alone, so SG Ready no longer shifts the heating curve (#50).

@@ -3596,6 +3596,20 @@ void updateTime(CanMember cm, const char *str_time)
 {
     ESP_LOGI("WRITE UHRZEIT VIA BUTTON", "%s", str_time);
 
+    // WPMW II: the manager ignores the single STUNDE/MINUTE/SEKUNDE writes but accepts UHRZEIT
+    // (0x0009, hour and minute in one value); the heat pump takes the time over and the seconds
+    // restart at 0. Confirmed on a TTL 33 with WPMW II, software 6518 (#68). While the clock menu
+    // is open on the display, the display shows "--.--" until the menu is left.
+    if (isWpmw2Model()) {
+        char hhmm[6];
+        strncpy(hhmm, str_time, 5);   // "HH:MM:SS" from input_datetime -> "HH:MM"
+        hhmm[5] = '\0';
+        ESP_LOGI("WRITE", "UHRZEIT: %s", hhmm);
+        writeSignal(&cm, "UHRZEIT", hhmm);
+        readSignal(&cm, "UHRZEIT");
+        return;
+    }
+
     char stunde[3];
     char minute[3];
     char sekunde[3];
@@ -3621,6 +3635,23 @@ void updateTime(CanMember cm, const char *str_time)
 void updateDate(CanMember cm, const char *str_date)
 {
     ESP_LOGI("WRITE DATUM VIA BUTTON", "%s", str_date);
+
+    // WPMW II: DATUM (0x000a, day and month in one value) works but resets JAHR to 0 (2000);
+    // writing JAHR (two digits) right after DATUM fixes it, and the manager recalculates the
+    // weekday itself. Confirmed on a TTL 33 with WPMW II, software 6518 (#68).
+    if (isWpmw2Model()) {
+        char ddmm[7];   // "YYYY-MM-DD" from input_datetime -> "DD.MM."
+        ddmm[0] = str_date[8]; ddmm[1] = str_date[9]; ddmm[2] = '.';
+        ddmm[3] = str_date[5]; ddmm[4] = str_date[6]; ddmm[5] = '.';
+        ddmm[6] = '\0';
+        char yy[3] = {str_date[2], str_date[3], '\0'};
+        ESP_LOGI("WRITE", "DATUM: %s, JAHR: %s", ddmm, yy);
+        writeSignal(&cm, "DATUM", ddmm);
+        writeSignal(&cm, "JAHR", yy);
+        readSignal(&cm, "DATUM");
+        readSignal(&cm, "JAHR");
+        return;
+    }
     char year[3];
     char month[3];
     char day[3];
