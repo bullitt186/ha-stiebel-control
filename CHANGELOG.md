@@ -24,6 +24,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Fixed
 
+- Numeric signals answering `0x9000` (function switched off, e.g. `BIVALENZALTERNATIVTEMPERATUR_HZG`
+  on KESSEL) were published as a number: `et_dec_val` showed -2867.2 °C and went into the long-term
+  statistics. `0x9000` is now not published for `et_dec_val`, `et_cent_val` and `et_mil_val`: the
+  entity keeps its last state, and it does not count for the poll back-off, because the device does
+  answer (#78). `et_hours` and `et_little_endian` are unchanged, because there `0x9000` is a valid
+  value.
 - The request manager started every call at the top of the request table, because
   `signalProcessingStartIndex` was never updated. With more due requests than one per second
   (e.g. wpl13e/wpl18e about 68, wpl17 about 63 per minute) the end of the table could starve;

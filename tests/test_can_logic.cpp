@@ -680,6 +680,28 @@ TEST_CASE("nextBackoffMs: capped at 6 h, never below base", "[can]") {
     CHECK(nextBackoffMs(8UL * 3600UL * 1000UL, 5) == 8UL * 3600UL * 1000UL);
 }
 
+TEST_CASE("0x9000 (function off) on a numeric signal: nothing published, last value stays", "[can][mqtt]") {
+    resetDiscoveryState();
+    const ElsterIndex* ei = GetElsterIndex("RUECKLAUFISTTEMP");
+    REQUIRE(ei->Type == et_dec_val);
+    processAndUpdate(0x480, makeFrame(0x92, 0x00, 0x16, 0x01, 0x31));  // 305 = 30.5
+    REQUIRE(mqttFindPayload("RUECKLAUFISTTEMP/state") == "30.5");
+    const size_t published = mqtt_client_instance().messages.size();
+    processAndUpdate(0x480, makeFrame(0x92, 0x00, 0x16, 0x90, 0x00));  // would be -2867.2
+    CHECK(mqtt_client_instance().messages.size() == published);
+    CHECK(mqttFindPayload("RUECKLAUFISTTEMP/state") == "30.5");
+}
+
+TEST_CASE("0x9000 (function off) does not raise the poll back-off", "[can]") {
+    resetDiscoveryState();
+    const CanMember& mgr = CanMembers[cm_manager];
+    const ElsterIndex* ei = GetElsterIndex("RUECKLAUFISTTEMP");
+    const uint64_t key = signalKey(mgr, "RUECKLAUFISTTEMP");
+    for (int i = 0; i < 2; i++) updateSensor(mgr, ei, "-255");
+    for (int i = 0; i < 3; i++) processAndUpdate(0x480, makeFrame(0x92, 0x00, 0x16, 0x90, 0x00));
+    CHECK(backoffIntervalMs(key, 60000) == 60000);
+}
+
 // processAndUpdate: Elster telegram type filter
 // Frame layout: [type | receiver address, receiver low bits, 0xFA, idx hi, idx lo, val hi, val lo]
 TEST_CASE("processAndUpdate: read request from another node is not a value", "[can]") {
