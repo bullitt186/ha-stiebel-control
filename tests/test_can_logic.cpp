@@ -22,7 +22,7 @@
 TEST_CASE("generate_read_id: MANAGER (0x480)", "[can]") {
     // address = (0x480 & 0x780) / 8 = 0x480 / 8 = 0x90
     // first = (0x90 & 0xF0) + 1 = 0x90 + 1 = 0x91
-    // second = 0x480 & 7 = 0
+    // second = 0x480 & 0x7F = 0
     auto id = generate_read_id(0x480);
     CHECK(id.first  == 0x91);
     CHECK(id.second == 0x00);
@@ -50,7 +50,15 @@ TEST_CASE("generate_write_id: read first byte = write first byte + 1", "[can]") 
         CHECK(r.second == w.second);
     }
 }
-TEST_CASE("generate_read_id: second byte encodes lower 3 bits of CAN ID", "[can]") {
+TEST_CASE("generate_read_id: second byte encodes the lower 7 bits of the CAN ID", "[can]") {
+    // HEIZMODUL_WPL 0x514 (WPL17, WPL-A): 0xa1 0x14, not 0x04 (that would address 0x504)
+    auto wpl = generate_read_id(0x514);
+    CHECK(wpl.first  == 0xa1);
+    CHECK(wpl.second == 0x14);
+    CHECK(generate_write_id(0x514).second == 0x14);
+    CHECK(generate_read_id(0x601).second == 0x01);   // MISCHERMODUL_2
+    CHECK(generate_read_id(0x201).second == 0x01);   // KESSEL_CANB
+
     // CAN ID 0x483: lower 3 bits = 3
     auto id = generate_read_id(0x483);
     CHECK(id.second == 3);
@@ -2037,9 +2045,21 @@ TEST_CASE("request manager: table resolved once, unknown/blacklisted skipped", "
     fake_millis() += 120000;               // everything due
     for (int i = 0; i < 10; i++) processSignalRequests();
     CHECK(fake_can().sent.size() == 4);   // each (member, signal) once, unknown/blacklisted never
+
+    // Round robin: a signal that is due again at once must not starve the rest of the table
+    fake_millis() += 120000;               // everything due again
+    fake_can().sent.clear();
+    processSignalRequests();
+    REQUIRE(fake_can().sent.size() == 1);
+    const std::vector<uint8_t> first = fake_can().sent[0];
+    for (auto& kv : nextRequestTime) kv.second = 0;   // all due, including the one just sent
+    processSignalRequests();
+    REQUIRE(fake_can().sent.size() == 2);
+    CHECK(fake_can().sent[1] != first);   // the next signal, not the first one again
     requestManagerStarted = false;
     requestManagerStartTime = 0;
     nextRequestTime.clear();
+    signalProcessingStartIndex = 0;
     fake_millis() = 0;
 }
 
