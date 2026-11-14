@@ -20,6 +20,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Fixed
 
+- Read and write requests to bus members with an id whose lower 7 bits exceed 7 went to the
+  wrong member: the frame header kept only 3 bits, so a request to 0x514 (HEIZMODUL_WPL) went to
+  0x504. Byte 1 (data[1]) now carries the lower 7 bits of the receiver id.
 - Right after an MQTT connect ESPHome queues its subscriptions and native states; its async publish
   queue holds 30 messages, so the SG Ready states and part of the republished discovery configs and
   states were dropped (seen as `mqtt_publish_failures` after a boot). Own republishing now starts
