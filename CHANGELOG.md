@@ -9,6 +9,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Added
 
+- Network package selectable by the substitution `network_package`: `network_wifi.yaml`
+  (default, WiFi, captive portal and WiFi sensors moved out of `common.yaml` unchanged) or the
+  new `network_ethernet_w5500.yaml` (W5500 SPI Ethernet, DHCP, pin defaults for the Waveshare
+  ESP32-S3-POE-ETH). Existing configurations need no change.
 - SG Ready room setpoint boost is configurable per state (`number.…_sg_ready_raum_boost_zustand_3/4`,
   0–5 K, defaults 1 K and 2 K as before). With 0 the room setpoint of heating circuit 1 is left
   alone, so SG Ready no longer shifts the heating curve (#50).
@@ -20,6 +24,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Fixed
 
+- Numeric signals answering `0x9000` (function switched off, e.g. `BIVALENZALTERNATIVTEMPERATUR_HZG`
+  on KESSEL) were published as a number: `et_dec_val` showed -2867.2 °C and went into the long-term
+  statistics. `0x9000` is now not published for `et_dec_val`, `et_cent_val` and `et_mil_val`: the
+  entity keeps its last state, and it does not count for the poll back-off, because the device does
+  answer (#78). `et_hours` and `et_little_endian` are unchanged, because there `0x9000` is a valid
+  value.
 - The request manager started every call at the top of the request table, because
   `signalProcessingStartIndex` was never updated. With more due requests than one per second
   (e.g. wpl13e/wpl18e about 68, wpl17 about 63 per minute) the end of the table could starve;

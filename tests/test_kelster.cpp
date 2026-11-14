@@ -54,6 +54,25 @@ TEST_CASE("VD runtime unavailable marker is preserved", "[kelster][runtime]") {
     SetValueType(val, GetElsterIndex("LZ_VERD_1_HEIZBETRIEB")->Type, 0x8000);
     CHECK(std::string(val) == "-255");
 }
+TEST_CASE("SetValueType: 0x9000 (function off) is no number on numeric types", "[kelster]") {
+    char val[32];
+    const unsigned char numericTypes[] = {et_dec_val, et_cent_val, et_mil_val};
+    for (unsigned char type : numericTypes) {
+        SetValueType(val, type, 0x9000);
+        CHECK(std::string(val).empty());
+    }
+}
+TEST_CASE("SetValueType: 0x9000 is unchanged on the other types", "[kelster]") {
+    char val[32];
+    SetValueType(val, et_default, 0x9000);
+    CHECK(std::string(val) == "-28672");
+    SetValueType(val, et_hours, 0x9000);          // 36864 h is a valid counter value
+    CHECK(std::string(val) == "36864");
+    SetValueType(val, et_little_endian, 0x9000);  // byte-swapped: 0x0090
+    CHECK(std::string(val) == "144");
+    SetValueType(val, et_bool, 0x9000);
+    CHECK(std::string(val) == "?");
+}
 TEST_CASE("SetValueType: et_byte signed", "[kelster]") {
     char val[32];
     SetValueType(val, et_byte, 255); // signed char 255 = -1

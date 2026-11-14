@@ -1,0 +1,28 @@
+#
+#  Network: Ethernet (W5500 SPI) instead of WiFi
+#
+#  Select it in your top-level substitutions (common.yaml includes it in place of
+#  network_wifi.yaml):
+#    network_package: network_ethernet_w5500.yaml
+#
+#  DHCP by default; add a manual_ip block below if you need a static address.
+#  Default pins: Waveshare ESP32-S3-POE-ETH. Override the eth_* substitutions in
+#  your top-level config if your board is wired differently.
+#
+
+substitutions:
+  eth_clk_pin: GPIO13
+  eth_mosi_pin: GPIO11
+  eth_miso_pin: GPIO12
+  eth_cs_pin: GPIO14
+  eth_int_pin: GPIO10
+  eth_rst_pin: GPIO9
+
+ethernet:
+  type: W5500
+  clk_pin: ${eth_clk_pin}
+  mosi_pin: ${eth_mosi_pin}
+  miso_pin: ${eth_miso_pin}
+  cs_pin: ${eth_cs_pin}
+  interrupt_pin: ${eth_int_pin}
+  reset_pin: ${eth_rst_pin}

@@ -19,6 +19,11 @@
 substitutions:
   disable_sg_ready: "false"   # "true" hides all SG Ready entities (e.g. WPC7, which has no SG Ready input)
   read_only: "false"          # "true": never write to the heat pump (no setpoints/modes/clock; reading and bus scan only)
+  # Network package from this folder: network_wifi.yaml (default) or network_ethernet_w5500.yaml
+  network_package: "network_wifi.yaml"
+
+packages:
+  network: !include ${network_package}
 
 esphome:
   min_version: 2026.7.0
@@ -547,13 +552,6 @@ text_sensor:
       entity_category: diagnostic
       icon: "mdi:restart-alert"
 
-  # Which access point is the ESP connected to? (reconnects jump between about -62 and -71 dBm)
-  - platform: wifi_info
-    bssid:
-      name: "WLAN BSSID"
-      entity_category: diagnostic
-      icon: "mdi:router-wireless"
-
   #########################################
   #                                       #
   #   BERECHNETE TEXT SENSORS             #
@@ -666,29 +664,6 @@ button:
 
 #########################################
 #                                       #
-#   WiFi & Captive Portal               #
-#                                       #
-#########################################
-wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
-  fast_connect: true
-  power_save_mode: none
-  # Stationary device: ESPHome's post-connect roaming scans all channels every
-  # 5 min when RSSI < -49 dBm. The off-channel scan stalls the MQTT TCP stream
-  # (>10 s write timeouts, disconnects) and caused task watchdog resets (#54).
-  post_connect_roaming: false
-  reboot_timeout: 5min
-  ap:
-    ssid: "Heatingpump Fallback Hotspot"
-    password: "AsBl9n46jlOx"
-
-# Enabled by default. To drop it together with the fallback hotspot (saves flash),
-# add the optional package ha-stiebel-control/no_captive_portal.yaml after this one.
-captive_portal:
-
-#########################################
-#                                       #
 #   SENSOR                              #
 #                                       #
 #########################################
@@ -735,32 +710,12 @@ sensor:
       entity_category: diagnostic
       icon: "mdi:timer-sand"
 
-  # WiFi and system sensors
+  # System sensors (WiFi sensors: network_wifi.yaml)
   - platform: uptime
     name: "Betriebszeit"
     id: uptime_s
     entity_category: diagnostic
     icon: "mdi:timer-outline"
-
-  - platform: wifi_signal
-    name: "WiFi Signal dBm"
-    icon: "mdi:wifi"
-    update_interval: 60s
-    id: wifi_dbm
-
-  - platform: template
-    name: "WiFi Signal"
-    icon: "mdi:signal"
-    unit_of_measurement: "%"
-    update_interval: 60s
-    id: wifi_percentage
-    lambda: |-
-      float dBm = id(wifi_dbm).state;
-      float MIN_DBM = -100.0; // Minimum RSSI in dBm
-      float MAX_DBM = -30.0; // Maximum RSSI in dBm
-      if (dBm < MIN_DBM) dBm = MIN_DBM;
-      if (dBm > MAX_DBM) dBm = MAX_DBM;
-      return ((dBm - MIN_DBM) / (MAX_DBM - MIN_DBM)) * 100;
 
   # -----------------------------------------------------------------------
   # COP energy accumulator sensors (universal - present on all Elster models)
