@@ -20,6 +20,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Fixed
 
+- The request manager started every call at the top of the request table, because
+  `signalProcessingStartIndex` was never updated. With more due requests than one per second
+  (e.g. wpl13e/wpl18e about 68, wpl17 about 63 per minute) the end of the table could starve;
+  it now continues after the last checked entry.
 - Read and write requests to bus members with an id whose lower 7 bits exceed 7 went to the
   wrong member: the frame header kept only 3 bits, so a request to 0x514 (HEIZMODUL_WPL) went to
   0x504. Byte 1 (data[1]) now carries the lower 7 bits of the receiver id.

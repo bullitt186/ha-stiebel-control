@@ -2045,9 +2045,21 @@ TEST_CASE("request manager: table resolved once, unknown/blacklisted skipped", "
     fake_millis() += 120000;               // everything due
     for (int i = 0; i < 10; i++) processSignalRequests();
     CHECK(fake_can().sent.size() == 4);   // each (member, signal) once, unknown/blacklisted never
+
+    // Round robin: a signal that is due again at once must not starve the rest of the table
+    fake_millis() += 120000;               // everything due again
+    fake_can().sent.clear();
+    processSignalRequests();
+    REQUIRE(fake_can().sent.size() == 1);
+    const std::vector<uint8_t> first = fake_can().sent[0];
+    for (auto& kv : nextRequestTime) kv.second = 0;   // all due, including the one just sent
+    processSignalRequests();
+    REQUIRE(fake_can().sent.size() == 2);
+    CHECK(fake_can().sent[1] != first);   // the next signal, not the first one again
     requestManagerStarted = false;
     requestManagerStartTime = 0;
     nextRequestTime.clear();
+    signalProcessingStartIndex = 0;
     fake_millis() = 0;
 }
 
