@@ -151,6 +151,7 @@
 #define LNAME_CALC_VERDICHTER_STARTS_HEUTE     "Verdichterstarts heute"
 #define LNAME_CALC_VERDICHTER_LAUFZEIT_HEUTE   "Verdichterlaufzeit heute"
 #define LNAME_CALC_VERDICHTER_LAUFZEIT_MITTEL  "Verdichterlaufzeit je Start heute"
+#define LNAME_CALC_ABTAUUNG_LAEUFT             "Abtauung läuft"
 
 // ============================================================================
 // Writable number friendly names (writableNumbers[])

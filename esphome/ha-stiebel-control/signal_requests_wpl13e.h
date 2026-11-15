@@ -40,7 +40,6 @@ extern const SignalRequest signalRequests[] = {
     {"WPVORLAUFIST",               FREQ_30S,   cm_kessel},
     {"EINSTELL_SPEICHERSOLLTEMP2", FREQ_30S,   cm_kessel},
     {"EINSTELL_SPEICHERSOLLTEMP2", FREQ_30S,   cm_manager},
-    {"ABTAUUNGAKTIV",              FREQ_1MIN,  cm_heizmodul},
     {"BETRIEBSART_WP",             FREQ_10MIN, cm_manager},
 
     // ========================================================================
@@ -105,7 +104,9 @@ extern const SignalRequest signalRequests[] = {
     {"SOLLWERT_UEBERHITZUNG",            FREQ_10MIN, cm_heizmodul},
     {"ISTWERT_UEBERHITZUNG_VERDAMPFER",  FREQ_1MIN,  cm_heizmodul},
     {"STARTS_ABTAUUNG",                  FREQ_30MIN, cm_heizmodul},
-    {"ZEITDAUER_LETZTE_ABTAUUNG",        FREQ_10MIN, cm_heizmodul},
+    // 0 while a defrost runs (calculated abtauung_laeuft); ABTAUUNGAKTIV stays off on the
+    // WPL13E during a defrost and is no longer requested.
+    {"ZEITDAUER_LETZTE_ABTAUUNG",        FREQ_1MIN,  cm_heizmodul},
     {"VORLAUFSOLLTEMP",                  FREQ_1MIN,  cm_kessel},
     {"ANZEIGE_HOCHDRUCK",          FREQ_1MIN,  cm_heizmodul},
     {"ANZEIGE_NIEDERDRUCK",        FREQ_1MIN,  cm_heizmodul},

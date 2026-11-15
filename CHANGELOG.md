@@ -9,6 +9,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Added
 
+- Calculated binary sensor "Abtauung läuft" (`abtauung_laeuft`): on while the heat pump module's
+  last defrost duration reads 0, which it does from the start of a defrost until it ends. On a WPL13E
+  `ABTAUUNGAKTIV` stayed off through three defrosts; the `wpl13e` table now polls the duration every
+  minute instead of `ABTAUUNGAKTIV` (#48).
 - WPMW II models: the "Update Uhrzeit" and "Update Datum" buttons write `UHRZEIT` as one value and `DATUM`
   followed by `JAHR`, the way the WPMW II manager accepts them (#68). The single `STUNDE`/`MINUTE`/`SEKUNDE`
   writes are ignored there, and `DATUM` alone resets the year to 2000. Other models are unchanged.
