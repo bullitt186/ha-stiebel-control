@@ -15,7 +15,9 @@ ha-stiebel-control/
 │   ├── ci_heatingpump_esp32.yaml           # CI compile target (classic ESP32 + MCP2515)
 │   ├── ci_heatingpump_s2.yaml              # CI config check of the deprecated board_esp32s2.yaml alias
 │   └── ha-stiebel-control/
-│       ├── common.yaml                     # Shared: WiFi, MQTT, API, OTA, sensors, SG Ready
+│       ├── common.yaml                     # Shared: MQTT, API, OTA, sensors, SG Ready; includes the network package
+│       ├── network_wifi.yaml               # Default network: WiFi, captive portal, WiFi sensors
+│       ├── network_ethernet_w5500.yaml     # Alternative network: W5500 SPI Ethernet
 │       ├── board_esp32s3.yaml              # ESP32-S3 hardware config (ESP-IDF, 16MB flash, OPI PSRAM)
 │       ├── board_esp32.yaml                # Classic ESP32 (esp32dev, ESP-IDF, 4MB) hardware config
 │       ├── board_esp32s2.yaml              # Deprecated alias of board_esp32.yaml (never was an S2)

@@ -58,6 +58,9 @@ jobs:
       - name: Compile (ESP32-S3, English)
         run: esphome -s language EN compile esphome/ci_heatingpump_s3.yaml
 
+      - name: Compile (ESP32-S3, W5500 Ethernet instead of WiFi)
+        run: esphome -s network_package network_ethernet_w5500.yaml compile esphome/ci_heatingpump_s3.yaml
+
       - name: Check package layout (includes resolve without a local ha-stiebel-control folder)
         run: |
           mkdir -p /tmp/layout/config

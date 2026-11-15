@@ -43,6 +43,8 @@ The key must match what HA's ESPHome integration has stored for this device. If 
 | `can_bit_rate` | CAN bus speed: `20kbps` (CAN-A: WPL13E/WPF10/WPC7) or `50kbps` (CAN-B: WPL17/WPL23/WPL10AC) | `20kbps` |
 | `disable_sg_ready` | `"true"` hides all SG Ready entities (models without SG Ready input) | `"false"` |
 | `read_only` | `"true"`: never write to the heat pump — no setpoint/mode/climate entities, clock buttons hidden; reading and bus scan keep working | `"false"` |
+| `network_package` | Network package from `ha-stiebel-control/`: `network_wifi.yaml` (WiFi + captive portal) or `network_ethernet_w5500.yaml` (W5500 Ethernet) | `"network_wifi.yaml"` |
+| `eth_clk_pin` … `eth_rst_pin` | W5500 SPI pins (`eth_clk_pin`, `eth_mosi_pin`, `eth_miso_pin`, `eth_cs_pin`, `eth_int_pin`, `eth_rst_pin`), only with `network_ethernet_w5500.yaml` | Waveshare ESP32-S3-POE-ETH: GPIO13/11/12/14/10/9 |
 
 > **Pin assignments are board-specific.** Always verify against your board's schematic
 > before wiring. Known working values for common boards:
@@ -99,6 +101,22 @@ flashing.
 ---
 
 ## Optional packages
+
+### Network: WiFi or W5500 Ethernet
+
+`common.yaml` includes the network package named by the substitution `network_package`.
+The default `network_wifi.yaml` holds WiFi, the captive portal and the WiFi sensors, so
+existing configurations need no change. For a board with a W5500 Ethernet module (e.g.
+Waveshare ESP32-S3-POE-ETH) select the Ethernet package in the top-level substitutions:
+
+```yaml
+substitutions:
+  network_package: network_ethernet_w5500.yaml
+  # eth_cs_pin: GPIO14        # only if your wiring differs from the defaults
+```
+
+DHCP is used by default. WiFi, the fallback hotspot and the WiFi sensors are then not built;
+`no_captive_portal.yaml` is not needed.
 
 ### `no_captive_portal.yaml` — no captive portal and no fallback hotspot
 
