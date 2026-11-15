@@ -32,6 +32,7 @@ ha-stiebel-control/
 │       ├── signal_requests_wpf10.h         # WPF10 signal polling table
 │       ├── ha-stiebel-control.h            # Core C++: CAN, MQTT discovery, calculated sensors
 │       ├── sg_ready_controller.h           # SG Ready state machine (pure C++, testable)
+│       ├── dhw_program.h                   # WPMW II time programs: parsing/validation (pure C++, testable)
 │       ├── config.h                        # Timing constants, limits
 │       └── elster/
 │           ├── ElsterTable.h               # signal table (name, index, type, flags) + ElsterMetaTable (HA metadata)
@@ -164,6 +165,12 @@ by `FakeIO` in the native unit test suite.
 
 This separation allows the state machine logic to be tested with Catch2 on the host
 without any ESP32 or ESPHome toolchain.
+
+`EspHomeSgReadyIO` does not write directly: it puts each write into a paced queue
+(`queuePacedWrite()` / `pacedWriteStep()` in `ha-stiebel-control.h`). The queue sends one write
+at a time, at least 1.5 s apart, checks the settled read-back and sends a write once more if
+the heat pump still reports another value. Writes sent back to back were partly lost on a
+WPMW II (#85). The time-program commands (DHW, heating circuit 1) use the same queue.
 
 ---
 
