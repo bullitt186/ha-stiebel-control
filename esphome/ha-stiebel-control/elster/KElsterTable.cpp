@@ -46,6 +46,12 @@ void SetValueType(char * Val, unsigned char Type, unsigned short Value)
 {
    if (Value == 0x8000)
      strcpy(Val, "-255");
+   // 0x9000 = function switched off. On signed scaled types it is no number (-2867.2 for et_dec_val):
+   // an empty value makes updateSensor() skip it, so the last state stays and no back-off is counted.
+   // Not for et_hours (36864 h is a valid count) or et_little_endian (0x9000 decodes to 144).
+   else
+   if (Value == 0x9000 && (Type == et_dec_val || Type == et_cent_val || Type == et_mil_val))
+     Val[0] = '\0';
    else
    switch (Type)
    {
