@@ -7,6 +7,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Added
+
+- Writable numbers take their range from the heat pump (#79). The firmware reads each number's
+  limits once with the Elster switch bytes `0xF8` (minimum) and `0xF9` (maximum), starting about a
+  minute after the request manager and at least 2 s apart, and then publishes the number and
+  climate discovery again with that range (same entity). `0x8000` on one side keeps that side from
+  `writableNumbers[]`; `0x8000` on both sides, no answer after one retry, or minimum ≥ maximum keep
+  the whole range from `writableNumbers[]`. Once the device range is known, numeric writes of these
+  numbers are clamped to it, also those from automations or plain MQTT; with the static range
+  writes are not changed (as before). Limit answers never reach the sensor path, and read and
+  write requests for the indices 0xF7–0xFA always use the long form, because in the short form
+  that byte is the switch byte.
+
 ## [2.7.0] — 2026-11-15
 
 Contributions from SolderAndSyntax and bastard-GIT: WPMW II clock/date writes, W5500 Ethernet,

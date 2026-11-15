@@ -158,6 +158,17 @@ These entities appear automatically in HA via MQTT discovery:
 | `number.manager_sg_ready_raum_boost_zustand_3` | SG Ready room setpoint boost (heating circuit 1) for state 3, default 1 K, 0 = off | 0–5 K | 0.5 K |
 | `number.manager_sg_ready_raum_boost_zustand_4` | SG Ready room setpoint boost (heating circuit 1) for state 4, default 2 K, 0 = off | 0–5 K | 0.5 K |
 
+**Range from the device:** the ranges above are defaults. About a minute after the request
+manager starts, the firmware asks the heat pump for the limits of each writable number (Elster
+switch bytes `0xF8` = minimum, `0xF9` = maximum), at least 2 s apart. Once both answers are in,
+the number (and the matching climate card) is published again with the device range. A side the
+device does not provide (`0x8000`) keeps its default; no answer after one retry, or a range with
+minimum ≥ maximum keeps the whole default range. Once the device range is known, every numeric
+write of the number is clamped to it, also from automations or plain MQTT; with the default
+range writes are not changed. The limits are read from the member the
+number's state comes from (model routing applies). The
+SG Ready boost numbers are not on the bus and keep their range.
+
 The room boost raises `RAUMSOLLTEMP_I` and with it the heating curve, which can add compressor
 starts. With 0 the room setpoint is not written at all, neither on entering nor on leaving the
 SG Ready state. All four boost values are stored on the ESP and survive a reboot.
