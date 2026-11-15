@@ -9,6 +9,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Added
 
+- WPL13E/WPL18E: heating program of heating circuit 2 (mixer circuit, `HEIZPROG_2_<day>`) as one
+  text entity per day, same format as the DHW and circuit 1 programs. In `Automatik` an empty
+  program keeps the circuit on its night setpoint.
 - Writable numbers take their range from the heat pump (#79). The firmware reads each number's
   limits once with the Elster switch bytes `0xF8` (minimum) and `0xF9` (maximum), starting about a
   minute after the request manager and at least 2 s apart, and then publishes the number and

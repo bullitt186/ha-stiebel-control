@@ -3109,7 +3109,7 @@ struct TimeProgramDef {
     const char* uid;            // unique_id prefix
     const char* names[dhwprog::DAYS];
 };
-static constexpr int TP_DHW = 0, TP_HEATING = 1, TP_COUNT = 2;
+static constexpr int TP_DHW = 0, TP_HEATING = 1, TP_HEATING2 = 2, TP_COUNT = 3;
 static const TimeProgramDef TIME_PROGRAMS[TP_COUNT] = {
     {dhwprog::PREFIX_DHW, "dhw_program", "stiebel_ww_programm_",
      {LNAME_WWPROG_MO, LNAME_WWPROG_DI, LNAME_WWPROG_MI, LNAME_WWPROG_DO,
@@ -3117,6 +3117,9 @@ static const TimeProgramDef TIME_PROGRAMS[TP_COUNT] = {
     {dhwprog::PREFIX_HEATING, "heating_program", "stiebel_heiz_programm_",
      {LNAME_HZPROG_MO, LNAME_HZPROG_DI, LNAME_HZPROG_MI, LNAME_HZPROG_DO,
       LNAME_HZPROG_FR, LNAME_HZPROG_SA, LNAME_HZPROG_SO}},
+    {dhwprog::PREFIX_HEATING2, "heating_program_2", "stiebel_heiz_programm_hk2_",
+     {LNAME_HZ2PROG_MO, LNAME_HZ2PROG_DI, LNAME_HZ2PROG_MI, LNAME_HZ2PROG_DO,
+      LNAME_HZ2PROG_FR, LNAME_HZ2PROG_SA, LNAME_HZ2PROG_SO}},
 };
 static DhwProgramDay timeProgram[TP_COUNT][dhwprog::DAYS];
 static DhwProgramDay (&dhwProgram)[dhwprog::DAYS] = timeProgram[TP_DHW];
@@ -3217,6 +3220,9 @@ inline bool handleDhwProgramCommand(int day, const std::string& payload) {
 }
 inline bool handleHeatingProgramCommand(int day, const std::string& payload) {
     return handleTimeProgramCommand(TP_HEATING, day, payload);
+}
+inline bool handleHeating2ProgramCommand(int day, const std::string& payload) {
+    return handleTimeProgramCommand(TP_HEATING2, day, payload);
 }
 
 // ============================================================================

@@ -313,6 +313,9 @@ per day, e.g. `text.stiebel_eltron_warmepumpe_warmwasser_programm_montag`:
 - The heating program of heating circuit 1 (`HEIZPROG_1_<day>`, manager) is shown the same way,
   e.g. `text.stiebel_eltron_warmepumpe_heizprogramm_hk1_montag` (WPL13E, WPL18E). `00:00-24:00`
   keeps the day setpoint around the clock in `Automatik`.
+- The heating program of heating circuit 2 (mixer circuit, `HEIZPROG_2_<day>`) follows the same
+  format, e.g. `text.stiebel_eltron_warmepumpe_heizprogramm_hk2_montag` (WPL13E, WPL18E). Without a
+  period the circuit runs on its night setpoint in `Automatik`.
 
 ---
 

@@ -196,6 +196,14 @@
 #define LNAME_HZPROG_FR                             "Heizprogramm HK1 Freitag"
 #define LNAME_HZPROG_SA                             "Heizprogramm HK1 Samstag"
 #define LNAME_HZPROG_SO                             "Heizprogramm HK1 Sonntag"
+// Heating program of heating circuit 2 (mixer circuit)
+#define LNAME_HZ2PROG_MO                            "Heizprogramm HK2 Montag"
+#define LNAME_HZ2PROG_DI                            "Heizprogramm HK2 Dienstag"
+#define LNAME_HZ2PROG_MI                            "Heizprogramm HK2 Mittwoch"
+#define LNAME_HZ2PROG_DO                            "Heizprogramm HK2 Donnerstag"
+#define LNAME_HZ2PROG_FR                            "Heizprogramm HK2 Freitag"
+#define LNAME_HZ2PROG_SA                            "Heizprogramm HK2 Samstag"
+#define LNAME_HZ2PROG_SO                            "Heizprogramm HK2 Sonntag"
 
 // ============================================================================
 // Select option strings (programmschalterOptions[], sgReadyOptions[])
