@@ -7,6 +7,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+## [2.7.0] — 2026-11-15
+
+Contributions from SolderAndSyntax and bastard-GIT: WPMW II clock/date writes, W5500 Ethernet,
+0x9000 handling, request and addressing fixes. SG Ready is more reliable and can leave the time
+programs active, which are now writable from Home Assistant.
+
+### Upgrade notes
+
+- WPL13E/WPL18E: `ABTAUUNGAKTIV` is no longer polled. Its HA entity
+  (`binary_sensor.heizmodul_abtauung_aktiv`) stays as unavailable and can be deleted; use
+  "Abtauung läuft" instead.
+- TTL 33: the raw sensors `W_WASSERPROG_1_<day>` are replaced by one text entity per day; the old
+  ones stay as unavailable entities and can be deleted.
+- SG Ready writes now go out one at a time and are checked (about 6 s per write), so a change of
+  state takes up to 20 s on the bus instead of happening at once.
+- A boost now starts from the setpoints read from the heat pump. If your DHW or room setpoint was
+  left boosted by an older version, set it back once before the next SG Ready cycle.
+- `common.yaml` no longer contains WiFi; a local copy that patches the `wifi:` block must patch
+  `network_wifi.yaml` instead.
+
 ### Added
 
 - WPMW II: DHW time program as one text entity per day (`W_WASSERPROG_1_<day>` with up to three

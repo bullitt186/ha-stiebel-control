@@ -54,6 +54,9 @@ For full step-by-step instructions (including remote package installation withou
 | ESP32-S3 | Waveshare ESP32-S3-RS485-CAN (or similar) | Built-in TWAI | ✅ Yes |
 | ESP32 (classic, `esp32dev`) | Any ESP32 dev board (4 MB flash is enough) | MCP2515 via SPI | Legacy |
 
+Network: WiFi by default; W5500 SPI Ethernet (e.g. Waveshare ESP32-S3-POE-ETH) via
+`network_package: network_ethernet_w5500.yaml`, see [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+
 > **Pin assignment is board-specific — always verify against your board's schematic.**
 > The Waveshare ESP32-S3-RS485-CAN uses GPIO15 (CAN TX) and GPIO16 (CAN RX);
 > a generic ESP32 DevKit + MCP2515 typically uses GPIO18/23/19/5 for SPI.
@@ -148,7 +151,8 @@ Change the `@vX.Y.Z` tag in your local `heatingpump.yaml` to the new release and
 - **SG Ready** — 4-state PV surplus control with automatic temperature boost ([docs](SG_READY.md))
 - **Writable controls** — DHW and room temperature setpoints (circuits I–III + night), operating mode, SG Ready state via HA entities or MQTT
 - **Multilingual** — entity display names in German (default) or English; set `language: "EN"` in `heatingpump.yaml`
-- **Calculated sensors** — COP (hot water / heating / total), Delta-T, compressor status
+- **Calculated sensors** — COP (hot water / heating / total), Delta-T, compressor status and daily statistics, defrost running
+- **Time programs (WPMW II)** — DHW program and heating program of circuit 1 as one text entity per day, writable with validation
 - **Date/time sync** — set heat pump clock from HA via buttons
 - **Thermostat cards** — MQTT climate entities for heating (room setpoint + operating mode as presets) and hot water
 - **Fault text** — the heat pump's fault code as plain text with a remedy hint (attribute)
@@ -157,7 +161,7 @@ Change the `@vX.Y.Z` tag in your local `heatingpump.yaml` to the new release and
 - **Self-tuning polling** — signals your model does not provide (-255) are polled less and never create HA entities
 - **Dashboards** — ready-made Lovelace views and a system schema in [`dashboards/`](dashboards/)
 - **Frequency-based polling** — configurable per-signal intervals (10s–60min)
-- **Native test suite** — 220+ Catch2 unit tests covering core logic, no hardware needed
+- **Native test suite** — 300+ Catch2 unit tests covering core logic, no hardware needed
 - **MQTT regression tests** — `make smoke-test` verifies required signals after each OTA flash
 
 For entity IDs, MQTT topics, and configuration options see [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
@@ -172,7 +176,7 @@ Automatically adjusts heat pump operation based on PV surplus:
 | State | Trigger | Action |
 |-------|---------|--------|
 | 1 — EVU Sperre | Grid peak / no PV | Standby (Bereitschaft) |
-| 2 — Normal | Standard | Comfort mode (Tagbetrieb) |
+| 2 — Normal | Standard | Tagbetrieb (default) or Automatik, selectable — Automatik lets time programs and DHW setpoint 2 apply |
 | 3 — Empfohlen | 1–2 kW surplus | Tagbetrieb + DHW boost + room +1°C |
 | 4 — Zwang | >2 kW surplus | Tagbetrieb + larger DHW boost + room +2°C |
 
