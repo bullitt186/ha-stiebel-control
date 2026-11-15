@@ -12,12 +12,19 @@ SG Ready is a standard for smart heat pump control with 4 operating states:
 | State | Name | Typical PV situation | Heat pump action |
 |-------|------|---------------------|-----------------|
 | **1** | EVU Sperre | Grid demand / no PV | **Bereitschaft** — standby only |
-| **2** | Normal | Standard operation | **Tagbetrieb** — comfort mode |
+| **2** | Normal | Standard operation | **Tagbetrieb** — comfort mode (or **Automatik**, see below) |
 | **3** | Empfohlen | 1–2 kW surplus available | **Tagbetrieb** + DHW boost + room boost (+1°C) |
 | **4** | Zwang | >2 kW surplus available | **Tagbetrieb** + larger DHW boost + room boost (+2°C) |
 
 > **Important:** States 3 and 4 use `Tagbetrieb` (continuous comfort mode, ignores schedule)
 > rather than `Warmwasser` — this keeps space heating active alongside DHW heating.
+
+**Mode in state 2.** `select.stiebel_eltron_warmepumpe_sg_ready_betriebsart_zustand_2` chooses what
+state 2 writes: `Tagbetrieb` (default) or `Automatik`. In `Tagbetrieb` the manager ignores all time
+programs, so the DHW program and the DHW setpoint 2 never apply. With `Automatik` they do, e.g. to
+charge hot water in the PV hours (see the DHW program entities in `docs/CONFIGURATION.md`). For
+continuous heating in `Automatik`, set the heating program to 00:00–24:00 or the night setpoint to
+the day setpoint. In state 2 a change of this select is written at once; it is kept on the ESP.
 
 ---
 
@@ -81,15 +88,20 @@ A ready-to-use example is in [`packages/sg_ready_automation_example.yaml`](packa
 The boost is applied **automatically by the firmware** — no extra HA automation needed.
 
 When state 3 is activated:
-1. Current DHW setpoint baseline is recorded (default: 48°C if not previously set)
+1. The DHW and room setpoints last read from the heat pump are recorded as baseline (48°C / 20°C
+   only if none was read yet). While a boost is active the baseline stays.
 2. `PROGRAMMSCHALTER` → `Tagbetrieb`
 3. DHW setpoint → baseline + `boost_state3` (e.g. 48 + 5 = 53°C, capped at 60°C)
 4. Room setpoint → baseline + 1°C (capped at 25°C)
 
 When returning to state 2 (Normal):
-1. `PROGRAMMSCHALTER` → `Tagbetrieb`
-2. DHW setpoint → restored to baseline
-3. Room setpoint → restored to baseline
+1. DHW setpoint → restored to baseline
+2. Room setpoint → restored to baseline
+3. `PROGRAMMSCHALTER` → the state-2 mode (`Tagbetrieb` or `Automatik`)
+
+The writes go out one at a time, 1.5 s apart at least. Each is checked against the read-back a few
+seconds later and sent once more if the heat pump still reports the old value; the log shows
+`WRITE_Q ... confirmed` or `... failed`. Writes sent back to back were partly lost on a WPMW II.
 
 State 1 (EVU Sperre):
 1. Temperatures restored to baseline

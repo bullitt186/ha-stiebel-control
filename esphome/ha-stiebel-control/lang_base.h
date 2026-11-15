@@ -177,6 +177,16 @@
 // ============================================================================
 #define LNAME_SEL_PROGRAMMSCHALTER             "Programmschalter"
 #define LNAME_SEL_SG_READY                     "SG Ready Zustand"
+#define LNAME_SEL_SG_READY_NORMAL_MODE         "SG Ready Betriebsart Zustand 2"
+
+// DHW time program, one text per day (#82)
+#define LNAME_WWPROG_MO                        "Warmwasser-Programm Montag"
+#define LNAME_WWPROG_DI                        "Warmwasser-Programm Dienstag"
+#define LNAME_WWPROG_MI                        "Warmwasser-Programm Mittwoch"
+#define LNAME_WWPROG_DO                        "Warmwasser-Programm Donnerstag"
+#define LNAME_WWPROG_FR                        "Warmwasser-Programm Freitag"
+#define LNAME_WWPROG_SA                        "Warmwasser-Programm Samstag"
+#define LNAME_WWPROG_SO                        "Warmwasser-Programm Sonntag"
 
 // ============================================================================
 // Select option strings (programmschalterOptions[], sgReadyOptions[])
