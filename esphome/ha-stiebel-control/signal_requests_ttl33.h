@@ -80,15 +80,29 @@ extern const SignalRequest signalRequests[] = {
     {"HEIZPROG_1_SO",              FREQ_10MIN, cm_mischermodul_3},
 
     // ========================================================================
-    // DHW time program (manager)
+    // DHW time program (manager): three periods per day, one text per day (#82)
     // ========================================================================
-    {"W_WASSERPROG_1_MO",          FREQ_10MIN, cm_manager},
-    {"W_WASSERPROG_1_DI",          FREQ_10MIN, cm_manager},
-    {"W_WASSERPROG_1_MI",          FREQ_10MIN, cm_manager},
-    {"W_WASSERPROG_1_DO",          FREQ_10MIN, cm_manager},
-    {"W_WASSERPROG_1_FR",          FREQ_10MIN, cm_manager},
-    {"W_WASSERPROG_1_SA",          FREQ_10MIN, cm_manager},
-    {"W_WASSERPROG_1_SO",          FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_MO",           FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_MO_SCHALT_2",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_MO_SCHALT_3",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_DI",           FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_DI_SCHALT_2",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_DI_SCHALT_3",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_MI",           FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_MI_SCHALT_2",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_MI_SCHALT_3",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_DO",           FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_DO_SCHALT_2",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_DO_SCHALT_3",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_FR",           FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_FR_SCHALT_2",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_FR_SCHALT_3",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_SA",           FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_SA_SCHALT_2",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_SA_SCHALT_3",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_SO",           FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_SO_SCHALT_2",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_SO_SCHALT_3",  FREQ_10MIN, cm_manager},
 
     // ========================================================================
     // SETTINGS (WPMW II parameters)

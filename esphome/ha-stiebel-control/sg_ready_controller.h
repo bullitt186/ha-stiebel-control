@@ -16,8 +16,10 @@
 // The WPM3 (WPL 10 AC) calls this mode "Komfortbetrieb", older WPM2 "Tagbetrieb".
 #ifdef HA_MODEL_wpl10ac
 #define SG_READY_NORMAL_MODE "Komfortbetrieb"
+#define SG_READY_AUTO_MODE   "Programmierbetrieb"
 #else
 #define SG_READY_NORMAL_MODE "Tagbetrieb"
+#define SG_READY_AUTO_MODE   "Automatik"
 #endif
 
 // ============================================================================
@@ -39,6 +41,10 @@ public:
 
     // Load boost state from NVS; returns false if nothing stored
     virtual bool loadBoostState(float& dhwTemp, float& roomTemp, bool& active) = 0;
+
+    // Last value read from the heat pump for a setpoint signal (EINSTELL_SPEICHERSOLLTEMP,
+    // RAUMSOLLTEMP_I); false if none was read yet. Used as the boost baseline (#85).
+    virtual bool currentSetpoint(const char* /*signalName*/, float& /*value*/) { return false; }
 };
 
 // ============================================================================
@@ -54,7 +60,7 @@ public:
     static constexpr int STATE_RECOMMENDED = 3;
     static constexpr int STATE_FORCED    = 4;
 
-    // Default setpoint fallbacks (used when originals were never captured)
+    // Default setpoint fallbacks (used when the heat pump's setpoint was not read yet)
     static constexpr float DEFAULT_DHW_TEMP  = 48.0f;
     static constexpr float DEFAULT_ROOM_TEMP = 20.0f;
 
@@ -68,6 +74,9 @@ public:
         // Room setpoint boost of heating circuit 1 (K); 0 = room setpoint untouched
         float roomBoostState3 = 1.0f;
         float roomBoostState4 = 2.0f;
+        // Operating mode in state 2: false = SG_READY_NORMAL_MODE (Tagbetrieb, default),
+        // true = SG_READY_AUTO_MODE (Automatik: time programs and setpoint 2 apply, #85)
+        bool normalAutomatik = false;
     };
 
     struct State {
@@ -131,6 +140,18 @@ public:
         }
     }
 
+    // Mode for state 2. With apply, in state 2 the new mode is written at once
+    // (not when restoring the setting from NVS on boot).
+    void setNormalAutomatik(bool automatik, bool apply = true) {
+        config_.normalAutomatik = automatik;
+        if (apply && state_.currentState == STATE_NORMAL)
+            io_.writeCanSignal("PROGRAMMSCHALTER", normalMode());
+    }
+    bool normalAutomatik() const { return config_.normalAutomatik; }
+    const char* normalMode() const {
+        return config_.normalAutomatik ? SG_READY_AUTO_MODE : SG_READY_NORMAL_MODE;
+    }
+
     void setRoomBoostState4(float boost) {
         if (boost >= 0.0f && boost <= 5.0f) {
             config_.roomBoostState4 = boost;
@@ -181,14 +202,23 @@ private:
     Config config_;
     State  state_;
 
+    // Baseline = the setpoint last read from the heat pump, so a boost returns to what the
+    // user had set; the constants only apply before the first read (#85).
+    float baseline(const char* signal, float fallback, float minValid, float maxValid) {
+        float v = 0.0f;
+        if (io_.currentSetpoint(signal, v) && v >= minValid && v <= maxValid) return v;
+        return fallback;
+    }
+
     // The room original is only taken when the room setpoint is boosted, so a
     // room boost of 0 never writes the room setpoint on the way back either.
+    // While a boost is active the originals stay (the read values are boosted then).
     void captureOriginals(bool boostRoom) {
         if (!state_.active || state_.originalDhwTemp == 0.0f) {
-            state_.originalDhwTemp = DEFAULT_DHW_TEMP;
+            state_.originalDhwTemp = baseline("EINSTELL_SPEICHERSOLLTEMP", DEFAULT_DHW_TEMP, 20.0f, MAX_DHW_TEMP);
         }
         if (boostRoom && (!state_.active || state_.originalRoomTemp == 0.0f)) {
-            state_.originalRoomTemp = DEFAULT_ROOM_TEMP;
+            state_.originalRoomTemp = baseline("RAUMSOLLTEMP_I", DEFAULT_ROOM_TEMP, 10.0f, MAX_ROOM_TEMP);
         }
     }
 
@@ -238,7 +268,7 @@ private:
         if (state_.active) {
             restoreDhw();
             restoreRoom();
-            io_.writeCanSignal("PROGRAMMSCHALTER", SG_READY_NORMAL_MODE);
+            io_.writeCanSignal("PROGRAMMSCHALTER", normalMode());
             state_.active = false;
             persistState();
         }

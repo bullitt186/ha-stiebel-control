@@ -283,6 +283,25 @@ The MQTT log topic `heatingpump/debug` only carries warnings and errors. The API
 |-----------|---------|
 | `select.manager_programmschalter` | Notbetrieb, Bereitschaft, Automatik, Tagbetrieb, Absenkbetrieb, Warmwasser |
 | `select.manager_sg_ready_zustand` | 1 - EVU Sperre, 2 - Normal, 3 - Empfohlen, 4 - Zwang |
+| `select.stiebel_eltron_warmepumpe_sg_ready_betriebsart_zustand_2` | Tagbetrieb (default), Automatik: mode written in SG Ready state 2, see SG_READY.md |
+
+### DHW Time Program (WPMW II, text entities)
+
+On WPL13E, WPL18E and TTL 33 the DHW program of the manager (`W_WASSERPROG_1_<day>` with
+`_SCHALT_2` and `_SCHALT_3`, three periods per day) is read every 10 minutes and shown as one entity
+per day, e.g. `text.stiebel_eltron_warmepumpe_warmwasser_programm_montag`:
+
+- Format `HH:MM-HH:MM`, up to three periods separated by commas: `06:30-09:00,11:00-17:00`.
+  `-` = no period on that day.
+- Writable on WPL13E and TTL 33 (tested on the display). Times must be on a 15-minute step,
+  start before end, periods must not overlap. Invalid input writes nothing and the entity shows
+  the program of the heat pump again. Only changed periods are written.
+- WPL18E shows the program read-only (sensor), `read_only: "true"` too.
+- The program applies only in `Automatik`: in `Tagbetrieb` the manager charges to the DHW setpoint
+  all day. Outside the program it holds the DHW setpoint 2.
+- The heating program of heating circuit 1 (`HEIZPROG_1_<day>`, manager) is shown the same way,
+  e.g. `text.stiebel_eltron_warmepumpe_heizprogramm_hk1_montag` (WPL13E, WPL18E). `00:00-24:00`
+  keeps the day setpoint around the clock in `Automatik`.
 
 ---
 
@@ -354,6 +373,8 @@ topic shows the device is alive. The interval is `STATE_HEARTBEAT_MS` in
   heartbeat). `last_updated` therefore no longer moves with every poll.
 - After every MQTT (re)connect all known values are published once (a few per 250 ms, after the
   discovery configs). A broker restart without persistence is covered that way.
+- SG Ready writes and DHW program writes go through a queue: one write at a time, checked against
+  the read-back and sent once more if needed (#85).
 - After a write (setpoint, mode, SG Ready, clock) the read-back of that signal is published even
   if the heat pump kept the old value, so HA always gets an answer to a command.
 - Not affected (always sent): SG Ready state and boost values, bus scan results, the fault list

@@ -26,6 +26,7 @@
 #include "config.h"
 #include "language_select.h"
 #include "sg_ready_controller.h"
+#include "dhw_program.h"
 // TWAI status/recovery for the built-in CAN controller (esp32_can). Under ESP-IDF the
 // TWAI driver is only linked when esp32_can is used; MCP2515 builds (classic ESP32)
 // have no <driver/twai.h> and skip the TWAI diagnostics (see publishCanDiagnostics()).
@@ -454,6 +455,12 @@ static const char* sgReadyOptions[] = {
     LNAME_OPT_SG_ZWANG,
 };
 
+// Operating mode in SG Ready state 2 (#85). The labels are the German protocol values.
+static const char* sgNormalModeOptions[] = {
+    LNAME_OPT_TAGBETRIEB,
+    LNAME_OPT_AUTOMATIK,
+};
+
 static const WritableSelectConfig writableSelects[] = {
     // ============================================================
     // SCHREIBBARE AUSWAHLFELDER (MQTT Select Entities)
@@ -467,7 +474,11 @@ static const WritableSelectConfig writableSelects[] = {
 
     // SG Ready state (Smart Grid Ready)
     {"SG_READY_STATE", LNAME_SEL_SG_READY,
-     cm_manager, sgReadyOptions, 4, "mdi:solar-power"}
+     cm_manager, sgReadyOptions, 4, "mdi:solar-power"},
+
+    // Operating mode written in SG Ready state 2 (index 2, used in common.yaml)
+    {"SG_READY_NORMAL_MODE", LNAME_SEL_SG_READY_NORMAL_MODE,
+     cm_manager, sgNormalModeOptions, 2, "mdi:home-clock"}
 };
 
 static const size_t WRITABLE_SELECT_COUNT = sizeof(writableSelects) / sizeof(WritableSelectConfig);
@@ -549,6 +560,9 @@ static float lastWpVorlaufIst = NAN;       // HEIZMODUL WPVORLAUFIST
 static float lastRuecklaufIstTemp = NAN;   // HEIZMODUL RUECKLAUFISTTEMP
 static float lastWpVorlaufKessel = NAN;    // KESSEL WPVORLAUFIST (fallback only)
 static float lastVerdichterValue = NAN;
+// Last DHW / room setpoint read from the SG Ready route: baseline of a boost (#85)
+static float lastSgDhwSetpoint = NAN;
+static float lastSgRoomSetpoint = NAN;
 // KESSEL PUMPENSTATUS; -1 = not received yet. Bit 0x4000 is the hot water charging pump (WPMW II).
 static int lastPumpenstatus = -1;
 inline bool isHotWaterCharging(int pumpenstatus) { return (pumpenstatus & 0x4000) != 0; }
@@ -1146,6 +1160,123 @@ void writeConfiguredSignal(CanMemberType fallback, const char* name, const char*
     const SignalRoute route = resolveSignalRoute(HA_DEVICE_MODEL_STR, ei->Index, fallback);
     writeSignal(&CanMembers[route.writeMember], name, value);
     readSignal(&CanMembers[route.readMember], ei);
+}
+
+// ============================================================================
+// PACED WRITES (SG Ready, DHW program)
+// ============================================================================
+// The WPMW II manager loses a write that follows the previous one within milliseconds:
+// on 13.11.2026 the second of three back-to-back SG Ready writes was lost twice (#85).
+// Queued writes go out one at a time with a gap. Each is checked against the settled
+// read-back and sent once more if the heat pump still reports another value.
+static constexpr uint32_t PACED_WRITE_GAP_MS = 1500;
+static constexpr uint32_t PACED_WRITE_VERIFY_MS = READBACK_SETTLE_MS + 1500;
+static constexpr uint8_t PACED_WRITE_TRIES = 2;
+static constexpr size_t PACED_WRITE_QUEUE_LEN = 32;
+struct PacedWrite {
+    const CanMember* writeCm;
+    const CanMember* readCm;
+    const ElsterIndex* ei;
+    char value[24];
+    uint8_t tries;          // 0 = waiting, else sends so far
+    uint32_t sentMs;
+    bool haveReadBack;
+    char readBack[24];
+};
+static PacedWrite pacedWrites[PACED_WRITE_QUEUE_LEN];
+static size_t pacedWriteCount = 0;
+static uint32_t pacedLastSendMs = 0;
+static bool pacedSentBefore = false;
+
+inline bool queuePacedWrite(const CanMember* writeCm, const CanMember* readCm,
+                            const ElsterIndex* ei, const char* value) {
+    if (!ei) return false;
+#ifdef HA_READ_ONLY_true
+    ESP_LOGW("WRITE_Q", "read_only: not writing \"%s\" = \"%s\"", ei->Name, value);
+    return false;
+#endif
+    // A newer value for a write still waiting replaces it (the one in flight stays)
+    for (size_t i = 0; i < pacedWriteCount; i++) {
+        PacedWrite& p = pacedWrites[i];
+        if (p.tries == 0 && p.ei == ei && p.writeCm == writeCm) {
+            snprintf(p.value, sizeof(p.value), "%s", value);
+            return true;
+        }
+    }
+    if (pacedWriteCount == PACED_WRITE_QUEUE_LEN) {
+        ESP_LOGW("WRITE_Q", "queue full, dropping %s = %s", ei->Name, value);
+        return false;
+    }
+    PacedWrite& p = pacedWrites[pacedWriteCount++];
+    p = PacedWrite{};
+    p.writeCm = writeCm;
+    p.readCm = readCm;
+    p.ei = ei;
+    snprintf(p.value, sizeof(p.value), "%s", value);
+    ESP_LOGI("WRITE_Q", "queued %s %s = %s", writeCm->Name, ei->Name, value);
+    return true;
+}
+
+// Same encoded value? Compares what would go on the bus ("53" = "53.0"); a time domain
+// read back as "not used time domain" equals an empty value.
+inline bool pacedValueMatches(const ElsterIndex* ei, const char* want, const char* got) {
+    std::string g(got);
+    if (ei->Type == et_time_domain && g.find(':') == std::string::npos) g.clear();
+    const char* a = want;
+    const char* b = g.c_str();
+    const int ea = TranslateString(a, ei->Type);
+    const int eb = TranslateString(b, ei->Type);
+    if (ea == -1 || eb == -1) return strcmp(want, g.c_str()) == 0;
+    return ea == eb;
+}
+
+// Called for every decoded value: keeps the newest read-back of the write in flight.
+inline void pacedWriteNoteValue(const CanMember& cm, const ElsterIndex* ei, const std::string& value) {
+    if (pacedWriteCount == 0) return;
+    PacedWrite& p = pacedWrites[0];
+    if (p.tries == 0 || p.ei->Index != ei->Index || p.readCm->CanId != cm.CanId || value == "-255") return;
+    snprintf(p.readBack, sizeof(p.readBack), "%s", value.c_str());
+    p.haveReadBack = true;
+}
+
+inline void sendPacedWrite(PacedWrite& p) {
+    const char* v = p.value;
+    writeSignal(p.writeCm, p.ei, v);   // also schedules the settled read-back on writeCm
+    if (p.readCm != p.writeCm) scheduleReadback(p.readCm, p.ei, READBACK_SETTLE_MS);
+    p.tries++;
+    p.sentMs = millis();
+    p.haveReadBack = false;
+    pacedLastSendMs = p.sentMs;
+    pacedSentBefore = true;
+}
+
+// Called every 250 ms (common.yaml): sends the next write once the gap has passed and
+// checks the one in flight once its settled read-back is due.
+inline void pacedWriteStep() {
+    if (pacedWriteCount == 0) return;
+    const uint32_t now = millis();
+    PacedWrite& p = pacedWrites[0];
+    if (p.tries == 0) {
+        if (pacedSentBefore && now - pacedLastSendMs < PACED_WRITE_GAP_MS) return;
+        sendPacedWrite(p);
+        return;
+    }
+    if (now - p.sentMs < PACED_WRITE_VERIFY_MS) return;
+    const bool ok = p.haveReadBack && pacedValueMatches(p.ei, p.value, p.readBack);
+    if (!ok && p.tries < PACED_WRITE_TRIES) {
+        ESP_LOGW("WRITE_Q", "%s %s = %s not confirmed (read \"%s\"), sending again",
+                 p.writeCm->Name, p.ei->Name, p.value, p.haveReadBack ? p.readBack : "nothing");
+        sendPacedWrite(p);
+        return;
+    }
+    if (ok) {
+        ESP_LOGI("WRITE_Q", "%s %s = %s confirmed", p.writeCm->Name, p.ei->Name, p.value);
+    } else {
+        ESP_LOGW("WRITE_Q", "%s %s = %s failed after %u sends (read \"%s\")", p.writeCm->Name, p.ei->Name,
+                 p.value, (unsigned)p.tries, p.haveReadBack ? p.readBack : "nothing");
+    }
+    for (size_t j = 1; j < pacedWriteCount; j++) pacedWrites[j - 1] = pacedWrites[j];
+    pacedWriteCount--;
 }
 
 // Unified function to publish MQTT discovery for calculated sensors
@@ -1952,6 +2083,8 @@ static std::vector<DiscoveredSignal> discoveryRepublishQueue;
 static bool copDiscoveryPublished = false;
 static constexpr size_t DISCOVERY_REPUBLISH_BATCH = 2;
 
+inline void dhwProgramRepublish();   // DHW time program, defined below
+
 void republishAllDiscoveries() {
     // Snapshot: signals discovered after this point publish their own config anyway.
     discoveryRepublishQueue.clear();
@@ -1960,6 +2093,7 @@ void republishAllDiscoveries() {
     discoveryRepublishPhase = DR_NUMBERS;
     discoveryRepublishPos = 0;
     copDiscoveryPublished = false;   // COP configs follow with the next COP update
+    dhwProgramRepublish();           // DHW program: config and text again
     ESP_LOGI("MQTT", "Republishing MQTT discoveries (%u signals)", (unsigned)discoveryRepublishQueue.size());
 }
 
@@ -2573,15 +2707,22 @@ public:
     static ESPPreferenceObject nvsRoom;
     static ESPPreferenceObject nvsActive;
 
+    // Writes go through the paced queue (one at a time, checked by read-back, #85).
+    // WPL9 keeps its CAN-B route.
     void writeCanSignal(const char* signalName, const char* value) override {
         const ElsterIndex* ei = GetElsterIndex(signalName);
         SignalRoute route = {cm_manager, cm_manager, cm_manager};
         if (strcmp(HA_DEVICE_MODEL_STR, "wpl9") == 0)
             route = resolveSignalRoute(HA_DEVICE_MODEL_STR, ei->Index, cm_manager);
-        const char* v = value;
-        writeSignal(&CanMembers[route.writeMember], ei, v);
-        // Preserve the non-blocking upstream readback and the WPL9 CAN-B route.
-        scheduleReadback(&CanMembers[route.readMember], ei);
+        queuePacedWrite(&CanMembers[route.writeMember], &CanMembers[route.readMember], ei, value);
+    }
+
+    bool currentSetpoint(const char* signalName, float& value) override {
+        const float v = strcmp(signalName, "EINSTELL_SPEICHERSOLLTEMP") == 0 ? lastSgDhwSetpoint
+                      : strcmp(signalName, "RAUMSOLLTEMP_I") == 0 ? lastSgRoomSetpoint : NAN;
+        if (std::isnan(v)) return false;
+        value = v;
+        return true;
     }
 
     // SG Ready states always go out (not through the publish-on-change cache)
@@ -2623,6 +2764,10 @@ inline void saveSgBoosts() {
     sgBoostPref.save(&s);
 }
 
+// SG Ready state-2 mode (#85), kept across reboots
+static constexpr uint32_t SG_NORMAL_MODE_KEY = 0x5B005703u;
+static ESPPreferenceObject sgNormalModePref;
+
 // Called from on_boot lambda in common.yaml
 void initBoostStatePrefs() {
     EspHomeSgReadyIO::nvsDhw    = global_preferences->make_preference<float>(0xB007BA5E, true);
@@ -2636,6 +2781,9 @@ void initBoostStatePrefs() {
         sgReadyController.setRoomBoostState3(s.v[2]);
         sgReadyController.setRoomBoostState4(s.v[3]);
     }
+    sgNormalModePref = global_preferences->make_preference<bool>(SG_NORMAL_MODE_KEY, true);
+    bool automatik = false;
+    if (sgNormalModePref.load(&automatik)) sgReadyController.setNormalAutomatik(automatik, false);
     ESP_LOGI("NVS", "Boost state preferences initialized");
 }
 
@@ -2701,6 +2849,8 @@ inline bool publishSgReadyState() {
     snprintf(r4, sizeof(r4), "%.1f", sgReadyController.roomBoostState4());
     ok &= mqttPublish("heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE3/state", r3, strlen(r3));
     ok &= mqttPublish("heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE4/state", r4, strlen(r4));
+    const char* mode = sgReadyController.normalAutomatik() ? sgNormalModeOptions[1] : sgNormalModeOptions[0];
+    ok &= mqttPublish("heatingpump/MANAGER/SG_READY_NORMAL_MODE/state", mode, strlen(mode));
     return ok;
 }
 
@@ -2715,6 +2865,147 @@ inline void sgReadyPublishStep() {
     if (sgReadyPublishRetryMs != 0 && static_cast<int32_t>(now - sgReadyPublishRetryMs) < 0) return;
     if (publishSgReadyState()) sgReadyPublishPending = false;
     else sgReadyPublishRetryMs = now + 1000;
+}
+
+// MQTT command for the SG Ready state-2 mode (#85). In state 2 the mode is written at once.
+inline bool handleSgReadyNormalMode(const std::string& payload) {
+    bool automatik;
+    if (payload == sgNormalModeOptions[1]) automatik = true;
+    else if (payload == sgNormalModeOptions[0]) automatik = false;
+    else return false;
+    sgReadyController.setNormalAutomatik(automatik);
+    sgNormalModePref.save(&automatik);
+    ESP_LOGI("SG_READY", "State 2 mode: %s", sgReadyController.normalMode());
+    scheduleSgReadyPublish();
+    return true;
+}
+
+// ============================================================================
+// TIME PROGRAMS (WPMW II): DHW (#82) and heating circuit 1
+// ============================================================================
+// One text per day in Home Assistant, from the three periods <prefix><day>(_SCHALT_2/3) on the
+// manager. Read on all WPMW II models; writable where the write was tested on the display.
+struct DhwProgramDay {
+    std::string period[dhwprog::PERIODS];
+    uint8_t known = 0;          // bit per period read
+    bool discovered = false;
+    std::string published;      // last text sent
+    uint32_t publishedMs = 0;
+};
+struct TimeProgramDef {
+    const char* prefix;         // signal name prefix
+    const char* topic;          // heatingpump/<topic>/<day>/state|set
+    const char* uid;            // unique_id prefix
+    const char* names[dhwprog::DAYS];
+};
+static constexpr int TP_DHW = 0, TP_HEATING = 1, TP_COUNT = 2;
+static const TimeProgramDef TIME_PROGRAMS[TP_COUNT] = {
+    {dhwprog::PREFIX_DHW, "dhw_program", "stiebel_ww_programm_",
+     {LNAME_WWPROG_MO, LNAME_WWPROG_DI, LNAME_WWPROG_MI, LNAME_WWPROG_DO,
+      LNAME_WWPROG_FR, LNAME_WWPROG_SA, LNAME_WWPROG_SO}},
+    {dhwprog::PREFIX_HEATING, "heating_program", "stiebel_heiz_programm_",
+     {LNAME_HZPROG_MO, LNAME_HZPROG_DI, LNAME_HZPROG_MI, LNAME_HZPROG_DO,
+      LNAME_HZPROG_FR, LNAME_HZPROG_SA, LNAME_HZPROG_SO}},
+};
+static DhwProgramDay timeProgram[TP_COUNT][dhwprog::DAYS];
+static DhwProgramDay (&dhwProgram)[dhwprog::DAYS] = timeProgram[TP_DHW];
+static const char* const TIME_PROGRAM_KEYS[dhwprog::DAYS] = {"mo", "di", "mi", "do", "fr", "sa", "so"};
+static constexpr uint32_t DHW_PROGRAM_HEARTBEAT_MS = 30UL * 60UL * 1000UL;
+
+inline bool dhwProgramWritable() {
+#ifdef HA_READ_ONLY_true
+    return false;
+#endif
+    return isWpmw2Model() &&
+           (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") == 0 || strcmp(HA_DEVICE_MODEL_STR, "ttl33") == 0);
+}
+
+inline bool publishTimeProgramDiscovery(int prog, int day) {
+    const TimeProgramDef& def = TIME_PROGRAMS[prog];
+    const bool writable = dhwProgramWritable();
+    const char* key = TIME_PROGRAM_KEYS[day];
+    char uid[48], topic[112];
+    snprintf(uid, sizeof(uid), "%s%s", def.uid, key);
+    snprintf(topic, sizeof(topic), "homeassistant/%s/heatingpump/%s/config", writable ? "text" : "sensor", uid);
+    std::string p = std::string("{\"name\":\"") + def.names[day] + "\",\"unique_id\":\"" + uid +
+                    "\",\"state_topic\":\"heatingpump/" + def.topic + "/" + key + "/state\",";
+    if (writable)
+        p += std::string("\"command_topic\":\"heatingpump/") + def.topic + "/" + key + "/set\",\"max\":40,";
+    p += "\"icon\":\"mdi:calendar-clock\",\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL_STR
+         "\"],\"name\":\"Stiebel Eltron Wärmepumpe\",\"manufacturer\":\"Stiebel Eltron\"}}";
+    return mqttPublish(topic, p.c_str(), p.size());
+}
+
+inline void timeProgramPublish(int prog, int day, bool force) {
+    DhwProgramDay& d = timeProgram[prog][day];
+    if (d.known != 0x7) return;
+    if (!d.discovered) d.discovered = publishTimeProgramDiscovery(prog, day);
+    const std::string text = dhwprog::dayText(d.period);
+    const uint32_t now = millis();
+    if (!force && text == d.published && now - d.publishedMs < DHW_PROGRAM_HEARTBEAT_MS) return;
+    char topic[64];
+    snprintf(topic, sizeof(topic), "heatingpump/%s/%s/state", TIME_PROGRAMS[prog].topic, TIME_PROGRAM_KEYS[day]);
+    if (mqttPublish(topic, text.c_str(), text.size())) {
+        d.published = text;
+        d.publishedMs = now;
+    }
+}
+
+// Config and text go out again with the next poll of each day (not all at once: the MQTT
+// queue is short right after an HA birth message).
+inline void dhwProgramRepublish() {
+    for (auto& prog : timeProgram)
+        for (auto& d : prog) {
+            d.discovered = false;
+            d.published.clear();
+        }
+}
+
+// A manager value of a program period? Then it updates that day's text (no raw sensor).
+inline bool timeProgramUpdate(const char* signal, const std::string& value) {
+    for (int prog = 0; prog < TP_COUNT; prog++) {
+        int day, slot;
+        if (!dhwprog::parseSignalName(signal, day, slot, TIME_PROGRAMS[prog].prefix)) continue;
+        if (value == "-255") return true;   // not provided by this manager
+        DhwProgramDay& d = timeProgram[prog][day];
+        d.period[slot] = dhwprog::normalizeDecoded(value);
+        d.known |= static_cast<uint8_t>(1u << slot);
+        timeProgramPublish(prog, day, false);
+        return true;
+    }
+    return false;
+}
+
+// MQTT command "11:00-17:00" / "06:30-09:00,11:00-17:00" / "-" for one day. Invalid input
+// writes nothing and sends the current program back, so HA shows what the heat pump has.
+inline bool handleTimeProgramCommand(int prog, int day, const std::string& payload) {
+    if (prog < 0 || prog >= TP_COUNT || day < 0 || day >= dhwprog::DAYS) return false;
+    if (!dhwProgramWritable()) {
+        ESP_LOGW("PROGRAM", "time programs are read-only on this model");
+        return false;
+    }
+    std::vector<dhwprog::Period> periods;
+    std::string err;
+    if (!dhwprog::parsePeriods(payload, periods, err)) {
+        ESP_LOGW("PROGRAM", "%s%s: \"%s\" rejected: %s", TIME_PROGRAMS[prog].prefix, dhwprog::DAY_CODES[day],
+                 payload.c_str(), err.c_str());
+        timeProgramPublish(prog, day, true);
+        return false;
+    }
+    DhwProgramDay& d = timeProgram[prog][day];
+    for (int slot = 0; slot < dhwprog::PERIODS; slot++) {
+        const std::string want = slot < static_cast<int>(periods.size()) ? dhwprog::formatPeriod(periods[slot]) : "";
+        if ((d.known & (1u << slot)) && d.period[slot] == want) continue;   // unchanged
+        const std::string name = dhwprog::signalName(day, slot, TIME_PROGRAMS[prog].prefix);
+        queuePacedWrite(&CanMembers[cm_manager], &CanMembers[cm_manager], GetElsterIndex(name.c_str()), want.c_str());
+    }
+    return true;
+}
+inline bool handleDhwProgramCommand(int day, const std::string& payload) {
+    return handleTimeProgramCommand(TP_DHW, day, payload);
+}
+inline bool handleHeatingProgramCommand(int day, const std::string& payload) {
+    return handleTimeProgramCommand(TP_HEATING, day, payload);
 }
 
 // ============================================================================
@@ -2751,6 +3042,8 @@ constexpr uint32_t HASH_WPVORLAUFIST = hash("WPVORLAUFIST");
 constexpr uint32_t HASH_RUECKLAUFISTTEMP = hash("RUECKLAUFISTTEMP");
 constexpr uint32_t HASH_VERDICHTER = hash("VERDICHTER");
 constexpr uint32_t HASH_PUMPENSTATUS = hash("PUMPENSTATUS");
+constexpr uint32_t HASH_EINSTELL_SPEICHERSOLLTEMP = hash("EINSTELL_SPEICHERSOLLTEMP");
+constexpr uint32_t HASH_RAUMSOLLTEMP_I = hash("RAUMSOLLTEMP_I");
 constexpr uint32_t HASH_ZEITDAUER_LETZTE_ABTAUUNG = hash("ZEITDAUER_LETZTE_ABTAUUNG");
 constexpr uint32_t HASH_FEHLERMELDUNG = hash("FEHLERMELDUNG");
 constexpr uint32_t HASH_EVU_SPERRE_AKTIV = hash("EVU_SPERRE_AKTIV");
@@ -2881,6 +3174,10 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
     // Skip empty values
     if (value.empty()) {
         return;
+    }
+    pacedWriteNoteValue(cm, ei, value);
+    if (isWpmw2Model() && strcmp(cm.Name, "MANAGER") == 0) {
+        if (timeProgramUpdate(ei->Name, value)) return;   // shown as one text per day
     }
     if (isIgnoredOnWpl13e(ei->Name)) return;
     if (isWpmw2Model() && strcmp(cm.Name, "HEIZMODUL") == 0) lastHeizmodulFrameMs = millis();
@@ -3070,6 +3367,20 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
                                        atoi(value.c_str()) == 0 ? "on" : "off");
             }
             break;
+
+        case HASH_EINSTELL_SPEICHERSOLLTEMP:
+        case HASH_RAUMSOLLTEMP_I: {
+            SignalRoute route = {cm_manager, cm_manager, cm_manager};
+            if (strcmp(HA_DEVICE_MODEL_STR, "wpl9") == 0)
+                route = resolveSignalRoute(HA_DEVICE_MODEL_STR, ei->Index, cm_manager);
+            if (CanMembers[route.readMember].CanId != cm.CanId) break;
+            char* endPtr;
+            const float v = strtof(value.c_str(), &endPtr);
+            if (endPtr == value.c_str() || *endPtr != '\0' || v < -50.0f) break;
+            if (strcmp(signalName, "EINSTELL_SPEICHERSOLLTEMP") == 0) lastSgDhwSetpoint = v;
+            else if (strcmp(signalName, "RAUMSOLLTEMP_I") == 0) lastSgRoomSetpoint = v;
+            break;
+        }
 
         case HASH_PUMPENSTATUS:
             if (strcmp(cm.Name, "KESSEL") == 0 && value != "-255") lastPumpenstatus = atoi(value.c_str());

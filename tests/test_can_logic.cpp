@@ -452,6 +452,12 @@ static void resetDiscoveryState() {
     mqtt_client_instance().clear();
     mqttConnectSeen = false;
     sgReadyPublishPending = false;
+    pacedWriteCount = 0;
+    pacedSentBefore = false;
+    pacedLastSendMs = 0;
+    lastSgDhwSetpoint = NAN;
+    lastSgRoomSetpoint = NAN;
+    for (auto& prog : timeProgram) for (auto& d : prog) d = DhwProgramDay{};
 }
 
 // ============================================================================
@@ -2106,40 +2112,223 @@ TEST_CASE("request manager: table resolved once, unknown/blacklisted skipped", "
 // #55: SG Ready read-back without delay()
 // ============================================================================
 
-TEST_CASE("SG Ready IO: write is sent at once, read-back ~100 ms later from the step", "[sgready][readback]") {
+TEST_CASE("SG Ready IO: writes are queued and sent one at a time (#85)", "[sgready][readback]") {
     resetDiscoveryState();
     pendingReadbackCount = 0;
     fake_can().sent.clear();
     fake_millis() = 5000;
     sgReadyIO.writeCanSignal("PROGRAMMSCHALTER", "Automatik");
     sgReadyIO.writeCanSignal("EINSTELL_SPEICHERSOLLTEMP", "55.0");
-    REQUIRE(fake_can().sent.size() == 2);          // two writes, no read yet
+    CHECK(fake_can().sent.empty());                // nothing on the bus before the step
+    REQUIRE(pacedWriteCount == 2);
+
+    pacedWriteStep();                              // first write
+    REQUIRE(fake_can().sent.size() == 1);
     CHECK((fake_can().sent[0][0] & 0x0F) == 0);    // telegram type 0 = write
-    CHECK(pendingReadbackCount == 4);              // early and settle read per signal
+    CHECK(pendingReadbackCount == 1);              // settled read-back
+    fake_millis() = 5000 + PACED_WRITE_GAP_MS;
+    pacedWriteStep();                              // second waits for the first to be checked
+    CHECK(fake_can().sent.size() == 1);
 
-    pendingReadbackStep();                         // not due yet
+    // settled read-back confirms the first write
+    updateSensor(CanMembers[cm_manager], GetElsterIndex("PROGRAMMSCHALTER"), "Automatik");
+    fake_millis() = 5000 + PACED_WRITE_VERIFY_MS;
+    pacedWriteStep();                              // confirmed, removed
+    CHECK(pacedWriteCount == 1);
+    CHECK(fake_can().sent.size() == 1);
+    pacedWriteStep();                              // second write goes out
     CHECK(fake_can().sent.size() == 2);
-    fake_millis() = 5000 + READBACK_DELAY_MS;
-    pendingReadbackStep();                         // one read per step
-    REQUIRE(fake_can().sent.size() == 3);
-    CHECK((fake_can().sent[2][0] & 0x0F) == 1);    // type 1 = read request
-    pendingReadbackStep();
-    CHECK(fake_can().sent.size() == 4);
-    pendingReadbackStep();
-    CHECK(fake_can().sent.size() == 4);
-    CHECK(pendingReadbackCount == 2);
-    fake_millis() = 5000 + READBACK_SETTLE_MS;
-    pendingReadbackStep();
-    pendingReadbackStep();
-    CHECK(fake_can().sent.size() == 6);
-    CHECK(pendingReadbackCount == 0);
+    CHECK(pacedWrites[0].tries == 1);
 
-    // the same signal twice -> one early and one settle read-back
-    sgReadyIO.writeCanSignal("PROGRAMMSCHALTER", "Automatik");
-    sgReadyIO.writeCanSignal("PROGRAMMSCHALTER", "Bereitschaft");
-    CHECK(pendingReadbackCount == 2);
+    // no matching read-back: sent once more, then given up
+    updateSensor(CanMembers[cm_manager], GetElsterIndex("EINSTELL_SPEICHERSOLLTEMP"), "48.0");
+    fake_millis() += PACED_WRITE_VERIFY_MS;
+    pacedWriteStep();
+    CHECK(fake_can().sent.size() == 3);
+    CHECK(pacedWrites[0].tries == 2);
+    fake_millis() += PACED_WRITE_VERIFY_MS;
+    pacedWriteStep();
+    CHECK(pacedWriteCount == 0);
+    CHECK(fake_can().sent.size() == 3);
     pendingReadbackCount = 0;
     fake_millis() = 0;
+}
+
+TEST_CASE("paced writes: a newer value replaces a waiting write of the same signal", "[sgready]") {
+    resetDiscoveryState();
+    fake_can().sent.clear();
+    sgReadyIO.writeCanSignal("PROGRAMMSCHALTER", "Automatik");
+    sgReadyIO.writeCanSignal("RAUMSOLLTEMP_I", "21.0");
+    sgReadyIO.writeCanSignal("RAUMSOLLTEMP_I", "20.0");
+    REQUIRE(pacedWriteCount == 2);
+    CHECK(std::string(pacedWrites[1].value) == "20.0");
+    pacedWriteCount = 0;
+}
+
+TEST_CASE("paced writes: values compare as encoded on the bus", "[sgready]") {
+    const ElsterIndex* dhw = GetElsterIndex("EINSTELL_SPEICHERSOLLTEMP");
+    CHECK(pacedValueMatches(dhw, "53.0", "53.0"));
+    CHECK(pacedValueMatches(dhw, "53", "53.0"));
+    CHECK_FALSE(pacedValueMatches(dhw, "53.0", "48.0"));
+    const ElsterIndex* prog = GetElsterIndex("W_WASSERPROG_1_MO");
+    CHECK(pacedValueMatches(prog, "11:00-17:00", "11:00-17:00"));
+    CHECK(pacedValueMatches(prog, "", "not used time domain"));
+    CHECK_FALSE(pacedValueMatches(prog, "11:00-17:00", "06:30-23:00"));
+    const ElsterIndex* ps = GetElsterIndex("PROGRAMMSCHALTER");
+    CHECK(pacedValueMatches(ps, "Automatik", "Automatik"));
+    CHECK_FALSE(pacedValueMatches(ps, "Automatik", "Tagbetrieb"));
+}
+
+TEST_CASE("SG Ready boost baseline is the setpoint read from the manager (#85)", "[sgready]") {
+    resetDiscoveryState();
+    if (std::strcmp(HA_DEVICE_MODEL_STR, "wpl9") == 0) return;   // WPL9 reads the setpoints on CAN-B
+    applySgReadyState(2);                          // no boost active from an earlier test
+    pacedWriteCount = 0;
+    updateSensor(CanMembers[cm_manager], GetElsterIndex("EINSTELL_SPEICHERSOLLTEMP"), "50.0");
+    updateSensor(CanMembers[cm_manager], GetElsterIndex("RAUMSOLLTEMP_I"), "21.0");
+    updateSensor(CanMembers[cm_kessel], GetElsterIndex("EINSTELL_SPEICHERSOLLTEMP"), "40.0");  // other member
+    CHECK(lastSgDhwSetpoint == Approx(50.0f));
+    CHECK(lastSgRoomSetpoint == Approx(21.0f));
+    applySgReadyState(3);
+    bool dhw = false, room = false;
+    for (size_t i = 0; i < pacedWriteCount; i++) {
+        const std::string n = pacedWrites[i].ei->Name, v = pacedWrites[i].value;
+        if (n == "EINSTELL_SPEICHERSOLLTEMP") dhw = (v == "55.0");
+        if (n == "RAUMSOLLTEMP_I") room = (v == "22.0");
+    }
+    CHECK(dhw);
+    CHECK(room);
+    pacedWriteCount = 0;
+    applySgReadyState(2);                          // back: restores 50 / 21
+    bool dhwBack = false, roomBack = false;
+    for (size_t i = 0; i < pacedWriteCount; i++) {
+        const std::string n = pacedWrites[i].ei->Name, v = pacedWrites[i].value;
+        if (n == "EINSTELL_SPEICHERSOLLTEMP") dhwBack = (v == "50.0");
+        if (n == "RAUMSOLLTEMP_I") roomBack = (v == "21.0");
+    }
+    CHECK(dhwBack);
+    CHECK(roomBack);
+    resetDiscoveryState();
+}
+
+TEST_CASE("SG Ready state 2 mode: select command, NVS and state publish (#85)", "[sgready]") {
+    resetDiscoveryState();
+    applySgReadyState(2);
+    pacedWriteCount = 0;
+    CHECK(handleSgReadyNormalMode(sgNormalModeOptions[1]));     // Automatik
+    CHECK(sgReadyController.normalAutomatik());
+    REQUIRE(pacedWriteCount == 1);                              // written at once in state 2
+    CHECK(std::string(pacedWrites[0].value) == sgNormalModeOptions[1]);
+    CHECK_FALSE(handleSgReadyNormalMode("Bereitschaft"));
+    CHECK(sgReadyController.normalAutomatik());
+    publishSgReadyState();
+    CHECK(mqttFindPayload("SG_READY_NORMAL_MODE/state") == sgNormalModeOptions[1]);
+    CHECK(handleSgReadyNormalMode(sgNormalModeOptions[0]));
+    CHECK_FALSE(sgReadyController.normalAutomatik());
+    resetDiscoveryState();
+}
+
+TEST_CASE("dhwprog: parse and validate period texts (#82)", "[dhwprog]") {
+    std::vector<dhwprog::Period> p;
+    std::string err;
+    CHECK(dhwprog::parsePeriods("11:00-17:00", p, err));
+    REQUIRE(p.size() == 1);
+    CHECK(p[0].start == 44);
+    CHECK(p[0].end == 68);
+    CHECK(dhwprog::parsePeriods(" 17:00-22:00 , 6:30-9:00 ", p, err));
+    REQUIRE(p.size() == 2);
+    CHECK(dhwprog::formatPeriod(p[0]) == "06:30-09:00");
+    CHECK(dhwprog::parsePeriods("00:00-24:00", p, err));
+    CHECK(p[0].end == 96);
+    CHECK(dhwprog::parsePeriods("-", p, err));
+    CHECK(p.empty());
+    CHECK(dhwprog::parsePeriods("", p, err));
+    CHECK(dhwprog::parsePeriods("06:00-09:00,09:00-12:00", p, err));   // touching is fine
+    CHECK_FALSE(dhwprog::parsePeriods("11:10-17:00", p, err));         // off the grid
+    CHECK_FALSE(dhwprog::parsePeriods("17:00-11:00", p, err));         // start after end
+    CHECK_FALSE(dhwprog::parsePeriods("11:00-11:00", p, err));
+    CHECK_FALSE(dhwprog::parsePeriods("06:00-10:00,09:00-12:00", p, err));   // overlap
+    CHECK_FALSE(dhwprog::parsePeriods("01:00-02:00,03:00-04:00,05:00-06:00,07:00-08:00", p, err));
+    CHECK_FALSE(dhwprog::parsePeriods("24:15-24:30", p, err));
+    CHECK_FALSE(dhwprog::parsePeriods("11:00", p, err));
+    CHECK_FALSE(dhwprog::parsePeriods("aa:bb-cc:dd", p, err));
+}
+
+TEST_CASE("dhwprog: signal names, decoded values and day text (#82)", "[dhwprog]") {
+    int day = -1, slot = -1;
+    CHECK(dhwprog::parseSignalName("W_WASSERPROG_1_MO", day, slot));
+    CHECK(day == 0);
+    CHECK(slot == 0);
+    CHECK(dhwprog::parseSignalName("W_WASSERPROG_1_SO_SCHALT_3", day, slot));
+    CHECK(day == 6);
+    CHECK(slot == 2);
+    CHECK_FALSE(dhwprog::parseSignalName("W_WASSERPROG_1_MO_FR", day, slot));
+    CHECK_FALSE(dhwprog::parseSignalName("HEIZPROG_1_MO", day, slot));
+    CHECK(dhwprog::signalName(3, 1) == "W_WASSERPROG_1_DO_SCHALT_2");
+    CHECK(dhwprog::signalName(6, 0, dhwprog::PREFIX_HEATING) == "HEIZPROG_1_SO");
+    CHECK(dhwprog::parseSignalName("HEIZPROG_1_DI_SCHALT_2", day, slot, dhwprog::PREFIX_HEATING));
+    CHECK(day == 1);
+    CHECK(slot == 1);
+    for (int d = 0; d < dhwprog::DAYS; d++)
+        for (int s2 = 0; s2 < dhwprog::PERIODS; s2++)
+            CHECK(GetElsterIndex(dhwprog::signalName(d, s2).c_str()) != nullptr);
+    CHECK(dhwprog::normalizeDecoded("not used time domain").empty());
+    const std::string none[3] = {"", "", ""};
+    CHECK(dhwprog::dayText(none) == "-");
+    const std::string two[3] = {"06:30-09:00", "", "11:00-17:00"};
+    CHECK(dhwprog::dayText(two) == "06:30-09:00,11:00-17:00");
+    // encoding round trip with the Elster table: 11:00-17:00 = 0x2C44, unused = 0x8080
+    const char* in = "11:00-17:00";
+    CHECK(TranslateString(in, et_time_domain) == 0x2C44);
+    const char* empty = "";
+    CHECK(TranslateString(empty, et_time_domain) == 0x8080);
+}
+
+TEST_CASE("DHW program: three periods form one text per day, commands write changes only (#82)", "[dhwprog]") {
+    resetDiscoveryState();
+    if (!isWpmw2Model()) {   // WPMW II only; the test build of other models skips this
+        updateSensor(CanMembers[cm_manager], GetElsterIndex("W_WASSERPROG_1_MO"), "06:30-23:00");
+        CHECK_FALSE(mqttTopicPublished("dhw_program/mo/state"));
+        return;
+    }
+    updateSensor(CanMembers[cm_manager], GetElsterIndex("W_WASSERPROG_1_MO"), "06:30-23:00");
+    updateSensor(CanMembers[cm_manager], GetElsterIndex("W_WASSERPROG_1_MO_SCHALT_2"), "not used time domain");
+    CHECK_FALSE(mqttTopicPublished("dhw_program/mo/state"));   // third period still unknown
+    updateSensor(CanMembers[cm_manager], GetElsterIndex("W_WASSERPROG_1_MO_SCHALT_3"), "not used time domain");
+    CHECK(mqttFindPayload("dhw_program/mo/state") == "06:30-23:00");
+    CHECK_FALSE(mqttTopicPublished("MANAGER/W_WASSERPROG_1_MO/state"));   // no raw sensor
+
+    if (dhwProgramWritable()) {
+        CHECK(handleDhwProgramCommand(0, "11:00-17:00"));
+        REQUIRE(pacedWriteCount == 1);                          // only the first period changes
+        CHECK(std::string(pacedWrites[0].ei->Name) == "W_WASSERPROG_1_MO");
+        CHECK(std::string(pacedWrites[0].value) == "11:00-17:00");
+        pacedWriteCount = 0;
+        CHECK(handleDhwProgramCommand(0, "17:00-22:00, 06:30-09:00"));
+        REQUIRE(pacedWriteCount == 2);                          // sorted: 06:30 first
+        CHECK(std::string(pacedWrites[0].value) == "06:30-09:00");
+        CHECK(std::string(pacedWrites[1].ei->Name) == "W_WASSERPROG_1_MO_SCHALT_2");
+        CHECK(std::string(pacedWrites[1].value) == "17:00-22:00");
+        pacedWriteCount = 0;
+        mqtt_client_instance().clear();
+        CHECK_FALSE(handleDhwProgramCommand(0, "11:10-17:00"));  // off the 15 min grid
+        CHECK(pacedWriteCount == 0);
+        CHECK(mqttFindPayload("dhw_program/mo/state") == "06:30-23:00");   // HA gets the real value back
+    }
+    // heating program of circuit 1: same layout, own topics
+    updateSensor(CanMembers[cm_manager], GetElsterIndex("HEIZPROG_1_SA"), "06:00-22:00");
+    updateSensor(CanMembers[cm_manager], GetElsterIndex("HEIZPROG_1_SA_SCHALT_2"), "not used time domain");
+    updateSensor(CanMembers[cm_manager], GetElsterIndex("HEIZPROG_1_SA_SCHALT_3"), "not used time domain");
+    CHECK(mqttFindPayload("heating_program/sa/state") == "06:00-22:00");
+    if (dhwProgramWritable()) {
+        pacedWriteCount = 0;
+        CHECK(handleHeatingProgramCommand(5, "00:00-24:00"));
+        REQUIRE(pacedWriteCount == 1);
+        CHECK(std::string(pacedWrites[0].ei->Name) == "HEIZPROG_1_SA");
+        CHECK(std::string(pacedWrites[0].value) == "00:00-24:00");
+        pacedWriteCount = 0;
+    }
+    resetDiscoveryState();
 }
 
 TEST_CASE("MQTT connect: own republishing waits until the connect burst has drained", "[mqtt][state]") {

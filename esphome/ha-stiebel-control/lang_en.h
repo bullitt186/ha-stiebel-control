@@ -318,6 +318,36 @@
 #define LNAME_SEL_PROGRAMMSCHALTER             "Operating Mode"
 #undef  LNAME_SEL_SG_READY
 #define LNAME_SEL_SG_READY                     "SG Ready State"
+#undef  LNAME_SEL_SG_READY_NORMAL_MODE
+#define LNAME_SEL_SG_READY_NORMAL_MODE         "SG Ready State 2 Operating Mode"
+#undef  LNAME_WWPROG_MO
+#define LNAME_WWPROG_MO                        "DHW Program Monday"
+#undef  LNAME_WWPROG_DI
+#define LNAME_WWPROG_DI                        "DHW Program Tuesday"
+#undef  LNAME_WWPROG_MI
+#define LNAME_WWPROG_MI                        "DHW Program Wednesday"
+#undef  LNAME_WWPROG_DO
+#define LNAME_WWPROG_DO                        "DHW Program Thursday"
+#undef  LNAME_WWPROG_FR
+#define LNAME_WWPROG_FR                        "DHW Program Friday"
+#undef  LNAME_WWPROG_SA
+#define LNAME_WWPROG_SA                        "DHW Program Saturday"
+#undef  LNAME_WWPROG_SO
+#define LNAME_WWPROG_SO                        "DHW Program Sunday"
+#undef  LNAME_HZPROG_MO
+#define LNAME_HZPROG_MO                             "Heating Program HC1 Monday"
+#undef  LNAME_HZPROG_DI
+#define LNAME_HZPROG_DI                             "Heating Program HC1 Tuesday"
+#undef  LNAME_HZPROG_MI
+#define LNAME_HZPROG_MI                             "Heating Program HC1 Wednesday"
+#undef  LNAME_HZPROG_DO
+#define LNAME_HZPROG_DO                             "Heating Program HC1 Thursday"
+#undef  LNAME_HZPROG_FR
+#define LNAME_HZPROG_FR                             "Heating Program HC1 Friday"
+#undef  LNAME_HZPROG_SA
+#define LNAME_HZPROG_SA                             "Heating Program HC1 Saturday"
+#undef  LNAME_HZPROG_SO
+#define LNAME_HZPROG_SO                             "Heating Program HC1 Sunday"
 
 // ============================================================================
 // Select option strings

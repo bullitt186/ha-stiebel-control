@@ -65,27 +65,34 @@ TEST_CASE("WPL9 SG Ready adapter shares DHW destinations and keeps room writes",
     if (std::strcmp(HA_DEVICE_MODEL_STR, "wpl9") != 0) return;
     EspHomeSgReadyIO adapter;
     pendingReadbackCount = 0;
+    pacedWriteCount = 0;
+    pacedSentBefore = false;
     fake_millis() = 1000;
     fake_can().sent.clear();
     adapter.writeCanSignal("EINSTELL_SPEICHERSOLLTEMP", "49");
+    CHECK(fake_can().sent.empty());       // queued (#85)
+    pacedWriteStep();
     REQUIRE(fake_can().sent.size() == 1);
-    REQUIRE(pendingReadbackCount == 2);   // early read-back plus the settle read-back
-    pendingReadbackStep();
-    CHECK(fake_can().sent.size() == 1);
-    fake_millis() += READBACK_DELAY_MS;
+    REQUIRE(pendingReadbackCount == 1);   // settled read-back on the same CAN-B member
+    fake_millis() += READBACK_SETTLE_MS;
     pendingReadbackStep();
     REQUIRE(fake_can().sent.size() == 2);
     CHECK(fake_can().sent[0] == std::vector<uint8_t>{0x40, 1, 0x13, 1, 0xea, 0, 0});
     CHECK(fake_can().sent[1] == std::vector<uint8_t>{0x41, 1, 0x13, 0, 0, 0, 0});
-    pendingReadbackCount = 0;   // drop the settle read-back, covered elsewhere
+    pacedWriteCount = 0;
+    pendingReadbackCount = 0;
     fake_can().sent.clear();
     adapter.writeCanSignal("RAUMSOLLTEMP_I", "20");
+    fake_millis() += PACED_WRITE_GAP_MS;
+    pacedWriteStep();
     REQUIRE(fake_can().sent.size() == 1);
-    fake_millis() += READBACK_DELAY_MS;
+    fake_millis() += READBACK_SETTLE_MS;
     pendingReadbackStep();
     REQUIRE(fake_can().sent.size() == 2);
     CHECK(fake_can().sent[0][0] == 0x90);
     CHECK(fake_can().sent[1][0] == 0x91);
+    pacedWriteCount = 0;
+    pacedSentBefore = false;
     pendingReadbackCount = 0;
     fake_millis() = 0;
 }

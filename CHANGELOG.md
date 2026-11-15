@@ -9,6 +9,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Added
 
+- WPMW II: DHW time program as one text entity per day (`W_WASSERPROG_1_<day>` with up to three
+  periods, e.g. `06:30-09:00,11:00-17:00`), read on WPL13E, WPL18E and TTL 33, writable on WPL13E
+  and TTL 33. Input is checked (15-minute steps, start before end, no overlap) before anything is
+  written. On TTL 33 the former raw sensors `W_WASSERPROG_1_<day>` are replaced by these entities (#82).
+  The heating program of heating circuit 1 (`HEIZPROG_1_<day>`, manager) is shown the same way on
+  WPL13E and WPL18E.
+- SG Ready: select for the operating mode in state 2, `Tagbetrieb` (default, as before) or
+  `Automatik`, so the time programs and the DHW setpoint 2 apply in normal operation (#85).
 - Calculated binary sensor "Abtauung läuft" (`abtauung_laeuft`): on while the heat pump module's
   last defrost duration reads 0, which it does from the start of a defrost until it ends. On a WPL13E
   `ABTAUUNGAKTIV` stayed off through three defrosts; the `wpl13e` table now polls the duration every
@@ -31,6 +39,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Fixed
 
+- SG Ready: the boost baseline is the DHW and room setpoint read from the heat pump, not the
+  constants 48 °C / 20 °C, so leaving state 3/4 restores the user's setpoints (#85).
+- SG Ready: writes sent back to back were partly lost on a WPL13E (DHW boost not applied, room
+  setpoint not restored). SG Ready writes now go out one at a time with a gap, each checked against
+  the read-back and sent once more if it did not take; every write is logged (#85).
 - Numeric signals answering `0x9000` (function switched off, e.g. `BIVALENZALTERNATIVTEMPERATUR_HZG`
   on KESSEL) were published as a number: `et_dec_val` showed -2867.2 °C and went into the long-term
   statistics. `0x9000` is now not published for `et_dec_val`, `et_cent_val` and `et_mil_val`: the

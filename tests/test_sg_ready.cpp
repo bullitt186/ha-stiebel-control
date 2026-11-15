@@ -80,6 +80,17 @@ struct FakeIO : ISgReadyIO {
     }
 
     void reset() { calls.clear(); }
+
+    // Setpoints "read from the heat pump" (NAN = not read yet)
+    float dhwSetpoint = NAN;
+    float roomSetpoint = NAN;
+    bool currentSetpoint(const char* signal, float& value) override {
+        const float v = std::string(signal) == "EINSTELL_SPEICHERSOLLTEMP" ? dhwSetpoint
+                      : std::string(signal) == "RAUMSOLLTEMP_I" ? roomSetpoint : NAN;
+        if (v != v) return false;
+        value = v;
+        return true;
+    }
 };
 
 // ============================================================================
@@ -390,4 +401,52 @@ TEST_CASE("room boost setters reject values outside 0-5 K", "[sg_ready]") {
     ctrl.setRoomBoostState4(6.0f);
     CHECK(ctrl.roomBoostState3() == Approx(1.0f));
     CHECK(ctrl.roomBoostState4() == Approx(2.0f));
+}
+
+// ── #85: baseline from the heat pump, state-2 mode ──────────────────────────
+
+TEST_CASE("boost baseline: setpoints read from the heat pump, restored afterwards (#85)", "[sg_ready]") {
+    FakeIO io;
+    io.dhwSetpoint = 50.0f;
+    io.roomSetpoint = 21.0f;
+    SgReadyController c(io);
+    c.applyState(3);
+    CHECK(io.lastCan("EINSTELL_SPEICHERSOLLTEMP") == "55.0");
+    CHECK(io.lastCan("RAUMSOLLTEMP_I") == "22.0");
+    io.dhwSetpoint = 55.0f;          // the boosted value is read back meanwhile
+    io.roomSetpoint = 22.0f;
+    c.applyState(4);                 // originals stay while a boost is active
+    CHECK(io.lastCan("EINSTELL_SPEICHERSOLLTEMP") == "58.0");
+    c.applyState(2);
+    CHECK(io.lastCan("EINSTELL_SPEICHERSOLLTEMP") == "50.0");
+    CHECK(io.lastCan("RAUMSOLLTEMP_I") == "21.0");
+}
+
+TEST_CASE("boost baseline: implausible or missing reads fall back to the constants", "[sg_ready]") {
+    FakeIO io;
+    io.dhwSetpoint = -255.0f;
+    SgReadyController c(io);
+    c.applyState(3);
+    CHECK(io.lastCan("EINSTELL_SPEICHERSOLLTEMP") == "53.0");   // 48 + 5
+    CHECK(io.lastCan("RAUMSOLLTEMP_I") == "21.0");              // 20 + 1
+}
+
+TEST_CASE("state 2 mode: default Tagbetrieb, Automatik on request (#85)", "[sg_ready]") {
+    FakeIO io;
+    SgReadyController c(io);
+    CHECK_FALSE(c.normalAutomatik());
+    CHECK(std::string(c.normalMode()) == SG_READY_NORMAL_MODE);
+    c.setNormalAutomatik(true);                    // state 2 (initial): written at once
+    CHECK(io.lastCan("PROGRAMMSCHALTER") == SG_READY_AUTO_MODE);
+    io.reset();
+    c.setNormalAutomatik(true, false);             // NVS restore on boot: no write
+    CHECK(io.countCan("PROGRAMMSCHALTER") == 0);
+    c.applyState(3);
+    CHECK(io.lastCan("PROGRAMMSCHALTER") == SG_READY_NORMAL_MODE);   // boosts keep Tagbetrieb
+    io.reset();
+    c.setNormalAutomatik(false);                   // not in state 2: no write now
+    CHECK(io.countCan("PROGRAMMSCHALTER") == 0);
+    c.setNormalAutomatik(true);
+    c.applyState(2);
+    CHECK(io.lastCan("PROGRAMMSCHALTER") == SG_READY_AUTO_MODE);
 }
