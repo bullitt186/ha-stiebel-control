@@ -261,6 +261,10 @@ static const CalculatedSensorConfig calculatedSensors[] = {
      "sensor", "duration", "min", "total_increasing", "mdi:timer-outline", "", "", "", true},
     {"stiebel_calculated_verdichter_laufzeit_mittel", LNAME_CALC_VERDICHTER_LAUFZEIT_MITTEL, "heatingpump/calculated/verdichter_laufzeit_mittel/state",
      "sensor", "duration", "min", "measurement", "mdi:timer-sand", "", "", "", true},
+
+    // Defrost running, from ZEITDAUER_LETZTE_ABTAUUNG (0 while a defrost runs, #48)
+    {"stiebel_calculated_abtauung_laeuft", LNAME_CALC_ABTAUUNG_LAEUFT, "heatingpump/calculated/abtauung_laeuft/state",
+     "binary_sensor", "running", "", "", "mdi:snowflake-melt", "on", "off", "", true},
 };
 
 static const size_t CALCULATED_SENSOR_COUNT = sizeof(calculatedSensors) / sizeof(CalculatedSensorConfig);
@@ -273,7 +277,8 @@ static const size_t CALC_IDX_MQTT_PUBLISH_FAILURES = 27;
 static const size_t CALC_IDX_VERDICHTER_STARTS = 28;
 static const size_t CALC_IDX_VERDICHTER_LAUFZEIT = 29;
 static const size_t CALC_IDX_VERDICHTER_LAUFZEIT_MITTEL = 30;
-static_assert(CALCULATED_SENSOR_COUNT == CALC_IDX_VERDICHTER_LAUFZEIT_MITTEL + 1,
+static const size_t CALC_IDX_ABTAUUNG_LAEUFT = 31;
+static_assert(CALCULATED_SENSOR_COUNT == CALC_IDX_ABTAUUNG_LAEUFT + 1,
               "calculatedSensors changed: update the CALC_IDX_* constants");
 
 // Decode buffer for SetValueType(): its longest texts are 20 characters plus the
@@ -2746,6 +2751,7 @@ constexpr uint32_t HASH_WPVORLAUFIST = hash("WPVORLAUFIST");
 constexpr uint32_t HASH_RUECKLAUFISTTEMP = hash("RUECKLAUFISTTEMP");
 constexpr uint32_t HASH_VERDICHTER = hash("VERDICHTER");
 constexpr uint32_t HASH_PUMPENSTATUS = hash("PUMPENSTATUS");
+constexpr uint32_t HASH_ZEITDAUER_LETZTE_ABTAUUNG = hash("ZEITDAUER_LETZTE_ABTAUUNG");
 constexpr uint32_t HASH_FEHLERMELDUNG = hash("FEHLERMELDUNG");
 constexpr uint32_t HASH_EVU_SPERRE_AKTIV = hash("EVU_SPERRE_AKTIV");
 constexpr uint32_t HASH_SOMMERBETRIEB = hash("SOMMERBETRIEB");
@@ -3053,6 +3059,17 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
             mqttPublish(topic, buf, strlen(buf));
             break;
         }
+
+        case HASH_ZEITDAUER_LETZTE_ABTAUUNG:
+            // The IWS resets the last defrost duration to 0 when a defrost starts and
+            // writes the new duration when it ends, so 0 marks a running defrost (#48).
+            // ABTAUUNGAKTIV stayed off through three defrosts on a WPL13E.
+            if (strcmp(cm.Name, "HEIZMODUL") == 0 && value != "-255") {
+                publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_ABTAUUNG_LAEUFT], false);
+                publishCalculatedState(calculatedSensors[CALC_IDX_ABTAUUNG_LAEUFT].stateTopic,
+                                       atoi(value.c_str()) == 0 ? "on" : "off");
+            }
+            break;
 
         case HASH_PUMPENSTATUS:
             if (strcmp(cm.Name, "KESSEL") == 0 && value != "-255") lastPumpenstatus = atoi(value.c_str());

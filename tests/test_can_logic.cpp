@@ -1142,6 +1142,23 @@ TEST_CASE("compressor stats are published with the compressor state", "[calc][co
     fake_millis() = 0;
 }
 
+TEST_CASE("defrost running: last defrost duration 0 means a defrost is running (#48)", "[calc]") {
+    resetDiscoveryState();
+    const ElsterIndex* ei = GetElsterIndex("ZEITDAUER_LETZTE_ABTAUUNG");
+    REQUIRE(ei != nullptr);
+    updateSensor(CanMembers[cm_heizmodul], ei, "708");
+    CHECK(mqttFindPayload("calculated/abtauung_laeuft/state") == "off");
+    mqtt_client_instance().clear();
+    updateSensor(CanMembers[cm_heizmodul], ei, "0");   // defrost started
+    CHECK(mqttFindPayload("calculated/abtauung_laeuft/state") == "on");
+    mqtt_client_instance().clear();
+    updateSensor(CanMembers[cm_heizmodul], ei, "813");  // defrost ended after 813 s
+    CHECK(mqttFindPayload("calculated/abtauung_laeuft/state") == "off");
+    mqtt_client_instance().clear();
+    updateSensor(CanMembers[cm_heizmodul], ei, "-255"); // not provided: no state
+    CHECK(mqttFindPayload("calculated/abtauung_laeuft/state").empty());
+}
+
 TEST_CASE("publishCompressorActive: value > 2 → on", "[calc]") {
     resetDiscoveryState();
     lastVerdichterValue = 50.0f;

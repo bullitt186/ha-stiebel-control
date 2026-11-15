@@ -268,6 +268,8 @@
 #define LNAME_CALC_VERDICHTER_LAUFZEIT_HEUTE   "Compressor Runtime Today"
 #undef  LNAME_CALC_VERDICHTER_LAUFZEIT_MITTEL
 #define LNAME_CALC_VERDICHTER_LAUFZEIT_MITTEL  "Compressor Runtime per Start Today"
+#undef  LNAME_CALC_ABTAUUNG_LAEUFT
+#define LNAME_CALC_ABTAUUNG_LAEUFT             "Defrost Running"
 #undef  LNAME_SOMMERBETRIEB_TEMP
 #define LNAME_SOMMERBETRIEB_TEMP               "Summer Mode Threshold"
 #undef  LNAME_ANZEIGE_HOCHDRUCK

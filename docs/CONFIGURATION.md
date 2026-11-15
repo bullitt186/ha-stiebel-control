@@ -280,6 +280,7 @@ Published to `heatingpump/calculated/` MQTT topics and auto-discovered in HA:
 | Delta T (running) | `heatingpump/calculated/delta_t_running/state` | Same, only when compressor active |
 | Control deviation | `heatingpump/calculated/regelabweichung/state` | KESSEL return sensor (control sensor HK1) − return setpoint |
 | Compressor active | `heatingpump/calculated/compressor_active/state` | on/off |
+| Defrost running | `heatingpump/calculated/abtauung_laeuft/state` | on/off; on while the heat pump module's last defrost duration (`ZEITDAUER_LETZTE_ABTAUUNG`) reads 0, i.e. a defrost is running |
 | Compressor starts today | `heatingpump/calculated/verdichter_starts_heute/state` | Starts since the heat pump's midnight; an off phase under 2 min does not count as a new start |
 | Compressor runtime today | `heatingpump/calculated/verdichter_laufzeit_heute/state` | Minutes the compressor ran today (30 s resolution) |
 | Runtime per start today | `heatingpump/calculated/verdichter_laufzeit_mittel/state` | Runtime today ÷ starts today, in minutes |
