@@ -457,7 +457,7 @@ static void resetDiscoveryState() {
     pacedLastSendMs = 0;
     lastSgDhwSetpoint = NAN;
     lastSgRoomSetpoint = NAN;
-    for (auto& d : dhwProgram) d = DhwProgramDay{};
+    for (auto& prog : timeProgram) for (auto& d : prog) d = DhwProgramDay{};
 }
 
 // ============================================================================
@@ -2265,6 +2265,10 @@ TEST_CASE("dhwprog: signal names, decoded values and day text (#82)", "[dhwprog]
     CHECK_FALSE(dhwprog::parseSignalName("W_WASSERPROG_1_MO_FR", day, slot));
     CHECK_FALSE(dhwprog::parseSignalName("HEIZPROG_1_MO", day, slot));
     CHECK(dhwprog::signalName(3, 1) == "W_WASSERPROG_1_DO_SCHALT_2");
+    CHECK(dhwprog::signalName(6, 0, dhwprog::PREFIX_HEATING) == "HEIZPROG_1_SO");
+    CHECK(dhwprog::parseSignalName("HEIZPROG_1_DI_SCHALT_2", day, slot, dhwprog::PREFIX_HEATING));
+    CHECK(day == 1);
+    CHECK(slot == 1);
     for (int d = 0; d < dhwprog::DAYS; d++)
         for (int s2 = 0; s2 < dhwprog::PERIODS; s2++)
             CHECK(GetElsterIndex(dhwprog::signalName(d, s2).c_str()) != nullptr);
@@ -2310,6 +2314,19 @@ TEST_CASE("DHW program: three periods form one text per day, commands write chan
         CHECK_FALSE(handleDhwProgramCommand(0, "11:10-17:00"));  // off the 15 min grid
         CHECK(pacedWriteCount == 0);
         CHECK(mqttFindPayload("dhw_program/mo/state") == "06:30-23:00");   // HA gets the real value back
+    }
+    // heating program of circuit 1: same layout, own topics
+    updateSensor(CanMembers[cm_manager], GetElsterIndex("HEIZPROG_1_SA"), "06:00-22:00");
+    updateSensor(CanMembers[cm_manager], GetElsterIndex("HEIZPROG_1_SA_SCHALT_2"), "not used time domain");
+    updateSensor(CanMembers[cm_manager], GetElsterIndex("HEIZPROG_1_SA_SCHALT_3"), "not used time domain");
+    CHECK(mqttFindPayload("heating_program/sa/state") == "06:00-22:00");
+    if (dhwProgramWritable()) {
+        pacedWriteCount = 0;
+        CHECK(handleHeatingProgramCommand(5, "00:00-24:00"));
+        REQUIRE(pacedWriteCount == 1);
+        CHECK(std::string(pacedWrites[0].ei->Name) == "HEIZPROG_1_SA");
+        CHECK(std::string(pacedWrites[0].value) == "00:00-24:00");
+        pacedWriteCount = 0;
     }
     resetDiscoveryState();
 }

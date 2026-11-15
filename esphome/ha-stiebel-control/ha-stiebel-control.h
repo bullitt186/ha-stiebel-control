@@ -2881,10 +2881,10 @@ inline bool handleSgReadyNormalMode(const std::string& payload) {
 }
 
 // ============================================================================
-// DHW TIME PROGRAM (WPMW II, #82)
+// TIME PROGRAMS (WPMW II): DHW (#82) and heating circuit 1
 // ============================================================================
-// One text per day in Home Assistant, from the three periods W_WASSERPROG_1_<day>(_SCHALT_2/3).
-// Read on all WPMW II models; writable where the write was tested on the display.
+// One text per day in Home Assistant, from the three periods <prefix><day>(_SCHALT_2/3) on the
+// manager. Read on all WPMW II models; writable where the write was tested on the display.
 struct DhwProgramDay {
     std::string period[dhwprog::PERIODS];
     uint8_t known = 0;          // bit per period read
@@ -2892,11 +2892,24 @@ struct DhwProgramDay {
     std::string published;      // last text sent
     uint32_t publishedMs = 0;
 };
-static DhwProgramDay dhwProgram[dhwprog::DAYS];
-static const char* const DHW_PROGRAM_NAMES[dhwprog::DAYS] = {
-    LNAME_WWPROG_MO, LNAME_WWPROG_DI, LNAME_WWPROG_MI, LNAME_WWPROG_DO,
-    LNAME_WWPROG_FR, LNAME_WWPROG_SA, LNAME_WWPROG_SO};
-static const char* const DHW_PROGRAM_KEYS[dhwprog::DAYS] = {"mo", "di", "mi", "do", "fr", "sa", "so"};
+struct TimeProgramDef {
+    const char* prefix;         // signal name prefix
+    const char* topic;          // heatingpump/<topic>/<day>/state|set
+    const char* uid;            // unique_id prefix
+    const char* names[dhwprog::DAYS];
+};
+static constexpr int TP_DHW = 0, TP_HEATING = 1, TP_COUNT = 2;
+static const TimeProgramDef TIME_PROGRAMS[TP_COUNT] = {
+    {dhwprog::PREFIX_DHW, "dhw_program", "stiebel_ww_programm_",
+     {LNAME_WWPROG_MO, LNAME_WWPROG_DI, LNAME_WWPROG_MI, LNAME_WWPROG_DO,
+      LNAME_WWPROG_FR, LNAME_WWPROG_SA, LNAME_WWPROG_SO}},
+    {dhwprog::PREFIX_HEATING, "heating_program", "stiebel_heiz_programm_",
+     {LNAME_HZPROG_MO, LNAME_HZPROG_DI, LNAME_HZPROG_MI, LNAME_HZPROG_DO,
+      LNAME_HZPROG_FR, LNAME_HZPROG_SA, LNAME_HZPROG_SO}},
+};
+static DhwProgramDay timeProgram[TP_COUNT][dhwprog::DAYS];
+static DhwProgramDay (&dhwProgram)[dhwprog::DAYS] = timeProgram[TP_DHW];
+static const char* const TIME_PROGRAM_KEYS[dhwprog::DAYS] = {"mo", "di", "mi", "do", "fr", "sa", "so"};
 static constexpr uint32_t DHW_PROGRAM_HEARTBEAT_MS = 30UL * 60UL * 1000UL;
 
 inline bool dhwProgramWritable() {
@@ -2907,30 +2920,31 @@ inline bool dhwProgramWritable() {
            (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") == 0 || strcmp(HA_DEVICE_MODEL_STR, "ttl33") == 0);
 }
 
-inline bool publishDhwProgramDiscovery(int day) {
+inline bool publishTimeProgramDiscovery(int prog, int day) {
+    const TimeProgramDef& def = TIME_PROGRAMS[prog];
     const bool writable = dhwProgramWritable();
-    const char* key = DHW_PROGRAM_KEYS[day];
-    char uid[40], topic[96];
-    snprintf(uid, sizeof(uid), "stiebel_ww_programm_%s", key);
+    const char* key = TIME_PROGRAM_KEYS[day];
+    char uid[48], topic[112];
+    snprintf(uid, sizeof(uid), "%s%s", def.uid, key);
     snprintf(topic, sizeof(topic), "homeassistant/%s/heatingpump/%s/config", writable ? "text" : "sensor", uid);
-    std::string p = std::string("{\"name\":\"") + DHW_PROGRAM_NAMES[day] + "\",\"unique_id\":\"" + uid +
-                    "\",\"state_topic\":\"heatingpump/dhw_program/" + key + "/state\",";
+    std::string p = std::string("{\"name\":\"") + def.names[day] + "\",\"unique_id\":\"" + uid +
+                    "\",\"state_topic\":\"heatingpump/" + def.topic + "/" + key + "/state\",";
     if (writable)
-        p += std::string("\"command_topic\":\"heatingpump/dhw_program/") + key + "/set\",\"max\":40,";
+        p += std::string("\"command_topic\":\"heatingpump/") + def.topic + "/" + key + "/set\",\"max\":40,";
     p += "\"icon\":\"mdi:calendar-clock\",\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL_STR
          "\"],\"name\":\"Stiebel Eltron Wärmepumpe\",\"manufacturer\":\"Stiebel Eltron\"}}";
     return mqttPublish(topic, p.c_str(), p.size());
 }
 
-inline void dhwProgramPublish(int day, bool force) {
-    DhwProgramDay& d = dhwProgram[day];
+inline void timeProgramPublish(int prog, int day, bool force) {
+    DhwProgramDay& d = timeProgram[prog][day];
     if (d.known != 0x7) return;
-    if (!d.discovered) d.discovered = publishDhwProgramDiscovery(day);
+    if (!d.discovered) d.discovered = publishTimeProgramDiscovery(prog, day);
     const std::string text = dhwprog::dayText(d.period);
     const uint32_t now = millis();
     if (!force && text == d.published && now - d.publishedMs < DHW_PROGRAM_HEARTBEAT_MS) return;
-    char topic[48];
-    snprintf(topic, sizeof(topic), "heatingpump/dhw_program/%s/state", DHW_PROGRAM_KEYS[day]);
+    char topic[64];
+    snprintf(topic, sizeof(topic), "heatingpump/%s/%s/state", TIME_PROGRAMS[prog].topic, TIME_PROGRAM_KEYS[day]);
     if (mqttPublish(topic, text.c_str(), text.size())) {
         d.published = text;
         d.publishedMs = now;
@@ -2940,43 +2954,58 @@ inline void dhwProgramPublish(int day, bool force) {
 // Config and text go out again with the next poll of each day (not all at once: the MQTT
 // queue is short right after an HA birth message).
 inline void dhwProgramRepublish() {
-    for (int d = 0; d < dhwprog::DAYS; d++) {
-        dhwProgram[d].discovered = false;
-        dhwProgram[d].published.clear();
-    }
+    for (auto& prog : timeProgram)
+        for (auto& d : prog) {
+            d.discovered = false;
+            d.published.clear();
+        }
 }
 
-inline void dhwProgramUpdate(int day, int slot, const std::string& value) {
-    if (value == "-255") return;   // not provided by this manager
-    DhwProgramDay& d = dhwProgram[day];
-    d.period[slot] = dhwprog::normalizeDecoded(value);
-    d.known |= static_cast<uint8_t>(1u << slot);
-    dhwProgramPublish(day, false);
+// A manager value of a program period? Then it updates that day's text (no raw sensor).
+inline bool timeProgramUpdate(const char* signal, const std::string& value) {
+    for (int prog = 0; prog < TP_COUNT; prog++) {
+        int day, slot;
+        if (!dhwprog::parseSignalName(signal, day, slot, TIME_PROGRAMS[prog].prefix)) continue;
+        if (value == "-255") return true;   // not provided by this manager
+        DhwProgramDay& d = timeProgram[prog][day];
+        d.period[slot] = dhwprog::normalizeDecoded(value);
+        d.known |= static_cast<uint8_t>(1u << slot);
+        timeProgramPublish(prog, day, false);
+        return true;
+    }
+    return false;
 }
 
 // MQTT command "11:00-17:00" / "06:30-09:00,11:00-17:00" / "-" for one day. Invalid input
 // writes nothing and sends the current program back, so HA shows what the heat pump has.
-inline bool handleDhwProgramCommand(int day, const std::string& payload) {
-    if (day < 0 || day >= dhwprog::DAYS) return false;
+inline bool handleTimeProgramCommand(int prog, int day, const std::string& payload) {
+    if (prog < 0 || prog >= TP_COUNT || day < 0 || day >= dhwprog::DAYS) return false;
     if (!dhwProgramWritable()) {
-        ESP_LOGW("WW_PROG", "DHW program is read-only on this model");
+        ESP_LOGW("PROGRAM", "time programs are read-only on this model");
         return false;
     }
     std::vector<dhwprog::Period> periods;
     std::string err;
     if (!dhwprog::parsePeriods(payload, periods, err)) {
-        ESP_LOGW("WW_PROG", "%s: \"%s\" rejected: %s", dhwprog::DAY_CODES[day], payload.c_str(), err.c_str());
-        dhwProgramPublish(day, true);
+        ESP_LOGW("PROGRAM", "%s%s: \"%s\" rejected: %s", TIME_PROGRAMS[prog].prefix, dhwprog::DAY_CODES[day],
+                 payload.c_str(), err.c_str());
+        timeProgramPublish(prog, day, true);
         return false;
     }
-    DhwProgramDay& d = dhwProgram[day];
+    DhwProgramDay& d = timeProgram[prog][day];
     for (int slot = 0; slot < dhwprog::PERIODS; slot++) {
         const std::string want = slot < static_cast<int>(periods.size()) ? dhwprog::formatPeriod(periods[slot]) : "";
         if ((d.known & (1u << slot)) && d.period[slot] == want) continue;   // unchanged
-        const std::string name = dhwprog::signalName(day, slot);
+        const std::string name = dhwprog::signalName(day, slot, TIME_PROGRAMS[prog].prefix);
         queuePacedWrite(&CanMembers[cm_manager], &CanMembers[cm_manager], GetElsterIndex(name.c_str()), want.c_str());
     }
     return true;
+}
+inline bool handleDhwProgramCommand(int day, const std::string& payload) {
+    return handleTimeProgramCommand(TP_DHW, day, payload);
+}
+inline bool handleHeatingProgramCommand(int day, const std::string& payload) {
+    return handleTimeProgramCommand(TP_HEATING, day, payload);
 }
 
 // ============================================================================
@@ -3148,11 +3177,7 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
     }
     pacedWriteNoteValue(cm, ei, value);
     if (isWpmw2Model() && strcmp(cm.Name, "MANAGER") == 0) {
-        int day, slot;
-        if (dhwprog::parseSignalName(ei->Name, day, slot)) {   // shown as one text per day
-            dhwProgramUpdate(day, slot, value);
-            return;
-        }
+        if (timeProgramUpdate(ei->Name, value)) return;   // shown as one text per day
     }
     if (isIgnoredOnWpl13e(ei->Name)) return;
     if (isWpmw2Model() && strcmp(cm.Name, "HEIZMODUL") == 0) lastHeizmodulFrameMs = millis();

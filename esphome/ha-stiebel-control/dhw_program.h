@@ -1,5 +1,6 @@
 /*
- * DHW time program of the WPMW II (#82): parsing and validation, no ESPHome dependencies.
+ * Time programs of the WPMW II (DHW #82, heating circuit 1): parsing and validation,
+ * no ESPHome dependencies.
  *
  * The manager holds three switching periods per day in W_WASSERPROG_1_<day>,
  * W_WASSERPROG_1_<day>_SCHALT_2 and _SCHALT_3 (MANAGER, et_time_domain). A period is
@@ -97,12 +98,15 @@ inline std::string dayText(const std::string periods[PERIODS]) {
     return out.empty() ? std::string(NONE) : out;
 }
 
+// Programs shown in Home Assistant: DHW and heating circuit 1, same layout on the manager.
+static constexpr const char* PREFIX_DHW = "W_WASSERPROG_1_";
+static constexpr const char* PREFIX_HEATING = "HEIZPROG_1_";
+
 // "W_WASSERPROG_1_MO" → day 0 slot 0, "..._MO_SCHALT_3" → day 0 slot 2. Block setters
 // (MO_FR, SA_SO, MO_SO) and other names → false.
-inline bool parseSignalName(const char* name, int& day, int& slot) {
-    static const char* PREFIX = "W_WASSERPROG_1_";
-    const size_t pl = std::strlen(PREFIX);
-    if (std::strncmp(name, PREFIX, pl) != 0) return false;
+inline bool parseSignalName(const char* name, int& day, int& slot, const char* prefix = PREFIX_DHW) {
+    const size_t pl = std::strlen(prefix);
+    if (std::strncmp(name, prefix, pl) != 0) return false;
     const char* d = name + pl;
     for (int i = 0; i < DAYS; i++) {
         if (std::strncmp(d, DAY_CODES[i], 2) != 0) continue;
@@ -115,8 +119,8 @@ inline bool parseSignalName(const char* name, int& day, int& slot) {
     return false;
 }
 
-inline std::string signalName(int day, int slot) {
-    std::string n = std::string("W_WASSERPROG_1_") + DAY_CODES[day];
+inline std::string signalName(int day, int slot, const char* prefix = PREFIX_DHW) {
+    std::string n = std::string(prefix) + DAY_CODES[day];
     if (slot == 1) n += "_SCHALT_2";
     if (slot == 2) n += "_SCHALT_3";
     return n;

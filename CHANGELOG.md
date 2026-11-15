@@ -13,6 +13,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   periods, e.g. `06:30-09:00,11:00-17:00`), read on WPL13E, WPL18E and TTL 33, writable on WPL13E
   and TTL 33. Input is checked (15-minute steps, start before end, no overlap) before anything is
   written. On TTL 33 the former raw sensors `W_WASSERPROG_1_<day>` are replaced by these entities (#82).
+  The heating program of heating circuit 1 (`HEIZPROG_1_<day>`, manager) is shown the same way on
+  WPL13E and WPL18E.
 - SG Ready: select for the operating mode in state 2, `Tagbetrieb` (default, as before) or
   `Automatik`, so the time programs and the DHW setpoint 2 apply in normal operation (#85).
 - Calculated binary sensor "Abtauung läuft" (`abtauung_laeuft`): on while the heat pump module's

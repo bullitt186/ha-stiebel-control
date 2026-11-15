@@ -188,6 +188,15 @@
 #define LNAME_WWPROG_SA                        "Warmwasser-Programm Samstag"
 #define LNAME_WWPROG_SO                        "Warmwasser-Programm Sonntag"
 
+// Heating program of heating circuit 1, one text per day
+#define LNAME_HZPROG_MO                             "Heizprogramm HK1 Montag"
+#define LNAME_HZPROG_DI                             "Heizprogramm HK1 Dienstag"
+#define LNAME_HZPROG_MI                             "Heizprogramm HK1 Mittwoch"
+#define LNAME_HZPROG_DO                             "Heizprogramm HK1 Donnerstag"
+#define LNAME_HZPROG_FR                             "Heizprogramm HK1 Freitag"
+#define LNAME_HZPROG_SA                             "Heizprogramm HK1 Samstag"
+#define LNAME_HZPROG_SO                             "Heizprogramm HK1 Sonntag"
+
 // ============================================================================
 // Select option strings (programmschalterOptions[], sgReadyOptions[])
 // ============================================================================

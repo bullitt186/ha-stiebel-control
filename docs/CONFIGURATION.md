@@ -299,6 +299,9 @@ per day, e.g. `text.stiebel_eltron_warmepumpe_warmwasser_programm_montag`:
 - WPL18E shows the program read-only (sensor), `read_only: "true"` too.
 - The program applies only in `Automatik`: in `Tagbetrieb` the manager charges to the DHW setpoint
   all day. Outside the program it holds the DHW setpoint 2.
+- The heating program of heating circuit 1 (`HEIZPROG_1_<day>`, manager) is shown the same way,
+  e.g. `text.stiebel_eltron_warmepumpe_heizprogramm_hk1_montag` (WPL13E, WPL18E). `00:00-24:00`
+  keeps the day setpoint around the clock in `Automatik`.
 
 ---
 

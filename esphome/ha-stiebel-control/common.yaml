@@ -486,6 +486,29 @@ mqtt:
       then:
         - lambda: handleDhwProgramCommand(6, x);
 
+    # Heating program of heating circuit 1, same format (WPMW II)
+    - topic: heatingpump/heating_program/mo/set
+      then:
+        - lambda: handleHeatingProgramCommand(0, x);
+    - topic: heatingpump/heating_program/di/set
+      then:
+        - lambda: handleHeatingProgramCommand(1, x);
+    - topic: heatingpump/heating_program/mi/set
+      then:
+        - lambda: handleHeatingProgramCommand(2, x);
+    - topic: heatingpump/heating_program/do/set
+      then:
+        - lambda: handleHeatingProgramCommand(3, x);
+    - topic: heatingpump/heating_program/fr/set
+      then:
+        - lambda: handleHeatingProgramCommand(4, x);
+    - topic: heatingpump/heating_program/sa/set
+      then:
+        - lambda: handleHeatingProgramCommand(5, x);
+    - topic: heatingpump/heating_program/so/set
+      then:
+        - lambda: handleHeatingProgramCommand(6, x);
+
     # SG Ready room setpoint boost (heating circuit 1) for State 3, 0 = off
     - topic: heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE3/set
       then:
