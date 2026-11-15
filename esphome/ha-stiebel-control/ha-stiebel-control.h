@@ -384,6 +384,19 @@ static const WritableNumberConfig writableNumbers[] = {
 
 static const size_t WRITABLE_NUMBER_COUNT = sizeof(writableNumbers) / sizeof(WritableNumberConfig);
 
+// TTL 33 (WPMW II): the heat pump module answers VERDICHTER with placeholders, so the compressor
+// state comes from KESSEL WP_PUMPENSTATUS, which is on exactly while a compressor runs (#68, #83).
+static constexpr bool isTtl33Model() {
+#ifdef HA_MODEL_ttl33
+    return true;
+#else
+    return false;
+#endif
+}
+// Synthetic VERDICHTER value for a running compressor: above the > 2 (compressor_active) and
+// > 1.5 (betriebsstatus) thresholds that the VERDICHTER-based models use.
+static constexpr float COMPRESSOR_ON_VALUE = 3.0f;
+
 // Models with a WPMW II manager. Writes stay limited per model in writableNumberApplies().
 static constexpr bool isWpmw2Model() {
 #ifdef HA_CONTROLLER_WPMW2
@@ -2751,6 +2764,7 @@ constexpr uint32_t HASH_WPVORLAUFIST = hash("WPVORLAUFIST");
 constexpr uint32_t HASH_RUECKLAUFISTTEMP = hash("RUECKLAUFISTTEMP");
 constexpr uint32_t HASH_VERDICHTER = hash("VERDICHTER");
 constexpr uint32_t HASH_PUMPENSTATUS = hash("PUMPENSTATUS");
+constexpr uint32_t HASH_WP_PUMPENSTATUS = hash("WP_PUMPENSTATUS");
 constexpr uint32_t HASH_ZEITDAUER_LETZTE_ABTAUUNG = hash("ZEITDAUER_LETZTE_ABTAUUNG");
 constexpr uint32_t HASH_FEHLERMELDUNG = hash("FEHLERMELDUNG");
 constexpr uint32_t HASH_EVU_SPERRE_AKTIV = hash("EVU_SPERRE_AKTIV");
@@ -3075,7 +3089,15 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
             if (strcmp(cm.Name, "KESSEL") == 0 && value != "-255") lastPumpenstatus = atoi(value.c_str());
             break;
 
+        case HASH_WP_PUMPENSTATUS:
+            if (isTtl33Model() && strcmp(cm.Name, "KESSEL") == 0) {
+                if (value == "on") lastVerdichterValue = COMPRESSOR_ON_VALUE;
+                else if (value == "off") lastVerdichterValue = 0.0f;
+            }
+            break;
+
         case HASH_VERDICHTER: {
+            if (isTtl33Model()) break;   // placeholders on the TTL 33, see WP_PUMPENSTATUS
             char* endPtr;
             float floatValue = strtof(value.c_str(), &endPtr);
             if (endPtr != value.c_str() && *endPtr == '\0') {

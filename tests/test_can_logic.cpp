@@ -850,7 +850,10 @@ TEST_CASE("updateSensor: VERDICHTER value updates lastVerdichterValue", "[mqtt]"
     const ElsterIndex* ei = GetElsterIndex("VERDICHTER");
     REQUIRE(ei != nullptr);
     updateSensor(heizmodul, ei, "50.0");
-    CHECK(lastVerdichterValue == Approx(50.0f));
+    if (isTtl33Model())
+        CHECK(std::isnan(lastVerdichterValue));   // TTL 33: WP_PUMPENSTATUS decides (#83)
+    else
+        CHECK(lastVerdichterValue == Approx(50.0f));
 }
 
 // ============================================================================
@@ -1179,6 +1182,33 @@ TEST_CASE("defrost running: last defrost duration 0 means a defrost is running (
     mqtt_client_instance().clear();
     updateSensor(CanMembers[cm_heizmodul], ei, "-255"); // not provided: no state
     CHECK(mqttFindPayload("calculated/abtauung_laeuft/state").empty());
+}
+
+TEST_CASE("ttl33: compressor state from KESSEL WP_PUMPENSTATUS, VERDICHTER ignored (#83)", "[calc]") {
+    resetDiscoveryState();
+    const ElsterIndex* wp = GetElsterIndex("WP_PUMPENSTATUS");
+    const ElsterIndex* vd = GetElsterIndex("VERDICHTER");
+    REQUIRE(wp != nullptr);
+    REQUIRE(vd != nullptr);
+    lastVerdichterValue = NAN;
+    if (isTtl33Model()) {
+        updateSensor(CanMembers[cm_kessel], wp, "on");
+        CHECK(lastVerdichterValue == COMPRESSOR_ON_VALUE);
+        updateSensor(CanMembers[cm_heizmodul], vd, "0.8");   // HEIZMODUL placeholder: no effect
+        CHECK(lastVerdichterValue == COMPRESSOR_ON_VALUE);
+        updateSensor(CanMembers[cm_kessel], wp, "?");        // undecodable: keep last state
+        CHECK(lastVerdichterValue == COMPRESSOR_ON_VALUE);
+        updateSensor(CanMembers[cm_manager], wp, "off");     // other member: no effect
+        CHECK(lastVerdichterValue == COMPRESSOR_ON_VALUE);
+        updateSensor(CanMembers[cm_kessel], wp, "off");
+        CHECK(lastVerdichterValue == 0.0f);
+    } else {
+        updateSensor(CanMembers[cm_kessel], wp, "on");       // other models: VERDICHTER decides
+        CHECK(std::isnan(lastVerdichterValue));
+        updateSensor(CanMembers[cm_heizmodul], vd, "50");
+        CHECK(lastVerdichterValue == 50.0f);
+    }
+    lastVerdichterValue = NAN;
 }
 
 TEST_CASE("publishCompressorActive: value > 2 → on", "[calc]") {

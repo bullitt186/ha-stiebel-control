@@ -121,7 +121,7 @@ extern const SignalRequest signalRequests[] = {
     {"KESSELSTATUS",               FREQ_1MIN,  cm_kessel},
     {"PUMPENSTATUS",               FREQ_1MIN,  cm_kessel},
     {"HZK_PUMPE",                  FREQ_1MIN,  cm_kessel},
-    {"WP_PUMPENSTATUS",            FREQ_1MIN,  cm_kessel},
+    {"WP_PUMPENSTATUS",            FREQ_30S,   cm_kessel},          // compressor running (#83)
     {"ZWEITER_WE_STATUS",          FREQ_1MIN,  cm_manager},
     {"HEIZKREIS_STATUS",           FREQ_1MIN,  cm_manager},         // circuit 1
     {"HEIZKREIS_STATUS",           FREQ_1MIN,  cm_mischermodul_3},  // circuit 2

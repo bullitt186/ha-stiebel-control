@@ -31,6 +31,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Fixed
 
+- TTL 33: `compressor_active` stayed off, because the heat pump module answers `VERDICHTER` with
+  placeholders. On `ttl33` the compressor state now comes from KESSEL `WP_PUMPENSTATUS` (polled every
+  30 s), which is on exactly while a compressor runs. The compressor statistics and the operating
+  state build on it. Other models are unchanged (#83).
 - Numeric signals answering `0x9000` (function switched off, e.g. `BIVALENZALTERNATIVTEMPERATUR_HZG`
   on KESSEL) were published as a number: `et_dec_val` showed -2867.2 °C and went into the long-term
   statistics. `0x9000` is now not published for `et_dec_val`, `et_cent_val` and `et_mil_val`: the
