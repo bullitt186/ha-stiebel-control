@@ -2328,6 +2328,17 @@ TEST_CASE("DHW program: three periods form one text per day, commands write chan
         CHECK(std::string(pacedWrites[0].value) == "00:00-24:00");
         pacedWriteCount = 0;
     }
+    // heating program of circuit 2 (mixer circuit)
+    updateSensor(CanMembers[cm_manager], GetElsterIndex("HEIZPROG_2_MO"), "not used time domain");
+    updateSensor(CanMembers[cm_manager], GetElsterIndex("HEIZPROG_2_MO_SCHALT_2"), "not used time domain");
+    updateSensor(CanMembers[cm_manager], GetElsterIndex("HEIZPROG_2_MO_SCHALT_3"), "not used time domain");
+    CHECK(mqttFindPayload("heating_program_2/mo/state") == "-");
+    if (dhwProgramWritable()) {
+        CHECK(handleHeating2ProgramCommand(0, "00:00-24:00"));
+        REQUIRE(pacedWriteCount == 1);
+        CHECK(std::string(pacedWrites[0].ei->Name) == "HEIZPROG_2_MO");
+        pacedWriteCount = 0;
+    }
     resetDiscoveryState();
 }
 

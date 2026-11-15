@@ -176,6 +176,29 @@ extern const SignalRequest signalRequests[] = {
     {"HEIZPROG_1_SO",               FREQ_10MIN, cm_manager},
     {"HEIZPROG_1_SO_SCHALT_2",      FREQ_10MIN, cm_manager},
     {"HEIZPROG_1_SO_SCHALT_3",      FREQ_10MIN, cm_manager},
+
+    // Heating program of heating circuit 2 (mixer circuit, manager), same layout
+    {"HEIZPROG_2_MO",               FREQ_10MIN, cm_manager},
+    {"HEIZPROG_2_MO_SCHALT_2",      FREQ_10MIN, cm_manager},
+    {"HEIZPROG_2_MO_SCHALT_3",      FREQ_10MIN, cm_manager},
+    {"HEIZPROG_2_DI",               FREQ_10MIN, cm_manager},
+    {"HEIZPROG_2_DI_SCHALT_2",      FREQ_10MIN, cm_manager},
+    {"HEIZPROG_2_DI_SCHALT_3",      FREQ_10MIN, cm_manager},
+    {"HEIZPROG_2_MI",               FREQ_10MIN, cm_manager},
+    {"HEIZPROG_2_MI_SCHALT_2",      FREQ_10MIN, cm_manager},
+    {"HEIZPROG_2_MI_SCHALT_3",      FREQ_10MIN, cm_manager},
+    {"HEIZPROG_2_DO",               FREQ_10MIN, cm_manager},
+    {"HEIZPROG_2_DO_SCHALT_2",      FREQ_10MIN, cm_manager},
+    {"HEIZPROG_2_DO_SCHALT_3",      FREQ_10MIN, cm_manager},
+    {"HEIZPROG_2_FR",               FREQ_10MIN, cm_manager},
+    {"HEIZPROG_2_FR_SCHALT_2",      FREQ_10MIN, cm_manager},
+    {"HEIZPROG_2_FR_SCHALT_3",      FREQ_10MIN, cm_manager},
+    {"HEIZPROG_2_SA",               FREQ_10MIN, cm_manager},
+    {"HEIZPROG_2_SA_SCHALT_2",      FREQ_10MIN, cm_manager},
+    {"HEIZPROG_2_SA_SCHALT_3",      FREQ_10MIN, cm_manager},
+    {"HEIZPROG_2_SO",               FREQ_10MIN, cm_manager},
+    {"HEIZPROG_2_SO_SCHALT_2",      FREQ_10MIN, cm_manager},
+    {"HEIZPROG_2_SO_SCHALT_3",      FREQ_10MIN, cm_manager},
 };
 
 extern const size_t SIGNAL_REQUEST_COUNT_VALUE = sizeof(signalRequests) / sizeof(SignalRequest);
