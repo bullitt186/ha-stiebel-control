@@ -458,6 +458,7 @@ static void resetDiscoveryState() {
     lastSgDhwSetpoint = NAN;
     lastSgRoomSetpoint = NAN;
     for (auto& prog : timeProgram) for (auto& d : prog) d = DhwProgramDay{};
+    resetNumberLimits();
 }
 
 // ============================================================================
@@ -2077,6 +2078,7 @@ TEST_CASE("request manager: table resolved once, unknown/blacklisted skipped", "
     CHECK(resolvedRequests[2].ei == nullptr);
     CHECK(resolvedRequests[3].ei == nullptr);
 
+    resetNumberLimits(true);   // device limits (#79) have their own test
     // Startup delay, then one request per call; only the two known signals are polled
     requestManagerStarted = false;
     requestManagerStartTime = 0;
@@ -2105,6 +2107,7 @@ TEST_CASE("request manager: table resolved once, unknown/blacklisted skipped", "
     requestManagerStartTime = 0;
     nextRequestTime.clear();
     signalProcessingStartIndex = 0;
+    resetNumberLimits();
     fake_millis() = 0;
 }
 
@@ -2386,6 +2389,209 @@ TEST_CASE("writeSignal: a second read-back follows once the value has settled", 
     CHECK((fake_can().sent[1][0] & 0x0F) == 1);   // read request to the written member
     CHECK(pendingReadbackCount == 0);
     fake_millis() = 0;
+}
+
+// ============================================================================
+// #79: device limits of writable numbers (switch bytes 0xF8 = min, 0xF9 = max)
+// ============================================================================
+
+static std::string lastPayload(const std::string& topicSubstr) {
+    std::string last;
+    for (const auto& m : mqtt_client_instance().messages)
+        if (m.topic.find(topicSubstr) != std::string::npos) last = m.payload;
+    return last;
+}
+
+static std::vector<uint8_t> limitAnswer(uint8_t switchByte, uint16_t index, uint16_t raw) {
+    return {0xD2, 0x00, switchByte, static_cast<uint8_t>(index >> 8), static_cast<uint8_t>(index & 0xFF),
+            static_cast<uint8_t>(raw >> 8), static_cast<uint8_t>(raw & 0xFF)};
+}
+
+// Runs the limit reads of writableNumbers[0] (DHW setpoint) up to the first request.
+static const CanMember* startLimitReads(unsigned long& t) {
+    resetDiscoveryState();
+    fake_can().sent.clear();
+    t = 1000;
+    fake_millis() = t;
+    numberLimitsStep(t);                        // only sets the start time
+    REQUIRE(fake_can().sent.empty());
+    t += NUMBER_LIMITS_START_DELAY_MS;
+    fake_millis() = t;
+    numberLimitsStep(t);
+    REQUIRE(fake_can().sent.size() == 1);
+    return getWritableNumberMember(writableNumbers[0]);
+}
+
+TEST_CASE("limits: frame layout, indices 0xF7-0xFA always long form", "[limits][can]") {
+    CHECK(elsterShortForm(0x0005));
+    CHECK(elsterShortForm(0x00F6));
+    for (uint16_t idx = 0x00F7; idx <= 0x00FA; idx++) CHECK_FALSE(elsterShortForm(idx));
+    CHECK_FALSE(elsterShortForm(0x0013, ELSTER_SWITCH_MIN));
+    CHECK_FALSE(elsterShortForm(0x0100));
+
+    fake_can().sent.clear();
+    readSignalRaw(&CanMembers[cm_manager], 0x0013, "T", ELSTER_SWITCH_MIN);
+    readSignalRaw(&CanMembers[cm_manager], 0x0013, "T", ELSTER_SWITCH_MAX);
+    readSignalRaw(&CanMembers[cm_manager], 0x00F8, "T");
+    readSignalRaw(&CanMembers[cm_manager], 0x0005, "T");
+    REQUIRE(fake_can().sent.size() == 4);
+    const auto& mn = fake_can().sent[0];
+    CHECK((mn[2] == 0xF8 && mn[3] == 0x00 && mn[4] == 0x13 && mn[5] == 0 && mn[6] == 0));
+    CHECK((fake_can().sent[1][2] == 0xF9 && fake_can().sent[1][4] == 0x13));
+    const auto& f8 = fake_can().sent[2];          // index 0x00F8: long form, not a switch byte
+    CHECK((f8[2] == 0xFA && f8[3] == 0x00 && f8[4] == 0xF8));
+    CHECK(fake_can().sent[3][2] == 0x05);         // short form unchanged
+}
+
+TEST_CASE("limits: an answer to 0xF8/0xF9 is not a sensor value", "[limits][can]") {
+    resetDiscoveryState();
+    // nobody waits for it (e.g. another bus node asked): dropped, not decoded as index 0xF8
+    processAndUpdate(0x480, limitAnswer(ELSTER_SWITCH_MIN, 0x0005, 0x0032));
+    processAndUpdate(0x480, limitAnswer(ELSTER_SWITCH_MAX, 0x0005, 0x012C));
+    CHECK(mqtt_client_instance().messages.empty());
+}
+
+TEST_CASE("limits: device range replaces the static one after both answers", "[limits][mqtt]") {
+    unsigned long t;
+    const CanMember* m = startLimitReads(t);
+    const uint16_t idx = GetElsterIndex(writableNumbers[0].signalName)->Index;
+    const auto& req = fake_can().sent[0];
+    CHECK((req[2] == ELSTER_SWITCH_MIN && req[3] == (idx >> 8) && req[4] == (idx & 0xFF)));
+
+    // same step time again: no second request
+    numberLimitsStep(t);
+    CHECK(fake_can().sent.size() == 1);
+
+    processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MIN, idx, 0x0064));   // 10.0
+    CHECK(numberLimits[0].state == NumberLimitState::WaitMax);
+    CHECK(lastPayload("homeassistant/number/").empty());   // static range until both are in
+    numberLimitsStep(t + 100);                                // gap not over yet
+    CHECK(fake_can().sent.size() == 1);
+    t += NUMBER_LIMITS_GAP_MS;
+    fake_millis() = t;
+    numberLimitsStep(t);
+    REQUIRE(fake_can().sent.size() == 2);
+    CHECK(fake_can().sent[1][2] == ELSTER_SWITCH_MAX);
+    processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MAX, idx, 0x0258));   // 60.0
+
+    CHECK(numberLimits[0].state == NumberLimitState::Device);
+    CHECK(writableNumberMin(0) == Approx(10.0f));
+    CHECK(writableNumberMax(0) == Approx(60.0f));
+    std::string uid = std::string("stiebel_") + m->Name + "_" + writableNumbers[0].signalName;
+    std::transform(uid.begin(), uid.end(), uid.begin(), ::tolower);
+    const std::string disc = lastPayload("homeassistant/number/heatingpump/" + uid + "/config");
+    REQUIRE_FALSE(disc.empty());
+    CHECK(disc.find("\"unique_id\":\"" + uid + "\"") != std::string::npos);   // same entity, no second one
+    CHECK(disc.find("\"min\":10,") != std::string::npos);
+    CHECK(disc.find("\"max\":60,") != std::string::npos);
+    CHECK(mqttFindPayload(writableNumbers[0].signalName + std::string("/state")).empty());   // no fake state
+
+    // writes are clamped to the device range
+    fake_can().sent.clear();
+    writeSignal(m, writableNumbers[0].signalName, "70");
+    REQUIRE(fake_can().sent.size() == 1);
+    const auto& w = fake_can().sent[0];
+    const bool shortForm = elsterShortForm(idx);
+    CHECK(w[shortForm ? 3 : 5] == 0x02);
+    CHECK(w[shortForm ? 4 : 6] == 0x58);   // 600 = 60.0
+    fake_can().sent.clear();
+    writeSignal(m, writableNumbers[0].signalName, "5");
+    REQUIRE(fake_can().sent.size() == 1);
+    CHECK(fake_can().sent[0][shortForm ? 4 : 6] == 0x64);   // 100 = 10.0
+    resetNumberLimits();
+    pendingReadbackCount = 0;
+}
+
+TEST_CASE("limits: 0x8000 on one side keeps that side static", "[limits]") {
+    unsigned long t;
+    const CanMember* m = startLimitReads(t);
+    const uint16_t idx = GetElsterIndex(writableNumbers[0].signalName)->Index;
+    processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MIN, idx, 0x8000));
+    t += NUMBER_LIMITS_GAP_MS;
+    numberLimitsStep(t);
+    processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MAX, idx, 0x0258));
+    CHECK(numberLimits[0].state == NumberLimitState::Device);
+    CHECK(writableNumberMin(0) == Approx(writableNumbers[0].min));
+    CHECK(writableNumberMax(0) == Approx(60.0f));
+    resetNumberLimits();
+}
+
+TEST_CASE("limits: 0x8000 on both sides, min >= max or no answer keep the static range", "[limits]") {
+    const uint16_t idx = GetElsterIndex(writableNumbers[0].signalName)->Index;
+    SECTION("both 0x8000") {
+        unsigned long t;
+        const CanMember* m = startLimitReads(t);
+        processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MIN, idx, 0x8000));
+        numberLimitsStep(t + NUMBER_LIMITS_GAP_MS);
+        processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MAX, idx, 0x8000));
+    }
+    SECTION("min >= max") {
+        unsigned long t;
+        const CanMember* m = startLimitReads(t);
+        processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MIN, idx, 0x0258));
+        numberLimitsStep(t + NUMBER_LIMITS_GAP_MS);
+        processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MAX, idx, 0x0064));
+    }
+    SECTION("no answer: one retry, then static, then the next number") {
+        unsigned long t;
+        startLimitReads(t);
+        t += NUMBER_LIMITS_TIMEOUT_MS;
+        numberLimitsStep(t);
+        CHECK(fake_can().sent.size() == 2);          // retry of 0xF8
+        CHECK(fake_can().sent[1][2] == ELSTER_SWITCH_MIN);
+        t += NUMBER_LIMITS_TIMEOUT_MS;
+        numberLimitsStep(t);                         // second timeout: give up
+        CHECK(numberLimitsActive != 0);
+    }
+    CHECK(numberLimits[0].state == NumberLimitState::Static);
+    CHECK(writableNumberMin(0) == Approx(writableNumbers[0].min));
+    CHECK(writableNumberMax(0) == Approx(writableNumbers[0].max));
+    CHECK(lastPayload("homeassistant/number/").empty());   // nothing republished
+    resetNumberLimits();
+}
+
+TEST_CASE("limits: answers from another member or index are ignored", "[limits]") {
+    unsigned long t;
+    const CanMember* m = startLimitReads(t);
+    const uint16_t idx = GetElsterIndex(writableNumbers[0].signalName)->Index;
+    processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MIN, static_cast<uint16_t>(idx + 1), 0x0064));
+    processAndUpdate(m->CanId == 0x180 ? 0x480 : 0x180, limitAnswer(ELSTER_SWITCH_MIN, idx, 0x0064));
+    CHECK(numberLimits[0].state == NumberLimitState::WaitMin);
+    CHECK(mqtt_client_instance().messages.empty());
+    resetNumberLimits();
+}
+
+TEST_CASE("limits: virtual SG Ready numbers are never requested", "[limits]") {
+    for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; i++)
+        if (strncmp(writableNumbers[i].signalName, "SG_READY_", 9) == 0) CHECK_FALSE(numberLimitsWanted(i));
+}
+
+TEST_CASE("limits: no clamping with the static range, clamping with the device range", "[limits]") {
+    resetDiscoveryState();
+    const int i = writableNumberIndexByName("RAUMSOLLTEMP_I");
+    REQUIRE(i >= 0);
+    const ElsterIndex* ei = GetElsterIndex("RAUMSOLLTEMP_I");
+    char out[16];
+    CHECK_FALSE(clampToNumberLimits(ei, "45", out, sizeof(out)));   // static range: unchanged behaviour
+    numberLimits[i].state = NumberLimitState::Device;
+    numberLimits[i].min = 5.0f;
+    numberLimits[i].max = 30.0f;
+    CHECK(clampToNumberLimits(ei, "45", out, sizeof(out)));
+    CHECK(std::string(out) == "30");
+    CHECK(clampToNumberLimits(ei, "2", out, sizeof(out)));
+    CHECK(std::string(out) == "5");
+    CHECK_FALSE(clampToNumberLimits(ei, "21.5", out, sizeof(out)));
+    CHECK_FALSE(clampToNumberLimits(ei, "nan", out, sizeof(out)));
+    CHECK_FALSE(clampToNumberLimits(GetElsterIndex("PROGRAMMSCHALTER"), "Automatik", out, sizeof(out)));
+    CHECK_FALSE(clampToNumberLimits(GetElsterIndex("AUSSENTEMP"), "99", out, sizeof(out)));   // not writable
+
+    // paced writes store the clamped value, so the read-back check compares the right value
+    pacedWriteCount = 0;
+    REQUIRE(queuePacedWrite(&CanMembers[cm_manager], &CanMembers[cm_manager], ei, "45"));
+    REQUIRE(pacedWriteCount == 1);
+    CHECK(std::string(pacedWrites[0].value) == "30");
+    pacedWriteCount = 0;
+    resetNumberLimits();
 }
 
 #include "wpl9_cases.inc"
