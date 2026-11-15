@@ -348,6 +348,20 @@
 #define LNAME_HZPROG_SA                             "Heating Program HC1 Saturday"
 #undef  LNAME_HZPROG_SO
 #define LNAME_HZPROG_SO                             "Heating Program HC1 Sunday"
+#undef  LNAME_HZ2PROG_MO
+#define LNAME_HZ2PROG_MO                            "Heating Program HC2 Monday"
+#undef  LNAME_HZ2PROG_DI
+#define LNAME_HZ2PROG_DI                            "Heating Program HC2 Tuesday"
+#undef  LNAME_HZ2PROG_MI
+#define LNAME_HZ2PROG_MI                            "Heating Program HC2 Wednesday"
+#undef  LNAME_HZ2PROG_DO
+#define LNAME_HZ2PROG_DO                            "Heating Program HC2 Thursday"
+#undef  LNAME_HZ2PROG_FR
+#define LNAME_HZ2PROG_FR                            "Heating Program HC2 Friday"
+#undef  LNAME_HZ2PROG_SA
+#define LNAME_HZ2PROG_SA                            "Heating Program HC2 Saturday"
+#undef  LNAME_HZ2PROG_SO
+#define LNAME_HZ2PROG_SO                            "Heating Program HC2 Sunday"
 
 // ============================================================================
 // Select option strings

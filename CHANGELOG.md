@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Added
+
+- WPL13E/WPL18E: heating program of heating circuit 2 (mixer circuit, `HEIZPROG_2_<day>`) as one
+  text entity per day, same format as the DHW and circuit 1 programs. In `Automatik` an empty
+  program keeps the circuit on its night setpoint.
+
 ## [2.7.0] — 2026-11-15
 
 Contributions from SolderAndSyntax and bastard-GIT: WPMW II clock/date writes, W5500 Ethernet,
