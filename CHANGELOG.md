@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Fixed
+
+- A raw bus scan (`heatingpump/scan/start` with an index range) crashed the ESP after a few
+  thousand indices: `GetElsterIndex()` cached every index that is not in the table in a hash map,
+  which grew until a rehash failed (`exception/panic`, seen on a WPL13E at 0x601 0x0000-0x0fff).
+  Index lookups now use a table sorted once at startup (binary search, fixed size) and cache nothing.
+
 ### Added
 
 - WPL13E/WPL18E: heating program of heating circuit 2 (mixer circuit, `HEIZPROG_2_<day>`) as one
