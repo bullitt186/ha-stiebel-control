@@ -13,6 +13,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   text entity per day, same format as the DHW and circuit 1 programs. In `Automatik` an empty
   program keeps the circuit on its night setpoint.
 
+### Fixed
+
+- WPL13E/WPL18E/TTL 33 (WPMW II): `FEHLERMELDUNG` takes the fault number from the high byte, so a
+  high-pressure stop shows `HD-SENSOR-MAX` instead of `ERR 7424` (#52). The fault list is
+  unchanged.
+
 ## [2.7.0] — 2026-11-15
 
 Contributions from SolderAndSyntax and bastard-GIT: WPMW II clock/date writes, W5500 Ethernet,

@@ -440,10 +440,11 @@ They use the same `/set` topics as the number entities, so the CAN member mappin
 
 ## Fault text
 
-`FEHLERMELDUNG` is decoded via `ErrorList` in `ElsterTable.h` ("Keine Stoerung" when 0). The
-`abhilfe` attribute holds a short remedy (`heatingpump/<MEMBER>/FEHLERMELDUNG/attributes`).
-WPL13E requests the heat pump module (IWS); the WPMW II manager answers a constant 69 on this
-index, which is no known fault code, so it is not requested.
+`FEHLERMELDUNG` is decoded via `ErrorList` in `ElsterTable.h` ("Keine Stoerung" when 0). On the
+WPMW II (WPL13E, WPL18E, TTL 33) the fault number is in the high byte (`0x1D00` = HD-SENSOR-MAX);
+the low byte is not part of it. The `abhilfe` attribute holds a short remedy
+(`heatingpump/<MEMBER>/FEHLERMELDUNG/attributes`). WPL13E requests the heat pump module (IWS);
+the WPMW II manager answers 69 (`0x0045`, no fault) on this index, so it is not requested.
 
 ## Bus scan
 

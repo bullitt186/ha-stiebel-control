@@ -125,6 +125,12 @@ TEST_CASE("getTypeDefaults: et_err_nr → alert-circle sensor", "[can]") {
     CHECK(std::string(comp) == "sensor");
     CHECK(std::string(icon) == "mdi:alert-circle");
 }
+TEST_CASE("getTypeDefaults: et_err_status → alert-circle sensor", "[can]") {
+    const char *comp, *dc, *unit, *sc, *icon;
+    getTypeDefaults(et_err_status, comp, dc, unit, sc, icon);
+    CHECK(std::string(comp) == "sensor");
+    CHECK(std::string(icon) == "mdi:alert-circle");
+}
 TEST_CASE("getTypeDefaults: et_dev_id → text", "[can]") {
     const char *comp, *dc, *unit, *sc, *icon;
     getTypeDefaults(et_dev_id, comp, dc, unit, sc, icon);
@@ -1630,9 +1636,15 @@ TEST_CASE("fault: code decoding and remedy attribute", "[fault]") {
     resetDiscoveryState();
     const ElsterIndex* ei = GetElsterIndex("FEHLERMELDUNG");
     REQUIRE(ei != nullptr);
+#ifdef HA_CONTROLLER_WPMW2
+    CHECK(ei->Type == et_err_status);
+    // HEIZMODUL answers fault 4 (Hochdruck) in the high byte
+    processAndUpdate(0x500, {0xD2, 0x00, 0x01, 0x04, 0x00, 0x00, 0x00});
+#else
     CHECK(ei->Type == et_err_nr);
     // HEIZMODUL answers fault 0x0004 (Hochdruck)
     processAndUpdate(0x500, {0xD2, 0x00, 0x01, 0x00, 0x04, 0x00, 0x00});
+#endif
     CHECK(mqttFindPayload("HEIZMODUL/FEHLERMELDUNG/state") == "Hochdruck");
     CHECK(mqttFindPayload("HEIZMODUL/FEHLERMELDUNG/attributes").find("Volumenstrom") != std::string::npos);
     CHECK(mqttFindPayload("homeassistant/sensor/heatingpump/").find("json_attributes_topic") != std::string::npos);

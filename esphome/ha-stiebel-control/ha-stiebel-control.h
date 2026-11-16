@@ -691,6 +691,7 @@ inline void getTypeDefaults(ElsterType type, const char*& component, const char*
             component = "sensor"; deviceClass = ""; unit = ""; stateClass = "measurement"; icon = "mdi:counter";
             break;
         case et_err_nr:
+        case et_err_status:
             component = "sensor"; deviceClass = ""; unit = ""; stateClass = ""; icon = "mdi:alert-circle";
             break;
         case et_dev_id:

@@ -66,7 +66,8 @@ static const char * ElsterTypeStr[] =
   "et_dev_nr",
   "et_err_nr",
   "et_dev_id",
-  "et_hours"
+  "et_hours",
+  "et_err_status"
 };
 #endif // ELSTER_TABLE_DEFINITIONS
 
@@ -119,7 +120,8 @@ typedef enum
   et_dev_nr,
   et_err_nr,
   et_dev_id,
-  et_hours         // unsigned whole-hour counter; 0x8000 remains unavailable
+  et_hours,        // unsigned whole-hour counter; 0x8000 remains unavailable
+  et_err_status    // live fault status: fault number (ErrorList) in the high byte
 } ElsterType;
 
 typedef struct
@@ -144,7 +146,17 @@ const ElsterIndex ElsterTable[] =
 //  Name                                                 Index   Type
 //  Struktur-Definition in KElsterTable.h 
   { "INDEX_NOT_FOUND"                             , 0x0000, 0               , true , false },
+#ifdef HA_CONTROLLER_WPMW2
+  // WPMW II: the live status word carries the fault number in the high byte, e.g. 0x1D00 =
+  // HD-SENSOR-MAX and 0x0400 = Hochdruck on HEIZMODUL during high-pressure stops (WPL18E),
+  // matching the fault list entries. The low byte is not part of the code: the WPM II
+  // (KESSEL, MANAGER, 0x601) sends 0x0045 without a fault and 0x1D45 with one. The fault
+  // list (FEHLERFELD_*) keeps the code in the low byte and stays et_err_nr; the 16-bit codes
+  // from 0x1f42 in ErrorList are reached only there.
+  { "FEHLERMELDUNG"                               , 0x0001, et_err_status   , false, true  },
+#else
   { "FEHLERMELDUNG"                               , 0x0001, et_err_nr       , false, true  },
+#endif
   { "UHRZEIT"                                     , 0x0009, et_zeit         , false, false },
   { "DATUM"                                       , 0x000a, et_datum        , false, false },
   { "GERAETE_ID"                                  , 0x000b, et_dev_id       , true , false },
