@@ -1,4 +1,5 @@
-.PHONY: compile compile-esp32 compile-s2 check logs upload config test test-all clean-tests smoke-test capture-baseline
+.PHONY: compile compile-esp32 compile-s2 check logs upload config test test-all clean-tests smoke-test capture-baseline \
+        mutate mutate-all
 
 # Extract model and MQTT credentials from local config files
 DEVICE_MODEL ?= $(shell grep 'device_model:' esphome/heatingpump.yaml | grep -v '^\s*\#' | head -1 | sed 's/.*"\(.*\)".*/\1/')
@@ -88,6 +89,20 @@ $(TEST_BIN): $(TEST_SRCS) $(TEST_EXTRA_OBJS) $(ELSTER_OBJS) $(TEST_HDRS)
 
 clean-tests:
 	rm -f $(TEST_BIN) $(TEST_EXTRA_OBJS) $(ELSTER_OBJS)
+
+# ── Mutation testing (Mull) ──────────────────────────────────────────────────
+
+# The same translation units as $(TEST_BIN), rebuilt with clang and the Mull plugin
+MUTATE_SOURCES = $(TEST_SRCS) $(TEST_EXTRA) $(ELSTER_SRCS)
+
+# Mutate only the C++ lines changed against origin/main (override: MUTATE_BASE=<ref>).
+# Shows whether the tests notice a wrong result, which line coverage does not.
+mutate:
+	MUTATE_SOURCES="$(MUTATE_SOURCES)" bash scripts/mutate.sh
+
+# Mutate all C++ logic under esphome/ha-stiebel-control/ (the weekly CI workflow runs this)
+mutate-all:
+	MUTATE_SOURCES="$(MUTATE_SOURCES)" bash scripts/mutate.sh --all
 
 # ── MQTT smoke test ───────────────────────────────────────────────────────────
 

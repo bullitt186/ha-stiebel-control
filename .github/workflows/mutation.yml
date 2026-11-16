@@ -1,0 +1,74 @@
+name: Mutation testing
+
+# Weekly full mutation run of the C++ logic with Mull. It reports the mutation
+# score per file; it is not a required check and never blocks a pull request.
+# Run `make mutate` locally for the lines a change touches (see CLAUDE.md).
+
+on:
+  schedule:
+    - cron: "41 3 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Mull 0.38.0 for LLVM 18 (the clang-18 of Ubuntu 24.04). Checksums from the
+  # GitHub release assets; update version, URLs and checksums together.
+  MULL_VERSION: "0.38.0"
+  MULL_RUNNER_DEB: Mull-0.38.0-ubuntu-amd64-24.04.deb
+  MULL_RUNNER_SHA256: 83ebc3c49f173b83dc0d991fff4b3ac8d6a2a7ecf51244d598507f85b04d5a29
+  MULL_PLUGIN_DEB: Mull-18-0.38.0-LLVM-18.1.3-ubuntu-amd64-24.04.deb
+  MULL_PLUGIN_SHA256: 8b3840841fc1cea78844ae35a1d48c0a0db3b0ce435019cd50ef78dd578b61bb
+
+jobs:
+  mutate:
+    name: Mutate C++ logic
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Mull
+        run: |
+          base="https://github.com/mull-project/mull/releases/download/${MULL_VERSION}"
+          curl -fsSLo "/tmp/${MULL_RUNNER_DEB}" "${base}/${MULL_RUNNER_DEB}"
+          curl -fsSLo "/tmp/${MULL_PLUGIN_DEB}" "${base}/${MULL_PLUGIN_DEB}"
+          echo "${MULL_RUNNER_SHA256}  /tmp/${MULL_RUNNER_DEB}" | sha256sum -c -
+          echo "${MULL_PLUGIN_SHA256}  /tmp/${MULL_PLUGIN_DEB}" | sha256sum -c -
+          sudo apt-get update
+          sudo apt-get install -y clang-18 "/tmp/${MULL_RUNNER_DEB}" "/tmp/${MULL_PLUGIN_DEB}"
+          mull-runner --version
+
+      - name: Run Mull on all C++ logic
+        run: make mutate-all
+
+      - name: Report mutation score
+        if: always()
+        run: |
+          {
+            echo "## Mutation testing (Mull ${MULL_VERSION})"
+            echo
+            if [ -f .mull/summary.md ]; then
+              cat .mull/summary.md
+              echo
+              echo "Surviving mutants are listed in the mutation-report artifact (mutation.txt)."
+            else
+              echo "No mutation results were produced."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: mutation-report
+          path: |
+            .mull/mutation.txt
+            .mull/mutation.sqlite
+            .mull/summary.md
+          if-no-files-found: ignore
+          retention-days: 30

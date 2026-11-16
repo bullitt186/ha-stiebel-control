@@ -13,6 +13,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   text entity per day, same format as the DHW and circuit 1 programs. In `Automatik` an empty
   program keeps the circuit on its night setpoint.
 
+### Changed
+
+- Development: mutation testing of the C++ logic with Mull (`make mutate` for changed lines,
+  `make mutate-all`, weekly non-blocking CI workflow), a Claude Code Stop hook that runs the fast
+  local checks, and design-first test rules in `CLAUDE.md`.
+
 ## [2.7.0] — 2026-11-15
 
 Contributions from SolderAndSyntax and bastard-GIT: WPMW II clock/date writes, W5500 Ethernet,
