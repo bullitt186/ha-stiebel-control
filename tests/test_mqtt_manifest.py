@@ -24,6 +24,21 @@ class ModelManifestTests(unittest.TestCase):
                 common, _ = smoke.load_required_topics(name)
                 self.assertIn("heatingpump/MANAGER/WW_ECO/state", common)
 
+    def test_wpl18e_uses_the_wpl13e_manifest(self):
+        self.assertEqual(smoke.load_required_topics("wpl18e"), smoke.load_required_topics("wpl13e"))
+        with open(smoke.MODELS_DIR / "wpl18e_smoke.json") as f:
+            self.assertNotIn("required_topics", json.load(f))
+
+    def test_alias_of_an_alias_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            (directory / "_common_smoke.json").write_text(json.dumps({"required_topics": ["a"]}))
+            (directory / "x_smoke.json").write_text(json.dumps({"same_as": "y"}))
+            (directory / "y_smoke.json").write_text(json.dumps({"same_as": "x"}))
+            with patch.object(smoke, "MODELS_DIR", directory), patch.object(smoke, "COMMON_FILE", directory / "_common_smoke.json"):
+                with self.assertRaises(ValueError):
+                    smoke.load_required_topics("x")
+
     def test_invalid_exclusion_is_rejected(self):
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)

@@ -56,4 +56,20 @@
     {"WAERMEERTRAG_2WE_WW_SUM_MWH",      FREQ_10MIN, cm_heizmodul}, \
     {"WAERMEERTRAG_2WE_HEIZ_SUM_MWH",    FREQ_10MIN, cm_heizmodul},
 
+// Daily and total energy counters of the heat pump module (IWS), in kWh and Wh. Used by models
+// whose HEIZMODUL answers them (wpl9, wpl10ac, wpl13e/wpl18e); one definition for all (#101).
+#define SIGNAL_REQUESTS_ENERGY_IWS \
+    {"EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH", FREQ_10MIN, cm_heizmodul}, \
+    {"EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH",  FREQ_10MIN, cm_heizmodul}, \
+    {"EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", FREQ_10MIN, cm_heizmodul}, \
+    {"EL_AUFNAHMELEISTUNG_WW_SUM_KWH",   FREQ_10MIN, cm_heizmodul}, \
+    {"EL_AUFNAHMELEISTUNG_WW_TAG_WH",    FREQ_10MIN, cm_heizmodul}, \
+    {"EL_AUFNAHMELEISTUNG_WW_TAG_KWH",   FREQ_10MIN, cm_heizmodul}, \
+    {"WAERMEERTRAG_HEIZ_SUM_KWH",        FREQ_10MIN, cm_heizmodul}, \
+    {"WAERMEERTRAG_HEIZ_TAG_WH",         FREQ_10MIN, cm_heizmodul}, \
+    {"WAERMEERTRAG_HEIZ_TAG_KWH",        FREQ_10MIN, cm_heizmodul}, \
+    {"WAERMEERTRAG_WW_SUM_KWH",          FREQ_10MIN, cm_heizmodul}, \
+    {"WAERMEERTRAG_WW_TAG_WH",           FREQ_10MIN, cm_heizmodul}, \
+    {"WAERMEERTRAG_WW_TAG_KWH",          FREQ_10MIN, cm_heizmodul},
+
 #endif // SIGNAL_REQUESTS_BASE_H

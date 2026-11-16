@@ -61,6 +61,17 @@ def load_required_topics(model: str) -> tuple[list[str], list[str]]:
         return common, []
     with open(model_file) as f:
         model_config = json.load(f)
+    # "same_as": another model's manifest applies unchanged (e.g. wpl18e polls the wpl13e table)
+    alias = model_config.get("same_as")
+    if alias:
+        if alias == model:
+            raise ValueError(f"Model {model} refers to itself in same_as")
+        alias_file = MODELS_DIR / f"{alias}_smoke.json"
+        with open(alias_file) as f:
+            target = json.load(f)
+        if "same_as" in target:
+            raise ValueError(f"Model {model}: same_as target {alias} is an alias itself")
+        model_config = target
     excluded = set(model_config.get("excluded_common_topics", []))
     unknown = excluded - set(common)
     if unknown:
@@ -151,6 +162,14 @@ def run_test(args) -> int:
 
 def run_capture(args) -> int:
     """Subscribe for window, write all observed topics to <model>_smoke.json."""
+    alias_file = MODELS_DIR / f"{args.model}_smoke.json"
+    if alias_file.exists():
+        with open(alias_file) as f:
+            alias = json.load(f).get("same_as")
+        if alias:
+            print(f"ERROR: {alias_file} uses the {alias} manifest (same_as); capture for {alias} instead.",
+                  file=sys.stderr)
+            return 1
     print(f"Capture mode: model={args.model}, broker={args.broker}, window={args.window}s")
     observed: dict[str, str] = {}
 
