@@ -1420,7 +1420,7 @@ TEST_CASE("writeSignal: et_betriebsart with unrecognized string is not sent to C
 
 TEST_CASE("writeSignal: et_betriebsart with valid German string is sent", "[can]") {
     fake_can().sent.clear();
-    const char* value = "Automatik";
+    const char* value = LNAME_OPT_AUTOMATIK;   // model's own name (WPM3: Programmierbetrieb)
     writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", value);
     CHECK(fake_can().sent.size() == 1);
 }
@@ -1610,7 +1610,7 @@ TEST_CASE("climate: heating and hot water discoveries reuse the number /set topi
     std::string dhw  = mqttFindPayload("climate/heatingpump/stiebel_climate_warmwasser/config");
     CHECK(heat.find("heatingpump/MANAGER/RAUMSOLLTEMP_I/set") != std::string::npos);
     CHECK(heat.find("PROGRAMMSCHALTER/set") != std::string::npos);
-    CHECK(heat.find("\"Tagbetrieb\"") != std::string::npos);
+    CHECK(heat.find(std::string("\"") + LNAME_OPT_TAGBETRIEB + "\"") != std::string::npos);
     CHECK(dhw.find("EINSTELL_SPEICHERSOLLTEMP/set") != std::string::npos);
     const bool wpl17 = std::strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0;
     const bool canbSetpoint = wpl17 || std::strcmp(HA_DEVICE_MODEL_STR, "wpl9") == 0;
@@ -2117,7 +2117,7 @@ TEST_CASE("SG Ready IO: writes are queued and sent one at a time (#85)", "[sgrea
     pendingReadbackCount = 0;
     fake_can().sent.clear();
     fake_millis() = 5000;
-    sgReadyIO.writeCanSignal("PROGRAMMSCHALTER", "Automatik");
+    sgReadyIO.writeCanSignal("PROGRAMMSCHALTER", LNAME_OPT_AUTOMATIK);
     sgReadyIO.writeCanSignal("EINSTELL_SPEICHERSOLLTEMP", "55.0");
     CHECK(fake_can().sent.empty());                // nothing on the bus before the step
     REQUIRE(pacedWriteCount == 2);
@@ -2131,7 +2131,7 @@ TEST_CASE("SG Ready IO: writes are queued and sent one at a time (#85)", "[sgrea
     CHECK(fake_can().sent.size() == 1);
 
     // settled read-back confirms the first write
-    updateSensor(CanMembers[cm_manager], GetElsterIndex("PROGRAMMSCHALTER"), "Automatik");
+    updateSensor(CanMembers[cm_manager], GetElsterIndex("PROGRAMMSCHALTER"), LNAME_OPT_AUTOMATIK);
     fake_millis() = 5000 + PACED_WRITE_VERIFY_MS;
     pacedWriteStep();                              // confirmed, removed
     CHECK(pacedWriteCount == 1);
@@ -2209,6 +2209,28 @@ TEST_CASE("SG Ready boost baseline is the setpoint read from the manager (#85)",
     CHECK(dhwBack);
     CHECK(roomBack);
     resetDiscoveryState();
+}
+
+TEST_CASE("model profile: one place decides the model's capabilities (#94)", "[model]") {
+    const std::string m = HA_DEVICE_MODEL_STR;
+#ifdef HA_CONTROLLER_WPMW2
+    const bool wpmw2Switch = true;
+#else
+    const bool wpmw2Switch = false;
+#endif
+    CHECK(kModel.wpmw2 == wpmw2Switch);
+    CHECK(kModel.wpmw2 == (m == "wpl13e" || m == "wpl18e" || m == "ttl33"));
+    CHECK(kModel.wpmw2WritesVerified == (m == "wpl13e" || m == "ttl33"));
+    CHECK(kModel.canBDhwRoutes == (m == "wpl9"));
+    CHECK(kModel.canBRoutes == (m == "wpl17"));
+    CHECK(kModel.singleHeatingCircuit == (m == "wpl17"));
+    CHECK(kModel.perMemberEnergy == (m == "wpl17"));
+    CHECK(kModel.ignoreUnusedIwsRuntime == (m == "wpl13e"));
+    CHECK(kModel.wwEcoReadable == (m != "wpl9"));
+#ifdef HA_CONTROLLER_WPM3
+    CHECK(m == "wpl10ac");
+    CHECK(std::string(SG_READY_NORMAL_MODE) == "Komfortbetrieb");
+#endif
 }
 
 TEST_CASE("SG Ready labels: one set, the select options, for every publish (#93)", "[sgready]") {

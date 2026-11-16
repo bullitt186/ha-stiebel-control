@@ -168,7 +168,7 @@ TEST_CASE("state 3 (Recommended): boosts DHW and room temp", "[sg_ready]") {
     ctrl.applyState(SgReadyController::STATE_RECOMMENDED);
 
     CHECK(ctrl.isActive() == true);
-    CHECK(io.hadCan("PROGRAMMSCHALTER", "Tagbetrieb"));
+    CHECK(io.hadCan("PROGRAMMSCHALTER", SG_READY_NORMAL_MODE));
     // DHW: 48.0 + 5.0 = 53.0
     CHECK(io.lastCan("EINSTELL_SPEICHERSOLLTEMP") == "53.0");
     // Room: 20.0 + 1.0 = 21.0
@@ -184,7 +184,7 @@ TEST_CASE("state 4 (Forced): boosts DHW and room temp more", "[sg_ready]") {
     ctrl.applyState(SgReadyController::STATE_FORCED);
 
     CHECK(ctrl.isActive() == true);
-    CHECK(io.hadCan("PROGRAMMSCHALTER", "Tagbetrieb"));
+    CHECK(io.hadCan("PROGRAMMSCHALTER", SG_READY_NORMAL_MODE));
     // DHW: 48.0 + 8.0 = 56.0
     CHECK(io.lastCan("EINSTELL_SPEICHERSOLLTEMP") == "56.0");
     // Room: 20.0 + 2.0 = 22.0
@@ -233,7 +233,7 @@ TEST_CASE("state 3 → state 2: restores original DHW and room temps", "[sg_read
     CHECK(io.lastCan("EINSTELL_SPEICHERSOLLTEMP") == "48.0");
     // Should restore room to 20.0
     CHECK(io.lastCan("RAUMSOLLTEMP_I") == "20.0");
-    CHECK(io.hadCan("PROGRAMMSCHALTER", "Tagbetrieb"));
+    CHECK(io.hadCan("PROGRAMMSCHALTER", SG_READY_NORMAL_MODE));
     CHECK(ctrl.isActive() == false);
 }
 
@@ -253,7 +253,7 @@ TEST_CASE("state 1 → state 2: restores temps if active", "[sg_ready]") {
     // Now back to normal — state was EVU lock, active=true, but originals already cleared
     // EVU lock already restored temps; state 2 should still run Tagbetrieb
     ctrl.applyState(SgReadyController::STATE_NORMAL);
-    CHECK(io.hadCan("PROGRAMMSCHALTER", "Tagbetrieb"));
+    CHECK(io.hadCan("PROGRAMMSCHALTER", SG_READY_NORMAL_MODE));
     CHECK(ctrl.isActive() == false);
 }
 
@@ -335,7 +335,7 @@ TEST_CASE("state 3 with zero boost: skips DHW write", "[sg_ready]") {
     ctrl.applyState(SgReadyController::STATE_RECOMMENDED);
 
     CHECK(io.countCan("EINSTELL_SPEICHERSOLLTEMP") == 0);
-    CHECK(io.hadCan("PROGRAMMSCHALTER", "Tagbetrieb"));  // mode still set
+    CHECK(io.hadCan("PROGRAMMSCHALTER", SG_READY_NORMAL_MODE));  // mode still set
 }
 
 TEST_CASE("boost state is persisted after state 3", "[sg_ready]") {

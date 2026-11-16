@@ -9,6 +9,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Fixed
 
+- WPMW II: `LZ_VERD_2_HEIZBETRIEB` used a signed type and would have turned negative above 32767 h;
+  it is decoded as hours like the other runtime counters.
 - SG Ready with `language: "EN"`: the controller published German state labels while the select used
   the English ones, on the same topic. All state labels now come from the language files (one
   `sgReadyStateLabel()`), and the command handler accepts either language (#93).
@@ -30,6 +32,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Changed
 
+- Model capabilities live in one place, `model_profile.h` (`kModel` flags such as
+  `wpmw2WritesVerified`, `canBRoutes`, `perMemberEnergy`); no code compares model names any more
+  and the build flag `-DHA_MODEL_<model>` is gone (`HA_DEVICE_MODEL` is the only input). The unit
+  tests of each model now compile its real signal table and operating mode names (#94).
+- Energy counter request rows are defined once (`SIGNAL_REQUESTS_ENERGY_IWS`), and the wpl18e smoke
+  manifest refers to wpl13e (`same_as`) instead of copying it (#101).
 - Development: mutation testing of the C++ logic with Mull (`make mutate` for changed lines,
   `make mutate-all`, weekly non-blocking CI workflow), a Claude Code Stop hook that runs the fast
   local checks, and design-first test rules in `CLAUDE.md`.
