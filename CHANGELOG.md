@@ -9,6 +9,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Fixed
 
+- SG Ready with `language: "EN"`: the controller published German state labels while the select used
+  the English ones, on the same topic. All state labels now come from the language files (one
+  `sgReadyStateLabel()`), and the command handler accepts either language (#93).
 - A raw bus scan (`heatingpump/scan/start` with an index range) crashed the ESP after a few
   thousand indices: `GetElsterIndex()` cached every index that is not in the table in a hash map,
   which grew until a rehash failed (`exception/panic`, seen on a WPL13E at 0x601 0x0000-0x0fff).

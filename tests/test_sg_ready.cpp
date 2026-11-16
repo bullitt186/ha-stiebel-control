@@ -81,6 +81,12 @@ struct FakeIO : ISgReadyIO {
 
     void reset() { calls.clear(); }
 
+    // Labels as the firmware's German select options (injected, #93)
+    const char* stateLabel(int state) override {
+        static const char* labels[] = {"Deaktiviert", "1 - EVU Sperre", "2 - Normal", "3 - Empfohlen", "4 - Zwang"};
+        return (state >= 0 && state <= 4) ? labels[state] : "Unbekannt";
+    }
+
     // Setpoints "read from the heat pump" (NAN = not read yet)
     float dhwSetpoint = NAN;
     float roomSetpoint = NAN;
@@ -102,16 +108,19 @@ TEST_CASE("parseStateString", "[sg_ready]") {
     CHECK(SgReadyController::parseStateString("2 - Normal")     == 2);
     CHECK(SgReadyController::parseStateString("3 - Empfohlen")  == 3);
     CHECK(SgReadyController::parseStateString("4 - Zwang")      == 4);
+    CHECK(SgReadyController::parseStateString("1 - Grid Lock")  == 1);   // EN labels
+    CHECK(SgReadyController::parseStateString("4 - Forced")     == 4);
     CHECK(SgReadyController::parseStateString("garbage")        == 0);
     CHECK(SgReadyController::parseStateString("")               == 0);
 }
 
-TEST_CASE("stateLabel", "[sg_ready]") {
-    CHECK(std::string(SgReadyController::stateLabel(1)) == "1 - EVU Sperre");
-    CHECK(std::string(SgReadyController::stateLabel(2)) == "2 - Normal");
-    CHECK(std::string(SgReadyController::stateLabel(3)) == "3 - Empfohlen");
-    CHECK(std::string(SgReadyController::stateLabel(4)) == "4 - Zwang");
-    CHECK(std::string(SgReadyController::stateLabel(0)) == "Unbekannt");
+TEST_CASE("state label comes from the IO (one label set for all publishes, #93)", "[sg_ready]") {
+    struct LabelIO : FakeIO {
+        const char* stateLabel(int state) override { return state == 3 ? "3 - Recommended" : "x"; }
+    } io;
+    SgReadyController c(io);
+    c.applyState(3);
+    CHECK(io.hadMqtt("3 - Recommended"));
 }
 
 TEST_CASE("applyState rejects invalid states", "[sg_ready]") {

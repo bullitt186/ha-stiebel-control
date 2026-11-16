@@ -2211,6 +2211,24 @@ TEST_CASE("SG Ready boost baseline is the setpoint read from the manager (#85)",
     resetDiscoveryState();
 }
 
+TEST_CASE("SG Ready labels: one set, the select options, for every publish (#93)", "[sgready]") {
+    for (int st = 1; st <= 4; st++) {
+        CHECK(std::string(sgReadyStateLabel(st)) == sgReadyOptions[st - 1]);
+        CHECK(SgReadyController::parseStateString(sgReadyOptions[st - 1]) == st);
+    }
+    CHECK(std::string(sgReadyStateLabel(0)) == LNAME_SG_DEAKTIVIERT);
+    CHECK(std::string(sgReadyStateLabel(9)) == LNAME_SG_UNBEKANNT);
+    resetDiscoveryState();
+    applySgReadyState(3);
+    const std::string controllerPublish = mqttFindPayload("SG_READY_STATE/state");
+    mqtt_client_instance().clear();
+    publishSgReadyState();
+    CHECK(controllerPublish == sgReadyOptions[2]);
+    CHECK(mqttFindPayload("SG_READY_STATE/state") == controllerPublish);
+    applySgReadyState(2);
+    resetDiscoveryState();
+}
+
 TEST_CASE("SG Ready state 2 mode: select command, NVS and state publish (#85)", "[sgready]") {
     resetDiscoveryState();
     applySgReadyState(2);

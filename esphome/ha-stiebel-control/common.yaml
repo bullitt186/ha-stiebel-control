@@ -157,13 +157,7 @@ mqtt:
         // Update sensors with initial values
         id(sg_ready_boost_state3_sensor).publish_state(sgReadyBoostState3Value());
         id(sg_ready_boost_state4_sensor).publish_state(sgReadyBoostState4Value());
-        id(SG_READY_CURRENT_STATE).publish_state(
-          currentSgReadyState == 0 ? "Deaktiviert" :
-          currentSgReadyState == 1 ? "1 - EVU Sperre" :
-          currentSgReadyState == 2 ? "2 - Normal" :
-          currentSgReadyState == 3 ? "3 - Empfohlen" :
-          currentSgReadyState == 4 ? "4 - Zwang" : "Unbekannt"
-        );
+        id(SG_READY_CURRENT_STATE).publish_state(sgReadyStateLabel(sgReadyController.currentState()));
   on_disconnect:
     - logger.log:
         level: WARN
@@ -266,12 +260,8 @@ mqtt:
             // Ensure discovery is published
             publishWritableSelectDiscovery(writableSelects[1]);
 
-            // Parse the state from the string (format: "1 - EVU Sperre", "2 - Normal", etc.)
-            int state = 0;
-            if (x.find("1 - ") == 0) state = 1;
-            else if (x.find("2 - ") == 0) state = 2;
-            else if (x.find("3 - ") == 0) state = 3;
-            else if (x.find("4 - ") == 0) state = 4;
+            // "N - <label>" in either language
+            const int state = SgReadyController::parseStateString(x);
 
             if (state >= 1 && state <= 4) {
                 applySgReadyState(state);
@@ -671,19 +661,7 @@ text_sensor:
     # the interval only refreshes the unchanged value.
     update_interval: 60s
     lambda: |-
-      if (currentSgReadyState == 0) {
-        return std::string("Deaktiviert");
-      } else if (currentSgReadyState == 1) {
-        return std::string("1 - EVU Sperre");
-      } else if (currentSgReadyState == 2) {
-        return std::string("2 - Normal");
-      } else if (currentSgReadyState == 3) {
-        return std::string("3 - Empfohlen");
-      } else if (currentSgReadyState == 4) {
-        return std::string("4 - Zwang");
-      } else {
-        return std::string("Unbekannt");
-      }
+      return std::string(sgReadyStateLabel(sgReadyController.currentState()));
 
   - platform: template
     name: "DATUM"

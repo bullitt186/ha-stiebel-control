@@ -234,6 +234,8 @@
 #define LNAME_OPT_SG_NORMAL                    "2 - Normal"
 #define LNAME_OPT_SG_EMPFOHLEN                 "3 - Empfohlen"
 #define LNAME_OPT_SG_ZWANG                     "4 - Zwang"
+#define LNAME_SG_DEAKTIVIERT                   "Deaktiviert"
+#define LNAME_SG_UNBEKANNT                     "Unbekannt"
 
 // ============================================================================
 // COP sensor names (publishCOPDiscovery())

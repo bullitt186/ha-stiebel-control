@@ -42,6 +42,10 @@ public:
     // Load boost state from NVS; returns false if nothing stored
     virtual bool loadBoostState(float& dhwTemp, float& roomTemp, bool& active) = 0;
 
+    // Display label of a state ("1 - EVU Sperre" ...). Injected so the labels live only in the
+    // language files and every publish uses the same set as the select options (#93).
+    virtual const char* stateLabel(int state) = 0;
+
     // Last value read from the heat pump for a setpoint signal (EINSTELL_SPEICHERSOLLTEMP,
     // RAUMSOLLTEMP_I); false if none was read yet. Used as the boost baseline (#85).
     virtual bool currentSetpoint(const char* /*signalName*/, float& /*value*/) { return false; }
@@ -110,7 +114,7 @@ public:
         // Publish new state to MQTT
         char topic[128];
         snprintf(topic, sizeof(topic), "heatingpump/MANAGER/SG_READY_STATE/state");
-        io_.publishMqtt(topic, stateLabel(newState));
+        io_.publishMqtt(topic, io_.stateLabel(newState));
 
         switch (newState) {
             case STATE_EVU_LOCK:   applyEvuLock();    break;
@@ -168,27 +172,8 @@ public:
     float originalDhwTemp() const { return state_.originalDhwTemp; }
     float originalRoomTemp() const { return state_.originalRoomTemp; }
 
-    // Human-readable label for a state value
-    static const char* stateLabel(int state) {
-        switch (state) {
-            case STATE_EVU_LOCK:    return "1 - EVU Sperre";
-            case STATE_NORMAL:     return "2 - Normal";
-            case STATE_RECOMMENDED: return "3 - Empfohlen";
-            case STATE_FORCED:     return "4 - Zwang";
-            default:               return "Unbekannt";
-        }
-    }
-
-    static const char* stateLabelFromString(const std::string& s) {
-        // Parse "1 - ...", "2 - ...", etc.
-        if (s.rfind("1 - ", 0) == 0) return stateLabel(STATE_EVU_LOCK);
-        if (s.rfind("2 - ", 0) == 0) return stateLabel(STATE_NORMAL);
-        if (s.rfind("3 - ", 0) == 0) return stateLabel(STATE_RECOMMENDED);
-        if (s.rfind("4 - ", 0) == 0) return stateLabel(STATE_FORCED);
-        return nullptr;
-    }
-
-    // Parse "1 - EVU Sperre" → 1, etc. Returns 0 on failure.
+    // "1 - EVU Sperre" / "1 - Grid Lock" → 1, etc.: the number prefix, in any language.
+    // Returns 0 on failure.
     static int parseStateString(const std::string& s) {
         if (s.rfind("1 - ", 0) == 0) return STATE_EVU_LOCK;
         if (s.rfind("2 - ", 0) == 0) return STATE_NORMAL;

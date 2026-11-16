@@ -392,6 +392,10 @@
 #define LNAME_OPT_SG_EMPFOHLEN                 "3 - Recommended"
 #undef  LNAME_OPT_SG_ZWANG
 #define LNAME_OPT_SG_ZWANG                     "4 - Forced"
+#undef  LNAME_SG_DEAKTIVIERT
+#define LNAME_SG_DEAKTIVIERT                   "Disabled"
+#undef  LNAME_SG_UNBEKANNT
+#define LNAME_SG_UNBEKANNT                     "Unknown"
 
 // ============================================================================
 // COP sensor names

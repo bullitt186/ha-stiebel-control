@@ -504,9 +504,6 @@ static const size_t WRITABLE_SELECT_COUNT = sizeof(writableSelects) / sizeof(Wri
 // RUNTIME STATE TRACKING
 // ============================================================================
 
-// SG Ready: legacy globals kept for YAML sensor lambdas that read currentSgReadyState
-// The controller is the authoritative source; these are updated via sgReadyStateInt().
-static int currentSgReadyState = 2;
 
 // DJB2 hash of a signal name (same function as hash_runtime() below)
 inline uint32_t elsterNameHash(const char* str) {
@@ -2729,8 +2726,18 @@ void publishCombinedEnergySensors() {
 // ESPHOME IO ADAPTER FOR SG READY CONTROLLER
 // ============================================================================
 
+// SG Ready state label: the select options (lang_base.h / lang_en.h) for 1-4. The only
+// place that maps a state to its text (#93).
+inline const char* sgReadyStateLabel(int state) {
+    if (state >= SgReadyController::STATE_EVU_LOCK && state <= SgReadyController::STATE_FORCED)
+        return sgReadyOptions[state - 1];
+    return state == SgReadyController::STATE_DISABLED ? LNAME_SG_DEAKTIVIERT : LNAME_SG_UNBEKANNT;
+}
+
 class EspHomeSgReadyIO : public ISgReadyIO {
 public:
+    const char* stateLabel(int state) override { return sgReadyStateLabel(state); }
+
     static ESPPreferenceObject nvsDhw;
     static ESPPreferenceObject nvsRoom;
     static ESPPreferenceObject nvsActive;
@@ -2818,16 +2825,13 @@ void initBoostStatePrefs() {
 // Called from on_boot lambda in common.yaml
 void loadBoostState() {
     sgReadyController.loadFromNvs();
-    currentSgReadyState = sgReadyController.currentState();
     ESP_LOGI("NVS", "Boost state loaded, active=%d", (int)sgReadyController.isActive());
 }
 
 // Called from MQTT on_message lambda in common.yaml
 void applySgReadyState(int state) {
     ESP_LOGI("SG_READY", "Applying SG Ready state %d", state);
-    if (sgReadyController.applyState(state)) {
-        currentSgReadyState = sgReadyController.currentState();
-    } else {
+    if (!sgReadyController.applyState(state)) {
         ESP_LOGW("SG_READY", "Invalid SG Ready state: %d", state);
     }
 }
@@ -2863,9 +2867,10 @@ inline bool publishSgReadyState() {
 #ifdef HA_DISABLE_SG_READY_true
     return true;
 #endif
-    int idx = currentSgReadyState - 1;
-    if (idx < 0 || idx > 3) idx = 1;  // fall back to "2 - Normal"
-    const char* s = sgReadyOptions[idx];
+    int st = sgReadyController.currentState();
+    if (st < SgReadyController::STATE_EVU_LOCK || st > SgReadyController::STATE_FORCED)
+        st = SgReadyController::STATE_NORMAL;
+    const char* s = sgReadyStateLabel(st);
     bool ok = mqttPublish("heatingpump/MANAGER/SG_READY_STATE/state", s, strlen(s));
     char b3[16], b4[16];
     snprintf(b3, sizeof(b3), "%.1f", sgReadyBoostState3Value());
