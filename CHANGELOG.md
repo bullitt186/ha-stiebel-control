@@ -32,6 +32,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Changed
 
+- Agent instructions (`.github/copilot-instructions.md`, imported by `CLAUDE.md`), `docs/ARCHITECTURE.md`
+  and `README.md` describe the current code: request tables per model, `model_profile.h`, `id: my_can`,
+  no dispatcher. CI checks that every repo path named there exists (`tests/check_doc_paths.py`, #100).
 - Model capabilities live in one place, `model_profile.h` (`kModel` flags such as
   `wpmw2WritesVerified`, `canBRoutes`, `perMemberEnergy`); no code compares model names any more
   and the build flag `-DHA_MODEL_<model>` is gone (`HA_DEVICE_MODEL` is the only input). The unit

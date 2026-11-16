@@ -184,6 +184,9 @@ jobs:
       - name: Validate MQTT model manifests
         run: python3 -m unittest discover -s tests -p 'test_mqtt_manifest.py'
 
+      - name: Check repo paths named in the agent and architecture docs
+        run: python3 tests/check_doc_paths.py
+
       - name: Validate YAML files
         run: |
           yamllint -d '{extends: relaxed, rules: {line-length: {max: 120}}}' \

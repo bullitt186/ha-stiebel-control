@@ -230,7 +230,7 @@ enabled under diagnostics) and post the output of `helperscripts/scan_report.py`
 In brief:
 1. Create `signal_requests_yourmodel.h` using `SIGNAL_REQUESTS_BASE` + your model's signals
 2. Create `yourmodel.yaml` (3 lines — just the `esphome: includes:` block)
-3. Add a dispatcher entry in `signal_requests_model.h`
+3. If the model needs special handling, add its flags in `model_profile.h`
 4. Create `tests/models/yourmodel_smoke.json` with verified required topics
 5. Submit a PR with logs showing signals responding on your hardware
 
