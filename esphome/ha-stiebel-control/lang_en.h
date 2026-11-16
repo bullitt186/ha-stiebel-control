@@ -201,6 +201,50 @@
 #undef  LNAME_BETRIEBSART_WP
 #define LNAME_BETRIEBSART_WP                   "Heat Pump Operating Mode"
 
+// WPMW II: IWS values and parameters (#52)
+#undef  LNAME_HYSTERESEZEIT
+#define LNAME_HYSTERESEZEIT                    "Hot Water Hysteresis"
+#undef  LNAME_TN
+#define LNAME_TN                               "Mixer Dynamics"
+#undef  LNAME_VERSTELLTE_RAUMSOLLTEMP
+#define LNAME_VERSTELLTE_RAUMSOLLTEMP          "Current Room Setpoint"
+#undef  LNAME_MAX_HYSTERESE
+#define LNAME_MAX_HYSTERESE                    "Maximum Hysteresis"
+#undef  LNAME_HZK_PUMPE
+#define LNAME_HZK_PUMPE                        "Heating Circuit Pump"
+#undef  LNAME_KESSELSTATUS
+#define LNAME_KESSELSTATUS                     "Heat Pump Demand"
+#undef  LNAME_BETRIEBS_STATUS
+#define LNAME_BETRIEBS_STATUS                  "Controller Operating Status"
+#undef  LNAME_STILLSTANDZEIT_0
+#define LNAME_STILLSTANDZEIT_0                 "Compressor Off Time Remaining"
+#undef  LNAME_PUMPENSTATUS
+#define LNAME_PUMPENSTATUS                     "Pump Status"
+#undef  LNAME_PUFFERSOLL
+#define LNAME_PUFFERSOLL                       "Buffer Target Temperature"
+#undef  LNAME_LEISTUNGSREDUZIERUNG_KUEHLEN
+#define LNAME_LEISTUNGSREDUZIERUNG_KUEHLEN     "Vapour Injection Temperature"
+#undef  LNAME_SCHALTFKT_QUELLE_IWS
+#define LNAME_SCHALTFKT_QUELLE_IWS             "Source Switching Function IWS"
+#undef  LNAME_REKUPERATORISTTEMP
+#define LNAME_REKUPERATORISTTEMP               "Compressor Inlet Temperature"
+#undef  LNAME_MESSSTROM_HOCHDRUCK
+#define LNAME_MESSSTROM_HOCHDRUCK              "High Pressure Sensor Current"
+#undef  LNAME_MESSSTROM_NIEDERDRUCK
+#define LNAME_MESSSTROM_NIEDERDRUCK            "Low Pressure Sensor Current"
+#undef  LNAME_VERDAMPFERISTTEMP_KOMPENSIERT
+#define LNAME_VERDAMPFERISTTEMP_KOMPENSIERT    "Evaporator Outlet Temperature"
+#undef  LNAME_VORLAUFISTTEMP_WP_IWS
+#define LNAME_VORLAUFISTTEMP_WP_IWS            "Condenser Outlet Temperature"
+#undef  LNAME_LUEFTERDREHZAHL
+#define LNAME_LUEFTERDREHZAHL                  "Fan Output"
+#undef  LNAME_SCHALTWERKDYNAMIKZEIT
+#define LNAME_SCHALTWERKDYNAMIKZEIT            "Controller Dynamics"
+#undef  LNAME_STILLSTANDZEIT
+#define LNAME_STILLSTANDZEIT                   "Compressor Off Time"
+#undef  LNAME_ZWEITER_WE_STATUS
+#define LNAME_ZWEITER_WE_STATUS                "Second Heat Generator Status"
+
 // ============================================================================
 // Calculated sensor names
 // ============================================================================

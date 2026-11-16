@@ -116,6 +116,29 @@
 #define LNAME_ANZEIGE_NIEDERDRUCK              "Niederdruck"
 #define LNAME_BETRIEBSART_WP                   "Betriebsart Wärmepumpe"
 
+// WPMW II: IWS values and parameters, checked against the display (#52)
+#define LNAME_HYSTERESEZEIT                    "Hysterese Warmwasser"
+#define LNAME_TN                               "Dynamik Mischer"
+#define LNAME_VERSTELLTE_RAUMSOLLTEMP          "Raumsoll aktuell"
+#define LNAME_MAX_HYSTERESE                    "Maximum Hysterese"
+#define LNAME_HZK_PUMPE                        "Heizkreispumpe"
+#define LNAME_KESSELSTATUS                     "Anforderung Wärmepumpe"
+#define LNAME_BETRIEBS_STATUS                  "Betriebsstatus Regler"
+#define LNAME_STILLSTANDZEIT_0                 "Stillstand Restzeit"
+#define LNAME_PUMPENSTATUS                     "Pumpe Status"
+#define LNAME_PUFFERSOLL                       "Puffer Soll Temperatur"
+#define LNAME_LEISTUNGSREDUZIERUNG_KUEHLEN     "Zwischeneinspritzung Temperatur"
+#define LNAME_SCHALTFKT_QUELLE_IWS             "Schaltfunktion Quelle IWS"
+#define LNAME_REKUPERATORISTTEMP               "Verdichter Eintritt Temperatur"
+#define LNAME_MESSSTROM_HOCHDRUCK              "Messstrom Hochdruck"
+#define LNAME_MESSSTROM_NIEDERDRUCK            "Messstrom Niederdruck"
+#define LNAME_VERDAMPFERISTTEMP_KOMPENSIERT    "Verdampfer Austritt Temperatur"
+#define LNAME_VORLAUFISTTEMP_WP_IWS            "Verflüssiger Austritt Temperatur"
+#define LNAME_LUEFTERDREHZAHL                  "Lüfterleistung"
+#define LNAME_SCHALTWERKDYNAMIKZEIT            "Reglerdynamik"
+#define LNAME_STILLSTANDZEIT                   "Stillstandzeit Verdichter"
+#define LNAME_ZWEITER_WE_STATUS                "Zweiter WE Status"
+
 // ============================================================================
 // Calculated sensor names (ha-stiebel-control.h calculatedSensors[])
 // ============================================================================

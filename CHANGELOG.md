@@ -7,8 +7,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Upgrade notes
+
+- WPL13E/WPL18E/TTL 33: some existing sensors get new display names; entity IDs stay. `STILLSTANDZEIT`
+  now has the unit min, so HA asks once to update the unit of its statistics (Developer tools →
+  Statistics).
+
 ### Added
 
+- WPL13E/WPL18E/TTL 33 (WPMW II): names, units and scaling for IWS values and parameters checked on a
+  WPL 18 E display: evaporator outlet, compressor inlet and vapour injection temperature, the pressure
+  sensor currents, condenser outlet (`FROSTTEMP`), fan output, controller and mixer dynamics,
+  compressor off time and its countdown (`STILLSTANDZEIT_0`, in s), the current room setpoint, and
+  names for eight further registers (#52). Most of them are not polled by default. Read-only; no new
+  writes.
 - WPL13E/WPL18E: heating program of heating circuit 2 (mixer circuit, `HEIZPROG_2_<day>`) as one
   text entity per day, same format as the DHW and circuit 1 programs. In `Automatik` an empty
   program keeps the circuit on its night setpoint.
