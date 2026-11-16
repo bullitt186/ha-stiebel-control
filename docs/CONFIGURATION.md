@@ -302,9 +302,22 @@ per day, e.g. `text.stiebel_eltron_warmepumpe_warmwasser_programm_montag`:
 - The heating program of heating circuit 1 (`HEIZPROG_1_<day>`, manager) is shown the same way,
   e.g. `text.stiebel_eltron_warmepumpe_heizprogramm_hk1_montag` (WPL13E, WPL18E). `00:00-24:00`
   keeps the day setpoint around the clock in `Automatik`.
-- The heating program of heating circuit 2 (mixer circuit, `HEIZPROG_2_<day>`) follows the same
-  format, e.g. `text.stiebel_eltron_warmepumpe_heizprogramm_hk2_montag` (WPL13E, WPL18E). Without a
-  period the circuit runs on its night setpoint in `Automatik`.
+- The heating program of heating circuit 2 (mixer circuit) follows the same format, e.g.
+  `text.stiebel_eltron_warmepumpe_heizprogramm_hk2_montag`. The WPMW II keeps it as `HEIZPROG_1_<day>`
+  on the virtual member `MISCHERMODUL_3` (0x602), not as `HEIZPROG_2` on the manager. Without a period
+  the circuit runs on its night setpoint in `Automatik`.
+
+### Heating circuit 2 (WPMW II mixer circuit, number entities)
+
+The WPMW II keeps the settings of heating circuit 2 on the virtual bus member `MISCHERMODUL_3`
+(0x602): display "Raumtemp. 2" Tag/Absenk and "Heizkurve 2". `RAUMSOLLTEMP_II` on the manager is
+**not** circuit 2 (a change there did not move the mixer flow setpoint). Writable on WPL13E and TTL 33.
+
+| Entity | Signal | Range |
+|---|---|---|
+| Raumsoll HK2 Tag Einstellung | `RAUMSOLLTEMP_I` @ 0x602 | 10–30 °C, 0.5 K |
+| Raumsoll HK2 Nacht Einstellung | `RAUMSOLLTEMP_NACHT` @ 0x602 | 10–30 °C, 0.5 K |
+| Heizkurve HK2 Einstellung | `HEIZKURVE` @ 0x602 | 0.1–3.0 |
 
 ---
 
