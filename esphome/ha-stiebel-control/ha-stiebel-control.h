@@ -769,55 +769,6 @@ const ElsterIndex *processCanMessage(const std::vector<uint8_t> &msg, uint32_t c
     return ei;
 }
 
-// Passiver Dekodierer: identisch zu processCanMessage, aber OHNE INFO-Log.
-// Gibt den ElsterIndex + formatierten Wert zurueck, damit der LISTEN-Sniffer
-// gezielt nur Temperatur-Signale (et_dec_val/et_cent_val) loggen kann.
-// Hinweis: 0x8000 (kein Sensor) wird als Wert -255 formatiert (SetValueType).
-const ElsterIndex *processCanMessageDebug(const std::vector<uint8_t> &msg, uint32_t can_id, std::string &signalValue, const CanMember **outCanMember)
-{
-    if (msg.size() < 7)
-    {
-        return &ElsterTable[0];
-    }
-
-    const CanMember &cm = lookupCanMember(can_id);
-    *outCanMember = &cm;
-
-    const ElsterIndex *ei;
-    uint8_t byte1;
-    uint8_t byte2;
-    char charValue[ELSTER_VALUE_BUF_SIZE];
-
-    if (msg[2] == 0xfa)
-    {
-        byte1 = msg[5];
-        byte2 = msg[6];
-        ei = GetElsterIndex(msg[4] + (msg[3] << 8));
-    }
-    else
-    {
-        byte1 = msg[3];
-        byte2 = msg[4];
-        ei = GetElsterIndex(msg[2]);
-    }
-
-    switch (ei->Type)
-    {
-    case et_double_val:
-        SetDoubleType(charValue, ei->Type, static_cast<double>(byte2 + (byte1 << 8)));
-        break;
-    case et_triple_val:
-        SetDoubleType(charValue, ei->Type, static_cast<double>(byte2 + (byte1 << 8)));
-        break;
-    default:
-        SetValueType(charValue, ei->Type, static_cast<int>(byte2 + (byte1 << 8)));
-        break;
-    }
-
-    signalValue = charValue;
-    return ei;
-}
-
 // ============================================================================
 // MQTT PUBLISH: failure counter, publish-on-change state cache (#55)
 // ============================================================================
