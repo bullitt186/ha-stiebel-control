@@ -22,11 +22,12 @@ built-in TWAI controller (recommended) and a classic ESP32 (`esp32dev`) with an 
     such as `SIGNAL_REQUESTS_ENERGY_IWS`
   - `signal_requests_<model>.h` — what the model polls: `{"SIGNAL", FREQ_xx, cm_member}` rows
   - `model_profile.h` — model capabilities (`kModel`), see below
+  - `can_members.h` — bus members (`CanMembers[]`, `CanMemberType`) and `SignalRequest`
   - `ha-stiebel-control.h` — core: CAN decode, MQTT discovery/state, calculated sensors, writable
     numbers/selects, time programs, paced writes, bus scan, fault list
   - `sg_ready_controller.h` — SG Ready state machine (pure C++, IO injected via `ISgReadyIO`)
   - `dhw_program.h` — WPMW II time program parsing/validation (pure C++)
-  - `config.h` — timing constants, `HA_DEVICE_MODEL_STR`
+  - `config.h` — timing constants, `HA_DEVICE_MODEL_STR`, `HA_TOPIC_ROOT`
   - `lang_base.h` (German `LNAME_*`), `lang_en.h` (English overrides), `language_select.h`
   - `elster/ElsterTable.h` — `ElsterTable[]` (name, index, type, blacklist, hasMetadata) and
     `ElsterMetaTable[]` (HA metadata); `elster/KElsterTable.cpp/.h`, `elster/NUtils.*`, `elster/NTypes.h`
@@ -38,14 +39,18 @@ built-in TWAI controller (recommended) and a classic ESP32 (`esp32dev`) with an 
    (`processSignalRequests()`, round-robin, one request per second).
 2. The answer is decoded in `processCanMessage()` with the type from `ElsterTable.h` and handled
    by `updateSensor()`: MQTT discovery on first value, then publish on change
-   (`heatingpump/<MEMBER>/<SIGNAL>/state`). Names, units and device classes come from
+   (`<root>/<MEMBER>/<SIGNAL>/state`, root `HA_TOPIC_ROOT` from `device_name`, default
+   `heatingpump`; never write the root as a literal). Names, units and device classes come from
    `ElsterMetaTable` (`LNAME_*`), otherwise from type defaults.
-3. Calculated values live in `calculatedSensors[]` in `ha-stiebel-control.h` (append only, indices
-   via `CALC_IDX_*`) and publish to `heatingpump/calculated/<name>/state`.
-4. Writable settings are `writableNumbers[]` / `writableSelects[]`. Their indices are used in
-   `common.yaml` handlers, so only append. Writes go through `writeSignal()` (read-back is scheduled
-   automatically); SG Ready and time program writes go through the paced queue
-   (`queuePacedWrite()`), one at a time with read-back check.
+3. Calculated values live in `calculatedSensors[]` in `ha-stiebel-control.h`; address rows by the
+   `CalcIdx` enum (`CALC_IDX_*`, same order as the table, checked by a static_assert), never by
+   number. `onDemand` rows are announced with their first value. Discovery payloads use
+   `HA_MAIN_DEVICE_JSON` / `memberDeviceJson()` for the device block.
+4. Writable settings are `writableNumbers[]` / `writableSelects[]`. Every `<root>/<A>/<B>/set`
+   command goes through `handleSetCommand()`, which finds the row by signal name and member and
+   checks `writableNumberApplies()` and min/max; adding a writable entity only touches its row.
+   Writes go through `writeSignal()` (read-back is scheduled automatically); SG Ready and time
+   program writes go through the paced queue (`queuePacedWrite()`), one at a time with read-back.
 
 **Adding a sensor:** find the exact signal name in `elster/ElsterTable.h`, add a request row to the
 model table(s) with the right member (`cm_manager`, `cm_kessel`, `cm_heizmodul`, …) and frequency.

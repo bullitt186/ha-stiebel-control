@@ -3,6 +3,7 @@
 
 # Extract model and MQTT credentials from local config files
 DEVICE_MODEL ?= $(shell grep 'device_model:' esphome/heatingpump.yaml | grep -v '^\s*\#' | head -1 | sed 's/.*"\(.*\)".*/\1/')
+DEVICE_NAME  ?= $(or $(shell grep '^\s*device_name:' esphome/heatingpump.yaml | head -1 | sed 's/.*device_name: *"\{0,1\}\([a-z0-9-]*\).*/\1/'),heatingpump)
 MQTT_BROKER  ?= $(shell grep 'mqtt_broker:' esphome/secrets.yaml | sed 's/mqtt_broker:[[:space:]]*//' | tr -d '"')
 MQTT_USER    ?= $(shell grep 'mqtt_username:' esphome/secrets.yaml | sed 's/mqtt_username:[[:space:]]*//' | tr -d '"')
 MQTT_PASS    ?= $(shell grep 'mqtt_password:' esphome/secrets.yaml | sed 's/mqtt_password:[[:space:]]*//' | tr -d '"')
@@ -113,6 +114,7 @@ smoke-test:
 	  --user "$(MQTT_USER)" \
 	  --password "$(MQTT_PASS)" \
 	  --model "$(DEVICE_MODEL)" \
+	  --root "$(DEVICE_NAME)" \
 	  --window 120
 
 # Capture a new baseline for the current model (300s window, overwrites model file)
@@ -122,5 +124,6 @@ capture-baseline:
 	  --user "$(MQTT_USER)" \
 	  --password "$(MQTT_PASS)" \
 	  --model "$(DEVICE_MODEL)" \
+	  --root "$(DEVICE_NAME)" \
 	  --window 300 \
 	  --capture-baseline

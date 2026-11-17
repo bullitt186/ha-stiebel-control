@@ -32,6 +32,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Changed
 
+- The `device_name` and `friendly_name` substitutions take effect (#102). `device_name` is the
+  ESPHome node name and the root of every MQTT topic, discovery node ID and default entity ID
+  (`<device_name>/MANAGER/…`, `sensor.<device_name>_…`); the firmware has no hard-coded
+  `heatingpump/` topic left. `friendly_name` names the ESPHome device in HA. **Upgrade:** with the
+  default `device_name: heatingpump` nothing changes on the bus or in MQTT. If your
+  `heatingpump.yaml` sets another `device_name`, the hostname, the topics and the discovery configs
+  move to that name: set it back to `heatingpump` to keep everything as it is. The ESPHome device in
+  HA shows your `friendly_name` instead of "Heating Pump CAN Interface". The smoke test takes the
+  root from `device_name` (`make smoke-test`, `--root`).
+- Discovery configs carry a language-independent `default_entity_id`
+  (`<domain>.heatingpump_<member>_<signal>`), so DE and EN builds create the same entity IDs on a
+  fresh install. The shipped dashboards, `docs/CONFIGURATION.md`, `SG_READY.md` and the SG Ready
+  example use these IDs; CI checks the dashboards (`tests/check_dashboard_ids.py`). **Existing
+  installs keep their entity IDs**; rename them in HA or adjust the dashboard IDs to use the shipped
+  dashboards (#96).
+- Discovery: the device block is defined once (`HA_MAIN_DEVICE_JSON`, `memberDeviceJson()`), the
+  COP sensors are rows of `calculatedSensors[]` (same topics and unique IDs as before), rows are
+  addressed by the `CalcIdx` enum and flagged `onDemand` instead of a hard-coded index threshold.
+  `can_members.h` holds the bus members and `SignalRequest`, so the test stub uses the real type (#95).
+- MQTT set commands: one subscription on `heatingpump/+/+/set` and one C++ dispatcher
+  (`handleSetCommand()`) replace about 25 YAML handlers that addressed table rows by position. Rows
+  are found by signal name and member, values are checked against the row's min/max (#92).
+- `common.yaml` no longer declares unused internal template sensors or polls `PROGRAMMSCHALTER`
+  and `SOMMERBETRIEB` a second time; `WW_ECO` moved into the request tables (#98). Dead code
+  (`processCanMessageDebug()`, `tests/main.cpp`) removed, `ai_refine_friendly_names.py` archived (#99).
 - Agent instructions (`.github/copilot-instructions.md`, imported by `CLAUDE.md`), `docs/ARCHITECTURE.md`
   and `README.md` describe the current code: request tables per model, `model_profile.h`, `id: my_can`,
   no dispatcher. CI checks that every repo path named there exists (`tests/check_doc_paths.py`, #100).

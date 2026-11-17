@@ -58,6 +58,7 @@
 
 extern const SignalRequest signalRequests[] = {
     SIGNAL_REQUESTS_BASE   // Datum/Uhrzeit, EVU-Sperre, Betriebsart, Energiezähler
+    {"WW_ECO",                     FREQ_1MIN,  cm_manager},  // DHW eco mode (was a YAML poller, #98)
 
     // ========================================================================
     // WPL17 (CAN-B): KESSEL_CANB (0x201) — Speicher/Raum/Heizkurve/Aussentemp

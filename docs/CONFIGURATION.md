@@ -29,8 +29,8 @@ The key must match what HA's ESPHome integration has stored for this device. If 
 
 | Substitution | Description | Default |
 |--------------|-------------|---------|
-| `device_name` | ESPHome device hostname | `heatingpump` |
-| `friendly_name` | Display name in HA | `"Stiebel Eltron Wärmepumpe"` |
+| `device_name` | ESPHome node name and hostname; root of every MQTT topic (`<device_name>/…`), node ID of the discovery topics and prefix of the default entity IDs. Lower case `a-z`, `0-9`, `-`, at most 24 characters. Topics and entity IDs in this documentation use the default | `heatingpump` |
+| `friendly_name` | Name of the ESPHome device in HA (native API: restart, reset reason, …). The MQTT device of the heat pump keeps its own name | `"Stiebel Eltron Wärmepumpe"` |
 | `device_model` | Heat pump model — selects signal table and HA device identifier | `"wpl13e"` |
 | `language` | Display language for HA entity names: `DE` (German, default) or `EN` (English) | `"DE"` |
 | `can_tx_pin` | CAN TX GPIO (ESP32-S3 built-in TWAI) | board-specific — see note below |
@@ -139,6 +139,26 @@ sync uses Home Assistant text sensors).
 
 ---
 
+## Entity IDs
+
+Every discovery config carries a language-independent `default_entity_id`:
+`<domain>.<device_name>_<unique ID without "stiebel_">` (a `-` in the device name becomes `_`), e.g. `sensor.heatingpump_kessel_aussentemp`,
+`number.heatingpump_manager_raumsolltemp_i`, `sensor.heatingpump_calculated_cop_gesamt`. DE and EN
+builds therefore create the same IDs, and renaming a display name does not change them. The IDs in
+this document and in `dashboards/` are these IDs (CI checks the dashboards with
+`tests/check_dashboard_ids.py`).
+
+The dashboards assume the default `device_name: heatingpump`; with another name, replace the
+`heatingpump_` prefix in the dashboard YAML.
+
+Two heat pumps on one broker need two device names: their topics and discovery configs are then
+separate. The unique IDs (`stiebel_<member>_<signal>`) and the HA device identifiers are still the
+same for both, so Home Assistant only shows the entities of the first one.
+
+Installs from before 2.8 keep the IDs HA gave their entities then (derived from the display
+name). To use the shipped dashboards there, rename the entity IDs under Settings → Entities, or
+adjust the IDs in the dashboard.
+
 ## Writable Controls
 
 These entities appear automatically in HA via MQTT discovery:
@@ -147,16 +167,16 @@ These entities appear automatically in HA via MQTT discovery:
 
 | Entity ID | Description | Range | Step |
 |-----------|-------------|-------|------|
-| `number.manager_speicher_soll_temperatur_einstellung` | DHW target temperature | 20–60°C | 1°C |
-| `number.manager_speicher_soll_temperatur_2_einstellung` | DHW eco target temperature | 20–60°C | 1°C |
-| `number.manager_raum_soll_temperatur_i_einstellung` | Room setpoint circuit 1 | 10–30°C | 0.5°C |
-| `number.manager_raum_soll_temperatur_ii_einstellung` | Room setpoint circuit 2 | 10–30°C | 0.5°C |
-| `number.manager_raum_soll_temperatur_iii_einstellung` | Room setpoint circuit 3 | 10–30°C | 0.5°C |
-| `number.manager_raum_soll_temperatur_nacht_einstellung` | Room setpoint night/reduced | 10–30°C | 0.5°C |
-| `number.manager_sg_ready_boost_zustand_3` | SG Ready DHW boost for state 3 | 0–10°C | 0.5°C |
-| `number.manager_sg_ready_boost_zustand_4` | SG Ready DHW boost for state 4 | 0–15°C | 0.5°C |
-| `number.manager_sg_ready_raum_boost_zustand_3` | SG Ready room setpoint boost (heating circuit 1) for state 3, default 1 K, 0 = off | 0–5 K | 0.5 K |
-| `number.manager_sg_ready_raum_boost_zustand_4` | SG Ready room setpoint boost (heating circuit 1) for state 4, default 2 K, 0 = off | 0–5 K | 0.5 K |
+| `number.heatingpump_manager_einstell_speichersolltemp` | DHW target temperature | 20–60°C | 1°C |
+| `number.heatingpump_manager_einstell_speichersolltemp2` | DHW eco target temperature | 20–60°C | 1°C |
+| `number.heatingpump_manager_raumsolltemp_i` | Room setpoint circuit 1 | 10–30°C | 0.5°C |
+| `number.heatingpump_manager_raumsolltemp_ii` | Room setpoint circuit 2 | 10–30°C | 0.5°C |
+| `number.heatingpump_manager_raumsolltemp_iii` | Room setpoint circuit 3 | 10–30°C | 0.5°C |
+| `number.heatingpump_manager_raumsolltemp_nacht` | Room setpoint night/reduced | 10–30°C | 0.5°C |
+| `number.heatingpump_manager_sg_ready_boost_state3` | SG Ready DHW boost for state 3 | 0–10°C | 0.5°C |
+| `number.heatingpump_manager_sg_ready_boost_state4` | SG Ready DHW boost for state 4 | 0–15°C | 0.5°C |
+| `number.heatingpump_manager_sg_ready_room_boost_state3` | SG Ready room setpoint boost (heating circuit 1) for state 3, default 1 K, 0 = off | 0–5 K | 0.5 K |
+| `number.heatingpump_manager_sg_ready_room_boost_state4` | SG Ready room setpoint boost (heating circuit 1) for state 4, default 2 K, 0 = off | 0–5 K | 0.5 K |
 
 The room boost raises `RAUMSOLLTEMP_I` and with it the heating curve, which can add compressor
 starts. With 0 the room setpoint is not written at all, neither on entering nor on leaving the
@@ -176,11 +196,11 @@ Reglerdynamik as 40, Stillstandzeit as 41), so go by the title on the display.
 
 | Entity ID | WPMW II parameter | Register | Range | Step |
 |-----------|-------------------|----------|-------|------|
-| `number.manager_reglerdynamik_einstellung` | 42 Reglerdynamik (switching distance between compressor stages and the 2nd heat generator) | 0xfdb0 | 1–30 | 1 |
-| `number.manager_bivalenzpunkt_heizung_einstellung` | 27 bivalence point heating (2nd heat generator in parallel below) | 0x01ac | −20–30°C | 0.5°C |
-| `number.manager_bivalenzpunkt_warmwasser_einstellung` | 33 bivalence point hot water | 0x01ad | −20–30°C | 0.5°C |
-| `number.manager_stillstandzeit_verdichter_einstellung` | 43 minimum compressor off time (the manual forbids less than 20 min in normal operation) | 0xfdb1 | 20–120 min | 1 min |
-| `number.manager_sommerbetrieb_grenztemperatur_einstellung` | 10 summer mode, AUSSENTEMP threshold | 0x01bf | 10–30°C | 0.5°C |
+| `number.heatingpump_manager_schaltwerkdynamikzeit_set` | 42 Reglerdynamik (switching distance between compressor stages and the 2nd heat generator) | 0xfdb0 | 1–30 | 1 |
+| `number.heatingpump_manager_bivalentparalleltemperatur_hzg_set` | 27 bivalence point heating (2nd heat generator in parallel below) | 0x01ac | −20–30°C | 0.5°C |
+| `number.heatingpump_manager_bivalentparalleltemperatur_ww_set` | 33 bivalence point hot water | 0x01ad | −20–30°C | 0.5°C |
+| `number.heatingpump_manager_stillstandzeit_set` | 43 minimum compressor off time (the manual forbids less than 20 min in normal operation) | 0xfdb1 | 20–120 min | 1 min |
+| `number.heatingpump_manager_sw_aussentemp_set` | 10 summer mode, AUSSENTEMP threshold | 0x01bf | 10–30°C | 0.5°C |
 
 Parameters 10 and 43 were confirmed by changing them on the display and reading the bus. On
 the WPMW II, `SOMMERBETRIEB_TEMP` (0xfdb5) and `SPERRZEIT` (0x0026) did not follow the display.
@@ -230,12 +250,12 @@ heating circuit 1. Abtauzeit-Min was not found on the bus.
 
 | Entity ID | Description | Unit |
 |-----------|-------------|------|
-| `sensor.heizmodul_lz_verd_1_heizbetrieb` | Compressor 1 heating runtime | h |
-| `sensor.heizmodul_lz_verd_2_heizbetrieb` | Compressor 2 heating runtime | h |
-| `sensor.heizmodul_lz_verd_1_2_heizbetrieb` | Compressor 1+2 heating runtime | h |
-| `sensor.heizmodul_lz_verd_1_kuehlbetrieb` | Compressor 1 cooling runtime | h |
-| `sensor.heizmodul_lz_verd_2_kuehlbetrieb` | Compressor 2 cooling runtime | h |
-| `sensor.heizmodul_lz_verd_1_2_kuehlbetrieb` | Compressor 1+2 cooling runtime | h |
+| `sensor.heatingpump_heizmodul_lz_verd_1_heizbetrieb` | Compressor 1 heating runtime | h |
+| `sensor.heatingpump_heizmodul_lz_verd_2_heizbetrieb` | Compressor 2 heating runtime | h |
+| `sensor.heatingpump_heizmodul_lz_verd_1_2_heizbetrieb` | Compressor 1+2 heating runtime | h |
+| `sensor.heatingpump_heizmodul_lz_verd_1_kuehlbetrieb` | Compressor 1 cooling runtime | h |
+| `sensor.heatingpump_heizmodul_lz_verd_2_kuehlbetrieb` | Compressor 2 cooling runtime | h |
+| `sensor.heatingpump_heizmodul_lz_verd_1_2_kuehlbetrieb` | Compressor 1+2 cooling runtime | h |
 
 ### CAN Bus Diagnostics (ESP32-S3 only, sensor entities)
 
@@ -243,13 +263,13 @@ Available automatically on ESP32-S3 / TWAI builds. Not present on MCP2515 builds
 
 | Entity ID | Description |
 |-----------|-------------|
-| `sensor.can_tx_fehlerzahler` | TX Error Counter (TEC) — rises on failed transmissions |
-| `sensor.can_rx_fehlerzahler` | RX Error Counter (REC) — rises on receive errors |
-| `sensor.can_bus_fehler` | Total bus error count (cumulative) |
-| `sensor.can_bus_zustand` | Bus state: Läuft / Gestoppt / Bus-Off / Erholung |
-| `sensor.can_rx_verloren_queue_voll` | Frames lost because the RX queue was full (`rx_missed_count`, cumulative) |
-| `sensor.can_rx_uberlauf_fifo` | Frames lost by a hardware RX FIFO overrun (`rx_overrun_count`, cumulative) |
-| `sensor.can_rx_warteschlange` | Frames waiting in the RX queue at the moment of the sample (`msgs_to_rx`) |
+| `sensor.heatingpump_calculated_can_tec` | TX Error Counter (TEC) — rises on failed transmissions |
+| `sensor.heatingpump_calculated_can_rec` | RX Error Counter (REC) — rises on receive errors |
+| `sensor.heatingpump_calculated_can_bus_errors` | Total bus error count (cumulative) |
+| `sensor.heatingpump_calculated_can_state` | Bus state: Läuft / Gestoppt / Bus-Off / Erholung |
+| `sensor.heatingpump_calculated_can_rx_missed` | Frames lost because the RX queue was full (`rx_missed_count`, cumulative) |
+| `sensor.heatingpump_calculated_can_rx_overrun` | Frames lost by a hardware RX FIFO overrun (`rx_overrun_count`, cumulative) |
+| `sensor.heatingpump_calculated_can_rx_queue` | Frames waiting in the RX queue at the moment of the sample (`msgs_to_rx`) |
 
 TEC/REC above 96 indicates warning level; above 127 the controller enters bus-off.
 Rising "RX verloren" or a queue that does not drain to 0 means the main loop does not keep up
@@ -259,7 +279,7 @@ with the bus traffic. The three RX sensors are disabled by default (enable them 
 
 | Entity ID | Description |
 |-----------|-------------|
-| `sensor.mqtt_sendefehler` | Publishes the MQTT client refused since boot (not connected, or the `idf_send_async` queue was full and the message was dropped). Disabled by default. |
+| `sensor.heatingpump_calculated_mqtt_publish_failures` | Publishes the MQTT client refused since boot (not connected, or the `idf_send_async` queue was full and the message was dropped). Disabled by default. |
 
 ### ESP Diagnostics (native API, diagnostic category)
 
@@ -281,15 +301,15 @@ The MQTT log topic `heatingpump/debug` only carries warnings and errors. The API
 
 | Entity ID | Options |
 |-----------|---------|
-| `select.manager_programmschalter` | Notbetrieb, Bereitschaft, Automatik, Tagbetrieb, Absenkbetrieb, Warmwasser |
-| `select.manager_sg_ready_zustand` | 1 - EVU Sperre, 2 - Normal, 3 - Empfohlen, 4 - Zwang |
-| `select.stiebel_eltron_warmepumpe_sg_ready_betriebsart_zustand_2` | Tagbetrieb (default), Automatik: mode written in SG Ready state 2, see SG_READY.md |
+| `select.heatingpump_manager_programmschalter` | Notbetrieb, Bereitschaft, Automatik, Tagbetrieb, Absenkbetrieb, Warmwasser |
+| `select.heatingpump_manager_sg_ready_state` | 1 - EVU Sperre, 2 - Normal, 3 - Empfohlen, 4 - Zwang |
+| `select.heatingpump_manager_sg_ready_normal_mode` | Tagbetrieb (default), Automatik: mode written in SG Ready state 2, see SG_READY.md |
 
 ### DHW Time Program (WPMW II, text entities)
 
 On WPL13E, WPL18E and TTL 33 the DHW program of the manager (`W_WASSERPROG_1_<day>` with
 `_SCHALT_2` and `_SCHALT_3`, three periods per day) is read every 10 minutes and shown as one entity
-per day, e.g. `text.stiebel_eltron_warmepumpe_warmwasser_programm_montag`:
+per day, e.g. `text.heatingpump_ww_programm_mo`:
 
 - Format `HH:MM-HH:MM`, up to three periods separated by commas: `06:30-09:00,11:00-17:00`.
   `-` = no period on that day.
@@ -300,10 +320,10 @@ per day, e.g. `text.stiebel_eltron_warmepumpe_warmwasser_programm_montag`:
 - The program applies only in `Automatik`: in `Tagbetrieb` the manager charges to the DHW setpoint
   all day. Outside the program it holds the DHW setpoint 2.
 - The heating program of heating circuit 1 (`HEIZPROG_1_<day>`, manager) is shown the same way,
-  e.g. `text.stiebel_eltron_warmepumpe_heizprogramm_hk1_montag` (WPL13E, WPL18E). `00:00-24:00`
+  e.g. `text.heatingpump_heiz_programm_mo` (WPL13E, WPL18E). `00:00-24:00`
   keeps the day setpoint around the clock in `Automatik`.
 - The heating program of heating circuit 2 (mixer circuit) follows the same format, e.g.
-  `text.stiebel_eltron_warmepumpe_heizprogramm_hk2_montag`. The WPMW II keeps it as `HEIZPROG_1_<day>`
+  `text.heatingpump_heiz_programm_hk2_mo`. The WPMW II keeps it as `HEIZPROG_1_<day>`
   on the virtual member `MISCHERMODUL_3` (0x602), not as `HEIZPROG_2` on the manager. Without a period
   the circuit runs on its night setpoint in `Automatik`.
 
@@ -490,9 +510,8 @@ up to 6 h; a real value resets it. See `docs/ARCHITECTURE.md`.
 `dashboards/heatingpump_standard.yaml` is a complete dashboard (overview, energy, diagnostics)
 built from standard cards; `dashboards/heatingpump_schema.yaml` is a picture-elements card
 with a system schema — copy `dashboards/www/heatingpump/` to `/config/www/heatingpump/` first.
-Both use the entity IDs of a fresh install; HA keeps an entity's original ID, so older
-installs may need to adjust a few IDs (e.g. `sensor.heizmodul_luftansaugtemperatur` was
-`sensor.heizmodul_aussen_temperatur`).
+Both use the entity IDs of a fresh install (see [Entity IDs](#entity-ids)); older installs keep
+their original IDs and need to rename them in HA or adjust the dashboard.
 
 ## Summer mode (WPL13E)
 

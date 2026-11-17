@@ -37,6 +37,7 @@
 
 extern const SignalRequest signalRequests[] = {
     SIGNAL_REQUESTS_BASE   // date/time, EVU lock, operating mode, energy counters
+    {"WW_ECO",                     FREQ_1MIN,  cm_manager},  // DHW eco mode (was a YAML poller, #98)
 
     // ========================================================================
     // TTL33-SPECIFIC: temperatures and setpoints

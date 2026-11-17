@@ -1,24 +1,24 @@
 {
   "description": "WPL9 read-feedback baseline verified on 2026-10-29. MANAGER/WW_ECO is intentionally disabled after repeated invalid responses. Topic presence alone does not prove freshness, register semantics or write acceptance.",
   "excluded_common_topics": [
-    "heatingpump/MANAGER/WW_ECO/state"
+    "{root}/MANAGER/WW_ECO/state"
   ],
   "required_topics": [
-    "heatingpump/KESSEL/SPEICHERISTTEMP/state",
-    "heatingpump/KESSEL/DRUCK_HEIZKREIS/state",
-    "heatingpump/RAUMFERNFUEHLER_2/RAUMISTTEMP/state",
-    "heatingpump/RAUMFERNFUEHLER_2/FEUCHTE/state",
-    "heatingpump/KESSEL_CANB/EINSTELL_SPEICHERSOLLTEMP/state",
-    "heatingpump/KESSEL_CANB/EINSTELL_SPEICHERSOLLTEMP2/state",
-    "heatingpump/MANAGER/RUECKLAUFISTTEMP/state",
-    "heatingpump/MANAGER/KESSELSOLLTEMP/state",
-    "heatingpump/MANAGER/SPEICHERSOLLTEMP/state",
-    "heatingpump/KESSEL/AUSSENTEMP/state",
-    "heatingpump/KESSEL/KESSELSOLLTEMP/state",
-    "heatingpump/KESSEL/SPEICHERSOLLTEMP/state",
-    "heatingpump/KESSEL/WPVORLAUFIST/state",
-    "heatingpump/KESSEL/PUFFERTEMP_UNTEN1/state",
-    "heatingpump/HEIZMODUL/LZ_VERD_1_HEIZBETRIEB/state",
-    "heatingpump/HEIZMODUL/LZ_VERD_1_KUEHLBETRIEB/state"
+    "{root}/KESSEL/SPEICHERISTTEMP/state",
+    "{root}/KESSEL/DRUCK_HEIZKREIS/state",
+    "{root}/RAUMFERNFUEHLER_2/RAUMISTTEMP/state",
+    "{root}/RAUMFERNFUEHLER_2/FEUCHTE/state",
+    "{root}/KESSEL_CANB/EINSTELL_SPEICHERSOLLTEMP/state",
+    "{root}/KESSEL_CANB/EINSTELL_SPEICHERSOLLTEMP2/state",
+    "{root}/MANAGER/RUECKLAUFISTTEMP/state",
+    "{root}/MANAGER/KESSELSOLLTEMP/state",
+    "{root}/MANAGER/SPEICHERSOLLTEMP/state",
+    "{root}/KESSEL/AUSSENTEMP/state",
+    "{root}/KESSEL/KESSELSOLLTEMP/state",
+    "{root}/KESSEL/SPEICHERSOLLTEMP/state",
+    "{root}/KESSEL/WPVORLAUFIST/state",
+    "{root}/KESSEL/PUFFERTEMP_UNTEN1/state",
+    "{root}/HEIZMODUL/LZ_VERD_1_HEIZBETRIEB/state",
+    "{root}/HEIZMODUL/LZ_VERD_1_KUEHLBETRIEB/state"
   ]
 }

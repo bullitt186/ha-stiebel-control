@@ -1456,7 +1456,7 @@ TEST_CASE("ABTAUUNGAKTIV is a binary sensor with on/off payloads", "[meta]") {
 }
 
 TEST_CASE("writableNumbers: WPMW II parameters sit at the indices common.yaml uses", "[writable]") {
-    // common.yaml's /set handlers call publishWritableNumberDiscovery(writableNumbers[9..13]).
+    // The WPMW II parameter rows (set commands find them by name, #92)
     static const char* expected[] = {"SCHALTWERKDYNAMIKZEIT",
                                      "BIVALENTPARALLELTEMPERATUR_HZG", "BIVALENTPARALLELTEMPERATUR_WW",
                                      "STILLSTANDZEIT", "SW_AUSSENTEMP"};
@@ -2211,6 +2211,99 @@ TEST_CASE("SG Ready boost baseline is the setpoint read from the manager (#85)",
     resetDiscoveryState();
 }
 
+TEST_CASE("discovery: one device block, COP from calculatedSensors, named rows (#95)", "[mqtt][discovery]") {
+    // rows by name
+    CHECK(std::string(calculatedSensors[CALC_IDX_DATE].uniqueId) == "stiebel_calculated_date");
+    CHECK(std::string(calculatedSensors[CALC_IDX_ENERGIE_HEIZ_TOTAL_KWH].uniqueId) == "stiebel_calculated_energie_heiz_total_kwh");
+    CHECK(std::string(calculatedSensors[CALC_IDX_ABTAUUNG_LAEUFT].uniqueId) == "stiebel_calculated_abtauung_laeuft");
+    CHECK(std::string(calculatedSensors[CALC_IDX_COP_GESAMT].uniqueId) == "stiebel_cop_gesamt");
+    CHECK_FALSE(calculatedSensors[CALC_IDX_COMPRESSOR_ACTIVE].onDemand);
+    CHECK(calculatedSensors[CALC_IDX_ENERGIE_HEIZ_TOTAL_KWH].onDemand);
+    // COP keeps its discovery topic and unique_id
+    resetDiscoveryState();
+    copDiscoveryPublished = false;
+    publishCOPDiscovery();
+    const std::string cop = mqttFindPayload("homeassistant/sensor/heatingpump/cop_ww/config");
+    CHECK(cop.find("\"unique_id\":\"stiebel_cop_ww\"") != std::string::npos);
+    CHECK(cop.find("\"state_topic\":\"heatingpump/calculated/cop_ww/state\"") != std::string::npos);
+    CHECK(cop.find(HA_MAIN_DEVICE_JSON) != std::string::npos);
+    // member device block
+    const std::string dev = memberDeviceJson("KESSEL");
+    CHECK(dev == "\"device\":{\"identifiers\":[\"stiebel_KESSEL\"],\"name\":\"Kessel\","
+                 "\"via_device\":\"" HA_MAIN_DEVICE_ID "\",\"manufacturer\":\"Stiebel Eltron\"}");
+    resetDiscoveryState();
+    publishMqttDiscovery(CanMembers[cm_kessel], GetElsterIndex("SPEICHERISTTEMP"));
+    CHECK(mqttFindPayload("homeassistant/").find(dev) != std::string::npos);
+    copDiscoveryPublished = false;
+    resetDiscoveryState();
+}
+
+TEST_CASE("discovery: language-independent default_entity_id in every payload (#96)", "[mqtt][discovery]") {
+    CHECK(defaultEntityIdJson("sensor", "stiebel_manager_aussentemp") ==
+          "\"default_entity_id\":\"sensor.heatingpump_manager_aussentemp\",");
+    CHECK(defaultEntityIdJson("number", "stiebel_MANAGER_HEIZKURVE_set") ==
+          "\"default_entity_id\":\"number.heatingpump_manager_heizkurve_set\",");
+    resetDiscoveryState();
+    publishMqttDiscovery(CanMembers[cm_kessel], GetElsterIndex("SPEICHERISTTEMP"));
+    CHECK(mqttFindPayload("homeassistant/").find("\"default_entity_id\":\"sensor.heatingpump_kessel_speicheristtemp\"") != std::string::npos);
+    resetDiscoveryState();
+    publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_COMPRESSOR_ACTIVE], true);
+    CHECK(mqttFindPayload("homeassistant/").find("binary_sensor.heatingpump_calculated_compressor_active") != std::string::npos);
+    resetDiscoveryState();
+    publishWritableSelectDiscovery(writableSelects[0], true);
+    CHECK(mqttFindPayload("homeassistant/select/").find("select.heatingpump_manager_programmschalter") != std::string::npos);
+    resetDiscoveryState();
+}
+
+TEST_CASE("handleSetCommand: one dispatcher for numbers, selects and programs (#92)", "[mqtt][set]") {
+    resetDiscoveryState();
+    fake_can().sent.clear();
+    // number, by signal name and member
+    CHECK(handleSetCommand("heatingpump/MANAGER/RAUMSOLLTEMP_I/set", "21.5"));
+    REQUIRE(fake_can().sent.size() == 2);                     // write + read-back request
+    CHECK((fake_can().sent[0][0] & 0x0F) == 0);
+    CHECK(mqttTopicPublished("homeassistant/number/heatingpump/"));
+    // range check from the table row
+    fake_can().sent.clear();
+    CHECK_FALSE(handleSetCommand("heatingpump/MANAGER/RAUMSOLLTEMP_I/set", "45"));
+    CHECK_FALSE(handleSetCommand("heatingpump/MANAGER/RAUMSOLLTEMP_I/set", "abc"));
+    CHECK(fake_can().sent.empty());
+    // unknown topics
+    CHECK_FALSE(handleSetCommand("heatingpump/MANAGER/NOPE/set", "1"));
+    CHECK_FALSE(handleSetCommand("other/MANAGER/RAUMSOLLTEMP_I/set", "21"));
+    CHECK_FALSE(handleSetCommand("heatingpump/NOMEMBER/RAUMSOLLTEMP_I/set", "21"));
+    CHECK_FALSE(handleSetCommand("heatingpump/MANAGER/RAUMSOLLTEMP_I/state", "21"));
+    // heating circuit 2 on MISCHERMODUL_3: only where verified
+    fake_can().sent.clear();
+    CHECK(handleSetCommand("heatingpump/MISCHERMODUL_3/RAUMSOLLTEMP_I/set", "20.5") == kModel.wpmw2WritesVerified);
+    CHECK(fake_can().sent.empty() == !kModel.wpmw2WritesVerified);
+    // WPL9: former KESSEL topic of the DHW setpoint still works, elsewhere it does not
+    fake_can().sent.clear();
+    CHECK(handleSetCommand("heatingpump/KESSEL/EINSTELL_SPEICHERSOLLTEMP/set", "48") == kModel.canBDhwRoutes);
+    // SG Ready values live on the ESP
+    CHECK(handleSetCommand("heatingpump/MANAGER/SG_READY_BOOST_STATE3/set", "6.5"));
+    CHECK(sgReadyController.boostState3() == Approx(6.5f));
+    CHECK_FALSE(handleSetCommand("heatingpump/MANAGER/SG_READY_BOOST_STATE3/set", "11"));
+    CHECK(handleSetCommand("heatingpump/MANAGER/SG_READY_BOOST_STATE3/set", "5"));
+    CHECK(handleSetCommand("heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE4/set", "2"));
+    // select
+    bool hookCalled = false;
+    onSgReadyChanged = [&hookCalled]() { hookCalled = true; };
+    CHECK(handleSetCommand("heatingpump/MANAGER/SG_READY_STATE/set", sgReadyOptions[2]));
+    CHECK(sgReadyController.currentState() == 3);
+    CHECK(hookCalled);
+    CHECK_FALSE(handleSetCommand("heatingpump/MANAGER/SG_READY_STATE/set", "9 - x"));
+    CHECK(handleSetCommand("heatingpump/MANAGER/SG_READY_STATE/set", sgReadyOptions[1]));
+    onSgReadyChanged = nullptr;
+    // time program
+    pacedWriteCount = 0;
+    CHECK(handleSetCommand("heatingpump/dhw_program/mo/set", "11:00-17:00") == dhwProgramWritable());
+    CHECK_FALSE(handleSetCommand("heatingpump/dhw_program/xx/set", "11:00-17:00"));
+    pacedWriteCount = 0;
+    pendingReadbackCount = 0;
+    resetDiscoveryState();
+}
+
 TEST_CASE("model profile: one place decides the model's capabilities (#94)", "[model]") {
     const std::string m = HA_DEVICE_MODEL_STR;
 #ifdef HA_CONTROLLER_WPMW2
@@ -2226,7 +2319,6 @@ TEST_CASE("model profile: one place decides the model's capabilities (#94)", "[m
     CHECK(kModel.singleHeatingCircuit == (m == "wpl17"));
     CHECK(kModel.perMemberEnergy == (m == "wpl17"));
     CHECK(kModel.ignoreUnusedIwsRuntime == (m == "wpl13e"));
-    CHECK(kModel.wwEcoReadable == (m != "wpl9"));
 #ifdef HA_CONTROLLER_WPM3
     CHECK(m == "wpl10ac");
     CHECK(std::string(SG_READY_NORMAL_MODE) == "Komfortbetrieb");
@@ -2279,7 +2371,7 @@ TEST_CASE("WPMW II heating circuit 2 settings are numbers on MISCHERMODUL_3", "[
         CHECK(getWritableNumberMember(writableNumbers[i]) == &CanMembers[cm_mischermodul_3]);
     }
     CHECK(found == 3);
-    // indices used in common.yaml
+    // the circuit 2 rows follow the manager rows (findWritableNumber() returns circuit 1 first)
     CHECK(std::string(writableNumbers[16].signalName) == "RAUMSOLLTEMP_I");
     CHECK(std::string(writableNumbers[17].signalName) == "RAUMSOLLTEMP_NACHT");
     CHECK(std::string(writableNumbers[18].signalName) == "HEIZKURVE");
@@ -2466,3 +2558,73 @@ TEST_CASE("writeSignal: a second read-back follows once the value has settled", 
 }
 
 #include "wpl9_cases.inc"
+
+// ============================================================================
+// MQTT topic root from the device_name substitution (#102)
+// ============================================================================
+// CI builds this file a second time with -DHA_DEVICE_NAME=hp-2 -DTEST_EXPECTED_ROOT="hp-2"
+// and runs the [topic_root] tests: every topic and every topic in a discovery payload must
+// then live under hp-2/, and nothing may still name heatingpump.
+#ifndef TEST_EXPECTED_ROOT
+#define TEST_EXPECTED_ROOT "heatingpump"
+#endif
+
+TEST_CASE("topic root: every topic and discovery payload follows device_name (#102)", "[mqtt][topic_root]") {
+    const std::string root = TEST_EXPECTED_ROOT;
+    std::string entityRoot = root;
+    std::replace(entityRoot.begin(), entityRoot.end(), '-', '_');
+    resetDiscoveryState();
+    publishAllCalculatedSensorDiscoveries(true);
+    publishAllWritableNumberDiscoveries(true);
+    publishAllWritableSelectDiscoveries(true);
+    publishClimateDiscoveries();
+    publishSgReadyState();
+    publishTimeProgramDiscovery(0, 0);
+    const ElsterIndex* ei = GetElsterIndex("AUSSENTEMP");
+    REQUIRE(ei != nullptr);
+    publishMqttDiscovery(CanMembers[cm_manager], ei);
+    publishMqttState(CanMembers[cm_manager], ei, "4.5");
+    publishScanStatus("idle");
+
+    const auto& msgs = mqtt_client_instance().messages;
+    REQUIRE(msgs.size() > 20);
+    CHECK(mqttTopicPublished(root + "/MANAGER/AUSSENTEMP/state"));
+    CHECK(mqttTopicPublished(root + "/MANAGER/SG_READY_STATE/state"));
+    size_t topicFields = 0, entityIds = 0;
+    for (const auto& m : msgs) {
+        INFO(m.topic);
+        if (m.topic.rfind("homeassistant/", 0) == 0) {
+            // homeassistant/<component>/<root>/<unique_id>/config
+            size_t a = m.topic.find('/', 14);
+            REQUIRE(a != std::string::npos);
+            CHECK(m.topic.compare(a + 1, root.size() + 1, root + "/") == 0);
+        } else {
+            CHECK(m.topic.rfind(root + "/", 0) == 0);
+        }
+        if (root != "heatingpump") {
+            CHECK(m.topic.find("heatingpump") == std::string::npos);
+            CHECK(m.payload.find("heatingpump") == std::string::npos);
+        }
+        // every "..._topic":"<value>" in a payload starts with the root
+        for (size_t p = m.payload.find("_topic\":\""); p != std::string::npos;
+             p = m.payload.find("_topic\":\"", p + 1)) {
+            ++topicFields;
+            CHECK(m.payload.compare(p + 9, root.size() + 1, root + "/") == 0);
+        }
+        size_t d = m.payload.find("\"default_entity_id\":\"");
+        if (d != std::string::npos) {
+            ++entityIds;
+            size_t dot = m.payload.find('.', d);
+            REQUIRE(dot != std::string::npos);
+            CHECK(m.payload.compare(dot + 1, entityRoot.size() + 1, entityRoot + "_") == 0);
+        }
+    }
+    CHECK(topicFields > 20);
+    CHECK(entityIds > 10);
+
+    // set commands are accepted under the root only
+    fake_can().sent.clear();
+    CHECK(handleSetCommand(root + "/MANAGER/RAUMSOLLTEMP_I/set", "21.5"));
+    CHECK_FALSE(fake_can().sent.empty());
+    if (root != "heatingpump") CHECK_FALSE(handleSetCommand("heatingpump/MANAGER/RAUMSOLLTEMP_I/set", "21.5"));
+}
