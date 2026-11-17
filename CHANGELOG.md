@@ -32,6 +32,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Changed
 
+- MQTT set commands: one subscription on `heatingpump/+/+/set` and one C++ dispatcher
+  (`handleSetCommand()`) replace about 25 YAML handlers that addressed table rows by position. Rows
+  are found by signal name and member, values are checked against the row's min/max (#92).
+- `common.yaml` no longer declares unused internal template sensors or polls `PROGRAMMSCHALTER`
+  and `SOMMERBETRIEB` a second time; `WW_ECO` moved into the request tables (#98). Dead code
+  (`processCanMessageDebug()`, `tests/main.cpp`) removed, `ai_refine_friendly_names.py` archived (#99).
 - Agent instructions (`.github/copilot-instructions.md`, imported by `CLAUDE.md`), `docs/ARCHITECTURE.md`
   and `README.md` describe the current code: request tables per model, `model_profile.h`, `id: my_can`,
   no dispatcher. CI checks that every repo path named there exists (`tests/check_doc_paths.py`, #100).

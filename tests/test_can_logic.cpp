@@ -1456,7 +1456,7 @@ TEST_CASE("ABTAUUNGAKTIV is a binary sensor with on/off payloads", "[meta]") {
 }
 
 TEST_CASE("writableNumbers: WPMW II parameters sit at the indices common.yaml uses", "[writable]") {
-    // common.yaml's /set handlers call publishWritableNumberDiscovery(writableNumbers[9..13]).
+    // The WPMW II parameter rows (set commands find them by name, #92)
     static const char* expected[] = {"SCHALTWERKDYNAMIKZEIT",
                                      "BIVALENTPARALLELTEMPERATUR_HZG", "BIVALENTPARALLELTEMPERATUR_WW",
                                      "STILLSTANDZEIT", "SW_AUSSENTEMP"};
@@ -2211,6 +2211,55 @@ TEST_CASE("SG Ready boost baseline is the setpoint read from the manager (#85)",
     resetDiscoveryState();
 }
 
+TEST_CASE("handleSetCommand: one dispatcher for numbers, selects and programs (#92)", "[mqtt][set]") {
+    resetDiscoveryState();
+    fake_can().sent.clear();
+    // number, by signal name and member
+    CHECK(handleSetCommand("heatingpump/MANAGER/RAUMSOLLTEMP_I/set", "21.5"));
+    REQUIRE(fake_can().sent.size() == 2);                     // write + read-back request
+    CHECK((fake_can().sent[0][0] & 0x0F) == 0);
+    CHECK(mqttTopicPublished("homeassistant/number/heatingpump/"));
+    // range check from the table row
+    fake_can().sent.clear();
+    CHECK_FALSE(handleSetCommand("heatingpump/MANAGER/RAUMSOLLTEMP_I/set", "45"));
+    CHECK_FALSE(handleSetCommand("heatingpump/MANAGER/RAUMSOLLTEMP_I/set", "abc"));
+    CHECK(fake_can().sent.empty());
+    // unknown topics
+    CHECK_FALSE(handleSetCommand("heatingpump/MANAGER/NOPE/set", "1"));
+    CHECK_FALSE(handleSetCommand("other/MANAGER/RAUMSOLLTEMP_I/set", "21"));
+    CHECK_FALSE(handleSetCommand("heatingpump/NOMEMBER/RAUMSOLLTEMP_I/set", "21"));
+    CHECK_FALSE(handleSetCommand("heatingpump/MANAGER/RAUMSOLLTEMP_I/state", "21"));
+    // heating circuit 2 on MISCHERMODUL_3: only where verified
+    fake_can().sent.clear();
+    CHECK(handleSetCommand("heatingpump/MISCHERMODUL_3/RAUMSOLLTEMP_I/set", "20.5") == kModel.wpmw2WritesVerified);
+    CHECK(fake_can().sent.empty() == !kModel.wpmw2WritesVerified);
+    // WPL9: former KESSEL topic of the DHW setpoint still works, elsewhere it does not
+    fake_can().sent.clear();
+    CHECK(handleSetCommand("heatingpump/KESSEL/EINSTELL_SPEICHERSOLLTEMP/set", "48") == kModel.canBDhwRoutes);
+    // SG Ready values live on the ESP
+    CHECK(handleSetCommand("heatingpump/MANAGER/SG_READY_BOOST_STATE3/set", "6.5"));
+    CHECK(sgReadyController.boostState3() == Approx(6.5f));
+    CHECK_FALSE(handleSetCommand("heatingpump/MANAGER/SG_READY_BOOST_STATE3/set", "11"));
+    CHECK(handleSetCommand("heatingpump/MANAGER/SG_READY_BOOST_STATE3/set", "5"));
+    CHECK(handleSetCommand("heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE4/set", "2"));
+    // select
+    bool hookCalled = false;
+    onSgReadyChanged = [&hookCalled]() { hookCalled = true; };
+    CHECK(handleSetCommand("heatingpump/MANAGER/SG_READY_STATE/set", sgReadyOptions[2]));
+    CHECK(sgReadyController.currentState() == 3);
+    CHECK(hookCalled);
+    CHECK_FALSE(handleSetCommand("heatingpump/MANAGER/SG_READY_STATE/set", "9 - x"));
+    CHECK(handleSetCommand("heatingpump/MANAGER/SG_READY_STATE/set", sgReadyOptions[1]));
+    onSgReadyChanged = nullptr;
+    // time program
+    pacedWriteCount = 0;
+    CHECK(handleSetCommand("heatingpump/dhw_program/mo/set", "11:00-17:00") == dhwProgramWritable());
+    CHECK_FALSE(handleSetCommand("heatingpump/dhw_program/xx/set", "11:00-17:00"));
+    pacedWriteCount = 0;
+    pendingReadbackCount = 0;
+    resetDiscoveryState();
+}
+
 TEST_CASE("model profile: one place decides the model's capabilities (#94)", "[model]") {
     const std::string m = HA_DEVICE_MODEL_STR;
 #ifdef HA_CONTROLLER_WPMW2
@@ -2278,7 +2327,7 @@ TEST_CASE("WPMW II heating circuit 2 settings are numbers on MISCHERMODUL_3", "[
         CHECK(getWritableNumberMember(writableNumbers[i]) == &CanMembers[cm_mischermodul_3]);
     }
     CHECK(found == 3);
-    // indices used in common.yaml
+    // the circuit 2 rows follow the manager rows (findWritableNumber() returns circuit 1 first)
     CHECK(std::string(writableNumbers[16].signalName) == "RAUMSOLLTEMP_I");
     CHECK(std::string(writableNumbers[17].signalName) == "RAUMSOLLTEMP_NACHT");
     CHECK(std::string(writableNumbers[18].signalName) == "HEIZKURVE");

@@ -42,10 +42,11 @@ built-in TWAI controller (recommended) and a classic ESP32 (`esp32dev`) with an 
    `ElsterMetaTable` (`LNAME_*`), otherwise from type defaults.
 3. Calculated values live in `calculatedSensors[]` in `ha-stiebel-control.h` (append only, indices
    via `CALC_IDX_*`) and publish to `heatingpump/calculated/<name>/state`.
-4. Writable settings are `writableNumbers[]` / `writableSelects[]`. Their indices are used in
-   `common.yaml` handlers, so only append. Writes go through `writeSignal()` (read-back is scheduled
-   automatically); SG Ready and time program writes go through the paced queue
-   (`queuePacedWrite()`), one at a time with read-back check.
+4. Writable settings are `writableNumbers[]` / `writableSelects[]`. Every `<root>/<A>/<B>/set`
+   command goes through `handleSetCommand()`, which finds the row by signal name and member and
+   checks `writableNumberApplies()` and min/max; adding a writable entity only touches its row.
+   Writes go through `writeSignal()` (read-back is scheduled automatically); SG Ready and time
+   program writes go through the paced queue (`queuePacedWrite()`), one at a time with read-back.
 
 **Adding a sensor:** find the exact signal name in `elster/ElsterTable.h`, add a request row to the
 model table(s) with the right member (`cm_manager`, `cm_kessel`, `cm_heizmodul`, …) and frequency.

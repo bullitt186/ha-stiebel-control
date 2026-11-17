@@ -43,6 +43,7 @@
 #include <tuple>
 #include <unordered_map>
 #include <vector>
+#include <functional>
 #include <algorithm>
 #include <tuple>
 #include <cmath>
@@ -386,7 +387,6 @@ static const WritableNumberConfig writableNumbers[] = {
     // WPMW II heating circuit 2 (mixer circuit): the manager keeps its settings on the virtual
     // member MISCHERMODUL_3 (0x602). Display "Raumtemp. 2" Tag/Absenk and "Heizkurve 2";
     // the Tag value moved 20.0 -> 20.5 on 0x602 after a change on the display (WPL13E).
-    // Indices 16-18 are used in common.yaml.
     {"RAUMSOLLTEMP_I", LNAME_NUM_HK2_RAUMSOLL_TAG,
      cm_mischermodul_3, 10.0, 30.0, 0.5, "°C", "mdi:home-thermometer", "temperature"},
     {"RAUMSOLLTEMP_NACHT", LNAME_NUM_HK2_RAUMSOLL_NACHT,
@@ -486,7 +486,7 @@ static const WritableSelectConfig writableSelects[] = {
     {"SG_READY_STATE", LNAME_SEL_SG_READY,
      cm_manager, sgReadyOptions, 4, "mdi:solar-power"},
 
-    // Operating mode written in SG Ready state 2 (index 2, used in common.yaml)
+    // Operating mode written in SG Ready state 2
     {"SG_READY_NORMAL_MODE", LNAME_SEL_SG_READY_NORMAL_MODE,
      cm_manager, sgNormalModeOptions, 2, "mdi:home-clock"}
 };
@@ -2988,6 +2988,119 @@ inline bool handleHeatingProgramCommand(int day, const std::string& payload) {
 }
 inline bool handleHeating2ProgramCommand(int day, const std::string& payload) {
     return handleTimeProgramCommand(TP_HEATING2, day, payload);
+}
+
+// ============================================================================
+// MQTT SET COMMANDS: one entry point for every "<root>/<A>/<B>/set" topic (#92)
+// ============================================================================
+// <A>/<B> is either <MEMBER>/<SIGNAL> (writable numbers and selects, looked up by signal
+// name and member) or <program>/<day> (time programs). Adding or removing a writable
+// entity only touches its table row. common.yaml subscribes "<root>/+/+/set" once.
+static const char* const MQTT_TOPIC_ROOT = "heatingpump";
+// Set from common.yaml: refreshes the native SG Ready entities after a change
+static std::function<void()> onSgReadyChanged;
+
+inline void notifySgReadyChanged() {
+    scheduleSgReadyPublish();
+    if (onSgReadyChanged) onSgReadyChanged();
+}
+
+inline bool memberFromName(const std::string& name, CanMemberType& out) {
+    for (size_t i = 0; i < sizeof(CanMembers) / sizeof(CanMember); ++i)
+        if (name == CanMembers[i].Name) { out = static_cast<CanMemberType>(i); return true; }
+    return false;
+}
+
+// Topic member accepted for a number: its discovery member, its table owner, and on WPL9
+// the former KESSEL topics of the DHW setpoints.
+inline bool numberAcceptsMember(const WritableNumberConfig& c, CanMemberType member) {
+    if (getWritableNumberMember(c) == &CanMembers[member] || c.member == member) return true;
+    return member == cm_kessel && kModel.canBDhwRoutes &&
+           (strcmp(c.signalName, "EINSTELL_SPEICHERSOLLTEMP") == 0 ||
+            strcmp(c.signalName, "EINSTELL_SPEICHERSOLLTEMP2") == 0);
+}
+
+inline bool handleNumberCommand(const WritableNumberConfig& c, CanMemberType member, const std::string& payload) {
+    if (!writableNumberApplies(c)) {
+        ESP_LOGW("MQTT_CMD", "%s is not writable on %s", c.signalName, HA_DEVICE_MODEL_STR);
+        return false;
+    }
+    publishWritableNumberDiscovery(c);
+    char* end;
+    const float v = strtof(payload.c_str(), &end);
+    if (end == payload.c_str() || *end != '\0' || v < c.min - 0.001f || v > c.max + 0.001f) {
+        ESP_LOGW("MQTT_CMD", "%s: \"%s\" outside %.2f..%.2f", c.signalName, payload.c_str(), c.min, c.max);
+        return false;
+    }
+    // SG Ready values are kept on the ESP, not written to the heat pump
+    if (strcmp(c.signalName, "SG_READY_BOOST_STATE3") == 0) { setSgReadyBoost3(v); notifySgReadyChanged(); return true; }
+    if (strcmp(c.signalName, "SG_READY_BOOST_STATE4") == 0) { setSgReadyBoost4(v); notifySgReadyChanged(); return true; }
+    if (strcmp(c.signalName, "SG_READY_ROOM_BOOST_STATE3") == 0 || strcmp(c.signalName, "SG_READY_ROOM_BOOST_STATE4") == 0) {
+        const bool ok = handleSgReadyRoomBoost(c.signalName[25] == '3' ? 3 : 4, payload);
+        if (ok) notifySgReadyChanged();
+        return ok;
+    }
+    writeConfiguredSignal(member, c.signalName, payload.c_str());
+    return true;
+}
+
+inline bool handleSelectCommand(const WritableSelectConfig& c, const std::string& payload) {
+    publishWritableSelectDiscovery(c);
+    if (strcmp(c.signalName, "SG_READY_STATE") == 0) {
+        const int state = SgReadyController::parseStateString(payload);
+        if (state < SgReadyController::STATE_EVU_LOCK || state > SgReadyController::STATE_FORCED) {
+            ESP_LOGW("MQTT_CMD", "Invalid SG Ready state: %s", payload.c_str());
+            return false;
+        }
+        applySgReadyState(state);
+        if (onSgReadyChanged) onSgReadyChanged();
+        return true;
+    }
+    if (strcmp(c.signalName, "SG_READY_NORMAL_MODE") == 0) {
+        const bool ok = handleSgReadyNormalMode(payload);
+        if (!ok) ESP_LOGW("MQTT_CMD", "Invalid SG Ready state 2 mode: %s", payload.c_str());
+        return ok;
+    }
+    const char* v = payload.c_str();
+    writeSignal(&CanMembers[c.member], GetElsterIndex(c.signalName), v);
+    readSignal(&CanMembers[c.member], c.signalName);
+    return true;
+}
+
+// "<root>/<A>/<B>/set" → number, select or time program. Returns false if nothing matched
+// or the value was rejected.
+inline bool handleSetCommand(const std::string& topic, const std::string& payload) {
+    std::vector<std::string> parts;
+    size_t pos = 0;
+    while (true) {
+        const size_t slash = topic.find('/', pos);
+        parts.push_back(topic.substr(pos, slash == std::string::npos ? std::string::npos : slash - pos));
+        if (slash == std::string::npos) break;
+        pos = slash + 1;
+    }
+    if (parts.size() != 4 || parts[0] != MQTT_TOPIC_ROOT || parts[3] != "set") return false;
+    ESP_LOGI("MQTT_CMD", "%s/%s = %s", parts[1].c_str(), parts[2].c_str(), payload.c_str());
+    for (int prog = 0; prog < TP_COUNT; prog++) {
+        if (parts[1] != TIME_PROGRAMS[prog].topic) continue;
+        for (int day = 0; day < dhwprog::DAYS; day++)
+            if (parts[2] == TIME_PROGRAM_KEYS[day]) return handleTimeProgramCommand(prog, day, payload);
+        return false;
+    }
+    CanMemberType member;
+    if (!memberFromName(parts[1], member)) {
+        ESP_LOGW("MQTT_CMD", "Unknown member in %s", topic.c_str());
+        return false;
+    }
+    for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; i++) {
+        const WritableNumberConfig& c = writableNumbers[i];
+        if (parts[2] == c.signalName && numberAcceptsMember(c, member)) return handleNumberCommand(c, member, payload);
+    }
+    for (size_t i = 0; i < WRITABLE_SELECT_COUNT; i++) {
+        const WritableSelectConfig& c = writableSelects[i];
+        if (parts[2] == c.signalName && c.member == member) return handleSelectCommand(c, payload);
+    }
+    ESP_LOGW("MQTT_CMD", "No writable entity for %s", topic.c_str());
+    return false;
 }
 
 // ============================================================================
