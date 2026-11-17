@@ -24,6 +24,7 @@
 #include "ElsterTable.h"
 #include "KElsterTable.h"
 #include "config.h"
+#include "model_profile.h"
 #include "language_select.h"
 #include "sg_ready_controller.h"
 #include "dhw_program.h"
@@ -117,19 +118,19 @@ struct SignalRoute {
     CanMemberType stateMember;
 };
 
-inline SignalRoute resolveSignalRoute(const char* model, uint16_t index,
+inline SignalRoute resolveSignalRoute(const ModelProfile& model, uint16_t index,
                                      CanMemberType fallback) {
-    if (std::strcmp(model, "wpl9") == 0) {
-        // Test candidate: both DHW registers use CAN-B for writes and feedback.
-        // Valid live replies and actual WPM write acceptance still need capture.
-        if (index == 0x0013 || index == 0x0a06)
-            return {cm_kessel_canb, cm_kessel_canb, cm_kessel_canb};
-    }
-    // Preserve existing WPL17 discovery and MANAGER-topic routing.
-    if (std::strcmp(model, "wpl17") == 0 &&
-        (index == 0x0013 || index == 0x0a06 || index == 0x010e))
+    // WPL9 test candidate: both DHW registers use CAN-B for writes and feedback.
+    // Valid live replies and actual WPM write acceptance still need capture.
+    if (model.canBDhwRoutes && (index == 0x0013 || index == 0x0a06))
+        return {cm_kessel_canb, cm_kessel_canb, cm_kessel_canb};
+    // WPL17: DHW setpoints and the heating curve live on KESSEL_CANB.
+    if (model.canBRoutes && (index == 0x0013 || index == 0x0a06 || index == 0x010e))
         return {cm_kessel_canb, cm_kessel_canb, cm_kessel_canb};
     return {fallback, fallback, fallback};
+}
+inline SignalRoute resolveSignalRoute(uint16_t index, CanMemberType fallback) {
+    return resolveSignalRoute(kModel, index, fallback);
 }
 
 
@@ -397,13 +398,7 @@ static const WritableNumberConfig writableNumbers[] = {
 static const size_t WRITABLE_NUMBER_COUNT = sizeof(writableNumbers) / sizeof(WritableNumberConfig);
 
 // Models with a WPMW II manager. Writes stay limited per model in writableNumberApplies().
-static constexpr bool isWpmw2Model() {
-#ifdef HA_CONTROLLER_WPMW2
-    return true;
-#else
-    return false;
-#endif
-}
+static constexpr bool isWpmw2Model() { return kModel.wpmw2; }
 
 // WPMW II: the same signal is a different measuring point on the manager side (KESSEL,
 // WPM terminals) and in the heat pump module (HEIZMODUL, IWS) (#46). nullptr = table name.
@@ -504,9 +499,6 @@ static const size_t WRITABLE_SELECT_COUNT = sizeof(writableSelects) / sizeof(Wri
 // RUNTIME STATE TRACKING
 // ============================================================================
 
-// SG Ready: legacy globals kept for YAML sensor lambdas that read currentSgReadyState
-// The controller is the authoritative source; these are updated via sgReadyStateInt().
-static int currentSgReadyState = 2;
 
 // DJB2 hash of a signal name (same function as hash_runtime() below)
 inline uint32_t elsterNameHash(const char* str) {
@@ -1172,7 +1164,7 @@ void writeSignal(const CanMember *cm, const char *elsterName, const char *str)
 // Explicit read/writeSignal calls keep their original low-level semantics.
 void writeConfiguredSignal(CanMemberType fallback, const char* name, const char* value) {
     const ElsterIndex* ei = GetElsterIndex(name);
-    const SignalRoute route = resolveSignalRoute(HA_DEVICE_MODEL_STR, ei->Index, fallback);
+    const SignalRoute route = resolveSignalRoute(ei->Index, fallback);
     writeSignal(&CanMembers[route.writeMember], name, value);
     readSignal(&CanMembers[route.readMember], ei);
 }
@@ -1396,7 +1388,7 @@ static const CanMember* getWritableNumberMember(const WritableNumberConfig& conf
     if (isWpmw2Model() && strcmp(config.signalName, "HEIZKURVE") == 0)
         return &CanMembers[cm_manager];
     const SignalRoute route = resolveSignalRoute(
-        HA_DEVICE_MODEL_STR, GetElsterIndex(config.signalName)->Index, config.member);
+        GetElsterIndex(config.signalName)->Index, config.member);
     return &CanMembers[route.stateMember];
 }
 
@@ -1511,7 +1503,7 @@ void publishClimateDiscoveries() {
 #endif
     const char* device = "\"device\":{\"identifiers\":[\"stiebel_eltron_" HA_DEVICE_MODEL_STR "\"],"
                          "\"name\":\"Stiebel Eltron Wärmepumpe\",\"manufacturer\":\"Stiebel Eltron\"}";
-    const bool wpl17 = strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0;
+    const bool wpl17 = kModel.canBRoutes;   // DHW state on KESSEL_CANB
 
     // Heating: room setpoint (day) + operating mode (Programmschalter) as presets
     if (const WritableNumberConfig* room = findWritableNumber("RAUMSOLLTEMP_I")) {
@@ -1553,23 +1545,16 @@ void publishClimateDiscoveries() {
 // Whether the model gets a writable number entity for this signal
 static bool writableNumberApplies(const WritableNumberConfig& config) {
     const char* sig = config.signalName;
-    const bool isWpl17 = (strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0);
-    // WPL17 has only ONE heating circuit (RAUMSOLLTEMP_I). Skip II/III so the
-    // number entities are not created on single-circuit models (-255 only).
-    if ((strcmp(sig, "RAUMSOLLTEMP_II") == 0 || strcmp(sig, "RAUMSOLLTEMP_III") == 0) && isWpl17)
+    // Single-circuit models: no RAUMSOLLTEMP_II/III entities (-255 only).
+    if ((strcmp(sig, "RAUMSOLLTEMP_II") == 0 || strcmp(sig, "RAUMSOLLTEMP_III") == 0) && kModel.singleHeatingCircuit)
         return false;
-    // WPMW II writes verified on the display: WPL13E (bus scan, display) and TTL 33 (each value
-    // changed over CAN and back, checked on the WPMW II display).
-    const bool wpmw2Verified = (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") == 0 ||
-                                strcmp(HA_DEVICE_MODEL_STR, "ttl33") == 0);
-    // Heating circuit 2 settings on MISCHERMODUL_3 (0x602): WPMW II with a mixer circuit.
+    // Heating circuit 2 settings on MISCHERMODUL_3 (0x602): WPMW II writes checked on the display.
     if (config.member == cm_mischermodul_3)
-        return wpmw2Verified;
-    // HEIZKURVE is verified writable on WPL17 (KESSEL_CANB) and WPL13E/TTL 33 (MANAGER) only.
-    if (strcmp(sig, "HEIZKURVE") == 0 && !isWpl17 && !wpmw2Verified)
+        return kModel.wpmw2WritesVerified;
+    if (strcmp(sig, "HEIZKURVE") == 0 && !kModel.heatingCurveWritable())
         return false;
-    // WPMW II parameters 10/27/33/42/43 (WPL13E numbering): verified on WPL13E and TTL 33 only.
-    if (isWpmw2Parameter(sig) && !wpmw2Verified)
+    // WPMW II parameters 10/27/33/42/43 (WPL13E numbering)
+    if (isWpmw2Parameter(sig) && !kModel.wpmw2WritesVerified)
         return false;
     return true;
 }
@@ -2586,7 +2571,7 @@ void publishCombinedEnergySensors() {
     // (SUM_MWH*1000 + SUM_KWH + TAG_KWH + TAG_WH/1000) aus HEIZMODUL_WPL nutzen.
     // Damit ist der totale Zaehler fortlaufend (kein Sprung beim naechtlichen
     // Rollover). Die SUM-Register werden dazu mit FREQ_1MIN gelesen.
-    const bool useMember = (strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0);
+    const bool useMember = kModel.perMemberEnergy;
     auto publishTotal = [useMember](const CalculatedSensorConfig& cfg, const char* topic, const char* key, int slot,
                            const char* sumMwh, const char* sumKwh, const char* tagKwh, const char* tagWh) {
         float rawTotal; bool have = false;
@@ -2729,8 +2714,18 @@ void publishCombinedEnergySensors() {
 // ESPHOME IO ADAPTER FOR SG READY CONTROLLER
 // ============================================================================
 
+// SG Ready state label: the select options (lang_base.h / lang_en.h) for 1-4. The only
+// place that maps a state to its text (#93).
+inline const char* sgReadyStateLabel(int state) {
+    if (state >= SgReadyController::STATE_EVU_LOCK && state <= SgReadyController::STATE_FORCED)
+        return sgReadyOptions[state - 1];
+    return state == SgReadyController::STATE_DISABLED ? LNAME_SG_DEAKTIVIERT : LNAME_SG_UNBEKANNT;
+}
+
 class EspHomeSgReadyIO : public ISgReadyIO {
 public:
+    const char* stateLabel(int state) override { return sgReadyStateLabel(state); }
+
     static ESPPreferenceObject nvsDhw;
     static ESPPreferenceObject nvsRoom;
     static ESPPreferenceObject nvsActive;
@@ -2740,8 +2735,8 @@ public:
     void writeCanSignal(const char* signalName, const char* value) override {
         const ElsterIndex* ei = GetElsterIndex(signalName);
         SignalRoute route = {cm_manager, cm_manager, cm_manager};
-        if (strcmp(HA_DEVICE_MODEL_STR, "wpl9") == 0)
-            route = resolveSignalRoute(HA_DEVICE_MODEL_STR, ei->Index, cm_manager);
+        if (kModel.canBDhwRoutes)
+            route = resolveSignalRoute(ei->Index, cm_manager);
         queuePacedWrite(&CanMembers[route.writeMember], &CanMembers[route.readMember], ei, value);
     }
 
@@ -2818,16 +2813,13 @@ void initBoostStatePrefs() {
 // Called from on_boot lambda in common.yaml
 void loadBoostState() {
     sgReadyController.loadFromNvs();
-    currentSgReadyState = sgReadyController.currentState();
     ESP_LOGI("NVS", "Boost state loaded, active=%d", (int)sgReadyController.isActive());
 }
 
 // Called from MQTT on_message lambda in common.yaml
 void applySgReadyState(int state) {
     ESP_LOGI("SG_READY", "Applying SG Ready state %d", state);
-    if (sgReadyController.applyState(state)) {
-        currentSgReadyState = sgReadyController.currentState();
-    } else {
+    if (!sgReadyController.applyState(state)) {
         ESP_LOGW("SG_READY", "Invalid SG Ready state: %d", state);
     }
 }
@@ -2863,9 +2855,10 @@ inline bool publishSgReadyState() {
 #ifdef HA_DISABLE_SG_READY_true
     return true;
 #endif
-    int idx = currentSgReadyState - 1;
-    if (idx < 0 || idx > 3) idx = 1;  // fall back to "2 - Normal"
-    const char* s = sgReadyOptions[idx];
+    int st = sgReadyController.currentState();
+    if (st < SgReadyController::STATE_EVU_LOCK || st > SgReadyController::STATE_FORCED)
+        st = SgReadyController::STATE_NORMAL;
+    const char* s = sgReadyStateLabel(st);
     bool ok = mqttPublish("heatingpump/MANAGER/SG_READY_STATE/state", s, strlen(s));
     char b3[16], b4[16];
     snprintf(b3, sizeof(b3), "%.1f", sgReadyBoostState3Value());
@@ -2950,8 +2943,7 @@ inline bool dhwProgramWritable() {
 #ifdef HA_READ_ONLY_true
     return false;
 #endif
-    return isWpmw2Model() &&
-           (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") == 0 || strcmp(HA_DEVICE_MODEL_STR, "ttl33") == 0);
+    return isWpmw2Model() && kModel.wpmw2WritesVerified;
 }
 
 inline bool publishTimeProgramDiscovery(int prog, int day) {
@@ -3117,7 +3109,7 @@ constexpr uint32_t HASH_WAERMEERTRAG_WW_TAG_KWH = hash("WAERMEERTRAG_WW_TAG_KWH"
 // cooling: compressor 1 and cooling counters are only 0 / -255 (HA history).
 // (The former "MANAGER x = 0.0" copies were read requests, filtered in processAndUpdate.)
 static bool isIgnoredOnWpl13e(const char* name) {
-    if (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") != 0) return false;
+    if (!kModel.ignoreUnusedIwsRuntime) return false;
     return strncmp(name, "LZ_VERD_", 8) == 0 && (strstr(name, "VERD_1") || strstr(name, "KUEHL"));
 }
 
@@ -3408,8 +3400,8 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
         case HASH_EINSTELL_SPEICHERSOLLTEMP:
         case HASH_RAUMSOLLTEMP_I: {
             SignalRoute route = {cm_manager, cm_manager, cm_manager};
-            if (strcmp(HA_DEVICE_MODEL_STR, "wpl9") == 0)
-                route = resolveSignalRoute(HA_DEVICE_MODEL_STR, ei->Index, cm_manager);
+            if (kModel.canBDhwRoutes)
+                route = resolveSignalRoute(ei->Index, cm_manager);
             if (CanMembers[route.readMember].CanId != cm.CanId) break;
             char* endPtr;
             const float v = strtof(value.c_str(), &endPtr);

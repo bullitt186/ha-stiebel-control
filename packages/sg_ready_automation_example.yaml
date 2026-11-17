@@ -106,6 +106,8 @@ automation:
 #
 # select.manager_sg_ready_zustand
 #   Options: "1 - EVU Sperre", "2 - Normal", "3 - Empfohlen", "4 - Zwang"
+#   (language: "EN" build: "1 - Grid Lock", "2 - Normal", "3 - Recommended", "4 - Forced";
+#    the firmware accepts either set, it only reads the number before " - ")
 #   Controls the SG Ready state which automatically manages:
 #   - Operating mode (PROGRAMMSCHALTER)
 #   - DHW temperature boost/restore
