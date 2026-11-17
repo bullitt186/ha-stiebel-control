@@ -431,9 +431,10 @@ static const char* wpmw2MemberName(const char* member, const char* signal) {
         {"MISCHERMODUL_3", "RAUMSOLLTEMP_I",     LNAME_HK2_RAUMSOLL_TAG},
         {"MISCHERMODUL_3", "RAUMSOLLTEMP_NACHT", LNAME_HK2_RAUMSOLL_NACHT},
         {"MISCHERMODUL_3", "HEIZKURVE",          LNAME_HK2_HEIZKURVE},
-        // Room actual temperature per heating circuit (virtual members 0x601 / 0x602)
-        {"MISCHERMODUL_2", "RAUMISTTEMP",        LNAME_HK1_RAUMIST},
-        {"MISCHERMODUL_3", "RAUMISTTEMP",        LNAME_HK2_RAUMIST},
+        // Room actual temperature of the remote control FE 7 (one sensor, mirrored on the
+        // virtual members) and the circuit it is assigned to (parameter 22 "AUSWAHL FE")
+        {"MISCHERMODUL_3", "RAUMISTTEMP",        LNAME_RAUMIST_FE},
+        {"MANAGER", "FERNBEDIENUNGSZUORDNUNG",   LNAME_FE_ZUORDNUNG},
     };
     for (const Entry& e : names)
         if (strcmp(member, e.member) == 0 && strcmp(signal, e.signal) == 0) return e.name;
@@ -1448,6 +1449,18 @@ static const WritableNumberConfig* findWritableNumber(const char* signal) {
 
 static bool writableNumberApplies(const WritableNumberConfig& config);
 
+// WPMW II: heating circuit of the remote control FE 7 (manager FERNBEDIENUNGSZUORDNUNG, display
+// parameter 22 "AUSWAHL FE": 1 = HK1, 2 = HK2; 0 = not read yet or no FE). The FE has the only
+// room sensor; the manager mirrors its value on every virtual member (WPL13E, FE on HK2: 0x601,
+// 0x602, 0x301 and 0x302 followed one heated sensor). Its room temperature belongs to the climate
+// of that circuit only; the firmware reads it from 0x602.
+static uint8_t remoteControlCircuit = 0;
+
+inline std::string roomActualTopicJson(uint8_t circuit) {
+    if (!isWpmw2Model() || remoteControlCircuit != circuit) return "";
+    return "\"current_temperature_topic\":\"" HA_TOPIC_ROOT "/MISCHERMODUL_3/RAUMISTTEMP/state\",";
+}
+
 void publishClimateDiscoveries() {
 #ifdef HA_READ_ONLY_true
     return;
@@ -1465,10 +1478,7 @@ void publishClimateDiscoveries() {
           << "\"min_temp\":" << room->min << ",\"max_temp\":" << room->max << ",\"temp_step\":" << room->step << ","
           << "\"temperature_command_topic\":\"" HA_TOPIC_ROOT "/" << cm->Name << "/RAUMSOLLTEMP_I/set\","
           << "\"temperature_state_topic\":\"" HA_TOPIC_ROOT "/" << cm->Name << "/RAUMSOLLTEMP_I/state\",";
-        // WPMW II: room actual temperature of heating circuit 1 from the virtual member 0x601
-        if (kModel.wpmw2)
-            p << "\"current_temperature_topic\":\"" HA_TOPIC_ROOT "/MISCHERMODUL_2/RAUMISTTEMP/state\",";
-        p << "\"preset_modes\":[";
+        p << roomActualTopicJson(1) << "\"preset_modes\":[";
         for (size_t i = 0; i < sizeof(programmschalterOptions) / sizeof(programmschalterOptions[0]); i++)
             p << (i ? "," : "") << "\"" << programmschalterOptions[i] << "\"";
         p << "],\"preset_mode_command_topic\":\"" HA_TOPIC_ROOT "/MANAGER/PROGRAMMSCHALTER/set\","
@@ -1494,7 +1504,7 @@ void publishClimateDiscoveries() {
           << "\"min_temp\":" << hk2.min << ",\"max_temp\":" << hk2.max << ",\"temp_step\":" << hk2.step << ","
           << "\"temperature_command_topic\":\"" HA_TOPIC_ROOT "/MISCHERMODUL_3/RAUMSOLLTEMP_I/set\","
           << "\"temperature_state_topic\":\"" HA_TOPIC_ROOT "/MISCHERMODUL_3/RAUMSOLLTEMP_I/state\","
-          << "\"current_temperature_topic\":\"" HA_TOPIC_ROOT "/MISCHERMODUL_3/RAUMISTTEMP/state\","
+          << roomActualTopicJson(2)
           << "\"action_topic\":\"" HA_TOPIC_ROOT "/calculated/compressor_active/state\","
           << "\"action_template\":\"{{ 'heating' if value == 'on' else 'idle' }}\","
           << "\"availability_topic\":\"" HA_TOPIC_ROOT "/status\",\"icon\":\"mdi:heating-coil\"," << device << "}";
@@ -3088,6 +3098,7 @@ constexpr uint32_t HASH_RAUMSOLLTEMP_I = hash("RAUMSOLLTEMP_I");
 constexpr uint32_t HASH_ZEITDAUER_LETZTE_ABTAUUNG = hash("ZEITDAUER_LETZTE_ABTAUUNG");
 constexpr uint32_t HASH_FEHLERMELDUNG = hash("FEHLERMELDUNG");
 constexpr uint32_t HASH_EVU_SPERRE_AKTIV = hash("EVU_SPERRE_AKTIV");
+constexpr uint32_t HASH_FERNBEDIENUNGSZUORDNUNG = hash("FERNBEDIENUNGSZUORDNUNG");
 constexpr uint32_t HASH_SOMMERBETRIEB = hash("SOMMERBETRIEB");
 constexpr uint32_t HASH_SW_AUSSENTEMP = hash("SW_AUSSENTEMP");
 constexpr uint32_t HASH_GEBAEUDEART = hash("GEBAEUDEART");
@@ -3265,6 +3276,16 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
     // Publish state (on change / heartbeat)
     publishMqttState(cm, ei, publishValue);
     
+    // FE 7 assignment changed: the room temperature moves to the other circuit's climate
+    if (signalHash == HASH_FERNBEDIENUNGSZUORDNUNG && isWpmw2Model() && strcmp(cm.Name, "MANAGER") == 0) {
+        const long circuit = strtol(value.c_str(), nullptr, 10);
+        const uint8_t next = (circuit == 1 || circuit == 2) ? static_cast<uint8_t>(circuit) : 0;
+        if (next != remoteControlCircuit) {
+            remoteControlCircuit = next;
+            publishClimateDiscoveries();
+        }
+    }
+
     // Fast signal dispatch using compile-time hash (O(1) switch/jump table)
     
     switch (signalHash) {

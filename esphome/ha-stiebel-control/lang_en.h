@@ -332,10 +332,10 @@
 #define LNAME_HK2_RAUMSOLL_NACHT               "Room Setpoint HC2 Night"
 #undef  LNAME_HK2_HEIZKURVE
 #define LNAME_HK2_HEIZKURVE                    "Heating Curve HC2"
-#undef  LNAME_HK1_RAUMIST
-#define LNAME_HK1_RAUMIST                       "Room Temperature HC1"
-#undef  LNAME_HK2_RAUMIST
-#define LNAME_HK2_RAUMIST                       "Room Temperature HC2"
+#undef  LNAME_RAUMIST_FE
+#define LNAME_RAUMIST_FE                        "Room Temperature Remote Control"
+#undef  LNAME_FE_ZUORDNUNG
+#define LNAME_FE_ZUORDNUNG                      "Remote Control Heating Circuit"
 #undef  LNAME_WWPROG_MO
 #define LNAME_WWPROG_MO                        "DHW Program Monday"
 #undef  LNAME_WWPROG_DI

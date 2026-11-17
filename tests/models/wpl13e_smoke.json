@@ -10,12 +10,12 @@
     "{root}/KESSEL/SPEICHERSOLLTEMP/state",
     "{root}/KESSEL/WPVORLAUFIST/state",
     "{root}/MANAGER/EINSTELL_SPEICHERSOLLTEMP/state",
+    "{root}/MANAGER/FERNBEDIENUNGSZUORDNUNG/state",
     "{root}/MANAGER/RAUMSOLLTEMP_I/state",
     "{root}/MANAGER/RAUMSOLLTEMP_II/state",
     "{root}/MANAGER/RAUMSOLLTEMP_III/state",
     "{root}/MANAGER/RUECKLAUFISTTEMP/state",
     "{root}/MANAGER/SPEICHERSOLLTEMP/state",
-    "{root}/MISCHERMODUL_2/RAUMISTTEMP/state",
     "{root}/MISCHERMODUL_3/RAUMISTTEMP/state",
     "{root}/calculated/delta_t_continuous/state"
   ]
