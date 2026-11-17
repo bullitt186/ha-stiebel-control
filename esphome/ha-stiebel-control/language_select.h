@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include "model_profile.h"   // HA_CONTROLLER_WPM3 (operating mode names)
+
 #if defined(HA_LANGUAGE_EN)
   #include "lang_en.h"
 #else

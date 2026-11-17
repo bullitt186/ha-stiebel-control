@@ -230,6 +230,20 @@ TEST_CASE("ElsterTable: one shared copy, lookups point into it (#56)", "[kelster
     CHECK(std::string(ElsterTable[0].Name) == "INDEX_NOT_FOUND");
     CHECK(BetriebsartListCount == 6);
 }
+TEST_CASE("GetElsterIndex by index: same result as a linear search for every index", "[kelster]") {
+    // The sorted lookup must return the first table row with that index, and row 0 for
+    // indices that are not in the table (a raw bus scan asks for all of them).
+    for (unsigned idx = 0; idx <= 0xFFFF; idx++) {
+        const ElsterIndex* expected = &ElsterTable[0];
+        for (size_t i = 0; i < ElsterTableCount; i++)
+            if (ElsterTable[i].Index == idx) { expected = &ElsterTable[i]; break; }
+        if (GetElsterIndex(static_cast<unsigned short>(idx)) != expected) {
+            FAIL("index 0x" << std::hex << idx);
+        }
+    }
+    SUCCEED();
+}
+
 TEST_CASE("GetElsterIndex by index: unknown index returns INDEX_NOT_FOUND sentinel", "[kelster]") {
     const ElsterIndex* ei = GetElsterIndex((unsigned short)0xDEAD);
     CHECK(std::string(ei->Name) == "INDEX_NOT_FOUND");
@@ -270,7 +284,7 @@ TEST_CASE("TranslateString: et_little_bool off → 0", "[kelster]") {
     CHECK(TranslateString(s, et_little_bool) == 0);
 }
 TEST_CASE("TranslateString: et_betriebsart Automatik", "[kelster]") {
-    const char* s = "Automatik";
+    const char* s = LNAME_OPT_AUTOMATIK;   // "Programmierbetrieb" on the WPM3 (wpl10ac)
     int result = TranslateString(s, et_betriebsart);
     CHECK(result >= 0); // Valid betriebsart index
 }

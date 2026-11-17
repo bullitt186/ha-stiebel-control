@@ -1,27 +1,27 @@
 // Included by test_can_logic.cpp after the firmware and test helpers.
 TEST_CASE("model routes preserve defaults and WPL17 ownership", "[routes]") {
-    for (const char* model : {"wpl10ac", "wpl13e", "wpf10", "unknown"}) {
+    for (const ModelProfile* model : {&kProfileGeneric, &kProfileWpl13e, &kProfileWpl18e, &kProfileTtl33}) {
         for (uint16_t index : {0x0013, 0x0a06, 0x010e}) {
-            auto r = resolveSignalRoute(model, index, cm_manager);
+            auto r = resolveSignalRoute(*model, index, cm_manager);
             CHECK(r.writeMember == cm_manager);
             CHECK(r.readMember == cm_manager);
             CHECK(r.stateMember == cm_manager);
         }
     }
     for (uint16_t index : {0x0013, 0x0a06, 0x010e}) {
-        auto r = resolveSignalRoute("wpl17", index, cm_manager);
+        auto r = resolveSignalRoute(kProfileWpl17, index, cm_manager);
         CHECK(r.writeMember == cm_kessel_canb);
         CHECK(r.readMember == cm_kessel_canb);
         CHECK(r.stateMember == cm_kessel_canb);
     }
-    auto room = resolveSignalRoute("wpl9", 0x0005, cm_manager);
+    auto room = resolveSignalRoute(kProfileWpl9, 0x0005, cm_manager);
     CHECK(room.writeMember == cm_manager);
     CHECK(room.readMember == cm_manager);
 }
 
 TEST_CASE("WPL9 DHW writes and feedback use CAN-B", "[routes]") {
-    auto primary = resolveSignalRoute("wpl9", 0x0013, cm_manager);
-    auto secondary = resolveSignalRoute("wpl9", 0x0a06, cm_manager);
+    auto primary = resolveSignalRoute(kProfileWpl9, 0x0013, cm_manager);
+    auto secondary = resolveSignalRoute(kProfileWpl9, 0x0a06, cm_manager);
     CHECK(primary.writeMember == cm_kessel_canb);
     CHECK(primary.readMember == cm_kessel_canb);
     CHECK(primary.stateMember == cm_kessel_canb);

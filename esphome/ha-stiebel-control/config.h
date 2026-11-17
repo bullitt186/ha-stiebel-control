@@ -23,6 +23,17 @@
 #define HA_STRINGIFY(x) HA_STRINGIFY_(x)
 #define HA_DEVICE_MODEL_STR HA_STRINGIFY(HA_DEVICE_MODEL)
 
+// Device name (the `device_name` substitution, -DHA_DEVICE_NAME=<name>, unquoted like the
+// model). It is the ESPHome node name and the root of every MQTT topic and default entity ID.
+#ifndef HA_DEVICE_NAME
+#define HA_DEVICE_NAME heatingpump
+#endif
+#define HA_TOPIC_ROOT HA_STRINGIFY(HA_DEVICE_NAME)
+#ifdef __cplusplus
+// Topic buffers leave room for a root of up to 24 characters
+static_assert(sizeof(HA_TOPIC_ROOT) - 1 <= 24, "device_name: at most 24 characters");
+#endif
+
 // ============================================================================
 // REQUEST MANAGER SETTINGS
 // ============================================================================

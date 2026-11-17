@@ -16,6 +16,7 @@
 
 extern const SignalRequest signalRequests[] = {
     SIGNAL_REQUESTS_BASE   // date/time, EVU lock, operating mode, energy counters
+    {"WW_ECO",                     FREQ_1MIN,  cm_manager},  // DHW eco mode (was a YAML poller, #98)
 
     // ========================================================================
     // WPL13E-SPECIFIC: temperatures and heating circuits
@@ -80,18 +81,7 @@ extern const SignalRequest signalRequests[] = {
     // daily values ("WM TAG" in the WPMW II manual) refine COP and feed the
     // combined total/daily sensors.
     // ========================================================================
-    {"EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH", FREQ_10MIN, cm_heizmodul},
-    {"EL_AUFNAHMELEISTUNG_WW_SUM_KWH",   FREQ_10MIN, cm_heizmodul},
-    {"WAERMEERTRAG_HEIZ_SUM_KWH",        FREQ_10MIN, cm_heizmodul},
-    {"WAERMEERTRAG_WW_SUM_KWH",          FREQ_10MIN, cm_heizmodul},
-    {"EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", FREQ_10MIN, cm_heizmodul},
-    {"EL_AUFNAHMELEISTUNG_WW_TAG_KWH",   FREQ_10MIN, cm_heizmodul},
-    {"WAERMEERTRAG_HEIZ_TAG_KWH",        FREQ_10MIN, cm_heizmodul},
-    {"WAERMEERTRAG_WW_TAG_KWH",          FREQ_10MIN, cm_heizmodul},
-    {"EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH",  FREQ_10MIN, cm_heizmodul},
-    {"EL_AUFNAHMELEISTUNG_WW_TAG_WH",    FREQ_10MIN, cm_heizmodul},
-    {"WAERMEERTRAG_HEIZ_TAG_WH",         FREQ_10MIN, cm_heizmodul},
-    {"WAERMEERTRAG_WW_TAG_WH",           FREQ_10MIN, cm_heizmodul},
+    SIGNAL_REQUESTS_ENERGY_IWS   // daily and total energy counters (signal_requests_base.h)
 
     // ========================================================================
     // DIAGNOSTICS ("INFO IWS" in the WPMW II manual)
@@ -177,28 +167,39 @@ extern const SignalRequest signalRequests[] = {
     {"HEIZPROG_1_SO_SCHALT_2",      FREQ_10MIN, cm_manager},
     {"HEIZPROG_1_SO_SCHALT_3",      FREQ_10MIN, cm_manager},
 
-    // Heating program of heating circuit 2 (mixer circuit, manager), same layout
-    {"HEIZPROG_2_MO",               FREQ_10MIN, cm_manager},
-    {"HEIZPROG_2_MO_SCHALT_2",      FREQ_10MIN, cm_manager},
-    {"HEIZPROG_2_MO_SCHALT_3",      FREQ_10MIN, cm_manager},
-    {"HEIZPROG_2_DI",               FREQ_10MIN, cm_manager},
-    {"HEIZPROG_2_DI_SCHALT_2",      FREQ_10MIN, cm_manager},
-    {"HEIZPROG_2_DI_SCHALT_3",      FREQ_10MIN, cm_manager},
-    {"HEIZPROG_2_MI",               FREQ_10MIN, cm_manager},
-    {"HEIZPROG_2_MI_SCHALT_2",      FREQ_10MIN, cm_manager},
-    {"HEIZPROG_2_MI_SCHALT_3",      FREQ_10MIN, cm_manager},
-    {"HEIZPROG_2_DO",               FREQ_10MIN, cm_manager},
-    {"HEIZPROG_2_DO_SCHALT_2",      FREQ_10MIN, cm_manager},
-    {"HEIZPROG_2_DO_SCHALT_3",      FREQ_10MIN, cm_manager},
-    {"HEIZPROG_2_FR",               FREQ_10MIN, cm_manager},
-    {"HEIZPROG_2_FR_SCHALT_2",      FREQ_10MIN, cm_manager},
-    {"HEIZPROG_2_FR_SCHALT_3",      FREQ_10MIN, cm_manager},
-    {"HEIZPROG_2_SA",               FREQ_10MIN, cm_manager},
-    {"HEIZPROG_2_SA_SCHALT_2",      FREQ_10MIN, cm_manager},
-    {"HEIZPROG_2_SA_SCHALT_3",      FREQ_10MIN, cm_manager},
-    {"HEIZPROG_2_SO",               FREQ_10MIN, cm_manager},
-    {"HEIZPROG_2_SO_SCHALT_2",      FREQ_10MIN, cm_manager},
-    {"HEIZPROG_2_SO_SCHALT_3",      FREQ_10MIN, cm_manager},
+    // Heating circuit 2 (mixer circuit): settings and program on the manager's virtual
+    // member MISCHERMODUL_3 (0x602), display "Raumtemp. 2" / "Heizkurve 2"
+    // Remote control FE 7: room actual temperature (the manager itself does not answer it, its
+    // virtual members mirror the one FE sensor) and the circuit it is assigned to (parameter 22)
+    {"RAUMISTTEMP",                 FREQ_1MIN,  cm_mischermodul_3},
+    // Effective room setpoint of the FE circuit: day/night setpoint plus the FE knob (+-5 K);
+    // the FE mode switch shows here too (moon = night setpoint without correction)
+    {"VERSTELLTE_RAUMSOLLTEMP",     FREQ_1MIN,  cm_mischermodul_3},
+    {"FERNBEDIENUNGSZUORDNUNG",     FREQ_10MIN, cm_manager},
+    {"RAUMSOLLTEMP_I",              FREQ_10MIN, cm_mischermodul_3},
+    {"RAUMSOLLTEMP_NACHT",          FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZKURVE",                   FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_MO",               FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_MO_SCHALT_2",      FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_MO_SCHALT_3",      FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_DI",               FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_DI_SCHALT_2",      FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_DI_SCHALT_3",      FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_MI",               FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_MI_SCHALT_2",      FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_MI_SCHALT_3",      FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_DO",               FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_DO_SCHALT_2",      FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_DO_SCHALT_3",      FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_FR",               FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_FR_SCHALT_2",      FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_FR_SCHALT_3",      FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_SA",               FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_SA_SCHALT_2",      FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_SA_SCHALT_3",      FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_SO",               FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_SO_SCHALT_2",      FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_SO_SCHALT_3",      FREQ_10MIN, cm_mischermodul_3},
 };
 
 extern const size_t SIGNAL_REQUEST_COUNT_VALUE = sizeof(signalRequests) / sizeof(SignalRequest);
