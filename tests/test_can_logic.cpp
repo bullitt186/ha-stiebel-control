@@ -2630,46 +2630,91 @@ TEST_CASE("topic root: every topic and discovery payload follows device_name (#1
 }
 
 // ============================================================================
-// WPMW II: room actual temperature and climate of heating circuit 2
+// WPMW II: remote control FE 7 and the climate of heating circuit 2
 // ============================================================================
-// Bus scan on a WPL13E (17.11.2026): RAUMISTTEMP (index 0x0011) answers on the virtual members
-// 0x601 (HC1, 21.7 = display "Raum ist") and 0x602 (HC2), not on the manager.
+// WPL13E, 17.11.2026: RAUMISTTEMP (index 0x0011) answers on the virtual members, not on the
+// manager. Heating the FE 7 with a hair dryer moved 0x601, 0x602, 0x301 and 0x302 together
+// (21.8 -> 33.8 C): one room sensor. The display shows RAUMISTTEMP only under "Raumtemp 2", and
+// the manager reads FERNBEDIENUNGSZUORDNUNG (0x0183) = 2: the FE belongs to HK2. Manual WPMW II,
+// parameter 22 "AUSWAHL FE": HEIZKREIS 1 / HEIZKREIS 2.
 
-TEST_CASE("WPMW II: room actual temperature per heating circuit", "[mqtt][wpmw2]") {
+static std::string climatePayload(const char* id) {
+    return mqttFindPayload(std::string("climate/heatingpump/") + id + "/config");
+}
+
+static void setRemoteControlCircuit(const char* value) {
+    updateSensor(CanMembers[cm_manager], GetElsterIndex("FERNBEDIENUNGSZUORDNUNG"), value);
+}
+
+TEST_CASE("WPMW II: one room sensor of the remote control, named after it", "[mqtt][wpmw2]") {
     const ElsterIndex* ei = GetElsterIndex("RAUMISTTEMP");
     REQUIRE(ei != nullptr);
     CHECK(ei->Index == 0x0011);
+    const ElsterIndex* fe = GetElsterIndex("FERNBEDIENUNGSZUORDNUNG");
+    REQUIRE(fe != nullptr);
+    CHECK(fe->Index == 0x0183);
     resetDiscoveryState();
-    publishMqttDiscovery(CanMembers[cm_mischermodul_2], ei);
     publishMqttDiscovery(CanMembers[cm_mischermodul_3], ei);
-    const std::string hk1 = mqttFindPayload("stiebel_mischermodul_2_raumisttemp/config");
-    const std::string hk2 = mqttFindPayload("stiebel_mischermodul_3_raumisttemp/config");
-    REQUIRE_FALSE(hk1.empty());
-    REQUIRE_FALSE(hk2.empty());
-    CHECK(hk2.find("\"device_class\":\"temperature\"") != std::string::npos);
-    CHECK(hk2.find("\"unit_of_measurement\":\"°C\"") != std::string::npos);
-    const bool hk1Named = hk1.find(std::string("\"name\":\"") + LNAME_HK1_RAUMIST + "\"") != std::string::npos;
-    const bool hk2Named = hk2.find(std::string("\"name\":\"") + LNAME_HK2_RAUMIST + "\"") != std::string::npos;
-    CHECK(hk1Named == kModel.wpmw2);
-    CHECK(hk2Named == kModel.wpmw2);
+    const std::string room = mqttFindPayload("stiebel_mischermodul_3_raumisttemp/config");
+    REQUIRE_FALSE(room.empty());
+    CHECK(room.find("\"device_class\":\"temperature\"") != std::string::npos);
+    CHECK(room.find("\"unit_of_measurement\":\"°C\"") != std::string::npos);
+    const bool named = room.find(std::string("\"name\":\"") + LNAME_RAUMIST_FE + "\"") != std::string::npos;
+    CHECK(named == kModel.wpmw2);
+}
+
+TEST_CASE("WPMW II: room temperature goes to the climate of the FE circuit only", "[mqtt][wpmw2]") {
+    const std::string topic = "\"current_temperature_topic\":\"heatingpump/MISCHERMODUL_3/RAUMISTTEMP/state\"";
+    auto has = [&](const char* id) { return climatePayload(id).find(topic) != std::string::npos; };
+    resetDiscoveryState();
+    remoteControlCircuit = 0;
+    publishClimateDiscoveries();
+    CHECK_FALSE(has("stiebel_climate_heizung"));            // not read yet: no room value anywhere
+    CHECK_FALSE(has("stiebel_climate_heizung_hk2"));
+
+    // FE on HK2 (WPL13E above): the climates are announced again with the value on HK2
+    mqtt_client_instance().clear();
+    setRemoteControlCircuit("2");
+    CHECK(remoteControlCircuit == (kModel.wpmw2 ? 2 : 0));
+    if (kModel.wpmw2) {
+        CHECK_FALSE(has("stiebel_climate_heizung"));
+        CHECK(has("stiebel_climate_heizung_hk2") == kModel.wpmw2WritesVerified);
+    }
+
+    // FE on HK1: the value moves to the heating climate
+    mqtt_client_instance().clear();
+    setRemoteControlCircuit("1");
+    if (kModel.wpmw2) {
+        CHECK(has("stiebel_climate_heizung"));
+        CHECK_FALSE(has("stiebel_climate_heizung_hk2"));
+    }
+
+    // unchanged value: no new announcement; other values: no assignment
+    mqtt_client_instance().clear();
+    setRemoteControlCircuit("1");
+    CHECK(climatePayload("stiebel_climate_heizung").empty());
+    setRemoteControlCircuit("0");
+    CHECK(remoteControlCircuit == 0);
+    if (kModel.wpmw2) CHECK_FALSE(has("stiebel_climate_heizung"));
+
+    // the assignment is the manager's: the same signal on another member changes nothing
+    setRemoteControlCircuit("2");
+    updateSensor(CanMembers[cm_mischermodul_3], GetElsterIndex("FERNBEDIENUNGSZUORDNUNG"), "1");
+    CHECK(remoteControlCircuit == (kModel.wpmw2 ? 2 : 0));
+    remoteControlCircuit = 0;
 }
 
 TEST_CASE("WPMW II: heating circuit 2 gets its own climate entity", "[mqtt][wpmw2]") {
     resetDiscoveryState();
+    remoteControlCircuit = 2;
     publishClimateDiscoveries();
-    const std::string heat = mqttFindPayload("climate/heatingpump/stiebel_climate_heizung/config");
-    const std::string hk2 = mqttFindPayload("climate/heatingpump/stiebel_climate_heizung_hk2/config");
-    REQUIRE_FALSE(heat.empty());
-    // HC1: room actual from 0x601 on WPMW II only
-    const bool hk1Current =
-        heat.find("\"current_temperature_topic\":\"heatingpump/MISCHERMODUL_2/RAUMISTTEMP/state\"") != std::string::npos;
-    CHECK(hk1Current == kModel.wpmw2);
+    const std::string hk2 = climatePayload("stiebel_climate_heizung_hk2");
+    REQUIRE_FALSE(climatePayload("stiebel_climate_heizung").empty());
     // HC2: only where the 0x602 writes are verified (WPL13E, TTL 33)
     CHECK((hk2.empty() == !kModel.wpmw2WritesVerified));
     if (kModel.wpmw2WritesVerified) {
         CHECK(hk2.find("\"temperature_command_topic\":\"heatingpump/MISCHERMODUL_3/RAUMSOLLTEMP_I/set\"") != std::string::npos);
         CHECK(hk2.find("\"temperature_state_topic\":\"heatingpump/MISCHERMODUL_3/RAUMSOLLTEMP_I/state\"") != std::string::npos);
-        CHECK(hk2.find("\"current_temperature_topic\":\"heatingpump/MISCHERMODUL_3/RAUMISTTEMP/state\"") != std::string::npos);
         CHECK(hk2.find("\"min_temp\":10,\"max_temp\":30,\"temp_step\":0.5") != std::string::npos);
         CHECK(hk2.find("preset_mode") == std::string::npos);   // operating mode stays on HC1
         CHECK(hk2.find("\"default_entity_id\":\"climate.heatingpump_climate_heizung_hk2\"") != std::string::npos);
@@ -2678,6 +2723,7 @@ TEST_CASE("WPMW II: heating circuit 2 gets its own climate entity", "[mqtt][wpmw
         CHECK(handleSetCommand("heatingpump/MISCHERMODUL_3/RAUMSOLLTEMP_I/set", "20.5"));
         CHECK_FALSE(fake_can().sent.empty());
     }
+    remoteControlCircuit = 0;
 }
 
 TEST_CASE("climate: mode follows the ESP availability instead of staying off", "[mqtt]") {

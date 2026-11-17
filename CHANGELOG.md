@@ -24,10 +24,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Added
 
-- WPMW II (WPL13E, WPL18E, TTL 33): room actual temperature per heating circuit as sensors
-  "Raum-Ist HK1" / "Raum-Ist HK2". The manager does not answer `RAUMISTTEMP`, its virtual members
-  0x601 (HC1) and 0x602 (HC2) do (found by a bus scan; 0x601 matched the display "Raum ist"). The
-  heating climate shows the HC1 value as current temperature.
+- WPMW II (WPL13E, WPL18E, TTL 33): room actual temperature of the remote control FE 7 as sensor
+  "Raum-Ist Fernbedienung", and the circuit it is assigned to (parameter 22 "AUSWAHL FE",
+  `FERNBEDIENUNGSZUORDNUNG`). The manager does not answer `RAUMISTTEMP`; its virtual members mirror
+  the one FE sensor (a WPL13E's 0x601, 0x602, 0x301 and 0x302 all followed a heated FE). The room
+  temperature is the current temperature of the climate of the assigned circuit only.
 - WPL13E/TTL 33: climate entity "Heizung HK2" for heating circuit 2 (day room setpoint on 0x602,
   current temperature from 0x602), so both circuits can use a thermostat card. The operating mode
   stays on the heating climate.
