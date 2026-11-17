@@ -65,19 +65,18 @@ struct ModelProfile {
     bool perMemberEnergy;         // energy totals from the HEIZMODUL_WPL counters (WPL17)
     bool ignoreUnusedIwsRuntime;  // drop VERD_1/KUEHL runtime answers the manager polls itself
                                   // (WPL13E: one compressor, no cooling)
-    bool wwEcoReadable;           // MANAGER WW_ECO answers (not on WPL9)
 
     constexpr bool heatingCurveWritable() const { return canBRoutes || wpmw2WritesVerified; }
 };
 
-//                                       wpmw2  verified single canB   canBDhw perMember ignoreIws wwEco
-inline constexpr ModelProfile kProfileGeneric{false, false,   false, false, false,  false,    false,    true};
-inline constexpr ModelProfile kProfileWpl9   {false, false,   false, false, true,   false,    false,    false};
-inline constexpr ModelProfile kProfileWpl13e {true,  true,    false, false, false,  false,    true,     true};
-inline constexpr ModelProfile kProfileWpl17  {false, false,   true,  true,  false,  true,     false,    true};
+//                                       wpmw2  verified single canB   canBDhw perMember ignoreIws
+inline constexpr ModelProfile kProfileGeneric{false, false,   false, false, false,  false,    false};
+inline constexpr ModelProfile kProfileWpl9   {false, false,   false, false, true,   false,    false};
+inline constexpr ModelProfile kProfileWpl13e {true,  true,    false, false, false,  false,    true};
+inline constexpr ModelProfile kProfileWpl17  {false, false,   true,  true,  false,  true,     false};
 // WPL18E polls the wpl13e table; WPMW II writes are not checked on its display yet
-inline constexpr ModelProfile kProfileWpl18e {true,  false,   false, false, false,  false,    false,    true};
-inline constexpr ModelProfile kProfileTtl33  {true,  true,    false, false, false,  false,    false,    true};
+inline constexpr ModelProfile kProfileWpl18e {true,  false,   false, false, false,  false,    false};
+inline constexpr ModelProfile kProfileTtl33  {true,  true,    false, false, false,  false,    false};
 
 #if HA_MODEL_ID == HA_MODEL_ID_wpl9
 inline constexpr const ModelProfile& kModel = kProfileWpl9;

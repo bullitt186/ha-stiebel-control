@@ -65,7 +65,6 @@ esphome:
     - "-DHA_DISABLE_SG_READY_${disable_sg_ready}"
     - "-DHA_READ_ONLY_${read_only}"
 
-
 #########################################
 #                                       #
 #   LOGGER                              #
@@ -79,7 +78,6 @@ logger:
 # (brownout vs. watchdog vs. software reset). Read by text_sensor platform: debug.
 debug:
   update_interval: 60s
-
 
 #########################################
 #                                       #
@@ -565,7 +563,6 @@ mqtt:
               ESP_LOGW("MQTT_CMD", "Invalid room boost value: %s", x.c_str());
             }
 
-
 #########################################
 #                                       #
 #   INTERVAL TIMER                      #
@@ -662,18 +659,6 @@ text_sensor:
     update_interval: 60s
     lambda: |-
       return std::string(sgReadyStateLabel(sgReadyController.currentState()));
-
-  - platform: template
-    name: "DATUM"
-    id: DATUM
-    internal: true
-    icon: "mdi:calendar"
-
-  - platform: template
-    name: "ZEIT"
-    id: ZEIT
-    internal: true
-    icon: "mdi:clock"
 
 #########################################
 #                                       #
@@ -800,138 +785,3 @@ sensor:
     entity_category: diagnostic
     icon: "mdi:timer-outline"
 
-  # -----------------------------------------------------------------------
-  # COP energy accumulator sensors (universal - present on all Elster models)
-  # -----------------------------------------------------------------------
-  - platform: template
-    name: "EL_AUFNAHMELEISTUNG_HEIZ_SUM"
-    id: EL_AUFNAHMELEISTUNG_HEIZ_SUM
-    internal: true
-    unit_of_measurement: MWh
-    device_class: energy
-    accuracy_decimals: 3
-    state_class: "total_increasing"
-
-  - platform: template
-    name: "EL_AUFNAHMELEISTUNG_WW_SUM"
-    id: EL_AUFNAHMELEISTUNG_WW_SUM
-    internal: true
-    unit_of_measurement: MWh
-    device_class: energy
-    accuracy_decimals: 3
-    state_class: "total_increasing"
-
-  - platform: template
-    name: "WAERMEERTRAG_2WE_HEIZ_SUM"
-    id: WAERMEERTRAG_2WE_HEIZ_SUM
-    internal: true
-    unit_of_measurement: MWh
-    device_class: energy
-    accuracy_decimals: 3
-    state_class: "total_increasing"
-
-  - platform: template
-    name: "WAERMEERTRAG_2WE_WW_SUM"
-    id: WAERMEERTRAG_2WE_WW_SUM
-    internal: true
-    unit_of_measurement: MWh
-    device_class: energy
-    accuracy_decimals: 3
-    state_class: "total_increasing"
-
-  - platform: template
-    name: "WAERMEERTRAG_HEIZ_SUM"
-    id: WAERMEERTRAG_HEIZ_SUM
-    internal: true
-    unit_of_measurement: MWh
-    device_class: energy
-    accuracy_decimals: 3
-    state_class: "total_increasing"
-
-  - platform: template
-    name: "WAERMEERTRAG_WW_SUM"
-    id: WAERMEERTRAG_WW_SUM
-    internal: true
-    unit_of_measurement: MWh
-    device_class: energy
-    accuracy_decimals: 3
-    state_class: "total_increasing"
-
-  # DHW and heating temperature sensors
-  - platform: template
-    name: "EINSTELL_SPEICHERSOLLTEMP"
-    id: EINSTELL_SPEICHERSOLLTEMP
-    internal: true
-    unit_of_measurement: "°C"
-    accuracy_decimals: 1
-
-  - platform: template
-    name: "EINSTELL_SPEICHERSOLLTEMP2"
-    id: EINSTELL_SPEICHERSOLLTEMP2
-    internal: true
-    unit_of_measurement: "°C"
-    accuracy_decimals: 1
-
-  - platform: template
-    name: "SPEICHERISTTEMP"
-    id: SPEICHERISTTEMP
-    internal: true
-    unit_of_measurement: "°C"
-    accuracy_decimals: 1
-    filters:
-      - offset: 3.9
-
-  - platform: template
-    name: "SPEICHERSOLLTEMP"
-    id: SPEICHERSOLLTEMP
-    internal: true
-    unit_of_measurement: "°C"
-    accuracy_decimals: 1
-
-  # COP output sensors
-  - platform: template
-    name: "COP_WW"
-    id: COP_WW
-    internal: true
-    device_class: "power_factor"
-    accuracy_decimals: 2
-
-  - platform: template
-    name: "COP_HEIZ"
-    id: COP_HEIZ
-    internal: true
-    device_class: "power_factor"
-    accuracy_decimals: 2
-
-  - platform: template
-    name: "COP_GESAMT"
-    id: COP_GESAMT
-    internal: true
-    device_class: "power_factor"
-    accuracy_decimals: 2
-
-  # Operating mode and season sensors - used to trigger CAN reads
-  - platform: template
-    name: "PROGRAMMSCHALTER"
-    id: PROGRAMMSCHALTER
-    internal: true
-    lambda: |-
-      readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
-      return {};
-
-  - platform: template
-    name: "SOMMERBETRIEB"
-    id: SOMMERBETRIEB
-    internal: true
-    lambda: |-
-      readSignal(&CanMembers[cm_manager], "SOMMERBETRIEB");
-      return {};
-
-  - platform: template
-    name: "WW_ECO"
-    id: WW_ECO
-    internal: true
-    lambda: |-
-      // Not on WPL9: MANAGER/WW_ECO repeatedly returned -255 there.
-      if (kModel.wwEcoReadable) readSignal(&CanMembers[cm_manager], "WW_ECO");
-      return {};

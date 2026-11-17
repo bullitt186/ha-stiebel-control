@@ -2226,7 +2226,6 @@ TEST_CASE("model profile: one place decides the model's capabilities (#94)", "[m
     CHECK(kModel.singleHeatingCircuit == (m == "wpl17"));
     CHECK(kModel.perMemberEnergy == (m == "wpl17"));
     CHECK(kModel.ignoreUnusedIwsRuntime == (m == "wpl13e"));
-    CHECK(kModel.wwEcoReadable == (m != "wpl9"));
 #ifdef HA_CONTROLLER_WPM3
     CHECK(m == "wpl10ac");
     CHECK(std::string(SG_READY_NORMAL_MODE) == "Komfortbetrieb");
