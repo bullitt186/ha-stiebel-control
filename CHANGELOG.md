@@ -42,6 +42,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Changed
 
+- `dashboards/heatingpump_standard.yaml` follows one design language: every color has one meaning on
+  every view (heating orange, hot water blue, electricity grey, flow red, return indigo, setpoints light
+  grey, outdoor blue-grey, room pink/purple, compressor deep purple, COP green), the same names for the
+  same values, tiles with trend lines instead of entity lists, and graphs for pressures and
+  temperatures. New view "Heizkreise": both heating circuits side by side (thermostat, night setpoint,
+  heating curve card, week program card) and the hot water program; it needs
+  `dashboards/www/stiebel-cards.js`, the other views use built-in cards only.
 - The `device_name` and `friendly_name` substitutions take effect (#102). `device_name` is the
   ESPHome node name and the root of every MQTT topic, discovery node ID and default entity ID
   (`<device_name>/MANAGER/…`, `sensor.<device_name>_…`); the firmware has no hard-coded
