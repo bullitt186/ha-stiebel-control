@@ -1,20 +1,22 @@
 {
   "description": "Required topics for WPL13E (air-source heat pump, 3 heating circuits). Based on 5-minute baseline captured 2026-06-13.",
   "required_topics": [
+    "{root}/HEIZMODUL/AUSSENTEMP/state",
+    "{root}/HEIZMODUL/WPVORLAUFIST/state",
     "{root}/KESSEL/AUSSENTEMP/state",
     "{root}/KESSEL/EINSTELL_SPEICHERSOLLTEMP/state",
     "{root}/KESSEL/RUECKLAUFISTTEMP/state",
     "{root}/KESSEL/SPEICHERISTTEMP/state",
     "{root}/KESSEL/SPEICHERSOLLTEMP/state",
     "{root}/KESSEL/WPVORLAUFIST/state",
-    "{root}/HEIZMODUL/AUSSENTEMP/state",
-    "{root}/HEIZMODUL/WPVORLAUFIST/state",
     "{root}/MANAGER/EINSTELL_SPEICHERSOLLTEMP/state",
-    "{root}/MANAGER/RUECKLAUFISTTEMP/state",
     "{root}/MANAGER/RAUMSOLLTEMP_I/state",
     "{root}/MANAGER/RAUMSOLLTEMP_II/state",
     "{root}/MANAGER/RAUMSOLLTEMP_III/state",
+    "{root}/MANAGER/RUECKLAUFISTTEMP/state",
     "{root}/MANAGER/SPEICHERSOLLTEMP/state",
+    "{root}/MISCHERMODUL_2/RAUMISTTEMP/state",
+    "{root}/MISCHERMODUL_3/RAUMISTTEMP/state",
     "{root}/calculated/delta_t_continuous/state"
   ]
 }

@@ -2628,3 +2628,54 @@ TEST_CASE("topic root: every topic and discovery payload follows device_name (#1
     CHECK_FALSE(fake_can().sent.empty());
     if (root != "heatingpump") CHECK_FALSE(handleSetCommand("heatingpump/MANAGER/RAUMSOLLTEMP_I/set", "21.5"));
 }
+
+// ============================================================================
+// WPMW II: room actual temperature and climate of heating circuit 2
+// ============================================================================
+// Bus scan on a WPL13E (17.11.2026): RAUMISTTEMP (index 0x0011) answers on the virtual members
+// 0x601 (HC1, 21.7 = display "Raum ist") and 0x602 (HC2), not on the manager.
+
+TEST_CASE("WPMW II: room actual temperature per heating circuit", "[mqtt][wpmw2]") {
+    const ElsterIndex* ei = GetElsterIndex("RAUMISTTEMP");
+    REQUIRE(ei != nullptr);
+    CHECK(ei->Index == 0x0011);
+    resetDiscoveryState();
+    publishMqttDiscovery(CanMembers[cm_mischermodul_2], ei);
+    publishMqttDiscovery(CanMembers[cm_mischermodul_3], ei);
+    const std::string hk1 = mqttFindPayload("stiebel_mischermodul_2_raumisttemp/config");
+    const std::string hk2 = mqttFindPayload("stiebel_mischermodul_3_raumisttemp/config");
+    REQUIRE_FALSE(hk1.empty());
+    REQUIRE_FALSE(hk2.empty());
+    CHECK(hk2.find("\"device_class\":\"temperature\"") != std::string::npos);
+    CHECK(hk2.find("\"unit_of_measurement\":\"°C\"") != std::string::npos);
+    const bool hk1Named = hk1.find(std::string("\"name\":\"") + LNAME_HK1_RAUMIST + "\"") != std::string::npos;
+    const bool hk2Named = hk2.find(std::string("\"name\":\"") + LNAME_HK2_RAUMIST + "\"") != std::string::npos;
+    CHECK(hk1Named == kModel.wpmw2);
+    CHECK(hk2Named == kModel.wpmw2);
+}
+
+TEST_CASE("WPMW II: heating circuit 2 gets its own climate entity", "[mqtt][wpmw2]") {
+    resetDiscoveryState();
+    publishClimateDiscoveries();
+    const std::string heat = mqttFindPayload("climate/heatingpump/stiebel_climate_heizung/config");
+    const std::string hk2 = mqttFindPayload("climate/heatingpump/stiebel_climate_heizung_hk2/config");
+    REQUIRE_FALSE(heat.empty());
+    // HC1: room actual from 0x601 on WPMW II only
+    const bool hk1Current =
+        heat.find("\"current_temperature_topic\":\"heatingpump/MISCHERMODUL_2/RAUMISTTEMP/state\"") != std::string::npos;
+    CHECK(hk1Current == kModel.wpmw2);
+    // HC2: only where the 0x602 writes are verified (WPL13E, TTL 33)
+    CHECK((hk2.empty() == !kModel.wpmw2WritesVerified));
+    if (kModel.wpmw2WritesVerified) {
+        CHECK(hk2.find("\"temperature_command_topic\":\"heatingpump/MISCHERMODUL_3/RAUMSOLLTEMP_I/set\"") != std::string::npos);
+        CHECK(hk2.find("\"temperature_state_topic\":\"heatingpump/MISCHERMODUL_3/RAUMSOLLTEMP_I/state\"") != std::string::npos);
+        CHECK(hk2.find("\"current_temperature_topic\":\"heatingpump/MISCHERMODUL_3/RAUMISTTEMP/state\"") != std::string::npos);
+        CHECK(hk2.find("\"min_temp\":10,\"max_temp\":30,\"temp_step\":0.5") != std::string::npos);
+        CHECK(hk2.find("preset_mode") == std::string::npos);   // operating mode stays on HC1
+        CHECK(hk2.find("\"default_entity_id\":\"climate.heatingpump_climate_heizung_hk2\"") != std::string::npos);
+        // the command reaches the 0x602 row through the set dispatcher
+        fake_can().sent.clear();
+        CHECK(handleSetCommand("heatingpump/MISCHERMODUL_3/RAUMSOLLTEMP_I/set", "20.5"));
+        CHECK_FALSE(fake_can().sent.empty());
+    }
+}

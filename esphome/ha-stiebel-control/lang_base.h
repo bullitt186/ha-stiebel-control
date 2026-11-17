@@ -61,6 +61,7 @@
 #define LNAME_HEIZKURVE                        "Heizkurve"
 #define LNAME_NUM_HEIZKURVE                    "Heizkurve Steigung Einstellung"
 #define LNAME_CLIMATE_HEIZUNG                  "Heizung"
+#define LNAME_CLIMATE_HEIZUNG_HK2              "Heizung HK2"
 #define LNAME_CLIMATE_WARMWASSER               "Warmwasser"
 #define LNAME_PROGRAMMSCHALTER                 "Programmschalter"
 #define LNAME_TAG                              "Tag"
@@ -186,6 +187,8 @@
 #define LNAME_HK2_RAUMSOLL_TAG                 "Raumsoll HK2 Tag"
 #define LNAME_HK2_RAUMSOLL_NACHT               "Raumsoll HK2 Nacht"
 #define LNAME_HK2_HEIZKURVE                    "Heizkurve HK2"
+#define LNAME_HK1_RAUMIST                       "Raum-Ist HK1"
+#define LNAME_HK2_RAUMIST                       "Raum-Ist HK2"
 
 // DHW time program, one text per day (#82)
 #define LNAME_WWPROG_MO                        "Warmwasser-Programm Montag"
