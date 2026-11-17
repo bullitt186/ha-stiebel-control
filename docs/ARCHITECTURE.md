@@ -29,6 +29,7 @@ ha-stiebel-control/
 │       ├── signal_requests_base.h          # Universal signals macro (all models) + shared row macros
 │       ├── signal_requests_<model>.h       # Request table of one model (e.g. signal_requests_wpl13e.h)
 │       ├── model_profile.h                 # Model capabilities (kModel), the only place that looks at the model
+│       ├── can_members.h                   # Bus members (CanMembers[], CanMemberType) and SignalRequest, no ESPHome deps
 │       ├── ha-stiebel-control.h            # Core C++: CAN, MQTT discovery, calculated sensors
 │       ├── sg_ready_controller.h           # SG Ready state machine (pure C++, testable)
 │       ├── dhw_program.h                   # WPMW II time programs: parsing/validation (pure C++, testable)

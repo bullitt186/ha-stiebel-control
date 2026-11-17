@@ -22,6 +22,7 @@ built-in TWAI controller (recommended) and a classic ESP32 (`esp32dev`) with an 
     such as `SIGNAL_REQUESTS_ENERGY_IWS`
   - `signal_requests_<model>.h` — what the model polls: `{"SIGNAL", FREQ_xx, cm_member}` rows
   - `model_profile.h` — model capabilities (`kModel`), see below
+  - `can_members.h` — bus members (`CanMembers[]`, `CanMemberType`) and `SignalRequest`
   - `ha-stiebel-control.h` — core: CAN decode, MQTT discovery/state, calculated sensors, writable
     numbers/selects, time programs, paced writes, bus scan, fault list
   - `sg_ready_controller.h` — SG Ready state machine (pure C++, IO injected via `ISgReadyIO`)
@@ -40,8 +41,10 @@ built-in TWAI controller (recommended) and a classic ESP32 (`esp32dev`) with an 
    by `updateSensor()`: MQTT discovery on first value, then publish on change
    (`heatingpump/<MEMBER>/<SIGNAL>/state`). Names, units and device classes come from
    `ElsterMetaTable` (`LNAME_*`), otherwise from type defaults.
-3. Calculated values live in `calculatedSensors[]` in `ha-stiebel-control.h` (append only, indices
-   via `CALC_IDX_*`) and publish to `heatingpump/calculated/<name>/state`.
+3. Calculated values live in `calculatedSensors[]` in `ha-stiebel-control.h`; address rows by the
+   `CalcIdx` enum (`CALC_IDX_*`, same order as the table, checked by a static_assert), never by
+   number. `onDemand` rows are announced with their first value. Discovery payloads use
+   `HA_MAIN_DEVICE_JSON` / `memberDeviceJson()` for the device block.
 4. Writable settings are `writableNumbers[]` / `writableSelects[]`. Every `<root>/<A>/<B>/set`
    command goes through `handleSetCommand()`, which finds the row by signal name and member and
    checks `writableNumberApplies()` and min/max; adding a writable entity only touches its row.

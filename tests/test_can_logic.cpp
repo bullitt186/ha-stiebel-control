@@ -2211,6 +2211,33 @@ TEST_CASE("SG Ready boost baseline is the setpoint read from the manager (#85)",
     resetDiscoveryState();
 }
 
+TEST_CASE("discovery: one device block, COP from calculatedSensors, named rows (#95)", "[mqtt][discovery]") {
+    // rows by name
+    CHECK(std::string(calculatedSensors[CALC_IDX_DATE].uniqueId) == "stiebel_calculated_date");
+    CHECK(std::string(calculatedSensors[CALC_IDX_ENERGIE_HEIZ_TOTAL_KWH].uniqueId) == "stiebel_calculated_energie_heiz_total_kwh");
+    CHECK(std::string(calculatedSensors[CALC_IDX_ABTAUUNG_LAEUFT].uniqueId) == "stiebel_calculated_abtauung_laeuft");
+    CHECK(std::string(calculatedSensors[CALC_IDX_COP_GESAMT].uniqueId) == "stiebel_cop_gesamt");
+    CHECK_FALSE(calculatedSensors[CALC_IDX_COMPRESSOR_ACTIVE].onDemand);
+    CHECK(calculatedSensors[CALC_IDX_ENERGIE_HEIZ_TOTAL_KWH].onDemand);
+    // COP keeps its discovery topic and unique_id
+    resetDiscoveryState();
+    copDiscoveryPublished = false;
+    publishCOPDiscovery();
+    const std::string cop = mqttFindPayload("homeassistant/sensor/heatingpump/cop_ww/config");
+    CHECK(cop.find("\"unique_id\":\"stiebel_cop_ww\"") != std::string::npos);
+    CHECK(cop.find("\"state_topic\":\"heatingpump/calculated/cop_ww/state\"") != std::string::npos);
+    CHECK(cop.find(HA_MAIN_DEVICE_JSON) != std::string::npos);
+    // member device block
+    const std::string dev = memberDeviceJson("KESSEL");
+    CHECK(dev == "\"device\":{\"identifiers\":[\"stiebel_KESSEL\"],\"name\":\"Kessel\","
+                 "\"via_device\":\"" HA_MAIN_DEVICE_ID "\",\"manufacturer\":\"Stiebel Eltron\"}");
+    resetDiscoveryState();
+    publishMqttDiscovery(CanMembers[cm_kessel], GetElsterIndex("SPEICHERISTTEMP"));
+    CHECK(mqttFindPayload("homeassistant/").find(dev) != std::string::npos);
+    copDiscoveryPublished = false;
+    resetDiscoveryState();
+}
+
 TEST_CASE("handleSetCommand: one dispatcher for numbers, selects and programs (#92)", "[mqtt][set]") {
     resetDiscoveryState();
     fake_can().sent.clear();

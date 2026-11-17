@@ -32,6 +32,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Changed
 
+- Discovery: the device block is defined once (`HA_MAIN_DEVICE_JSON`, `memberDeviceJson()`), the
+  COP sensors are rows of `calculatedSensors[]` (same topics and unique IDs as before), rows are
+  addressed by the `CalcIdx` enum and flagged `onDemand` instead of a hard-coded index threshold.
+  `can_members.h` holds the bus members and `SignalRequest`, so the test stub uses the real type (#95).
 - MQTT set commands: one subscription on `heatingpump/+/+/set` and one C++ dispatcher
   (`handleSetCommand()`) replace about 25 YAML handlers that addressed table rows by position. Rows
   are found by signal name and member, values are checked against the row's min/max (#92).

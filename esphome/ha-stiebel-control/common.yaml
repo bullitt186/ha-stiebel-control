@@ -57,6 +57,7 @@ esphome:
     - elster/NTypes.h
     - config.h
     - model_profile.h
+    - can_members.h
     # language_select.h picks the language (lang_base.h for DE, lang_en.h for EN).
     # lang_en.h must be listed so ESPHome copies it; its overrides only apply with HA_LANGUAGE_EN.
     - language_select.h
