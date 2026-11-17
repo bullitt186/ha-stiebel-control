@@ -17,6 +17,7 @@
     "{root}/MANAGER/RUECKLAUFISTTEMP/state",
     "{root}/MANAGER/SPEICHERSOLLTEMP/state",
     "{root}/MISCHERMODUL_3/RAUMISTTEMP/state",
+    "{root}/MISCHERMODUL_3/VERSTELLTE_RAUMSOLLTEMP/state",
     "{root}/calculated/delta_t_continuous/state"
   ]
 }

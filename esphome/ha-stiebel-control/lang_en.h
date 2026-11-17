@@ -334,6 +334,8 @@
 #define LNAME_HK2_HEIZKURVE                    "Heating Curve HC2"
 #undef  LNAME_RAUMIST_FE
 #define LNAME_RAUMIST_FE                        "Room Temperature Remote Control"
+#undef  LNAME_RAUMSOLL_WIRKSAM_FE
+#define LNAME_RAUMSOLL_WIRKSAM_FE               "Effective Room Setpoint Remote Control"
 #undef  LNAME_FE_ZUORDNUNG
 #define LNAME_FE_ZUORDNUNG                      "Remote Control Heating Circuit"
 #undef  LNAME_WWPROG_MO

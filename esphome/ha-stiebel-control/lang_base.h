@@ -188,6 +188,7 @@
 #define LNAME_HK2_RAUMSOLL_NACHT               "Raumsoll HK2 Nacht"
 #define LNAME_HK2_HEIZKURVE                    "Heizkurve HK2"
 #define LNAME_RAUMIST_FE                        "Raum-Ist Fernbedienung"
+#define LNAME_RAUMSOLL_WIRKSAM_FE               "Raumsoll wirksam Fernbedienung"
 #define LNAME_FE_ZUORDNUNG                      "Fernbedienung Heizkreis"
 
 // DHW time program, one text per day (#82)

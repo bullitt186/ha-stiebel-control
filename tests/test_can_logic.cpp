@@ -2663,6 +2663,29 @@ TEST_CASE("WPMW II: one room sensor of the remote control, named after it", "[mq
     CHECK(named == kModel.wpmw2);
 }
 
+// FE 7 knobs on a WPL13E (17.11.2026, FE on HK2, scan of 0x602 index 0x0012): day setpoint 20.5,
+// knob middle -> 22.0, knob at a stop -> 25.5 (+5 K), mode switch moon -> 20.0 = night setpoint.
+// The mixer flow setpoint followed (25.8 / 30.2 / 23.2 C).
+TEST_CASE("WPMW II: effective room setpoint of the FE circuit", "[mqtt][wpmw2]") {
+    const ElsterIndex* ei = GetElsterIndex("VERSTELLTE_RAUMSOLLTEMP");
+    REQUIRE(ei != nullptr);
+    CHECK(ei->Index == 0x0012);
+    // value as decoded from the bus: dec value 255 -> "25.5"
+    std::vector<uint8_t> frame = {0x31, 0x00, 0xfa, 0x00, 0x12, 0x00, 0xff};
+    std::string value;
+    const CanMember* cm = nullptr;
+    const ElsterIndex* decoded = processCanMessage(frame, 0x602, value, &cm);
+    CHECK(decoded == ei);
+    CHECK(value == "25.5");
+    resetDiscoveryState();
+    publishMqttDiscovery(CanMembers[cm_mischermodul_3], ei);
+    const std::string cfg = mqttFindPayload("stiebel_mischermodul_3_verstellte_raumsolltemp/config");
+    REQUIRE_FALSE(cfg.empty());
+    CHECK(cfg.find("\"device_class\":\"temperature\"") != std::string::npos);
+    const bool named = cfg.find(std::string("\"name\":\"") + LNAME_RAUMSOLL_WIRKSAM_FE + "\"") != std::string::npos;
+    CHECK(named == kModel.wpmw2);
+}
+
 TEST_CASE("WPMW II: room temperature goes to the climate of the FE circuit only", "[mqtt][wpmw2]") {
     const std::string topic = "\"current_temperature_topic\":\"heatingpump/MISCHERMODUL_3/RAUMISTTEMP/state\"";
     auto has = [&](const char* id) { return climatePayload(id).find(topic) != std::string::npos; };

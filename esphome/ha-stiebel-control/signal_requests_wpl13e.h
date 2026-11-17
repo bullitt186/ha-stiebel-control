@@ -172,6 +172,9 @@ extern const SignalRequest signalRequests[] = {
     // Remote control FE 7: room actual temperature (the manager itself does not answer it, its
     // virtual members mirror the one FE sensor) and the circuit it is assigned to (parameter 22)
     {"RAUMISTTEMP",                 FREQ_1MIN,  cm_mischermodul_3},
+    // Effective room setpoint of the FE circuit: day/night setpoint plus the FE knob (+-5 K);
+    // the FE mode switch shows here too (moon = night setpoint without correction)
+    {"VERSTELLTE_RAUMSOLLTEMP",     FREQ_1MIN,  cm_mischermodul_3},
     {"FERNBEDIENUNGSZUORDNUNG",     FREQ_10MIN, cm_manager},
     {"RAUMSOLLTEMP_I",              FREQ_10MIN, cm_mischermodul_3},
     {"RAUMSOLLTEMP_NACHT",          FREQ_10MIN, cm_mischermodul_3},

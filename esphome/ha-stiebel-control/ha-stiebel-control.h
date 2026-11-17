@@ -434,6 +434,7 @@ static const char* wpmw2MemberName(const char* member, const char* signal) {
         // Room actual temperature of the remote control FE 7 (one sensor, mirrored on the
         // virtual members) and the circuit it is assigned to (parameter 22 "AUSWAHL FE")
         {"MISCHERMODUL_3", "RAUMISTTEMP",        LNAME_RAUMIST_FE},
+        {"MISCHERMODUL_3", "VERSTELLTE_RAUMSOLLTEMP", LNAME_RAUMSOLL_WIRKSAM_FE},
         {"MANAGER", "FERNBEDIENUNGSZUORDNUNG",   LNAME_FE_ZUORDNUNG},
     };
     for (const Entry& e : names)

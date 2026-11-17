@@ -29,6 +29,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   `FERNBEDIENUNGSZUORDNUNG`). The manager does not answer `RAUMISTTEMP`; its virtual members mirror
   the one FE sensor (a WPL13E's 0x601, 0x602, 0x301 and 0x302 all followed a heated FE). The room
   temperature is the current temperature of the climate of the assigned circuit only.
+- WPMW II: effective room setpoint of the FE circuit as sensor "Raumsoll wirksam Fernbedienung"
+  (`VERSTELLTE_RAUMSOLLTEMP` on 0x602): day or night setpoint plus the FE knob (±5 K). It shows
+  the FE mode switch too (moon = night setpoint without correction).
 - WPL13E/TTL 33: climate entity "Heizung HK2" for heating circuit 2 (day room setpoint on 0x602,
   current temperature from 0x602), so both circuits can use a thermostat card. The operating mode
   stays on the heating climate.
