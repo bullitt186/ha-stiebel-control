@@ -527,6 +527,12 @@ module, Settings → Dashboards → ⋮ → Resources); raise a `?v=2` suffix af
 - `custom:stiebel-week-program-card` shows a time program (seven text entities, Monday first) as
   week bars; the pencil opens the text fields, *Mo auf Di–Fr* copies Monday.
 
+Both cards draw only with Home Assistant theme variables (text, divider, primary and card colors,
+font and spacing tokens), so themes and dark mode style them like the built-in cards. `color`
+takes the values of the tile card: a theme color name (`orange`, `blue`, `primary`, …), a CSS
+variable or a hex value; default is the heating color of the theme. Texts follow the user's
+language (German or English), numbers the user's number format.
+
 ```yaml
 - type: custom:stiebel-heating-curve-card
   title: Heizkurve HK1
@@ -538,7 +544,7 @@ module, Settings → Dashboards → ⋮ → Resources); raise a `?v=2` suffix af
   setpoint: sensor.heatingpump_kessel_kesselsolltemp  # optional marker
 - type: custom:stiebel-week-program-card
   title: Heizprogramm HK1
-  color: "#ff8100"                                    # optional
+  color: orange                                       # optional, theme color name or hex
   entities:
     - text.heatingpump_heiz_programm_mo
     # … one per day, Monday to Sunday
