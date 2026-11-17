@@ -1440,6 +1440,12 @@ static const WritableNumberConfig* findWritableNumber(const char* signal) {
     return nullptr;
 }
 
+// The climates only heat and have no mode command. Without a mode state HA shows them as "off"
+// (thermostat card "Aus"); the mode follows the availability of the ESP instead.
+#define CLIMATE_MODE_STATE_JSON \
+    "\"mode_state_topic\":\"" HA_TOPIC_ROOT "/status\"," \
+    "\"mode_state_template\":\"{{ 'heat' if value == 'online' else 'off' }}\","
+
 static bool writableNumberApplies(const WritableNumberConfig& config);
 
 void publishClimateDiscoveries() {
@@ -1455,7 +1461,7 @@ void publishClimateDiscoveries() {
         std::ostringstream p;
         p << "{\"name\":\"" << LNAME_CLIMATE_HEIZUNG << "\",\"unique_id\":\"stiebel_climate_heizung\","
           << defaultEntityIdJson("climate", "stiebel_climate_heizung")
-          << "\"modes\":[\"heat\"],\"temperature_unit\":\"C\","
+          << "\"modes\":[\"heat\"],\"temperature_unit\":\"C\"," << CLIMATE_MODE_STATE_JSON
           << "\"min_temp\":" << room->min << ",\"max_temp\":" << room->max << ",\"temp_step\":" << room->step << ","
           << "\"temperature_command_topic\":\"" HA_TOPIC_ROOT "/" << cm->Name << "/RAUMSOLLTEMP_I/set\","
           << "\"temperature_state_topic\":\"" HA_TOPIC_ROOT "/" << cm->Name << "/RAUMSOLLTEMP_I/state\",";
@@ -1484,7 +1490,7 @@ void publishClimateDiscoveries() {
         std::ostringstream p;
         p << "{\"name\":\"" << LNAME_CLIMATE_HEIZUNG_HK2 << "\",\"unique_id\":\"stiebel_climate_heizung_hk2\","
           << defaultEntityIdJson("climate", "stiebel_climate_heizung_hk2")
-          << "\"modes\":[\"heat\"],\"temperature_unit\":\"C\","
+          << "\"modes\":[\"heat\"],\"temperature_unit\":\"C\"," << CLIMATE_MODE_STATE_JSON
           << "\"min_temp\":" << hk2.min << ",\"max_temp\":" << hk2.max << ",\"temp_step\":" << hk2.step << ","
           << "\"temperature_command_topic\":\"" HA_TOPIC_ROOT "/MISCHERMODUL_3/RAUMSOLLTEMP_I/set\","
           << "\"temperature_state_topic\":\"" HA_TOPIC_ROOT "/MISCHERMODUL_3/RAUMSOLLTEMP_I/state\","
@@ -1503,7 +1509,7 @@ void publishClimateDiscoveries() {
         std::ostringstream p;
         p << "{\"name\":\"" << LNAME_CLIMATE_WARMWASSER << "\",\"unique_id\":\"stiebel_climate_warmwasser\","
           << defaultEntityIdJson("climate", "stiebel_climate_warmwasser")
-          << "\"modes\":[\"heat\"],\"temperature_unit\":\"C\","
+          << "\"modes\":[\"heat\"],\"temperature_unit\":\"C\"," << CLIMATE_MODE_STATE_JSON
           << "\"min_temp\":" << dhw->min << ",\"max_temp\":" << dhw->max << ",\"temp_step\":" << dhw->step << ","
           << "\"temperature_command_topic\":\"" HA_TOPIC_ROOT "/" << cm->Name << "/EINSTELL_SPEICHERSOLLTEMP/set\","
           << "\"temperature_state_topic\":\"" HA_TOPIC_ROOT "/" << cm->Name << "/EINSTELL_SPEICHERSOLLTEMP/state\","
