@@ -169,6 +169,11 @@ extern const SignalRequest signalRequests[] = {
 
     // Heating circuit 2 (mixer circuit): settings and program on the manager's virtual
     // member MISCHERMODUL_3 (0x602), display "Raumtemp. 2" / "Heizkurve 2"
+    // Room actual temperature as the controller sees it, per heating circuit: the manager's
+    // virtual members 0x601 (HC1) and 0x602 (HC2) answer RAUMISTTEMP, the manager itself does
+    // not. Scanned on a WPL13E: 0x601 21.7 = display "Raum ist" 21.7.
+    {"RAUMISTTEMP",                 FREQ_1MIN,  cm_mischermodul_2},
+    {"RAUMISTTEMP",                 FREQ_1MIN,  cm_mischermodul_3},
     {"RAUMSOLLTEMP_I",              FREQ_10MIN, cm_mischermodul_3},
     {"RAUMSOLLTEMP_NACHT",          FREQ_10MIN, cm_mischermodul_3},
     {"HEIZKURVE",                   FREQ_10MIN, cm_mischermodul_3},

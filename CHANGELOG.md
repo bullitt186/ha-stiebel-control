@@ -21,6 +21,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Added
 
+- WPMW II (WPL13E, WPL18E, TTL 33): room actual temperature per heating circuit as sensors
+  "Raum-Ist HK1" / "Raum-Ist HK2". The manager does not answer `RAUMISTTEMP`, its virtual members
+  0x601 (HC1) and 0x602 (HC2) do (found by a bus scan; 0x601 matched the display "Raum ist"). The
+  heating climate shows the HC1 value as current temperature.
+- WPL13E/TTL 33: climate entity "Heizung HK2" for heating circuit 2 (day room setpoint on 0x602,
+  current temperature from 0x602), so both circuits can use a thermostat card. The operating mode
+  stays on the heating climate.
 - WPMW II heating circuit 2 (mixer circuit): day and night room setpoint and heating curve as
   number entities. The manager keeps them on the virtual member `MISCHERMODUL_3` (0x602), found by a
   change of "Raumtemp. 2" on the display (20.0 -> 20.5 moved only `RAUMSOLLTEMP_I` @ 0x602);

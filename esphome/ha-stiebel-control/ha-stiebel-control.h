@@ -431,6 +431,9 @@ static const char* wpmw2MemberName(const char* member, const char* signal) {
         {"MISCHERMODUL_3", "RAUMSOLLTEMP_I",     LNAME_HK2_RAUMSOLL_TAG},
         {"MISCHERMODUL_3", "RAUMSOLLTEMP_NACHT", LNAME_HK2_RAUMSOLL_NACHT},
         {"MISCHERMODUL_3", "HEIZKURVE",          LNAME_HK2_HEIZKURVE},
+        // Room actual temperature per heating circuit (virtual members 0x601 / 0x602)
+        {"MISCHERMODUL_2", "RAUMISTTEMP",        LNAME_HK1_RAUMIST},
+        {"MISCHERMODUL_3", "RAUMISTTEMP",        LNAME_HK2_RAUMIST},
     };
     for (const Entry& e : names)
         if (strcmp(member, e.member) == 0 && strcmp(signal, e.signal) == 0) return e.name;
@@ -1437,6 +1440,8 @@ static const WritableNumberConfig* findWritableNumber(const char* signal) {
     return nullptr;
 }
 
+static bool writableNumberApplies(const WritableNumberConfig& config);
+
 void publishClimateDiscoveries() {
 #ifdef HA_READ_ONLY_true
     return;
@@ -1453,8 +1458,11 @@ void publishClimateDiscoveries() {
           << "\"modes\":[\"heat\"],\"temperature_unit\":\"C\","
           << "\"min_temp\":" << room->min << ",\"max_temp\":" << room->max << ",\"temp_step\":" << room->step << ","
           << "\"temperature_command_topic\":\"" HA_TOPIC_ROOT "/" << cm->Name << "/RAUMSOLLTEMP_I/set\","
-          << "\"temperature_state_topic\":\"" HA_TOPIC_ROOT "/" << cm->Name << "/RAUMSOLLTEMP_I/state\","
-          << "\"preset_modes\":[";
+          << "\"temperature_state_topic\":\"" HA_TOPIC_ROOT "/" << cm->Name << "/RAUMSOLLTEMP_I/state\",";
+        // WPMW II: room actual temperature of heating circuit 1 from the virtual member 0x601
+        if (kModel.wpmw2)
+            p << "\"current_temperature_topic\":\"" HA_TOPIC_ROOT "/MISCHERMODUL_2/RAUMISTTEMP/state\",";
+        p << "\"preset_modes\":[";
         for (size_t i = 0; i < sizeof(programmschalterOptions) / sizeof(programmschalterOptions[0]); i++)
             p << (i ? "," : "") << "\"" << programmschalterOptions[i] << "\"";
         p << "],\"preset_mode_command_topic\":\"" HA_TOPIC_ROOT "/MANAGER/PROGRAMMSCHALTER/set\","
@@ -1464,6 +1472,29 @@ void publishClimateDiscoveries() {
           << "\"availability_topic\":\"" HA_TOPIC_ROOT "/status\",\"icon\":\"mdi:radiator\"," << device << "}";
         std::string s = p.str();
         mqttPublish("homeassistant/climate/" HA_TOPIC_ROOT "/stiebel_climate_heizung/config", s.c_str(), s.length());
+    }
+
+    // WPMW II heating circuit 2 (mixer circuit, virtual member 0x602): day room setpoint and
+    // room actual temperature. The operating mode is shared and stays on the heating climate.
+    for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; i++) {
+        const WritableNumberConfig& hk2 = writableNumbers[i];
+        if (hk2.member != cm_mischermodul_3 || strcmp(hk2.signalName, "RAUMSOLLTEMP_I") != 0 ||
+            !writableNumberApplies(hk2))
+            continue;
+        std::ostringstream p;
+        p << "{\"name\":\"" << LNAME_CLIMATE_HEIZUNG_HK2 << "\",\"unique_id\":\"stiebel_climate_heizung_hk2\","
+          << defaultEntityIdJson("climate", "stiebel_climate_heizung_hk2")
+          << "\"modes\":[\"heat\"],\"temperature_unit\":\"C\","
+          << "\"min_temp\":" << hk2.min << ",\"max_temp\":" << hk2.max << ",\"temp_step\":" << hk2.step << ","
+          << "\"temperature_command_topic\":\"" HA_TOPIC_ROOT "/MISCHERMODUL_3/RAUMSOLLTEMP_I/set\","
+          << "\"temperature_state_topic\":\"" HA_TOPIC_ROOT "/MISCHERMODUL_3/RAUMSOLLTEMP_I/state\","
+          << "\"current_temperature_topic\":\"" HA_TOPIC_ROOT "/MISCHERMODUL_3/RAUMISTTEMP/state\","
+          << "\"action_topic\":\"" HA_TOPIC_ROOT "/calculated/compressor_active/state\","
+          << "\"action_template\":\"{{ 'heating' if value == 'on' else 'idle' }}\","
+          << "\"availability_topic\":\"" HA_TOPIC_ROOT "/status\",\"icon\":\"mdi:heating-coil\"," << device << "}";
+        std::string s = p.str();
+        mqttPublish("homeassistant/climate/" HA_TOPIC_ROOT "/stiebel_climate_heizung_hk2/config", s.c_str(), s.length());
+        break;
     }
 
     // Hot water: tank actual temperature + DHW setpoint
