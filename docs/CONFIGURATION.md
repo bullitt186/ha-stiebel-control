@@ -513,6 +513,37 @@ with a system schema — copy `dashboards/www/heatingpump/` to `/config/www/heat
 Both use the entity IDs of a fresh install (see [Entity IDs](#entity-ids)); older installs keep
 their original IDs and need to rename them in HA or adjust the dashboard.
 
+### Heating curve and week program cards
+
+`dashboards/www/stiebel-cards.js` adds two cards without further dependencies. Copy it to
+`/config/www/stiebel-cards.js` and add the resource `/local/stiebel-cards.js` (type JavaScript
+module, Settings → Dashboards → ⋮ → Resources); raise a `?v=2` suffix after an update.
+
+- `custom:stiebel-heating-curve-card` draws the heating curve over the outside temperature, like
+  the diagram in the WPMW II manual, with the night curve, grey comparison curves and the current
+  operating point. − and + show a preview of another slope; *Übernehmen* writes it.
+  The model `T = R + S · 20 · ((20 − Ta) / 20)^0.63` reproduces the manual's diagram and the
+  display points (+20/0/−20 °C) of a WPL13E; the ring marks the setpoint the controller reports.
+- `custom:stiebel-week-program-card` shows a time program (seven text entities, Monday first) as
+  week bars; the pencil opens the text fields, *Mo auf Di–Fr* copies Monday.
+
+```yaml
+- type: custom:stiebel-heating-curve-card
+  title: Heizkurve HK1
+  y_label: Rücklaufsoll
+  slope: number.heatingpump_manager_heizkurve_set
+  room: climate.heatingpump_climate_heizung          # or a number entity
+  room_night: number.heatingpump_manager_raumsolltemp_nacht
+  outdoor: sensor.heatingpump_kessel_aussentemp
+  setpoint: sensor.heatingpump_kessel_kesselsolltemp  # optional marker
+- type: custom:stiebel-week-program-card
+  title: Heizprogramm HK1
+  color: "#ff8100"                                    # optional
+  entities:
+    - text.heatingpump_heiz_programm_mo
+    # … one per day, Monday to Sunday
+```
+
 ## Summer mode (WPL13E)
 
 The WPMW II switches heating off when its *summer automatic* is on (`SOMMERBETRIEB`, parameter
