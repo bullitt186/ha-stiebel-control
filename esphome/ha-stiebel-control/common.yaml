@@ -17,6 +17,8 @@
 #
 # Defaults — override in your top-level heatingpump.yaml substitutions
 substitutions:
+  device_name: heatingpump    # ESPHome node name, hostname and root of every MQTT topic (lower case, a-z 0-9 -)
+  friendly_name: "Heating Pump CAN Interface"   # ESPHome device name in Home Assistant
   disable_sg_ready: "false"   # "true" hides all SG Ready entities (e.g. WPC7, which has no SG Ready input)
   read_only: "false"          # "true": never write to the heat pump (no setpoints/modes/clock; reading and bus scan only)
   # Network package from this folder: network_wifi.yaml (default) or network_ethernet_w5500.yaml
@@ -27,8 +29,8 @@ packages:
 
 esphome:
   min_version: 2026.7.0
-  name: heatingpump
-  friendly_name: "Heating Pump CAN Interface"
+  name: ${device_name}
+  friendly_name: ${friendly_name}
   project:
     name: "bullitt186.ha-stiebel-control"
     version: "2.7.0"
@@ -40,7 +42,7 @@ esphome:
           loadBoostState();
           initSummerPrefs();
           // One subscription for all set commands (#92)
-          id(mqtt_client).subscribe(std::string(MQTT_TOPIC_ROOT) + "/+/+/set",
+          id(mqtt_client).subscribe(HA_TOPIC_ROOT "/+/+/set",
               [](const std::string &topic, const std::string &payload) { handleSetCommand(topic, payload); });
           onSgReadyChanged = []() {
             id(SG_READY_CURRENT_STATE).update();
@@ -70,6 +72,7 @@ esphome:
     # model-specific signal_requests_*.h is declared by each model yaml package
   build_flags:
     - "-DHA_DEVICE_MODEL=${device_model}"
+    - "-DHA_DEVICE_NAME=${device_name}"
     - "-DHA_LANGUAGE_${language}"
     - "-DHA_DISABLE_SG_READY_${disable_sg_ready}"
     - "-DHA_READ_ONLY_${read_only}"
@@ -118,15 +121,16 @@ mqtt:
   # Disable native ESPHome discovery - using custom auto-discovery instead
   discovery: false
   discovery_prefix: homeassistant
+  topic_prefix: ${device_name}
   # Birth message - sent when ESP32 connects
   birth_message:
-    topic: heatingpump/status
+    topic: ${device_name}/status
     payload: online
     qos: 1
     retain: true
   # Last Will Testament - sent by broker if ESP32 disconnects unexpectedly
   will_message:
-    topic: heatingpump/status
+    topic: ${device_name}/status
     payload: offline
     qos: 1
     retain: true
@@ -137,7 +141,7 @@ mqtt:
   # Remote log via MQTT: warnings and errors only. Per-frame CAN logs are DEBUG and
   # INFO stays on the API/serial log (esphome logs).
   log_topic:
-    topic: heatingpump/debug
+    topic: ${device_name}/debug
     level: WARN
   # Keepalive for connection monitoring
   keepalive: 15s
@@ -170,7 +174,7 @@ mqtt:
         level: WARN
         format: "Disconnected from MQTT broker - will automatically retry"
   on_message:
-    - topic: heatingpump/reconnect
+    - topic: ${device_name}/reconnect
       then:
         - logger.log: "Manual reconnect triggered"
 
@@ -182,15 +186,15 @@ mqtt:
             if (x == "online") republishAllDiscoveries();
 
     # Bus scan: payload "<MEMBER>" (all table indices) or "<MEMBER> 0x0000 0x0fff"
-    - topic: heatingpump/scan/start
+    - topic: ${device_name}/scan/start
       then:
         - lambda: startScan(x);
-    - topic: heatingpump/scan/stop
+    - topic: ${device_name}/scan/stop
       then:
         - lambda: stopScan();
 
     # Force republish all discoveries (including writable entities)
-    - topic: heatingpump/republish_discoveries
+    - topic: ${device_name}/republish_discoveries
       then:
         - lambda: |-
             ESP_LOGI("MQTT_CMD", "Manual discovery republish triggered");
@@ -215,7 +219,7 @@ interval:
     then:
       - lambda: faultListStep();
 
-  # Bus scan (idle unless started via heatingpump/scan/start)
+  # Bus scan (idle unless started via <device_name>/scan/start)
   - interval: 150ms
     then:
       - lambda: scanStep();

@@ -29,8 +29,8 @@ The key must match what HA's ESPHome integration has stored for this device. If 
 
 | Substitution | Description | Default |
 |--------------|-------------|---------|
-| `device_name` | ESPHome device hostname | `heatingpump` |
-| `friendly_name` | Display name in HA | `"Stiebel Eltron Wärmepumpe"` |
+| `device_name` | ESPHome node name and hostname; root of every MQTT topic (`<device_name>/…`), node ID of the discovery topics and prefix of the default entity IDs. Lower case `a-z`, `0-9`, `-`, at most 24 characters. Topics and entity IDs in this documentation use the default | `heatingpump` |
+| `friendly_name` | Name of the ESPHome device in HA (native API: restart, reset reason, …). The MQTT device of the heat pump keeps its own name | `"Stiebel Eltron Wärmepumpe"` |
 | `device_model` | Heat pump model — selects signal table and HA device identifier | `"wpl13e"` |
 | `language` | Display language for HA entity names: `DE` (German, default) or `EN` (English) | `"DE"` |
 | `can_tx_pin` | CAN TX GPIO (ESP32-S3 built-in TWAI) | board-specific — see note below |
@@ -142,11 +142,18 @@ sync uses Home Assistant text sensors).
 ## Entity IDs
 
 Every discovery config carries a language-independent `default_entity_id`:
-`<domain>.heatingpump_<unique ID without "stiebel_">`, e.g. `sensor.heatingpump_kessel_aussentemp`,
+`<domain>.<device_name>_<unique ID without "stiebel_">` (a `-` in the device name becomes `_`), e.g. `sensor.heatingpump_kessel_aussentemp`,
 `number.heatingpump_manager_raumsolltemp_i`, `sensor.heatingpump_calculated_cop_gesamt`. DE and EN
 builds therefore create the same IDs, and renaming a display name does not change them. The IDs in
 this document and in `dashboards/` are these IDs (CI checks the dashboards with
 `tests/check_dashboard_ids.py`).
+
+The dashboards assume the default `device_name: heatingpump`; with another name, replace the
+`heatingpump_` prefix in the dashboard YAML.
+
+Two heat pumps on one broker need two device names: their topics and discovery configs are then
+separate. The unique IDs (`stiebel_<member>_<signal>`) and the HA device identifiers are still the
+same for both, so Home Assistant only shows the entities of the first one.
 
 Installs from before 2.8 keep the IDs HA gave their entities then (derived from the display
 name). To use the shipped dashboards there, rename the entity IDs under Settings → Entities, or

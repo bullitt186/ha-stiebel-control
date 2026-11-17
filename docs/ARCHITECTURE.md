@@ -97,7 +97,7 @@ ESPHome firmware (ha-stiebel-control.h)
          │ MQTT
          ▼
 MQTT Broker
-  heatingpump/{MEMBER}/{SIGNAL}/state    ← raw sensor values
+  heatingpump/{MEMBER}/{SIGNAL}/state    ← raw sensor values (root = device_name, HA_TOPIC_ROOT)
   heatingpump/calculated/{name}/state    ← derived values
   homeassistant/{type}/heatingpump/+/config ← auto-discovery
          │
@@ -193,6 +193,10 @@ Writable entities (numbers, selects) have a matching command topic:
 ```
 heatingpump/{CAN_MEMBER}/{SIGNAL_NAME}/set
 ```
+
+`heatingpump` is the default topic root. It is the `device_name` substitution, passed to the C++
+code as `-DHA_DEVICE_NAME` and used there as `HA_TOPIC_ROOT` (`config.h`); YAML uses
+`${device_name}`.
 
 All discovery configs are retained. They are sent again (a few per 250 ms, so the MQTT
 queue never sees a burst) on every broker connect and when Home Assistant publishes its

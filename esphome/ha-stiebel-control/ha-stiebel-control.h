@@ -93,9 +93,11 @@ inline SignalRoute resolveSignalRoute(uint16_t index, CanMemberType fallback) {
 // without "stiebel_">, lower case, e.g. sensor.heatingpump_manager_aussentemp. Registered
 // entities keep their IDs.
 inline std::string defaultEntityIdJson(const char* component, const std::string& uniqueId) {
-    std::string id = uniqueId.rfind("stiebel_", 0) == 0 ? uniqueId.substr(8) : uniqueId;
-    std::transform(id.begin(), id.end(), id.begin(), ::tolower);
-    return std::string("\"default_entity_id\":\"") + component + "." HA_TOPIC_ROOT "_" + id + "\",";
+    // An entity ID allows only a-z, 0-9 and "_": the hyphen of a device name like heat-pump becomes "_"
+    std::string id = std::string(HA_TOPIC_ROOT "_") +
+                     (uniqueId.rfind("stiebel_", 0) == 0 ? uniqueId.substr(8) : uniqueId);
+    std::transform(id.begin(), id.end(), id.begin(), [](unsigned char c) { return c == '-' ? '_' : (char)::tolower(c); });
+    return std::string("\"default_entity_id\":\"") + component + "." + id + "\",";
 }
 
 // Device of one CAN member, linked to the heat pump device
@@ -133,55 +135,55 @@ struct CalculatedSensorConfig {
 
 static const CalculatedSensorConfig calculatedSensors[] = {
     // Date sensor
-    {"stiebel_calculated_date", LNAME_CALC_DATE, "heatingpump/calculated/date/state",
+    {"stiebel_calculated_date", LNAME_CALC_DATE, HA_TOPIC_ROOT "/calculated/date/state",
      "sensor", "", "", "", "mdi:calendar", "", "", "", true},
 
     // Time sensor
-    {"stiebel_calculated_time", LNAME_CALC_TIME, "heatingpump/calculated/time/state",
+    {"stiebel_calculated_time", LNAME_CALC_TIME, HA_TOPIC_ROOT "/calculated/time/state",
      "sensor", "", "", "", "mdi:clock", "", "", "", true},
 
     // Delta T continuous
-    {"stiebel_calculated_delta_t_continuous", LNAME_CALC_DELTA_T_CONTINUOUS, "heatingpump/calculated/delta_t_continuous/state",
+    {"stiebel_calculated_delta_t_continuous", LNAME_CALC_DELTA_T_CONTINUOUS, HA_TOPIC_ROOT "/calculated/delta_t_continuous/state",
      "sensor", "temperature", "K", "measurement", "mdi:thermometer", "", "", "", true},
 
     // Delta T running (only when compressor active)
-    {"stiebel_calculated_delta_t_running", LNAME_CALC_DELTA_T_RUNNING, "heatingpump/calculated/delta_t_running/state",
+    {"stiebel_calculated_delta_t_running", LNAME_CALC_DELTA_T_RUNNING, HA_TOPIC_ROOT "/calculated/delta_t_running/state",
      "sensor", "temperature", "K", "measurement", "mdi:thermometer-chevron-up", "", "", "", true},
 
     // Compressor active binary sensor
-    {"stiebel_calculated_compressor_active", LNAME_CALC_COMPRESSOR_ACTIVE, "heatingpump/calculated/compressor_active/state",
+    {"stiebel_calculated_compressor_active", LNAME_CALC_COMPRESSOR_ACTIVE, HA_TOPIC_ROOT "/calculated/compressor_active/state",
      "binary_sensor", "running", "", "", "mdi:engine", "on", "off", "", true},
 
     // CAN bus diagnostic sensors (TWAI / ESP32-S3; silently inactive on MCP2515 builds)
-    {"stiebel_calculated_can_tec",        LNAME_CALC_CAN_TEC,        "heatingpump/calculated/can_tec/state",
+    {"stiebel_calculated_can_tec",        LNAME_CALC_CAN_TEC,        HA_TOPIC_ROOT "/calculated/can_tec/state",
      "sensor", "", "", "measurement", "mdi:alert-network", "", "", "diagnostic", false},
-    {"stiebel_calculated_can_rec",        LNAME_CALC_CAN_REC,        "heatingpump/calculated/can_rec/state",
+    {"stiebel_calculated_can_rec",        LNAME_CALC_CAN_REC,        HA_TOPIC_ROOT "/calculated/can_rec/state",
      "sensor", "", "", "measurement", "mdi:alert-network-outline", "", "", "diagnostic", false},
-    {"stiebel_calculated_can_bus_errors", LNAME_CALC_CAN_BUS_ERRORS, "heatingpump/calculated/can_bus_errors/state",
+    {"stiebel_calculated_can_bus_errors", LNAME_CALC_CAN_BUS_ERRORS, HA_TOPIC_ROOT "/calculated/can_bus_errors/state",
      "sensor", "", "", "total_increasing", "mdi:network-off", "", "", "diagnostic", false},
-    {"stiebel_calculated_can_state",      LNAME_CALC_CAN_STATE,      "heatingpump/calculated/can_state/state",
+    {"stiebel_calculated_can_state",      LNAME_CALC_CAN_STATE,      HA_TOPIC_ROOT "/calculated/can_state/state",
      "sensor", "", "", "", "mdi:can", "", "", "diagnostic", false},
 
     // Kombinierte Energie-Gesamtwerte (MWh*1000 + kWh), zusaetzlich zu den Einzelwerten
-    {"stiebel_calculated_energie_heiz_total_kwh", LNAME_CALC_ENERGIE_HEIZ_TOTAL_KWH, "heatingpump/calculated/energie_heiz_total_kwh/state",
+    {"stiebel_calculated_energie_heiz_total_kwh", LNAME_CALC_ENERGIE_HEIZ_TOTAL_KWH, HA_TOPIC_ROOT "/calculated/energie_heiz_total_kwh/state",
      "sensor", "energy", "kWh", "total_increasing", "mdi:flash", "", "", "", true, true},
-    {"stiebel_calculated_energie_ww_total_kwh", LNAME_CALC_ENERGIE_WW_TOTAL_KWH, "heatingpump/calculated/energie_ww_total_kwh/state",
+    {"stiebel_calculated_energie_ww_total_kwh", LNAME_CALC_ENERGIE_WW_TOTAL_KWH, HA_TOPIC_ROOT "/calculated/energie_ww_total_kwh/state",
      "sensor", "energy", "kWh", "total_increasing", "mdi:flash", "", "", "", true, true},
-    {"stiebel_calculated_waerme_heiz_total_kwh", LNAME_CALC_WAERME_HEIZ_TOTAL_KWH, "heatingpump/calculated/waerme_heiz_total_kwh/state",
+    {"stiebel_calculated_waerme_heiz_total_kwh", LNAME_CALC_WAERME_HEIZ_TOTAL_KWH, HA_TOPIC_ROOT "/calculated/waerme_heiz_total_kwh/state",
      "sensor", "energy", "kWh", "total_increasing", "mdi:fire", "", "", "", true, true},
-    {"stiebel_calculated_waerme_ww_total_kwh", LNAME_CALC_WAERME_WW_TOTAL_KWH, "heatingpump/calculated/waerme_ww_total_kwh/state",
+    {"stiebel_calculated_waerme_ww_total_kwh", LNAME_CALC_WAERME_WW_TOTAL_KWH, HA_TOPIC_ROOT "/calculated/waerme_ww_total_kwh/state",
      "sensor", "energy", "kWh", "total_increasing", "mdi:fire", "", "", "", true, true},
 
     // Aktuelle elektrische Leistung (W) — aus den feinen Tageszaehlern (EL_*_TAG_WH)
     // abgeleitet (Differenz der Wh-Zaehler pro Zeitintervall). Kein Stromzaehler noetig;
     // die WP zaehlt ihren Stromverbrauch selbst.
-    {"stiebel_calculated_el_leistung_w", LNAME_CALC_EL_LEISTUNG_W, "heatingpump/calculated/el_leistung_w/state",
+    {"stiebel_calculated_el_leistung_w", LNAME_CALC_EL_LEISTUNG_W, HA_TOPIC_ROOT "/calculated/el_leistung_w/state",
      "sensor", "power", "W", "measurement", "mdi:lightning-bolt", "", "", "", true, true},
 
     // Abgeleiteter Betriebsstatus: "Aus" | "Heizen" | "Warmwasser" | "Kuehlen".
     // Ersetzt das (auf der WPL17 unbrauchbare) WP_STATUS-Bitfeld, siehe Ableitung in
     // publishCombinedEnergySensors().
-    {"stiebel_calculated_betriebsstatus", LNAME_CALC_BETRIEBSSTATUS, "heatingpump/calculated/betriebsstatus/state",
+    {"stiebel_calculated_betriebsstatus", LNAME_CALC_BETRIEBSSTATUS, HA_TOPIC_ROOT "/calculated/betriebsstatus/state",
      "sensor", "", "", "", "mdi:heat-pump", "", "", "", true, true},
 
     // Kombinierte TAGES-Energiewerte (kWh-Anteil + Wh/1000 -> Wh-Aufloesung).
@@ -189,66 +191,66 @@ static const CalculatedSensorConfig calculatedSensors[] = {
     // zurueck; der Geraete-Gesamtzahler springt nur einmal pro Nacht. In HA ist
     // state_class total_increasing korrekt (Reset wird als Zaehlerneustart
     // behandelt) und als Basis fuer utility_meter (Tag/Monat/Jahr) geeignet.
-    {"stiebel_calculated_energie_heiz_tag_kwh", LNAME_CALC_ENERGIE_HEIZ_TAG_KWH, "heatingpump/calculated/energie_heiz_tag_kwh/state",
+    {"stiebel_calculated_energie_heiz_tag_kwh", LNAME_CALC_ENERGIE_HEIZ_TAG_KWH, HA_TOPIC_ROOT "/calculated/energie_heiz_tag_kwh/state",
      "sensor", "energy", "kWh", "total_increasing", "mdi:flash", "", "", "", true, true},
-    {"stiebel_calculated_energie_ww_tag_kwh", LNAME_CALC_ENERGIE_WW_TAG_KWH, "heatingpump/calculated/energie_ww_tag_kwh/state",
+    {"stiebel_calculated_energie_ww_tag_kwh", LNAME_CALC_ENERGIE_WW_TAG_KWH, HA_TOPIC_ROOT "/calculated/energie_ww_tag_kwh/state",
      "sensor", "energy", "kWh", "total_increasing", "mdi:flash", "", "", "", true, true},
-    {"stiebel_calculated_waerme_heiz_tag_kwh", LNAME_CALC_WAERME_HEIZ_TAG_KWH, "heatingpump/calculated/waerme_heiz_tag_kwh/state",
+    {"stiebel_calculated_waerme_heiz_tag_kwh", LNAME_CALC_WAERME_HEIZ_TAG_KWH, HA_TOPIC_ROOT "/calculated/waerme_heiz_tag_kwh/state",
      "sensor", "energy", "kWh", "total_increasing", "mdi:fire", "", "", "", true, true},
-    {"stiebel_calculated_waerme_ww_tag_kwh", LNAME_CALC_WAERME_WW_TAG_KWH, "heatingpump/calculated/waerme_ww_tag_kwh/state",
+    {"stiebel_calculated_waerme_ww_tag_kwh", LNAME_CALC_WAERME_WW_TAG_KWH, HA_TOPIC_ROOT "/calculated/waerme_ww_tag_kwh/state",
      "sensor", "energy", "kWh", "total_increasing", "mdi:fire", "", "", "", true, true},
 
     // Getrennte elektrische Leistung (W) aus den jeweiligen TAG_WH-Zaehlern.
     // Damit ist ein evtl. Riemann-Integral oder eine Leistungsanzeige pro
     // Betriebsart (Heizen / Warmwasser) in HA moeglich.
-    {"stiebel_calculated_el_leistung_heiz_w", LNAME_CALC_EL_LEISTUNG_HEIZ_W, "heatingpump/calculated/el_leistung_heiz_w/state",
+    {"stiebel_calculated_el_leistung_heiz_w", LNAME_CALC_EL_LEISTUNG_HEIZ_W, HA_TOPIC_ROOT "/calculated/el_leistung_heiz_w/state",
      "sensor", "power", "W", "measurement", "mdi:lightning-bolt", "", "", "", true, true},
-    {"stiebel_calculated_el_leistung_ww_w", LNAME_CALC_EL_LEISTUNG_WW_W, "heatingpump/calculated/el_leistung_ww_w/state",
+    {"stiebel_calculated_el_leistung_ww_w", LNAME_CALC_EL_LEISTUNG_WW_W, HA_TOPIC_ROOT "/calculated/el_leistung_ww_w/state",
      "sensor", "power", "W", "measurement", "mdi:lightning-bolt", "", "", "", true, true},
 
     // Summer mode as the WPMW II decides it (append only: indices above are hardcoded)
-    {"stiebel_calculated_sommerbetrieb_aktiv", LNAME_CALC_SOMMERBETRIEB_AKTIV, "heatingpump/calculated/sommerbetrieb_aktiv/state",
+    {"stiebel_calculated_sommerbetrieb_aktiv", LNAME_CALC_SOMMERBETRIEB_AKTIV, HA_TOPIC_ROOT "/calculated/sommerbetrieb_aktiv/state",
      "binary_sensor", "", "", "", "mdi:weather-sunny", "on", "off", "", true, true},
-    {"stiebel_calculated_aussentemp_gedaempft", LNAME_CALC_AUSSENTEMP_GEDAEMPFT, "heatingpump/calculated/aussentemp_gedaempft/state",
+    {"stiebel_calculated_aussentemp_gedaempft", LNAME_CALC_AUSSENTEMP_GEDAEMPFT, HA_TOPIC_ROOT "/calculated/aussentemp_gedaempft/state",
      "sensor", "temperature", "°C", "measurement", "mdi:thermometer-lines", "", "", "", true, true},
 
     // Control deviation of the WPM II: KESSEL return sensor (X2/3 = control sensor HK1)
     // minus the return setpoint. The compressor starts at about -0.7 K and stops at
     // about +2.6 K (measured on a WPL 13 E, five runs), so the value shows the
     // switching state directly.
-    {"stiebel_calculated_regelabweichung", LNAME_CALC_REGELABWEICHUNG, "heatingpump/calculated/regelabweichung/state",
+    {"stiebel_calculated_regelabweichung", LNAME_CALC_REGELABWEICHUNG, HA_TOPIC_ROOT "/calculated/regelabweichung/state",
      "sensor", "temperature", "K", "measurement", "mdi:swap-vertical", "", "", "", true, true},
 
     // More CAN/MQTT diagnostics (#55). CAN values come from twai_get_status_info()
     // and stay silent on MCP2515 builds; the MQTT counter is published on both.
-    {"stiebel_calculated_can_rx_missed",  LNAME_CALC_CAN_RX_MISSED,  "heatingpump/calculated/can_rx_missed/state",
+    {"stiebel_calculated_can_rx_missed",  LNAME_CALC_CAN_RX_MISSED,  HA_TOPIC_ROOT "/calculated/can_rx_missed/state",
      "sensor", "", "", "total_increasing", "mdi:message-alert-outline", "", "", "diagnostic", false, true},
-    {"stiebel_calculated_can_rx_overrun", LNAME_CALC_CAN_RX_OVERRUN, "heatingpump/calculated/can_rx_overrun/state",
+    {"stiebel_calculated_can_rx_overrun", LNAME_CALC_CAN_RX_OVERRUN, HA_TOPIC_ROOT "/calculated/can_rx_overrun/state",
      "sensor", "", "", "total_increasing", "mdi:message-alert", "", "", "diagnostic", false, true},
-    {"stiebel_calculated_can_rx_queue",   LNAME_CALC_CAN_RX_QUEUE,   "heatingpump/calculated/can_rx_queue/state",
+    {"stiebel_calculated_can_rx_queue",   LNAME_CALC_CAN_RX_QUEUE,   HA_TOPIC_ROOT "/calculated/can_rx_queue/state",
      "sensor", "", "", "measurement", "mdi:tray-full", "", "", "diagnostic", false, true},
-    {"stiebel_calculated_mqtt_publish_failures", LNAME_CALC_MQTT_PUBLISH_FAILURES, "heatingpump/calculated/mqtt_publish_failures/state",
+    {"stiebel_calculated_mqtt_publish_failures", LNAME_CALC_MQTT_PUBLISH_FAILURES, HA_TOPIC_ROOT "/calculated/mqtt_publish_failures/state",
      "sensor", "", "", "total_increasing", "mdi:message-off-outline", "", "", "diagnostic", false, true},
 
     // Compressor starts and runtime today (#49), from compressor_active, debounced
-    {"stiebel_calculated_verdichter_starts_heute", LNAME_CALC_VERDICHTER_STARTS_HEUTE, "heatingpump/calculated/verdichter_starts_heute/state",
+    {"stiebel_calculated_verdichter_starts_heute", LNAME_CALC_VERDICHTER_STARTS_HEUTE, HA_TOPIC_ROOT "/calculated/verdichter_starts_heute/state",
      "sensor", "", "", "total_increasing", "mdi:counter", "", "", "", true, true},
-    {"stiebel_calculated_verdichter_laufzeit_heute", LNAME_CALC_VERDICHTER_LAUFZEIT_HEUTE, "heatingpump/calculated/verdichter_laufzeit_heute/state",
+    {"stiebel_calculated_verdichter_laufzeit_heute", LNAME_CALC_VERDICHTER_LAUFZEIT_HEUTE, HA_TOPIC_ROOT "/calculated/verdichter_laufzeit_heute/state",
      "sensor", "duration", "min", "total_increasing", "mdi:timer-outline", "", "", "", true, true},
-    {"stiebel_calculated_verdichter_laufzeit_mittel", LNAME_CALC_VERDICHTER_LAUFZEIT_MITTEL, "heatingpump/calculated/verdichter_laufzeit_mittel/state",
+    {"stiebel_calculated_verdichter_laufzeit_mittel", LNAME_CALC_VERDICHTER_LAUFZEIT_MITTEL, HA_TOPIC_ROOT "/calculated/verdichter_laufzeit_mittel/state",
      "sensor", "duration", "min", "measurement", "mdi:timer-sand", "", "", "", true, true},
 
     // Defrost running, from ZEITDAUER_LETZTE_ABTAUUNG (0 while a defrost runs, #48)
-    {"stiebel_calculated_abtauung_laeuft", LNAME_CALC_ABTAUUNG_LAEUFT, "heatingpump/calculated/abtauung_laeuft/state",
+    {"stiebel_calculated_abtauung_laeuft", LNAME_CALC_ABTAUUNG_LAEUFT, HA_TOPIC_ROOT "/calculated/abtauung_laeuft/state",
      "binary_sensor", "running", "", "", "mdi:snowflake-melt", "on", "off", "", true, true},
 
     // COP (from the energy counters, announced with the first COP value). Their existing
     // discovery topics .../cop_ww/config etc. are kept (objectId).
-    {"stiebel_cop_ww", LNAME_COP_WW, "heatingpump/calculated/cop_ww/state",
+    {"stiebel_cop_ww", LNAME_COP_WW, HA_TOPIC_ROOT "/calculated/cop_ww/state",
      "sensor", "", "", "measurement", "mdi:water-boiler", "", "", "", true, true, "cop_ww"},
-    {"stiebel_cop_heiz", LNAME_COP_HEIZ, "heatingpump/calculated/cop_heiz/state",
+    {"stiebel_cop_heiz", LNAME_COP_HEIZ, HA_TOPIC_ROOT "/calculated/cop_heiz/state",
      "sensor", "", "", "measurement", "mdi:radiator", "", "", "", true, true, "cop_heiz"},
-    {"stiebel_cop_gesamt", LNAME_COP_GESAMT, "heatingpump/calculated/cop_gesamt/state",
+    {"stiebel_cop_gesamt", LNAME_COP_GESAMT, HA_TOPIC_ROOT "/calculated/cop_gesamt/state",
      "sensor", "", "", "measurement", "mdi:chart-line", "", "", "", true, true, "cop_gesamt"}
 };
 
@@ -833,7 +835,7 @@ inline StateCacheEntry* stateCacheFind(uint32_t hash, const char* topicOrMember,
 
 inline const char* stateEntryTopic(const StateCacheEntry& e, char* buf, size_t len) {
     if (!e.signal) return e.topic;
-    snprintf(buf, len, "heatingpump/%s/%s/state", e.topic, e.signal);
+    snprintf(buf, len, HA_TOPIC_ROOT "/%s/%s/state", e.topic, e.signal);
     return buf;
 }
 
@@ -1256,7 +1258,7 @@ void publishCalculatedSensorDiscovery(const CalculatedSensorConfig& config, bool
     // Build discovery topic
     char discoveryTopic[256];
     snprintf(discoveryTopic, sizeof(discoveryTopic), 
-             "homeassistant/%s/heatingpump/%s/config", config.component,
+             "homeassistant/%s/" HA_TOPIC_ROOT "/%s/config", config.component,
              config.objectId ? config.objectId : config.uniqueId);
     
     // Build JSON payload
@@ -1380,15 +1382,15 @@ void publishWritableNumberDiscovery(const WritableNumberConfig& config, bool for
     // Build discovery topic: homeassistant/number/heatingpump/<unique_id>/config
     char discoveryTopic[256];
     snprintf(discoveryTopic, sizeof(discoveryTopic), 
-             "homeassistant/number/heatingpump/%s/config", uid.c_str());
+             "homeassistant/number/" HA_TOPIC_ROOT "/%s/config", uid.c_str());
     
     // Build command topic: heatingpump/<MEMBER>/<SIGNAL>/set
     char commandTopic[128];
-    snprintf(commandTopic, sizeof(commandTopic), "heatingpump/%s/%s/set", cm->Name, config.signalName);
+    snprintf(commandTopic, sizeof(commandTopic), HA_TOPIC_ROOT "/%s/%s/set", cm->Name, config.signalName);
     
     // Build state topic: heatingpump/<MEMBER>/<SIGNAL>/state
     char stateTopic[128];
-    snprintf(stateTopic, sizeof(stateTopic), "heatingpump/%s/%s/state", cm->Name, config.signalName);
+    snprintf(stateTopic, sizeof(stateTopic), HA_TOPIC_ROOT "/%s/%s/state", cm->Name, config.signalName);
     
     // Build JSON payload
     std::ostringstream payload;
@@ -1450,18 +1452,18 @@ void publishClimateDiscoveries() {
           << defaultEntityIdJson("climate", "stiebel_climate_heizung")
           << "\"modes\":[\"heat\"],\"temperature_unit\":\"C\","
           << "\"min_temp\":" << room->min << ",\"max_temp\":" << room->max << ",\"temp_step\":" << room->step << ","
-          << "\"temperature_command_topic\":\"heatingpump/" << cm->Name << "/RAUMSOLLTEMP_I/set\","
-          << "\"temperature_state_topic\":\"heatingpump/" << cm->Name << "/RAUMSOLLTEMP_I/state\","
+          << "\"temperature_command_topic\":\"" HA_TOPIC_ROOT "/" << cm->Name << "/RAUMSOLLTEMP_I/set\","
+          << "\"temperature_state_topic\":\"" HA_TOPIC_ROOT "/" << cm->Name << "/RAUMSOLLTEMP_I/state\","
           << "\"preset_modes\":[";
         for (size_t i = 0; i < sizeof(programmschalterOptions) / sizeof(programmschalterOptions[0]); i++)
             p << (i ? "," : "") << "\"" << programmschalterOptions[i] << "\"";
-        p << "],\"preset_mode_command_topic\":\"heatingpump/MANAGER/PROGRAMMSCHALTER/set\","
-          << "\"preset_mode_state_topic\":\"heatingpump/MANAGER/PROGRAMMSCHALTER/state\","
-          << "\"action_topic\":\"heatingpump/calculated/compressor_active/state\","
+        p << "],\"preset_mode_command_topic\":\"" HA_TOPIC_ROOT "/MANAGER/PROGRAMMSCHALTER/set\","
+          << "\"preset_mode_state_topic\":\"" HA_TOPIC_ROOT "/MANAGER/PROGRAMMSCHALTER/state\","
+          << "\"action_topic\":\"" HA_TOPIC_ROOT "/calculated/compressor_active/state\","
           << "\"action_template\":\"{{ 'heating' if value == 'on' else 'idle' }}\","
-          << "\"availability_topic\":\"heatingpump/status\",\"icon\":\"mdi:radiator\"," << device << "}";
+          << "\"availability_topic\":\"" HA_TOPIC_ROOT "/status\",\"icon\":\"mdi:radiator\"," << device << "}";
         std::string s = p.str();
-        mqttPublish("homeassistant/climate/heatingpump/stiebel_climate_heizung/config", s.c_str(), s.length());
+        mqttPublish("homeassistant/climate/" HA_TOPIC_ROOT "/stiebel_climate_heizung/config", s.c_str(), s.length());
     }
 
     // Hot water: tank actual temperature + DHW setpoint
@@ -1472,12 +1474,12 @@ void publishClimateDiscoveries() {
           << defaultEntityIdJson("climate", "stiebel_climate_warmwasser")
           << "\"modes\":[\"heat\"],\"temperature_unit\":\"C\","
           << "\"min_temp\":" << dhw->min << ",\"max_temp\":" << dhw->max << ",\"temp_step\":" << dhw->step << ","
-          << "\"temperature_command_topic\":\"heatingpump/" << cm->Name << "/EINSTELL_SPEICHERSOLLTEMP/set\","
-          << "\"temperature_state_topic\":\"heatingpump/" << cm->Name << "/EINSTELL_SPEICHERSOLLTEMP/state\","
-          << "\"current_temperature_topic\":\"heatingpump/" << (wpl17 ? "KESSEL_CANB" : "KESSEL") << "/SPEICHERISTTEMP/state\","
-          << "\"availability_topic\":\"heatingpump/status\",\"icon\":\"mdi:water-boiler\"," << device << "}";
+          << "\"temperature_command_topic\":\"" HA_TOPIC_ROOT "/" << cm->Name << "/EINSTELL_SPEICHERSOLLTEMP/set\","
+          << "\"temperature_state_topic\":\"" HA_TOPIC_ROOT "/" << cm->Name << "/EINSTELL_SPEICHERSOLLTEMP/state\","
+          << "\"current_temperature_topic\":\"" HA_TOPIC_ROOT "/" << (wpl17 ? "KESSEL_CANB" : "KESSEL") << "/SPEICHERISTTEMP/state\","
+          << "\"availability_topic\":\"" HA_TOPIC_ROOT "/status\",\"icon\":\"mdi:water-boiler\"," << device << "}";
         std::string s = p.str();
-        mqttPublish("homeassistant/climate/heatingpump/stiebel_climate_warmwasser/config", s.c_str(), s.length());
+        mqttPublish("homeassistant/climate/" HA_TOPIC_ROOT "/stiebel_climate_warmwasser/config", s.c_str(), s.length());
     }
 }
 
@@ -1551,16 +1553,16 @@ void publishWritableSelectDiscovery(const WritableSelectConfig& config, bool for
     
     // Build discovery topic
     std::ostringstream discoveryTopicStream;
-    discoveryTopicStream << "homeassistant/select/heatingpump/" << uniqueIdStr << "/config";
+    discoveryTopicStream << "homeassistant/select/" HA_TOPIC_ROOT "/" << uniqueIdStr << "/config";
     std::string discoveryTopic = discoveryTopicStream.str();
     
     // Build command and state topics
     std::ostringstream commandTopicStream;
-    commandTopicStream << "heatingpump/" << cm->Name << "/" << config.signalName << "/set";
+    commandTopicStream << HA_TOPIC_ROOT "/" << cm->Name << "/" << config.signalName << "/set";
     std::string commandTopic = commandTopicStream.str();
     
     std::ostringstream stateTopicStream;
-    stateTopicStream << "heatingpump/" << cm->Name << "/" << config.signalName << "/state";
+    stateTopicStream << HA_TOPIC_ROOT "/" << cm->Name << "/" << config.signalName << "/state";
     std::string stateTopic = stateTopicStream.str();
     
     // Build JSON payload
@@ -1654,7 +1656,7 @@ void publishDate()
     std::string datum = "20" + jahr + "-" + monat + "-" + tag;
     
     // Publish state to MQTT
-    const char* stateTopic = "heatingpump/calculated/date/state";
+    const char* stateTopic = HA_TOPIC_ROOT "/calculated/date/state";
     publishCalculatedState(stateTopic, datum.c_str());
     ESP_LOGD("CALC", "Published date: %s (Jahr=%d, Monat=%d, Tag=%d)", datum.c_str(), ijahr, imonat, itag);
 }
@@ -1692,7 +1694,7 @@ void publishTime()
     snprintf(zeit, sizeof(zeit), "%02u:%02u:%02u", (unsigned)istunde % 100u, (unsigned)iminute % 100u, (unsigned)isekunde % 100u);
     
     // Publish state to MQTT
-    const char* stateTopic = "heatingpump/calculated/time/state";
+    const char* stateTopic = HA_TOPIC_ROOT "/calculated/time/state";
     publishCalculatedState(stateTopic, zeit);
     ESP_LOGD("CALC", "Published time: %s (Stunde=%d, Minute=%d, Sekunde=%d)", zeit, istunde, iminute, isekunde);
 }
@@ -1733,7 +1735,7 @@ void publishDeltaTContinuous()
     // Publish state to MQTT
     char value[16];
     snprintf(value, sizeof(value), "%.2f", deltaT);
-    const char* stateTopic = "heatingpump/calculated/delta_t_continuous/state";
+    const char* stateTopic = HA_TOPIC_ROOT "/calculated/delta_t_continuous/state";
     publishCalculatedState(stateTopic, value);
 }
 
@@ -1759,7 +1761,7 @@ void publishDeltaTRunning()
     // Publish state to MQTT
     char value[16];
     snprintf(value, sizeof(value), "%.2f", deltaT);
-    const char* stateTopic = "heatingpump/calculated/delta_t_running/state";
+    const char* stateTopic = HA_TOPIC_ROOT "/calculated/delta_t_running/state";
     publishCalculatedState(stateTopic, value);
 }
 
@@ -1833,7 +1835,7 @@ void publishCompressorActive()
     
     // Publish state to MQTT
     const char* state = isActive ? "on" : "off";
-    const char* stateTopic = "heatingpump/calculated/compressor_active/state";
+    const char* stateTopic = HA_TOPIC_ROOT "/calculated/compressor_active/state";
     publishCalculatedState(stateTopic, state);
     // Note: Delta T running is published separately by scheduler
 
@@ -1854,7 +1856,7 @@ void publishRegelabweichung()
 
     char value[16];
     snprintf(value, sizeof(value), "%.2f", lastKesselRuecklaufIst - lastKesselSollTemp);
-    const char* stateTopic = "heatingpump/calculated/regelabweichung/state";
+    const char* stateTopic = HA_TOPIC_ROOT "/calculated/regelabweichung/state";
     publishCalculatedState(stateTopic, value);
 }
 
@@ -1924,11 +1926,11 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
     // Build discovery topic
     char discoveryTopic[256];
     snprintf(discoveryTopic, sizeof(discoveryTopic), 
-             "homeassistant/%s/heatingpump/%s/config", component, uid.c_str());
+             "homeassistant/%s/" HA_TOPIC_ROOT "/%s/config", component, uid.c_str());
     
     // Build state topic
     char stateTopic[128];
-    snprintf(stateTopic, sizeof(stateTopic), "heatingpump/%s/%s/state", cm.Name, ei->Name);
+    snprintf(stateTopic, sizeof(stateTopic), HA_TOPIC_ROOT "/%s/%s/state", cm.Name, ei->Name);
     
     // Build JSON payload efficiently using ostringstream
     std::ostringstream payload;
@@ -1936,7 +1938,7 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
             << "\"unique_id\":\"" << uid << "\","
             << defaultEntityIdJson(component, uid)
             << "\"state_topic\":\"" << stateTopic << "\","
-            << "\"availability_topic\":\"heatingpump/status\"";
+            << "\"availability_topic\":\"" HA_TOPIC_ROOT "/status\"";
     
     // For binary sensors, specify payload values
     if (strcmp(component, "binary_sensor") == 0 && payloadOn && payloadOff) {
@@ -1969,7 +1971,7 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
         payload << ",\"icon\":\"" << icon << "\"";
     }
     if (strcmp(ei->Name, "FEHLERMELDUNG") == 0) {
-        payload << ",\"json_attributes_topic\":\"heatingpump/" << cm.Name << "/FEHLERMELDUNG/attributes\"";
+        payload << ",\"json_attributes_topic\":\"" HA_TOPIC_ROOT "/" << cm.Name << "/FEHLERMELDUNG/attributes\"";
     }
     
     // Device info - create individual device per CAN member as sub-device
@@ -2074,7 +2076,7 @@ void publishMqttState(const CanMember &cm, const ElsterIndex *ei, const char *va
     
     // Build state topic with bounds checking
     char stateTopic[128];
-    int written = snprintf(stateTopic, sizeof(stateTopic), "heatingpump/%s/%s/state", cm.Name, ei->Name);
+    int written = snprintf(stateTopic, sizeof(stateTopic), HA_TOPIC_ROOT "/%s/%s/state", cm.Name, ei->Name);
     if (written >= (int)sizeof(stateTopic)) {
         ESP_LOGW("MQTT", "Topic too long for %s/%s, truncated", cm.Name, ei->Name);
     }
@@ -2451,16 +2453,16 @@ void publishCombinedEnergySensors() {
         publishCalculatedState(topic, valueStr);
         ESP_LOGD("ENERGIE", "Gesamt (%s): %.3f kWh", key, total);
     };
-    publishTotal(calculatedSensors[CALC_IDX_ENERGIE_HEIZ_TOTAL_KWH], "heatingpump/calculated/energie_heiz_total_kwh/state", "combined_energie_heiz", 0,
+    publishTotal(calculatedSensors[CALC_IDX_ENERGIE_HEIZ_TOTAL_KWH], HA_TOPIC_ROOT "/calculated/energie_heiz_total_kwh/state", "combined_energie_heiz", 0,
                  "EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", "EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH",
                  "EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", "EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH");
-    publishTotal(calculatedSensors[CALC_IDX_ENERGIE_WW_TOTAL_KWH], "heatingpump/calculated/energie_ww_total_kwh/state", "combined_energie_ww", 1,
+    publishTotal(calculatedSensors[CALC_IDX_ENERGIE_WW_TOTAL_KWH], HA_TOPIC_ROOT "/calculated/energie_ww_total_kwh/state", "combined_energie_ww", 1,
                  "EL_AUFNAHMELEISTUNG_WW_SUM_MWH", "EL_AUFNAHMELEISTUNG_WW_SUM_KWH",
                  "EL_AUFNAHMELEISTUNG_WW_TAG_KWH", "EL_AUFNAHMELEISTUNG_WW_TAG_WH");
-    publishTotal(calculatedSensors[CALC_IDX_WAERME_HEIZ_TOTAL_KWH], "heatingpump/calculated/waerme_heiz_total_kwh/state", "combined_waerme_heiz", 2,
+    publishTotal(calculatedSensors[CALC_IDX_WAERME_HEIZ_TOTAL_KWH], HA_TOPIC_ROOT "/calculated/waerme_heiz_total_kwh/state", "combined_waerme_heiz", 2,
                  "WAERMEERTRAG_HEIZ_SUM_MWH", "WAERMEERTRAG_HEIZ_SUM_KWH",
                  "WAERMEERTRAG_HEIZ_TAG_KWH", "WAERMEERTRAG_HEIZ_TAG_WH");
-    publishTotal(calculatedSensors[CALC_IDX_WAERME_WW_TOTAL_KWH], "heatingpump/calculated/waerme_ww_total_kwh/state", "combined_waerme_ww", 3,
+    publishTotal(calculatedSensors[CALC_IDX_WAERME_WW_TOTAL_KWH], HA_TOPIC_ROOT "/calculated/waerme_ww_total_kwh/state", "combined_waerme_ww", 3,
                  "WAERMEERTRAG_WW_SUM_MWH", "WAERMEERTRAG_WW_SUM_KWH",
                  "WAERMEERTRAG_WW_TAG_KWH", "WAERMEERTRAG_WW_TAG_WH");
 
@@ -2518,7 +2520,7 @@ void publishCombinedEnergySensors() {
             }
             opState = ns;
             publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_BETRIEBSSTATUS], false);
-            publishCalculatedState("heatingpump/calculated/betriebsstatus/state", opState);
+            publishCalculatedState(HA_TOPIC_ROOT "/calculated/betriebsstatus/state", opState);
             lastStatusMs = nowMs;
         }
 
@@ -2533,11 +2535,11 @@ void publishCombinedEnergySensors() {
             snprintf(ph, sizeof(ph), "%.0f", pHeiz);
             snprintf(pw, sizeof(pw), "%.0f", pWw);
             publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_EL_LEISTUNG_W], false);
-            publishCalculatedState("heatingpump/calculated/el_leistung_w/state", v);
+            publishCalculatedState(HA_TOPIC_ROOT "/calculated/el_leistung_w/state", v);
             publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_EL_LEISTUNG_HEIZ_W], false);
-            publishCalculatedState("heatingpump/calculated/el_leistung_heiz_w/state", ph);
+            publishCalculatedState(HA_TOPIC_ROOT "/calculated/el_leistung_heiz_w/state", ph);
             publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_EL_LEISTUNG_WW_W], false);
-            publishCalculatedState("heatingpump/calculated/el_leistung_ww_w/state", pw);
+            publishCalculatedState(HA_TOPIC_ROOT "/calculated/el_leistung_ww_w/state", pw);
             ESP_LOGD("ENERGIE", "Leistung: %.0f W (Heiz %.0f, WW %.0f) in %.0fs", pHeiz + pWw, pHeiz, pWw, dtSec);
             accHeizWh = 0.0f; accWwWh = 0.0f; windowStartMs = nowMs;
         }
@@ -2558,10 +2560,10 @@ void publishCombinedEnergySensors() {
             publishCalculatedSensorDiscovery(cfg, false);
             publishCalculatedState(topic, s);
         };
-        pubDaily("EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", "EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH", calculatedSensors[CALC_IDX_ENERGIE_HEIZ_TAG_KWH], "heatingpump/calculated/energie_heiz_tag_kwh/state");
-        pubDaily("EL_AUFNAHMELEISTUNG_WW_TAG_KWH",   "EL_AUFNAHMELEISTUNG_WW_TAG_WH",   calculatedSensors[CALC_IDX_ENERGIE_WW_TAG_KWH], "heatingpump/calculated/energie_ww_tag_kwh/state");
-        pubDaily("WAERMEERTRAG_HEIZ_TAG_KWH",        "WAERMEERTRAG_HEIZ_TAG_WH",        calculatedSensors[CALC_IDX_WAERME_HEIZ_TAG_KWH], "heatingpump/calculated/waerme_heiz_tag_kwh/state");
-        pubDaily("WAERMEERTRAG_WW_TAG_KWH",          "WAERMEERTRAG_WW_TAG_WH",          calculatedSensors[CALC_IDX_WAERME_WW_TAG_KWH], "heatingpump/calculated/waerme_ww_tag_kwh/state");
+        pubDaily("EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", "EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH", calculatedSensors[CALC_IDX_ENERGIE_HEIZ_TAG_KWH], HA_TOPIC_ROOT "/calculated/energie_heiz_tag_kwh/state");
+        pubDaily("EL_AUFNAHMELEISTUNG_WW_TAG_KWH",   "EL_AUFNAHMELEISTUNG_WW_TAG_WH",   calculatedSensors[CALC_IDX_ENERGIE_WW_TAG_KWH], HA_TOPIC_ROOT "/calculated/energie_ww_tag_kwh/state");
+        pubDaily("WAERMEERTRAG_HEIZ_TAG_KWH",        "WAERMEERTRAG_HEIZ_TAG_WH",        calculatedSensors[CALC_IDX_WAERME_HEIZ_TAG_KWH], HA_TOPIC_ROOT "/calculated/waerme_heiz_tag_kwh/state");
+        pubDaily("WAERMEERTRAG_WW_TAG_KWH",          "WAERMEERTRAG_WW_TAG_WH",          calculatedSensors[CALC_IDX_WAERME_WW_TAG_KWH], HA_TOPIC_ROOT "/calculated/waerme_ww_tag_kwh/state");
     }
 }
 
@@ -2698,8 +2700,8 @@ inline bool handleSgReadyRoomBoost(int state, const std::string& payload) {
     if (state == 3) sgReadyController.setRoomBoostState3(v);
     else sgReadyController.setRoomBoostState4(v);
     saveSgBoosts();
-    char topic[64], value[16];
-    snprintf(topic, sizeof(topic), "heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE%d/state", state);
+    char topic[96], value[16];
+    snprintf(topic, sizeof(topic), HA_TOPIC_ROOT "/MANAGER/SG_READY_ROOM_BOOST_STATE%d/state", state);
     snprintf(value, sizeof(value), "%.1f",
              state == 3 ? sgReadyController.roomBoostState3() : sgReadyController.roomBoostState4());
     mqttPublish(topic, value, strlen(value));
@@ -2718,19 +2720,19 @@ inline bool publishSgReadyState() {
     if (st < SgReadyController::STATE_EVU_LOCK || st > SgReadyController::STATE_FORCED)
         st = SgReadyController::STATE_NORMAL;
     const char* s = sgReadyStateLabel(st);
-    bool ok = mqttPublish("heatingpump/MANAGER/SG_READY_STATE/state", s, strlen(s));
+    bool ok = mqttPublish(HA_TOPIC_ROOT "/MANAGER/SG_READY_STATE/state", s, strlen(s));
     char b3[16], b4[16];
     snprintf(b3, sizeof(b3), "%.1f", sgReadyBoostState3Value());
     snprintf(b4, sizeof(b4), "%.1f", sgReadyBoostState4Value());
-    ok &= mqttPublish("heatingpump/MANAGER/SG_READY_BOOST_STATE3/state", b3, strlen(b3));
-    ok &= mqttPublish("heatingpump/MANAGER/SG_READY_BOOST_STATE4/state", b4, strlen(b4));
+    ok &= mqttPublish(HA_TOPIC_ROOT "/MANAGER/SG_READY_BOOST_STATE3/state", b3, strlen(b3));
+    ok &= mqttPublish(HA_TOPIC_ROOT "/MANAGER/SG_READY_BOOST_STATE4/state", b4, strlen(b4));
     char r3[16], r4[16];
     snprintf(r3, sizeof(r3), "%.1f", sgReadyController.roomBoostState3());
     snprintf(r4, sizeof(r4), "%.1f", sgReadyController.roomBoostState4());
-    ok &= mqttPublish("heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE3/state", r3, strlen(r3));
-    ok &= mqttPublish("heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE4/state", r4, strlen(r4));
+    ok &= mqttPublish(HA_TOPIC_ROOT "/MANAGER/SG_READY_ROOM_BOOST_STATE3/state", r3, strlen(r3));
+    ok &= mqttPublish(HA_TOPIC_ROOT "/MANAGER/SG_READY_ROOM_BOOST_STATE4/state", r4, strlen(r4));
     const char* mode = sgReadyController.normalAutomatik() ? sgNormalModeOptions[1] : sgNormalModeOptions[0];
-    ok &= mqttPublish("heatingpump/MANAGER/SG_READY_NORMAL_MODE/state", mode, strlen(mode));
+    ok &= mqttPublish(HA_TOPIC_ROOT "/MANAGER/SG_READY_NORMAL_MODE/state", mode, strlen(mode));
     return ok;
 }
 
@@ -2811,11 +2813,11 @@ inline bool publishTimeProgramDiscovery(int prog, int day) {
     const char* key = TIME_PROGRAM_KEYS[day];
     char uid[48], topic[112];
     snprintf(uid, sizeof(uid), "%s%s", def.uid, key);
-    snprintf(topic, sizeof(topic), "homeassistant/%s/heatingpump/%s/config", writable ? "text" : "sensor", uid);
+    snprintf(topic, sizeof(topic), "homeassistant/%s/" HA_TOPIC_ROOT "/%s/config", writable ? "text" : "sensor", uid);
     std::string p = std::string("{\"name\":\"") + def.names[day] + "\",\"unique_id\":\"" + uid + "\"," +
-                    defaultEntityIdJson(writable ? "text" : "sensor", uid) + "\"state_topic\":\"heatingpump/" + def.topic + "/" + key + "/state\",";
+                    defaultEntityIdJson(writable ? "text" : "sensor", uid) + "\"state_topic\":\"" HA_TOPIC_ROOT "/" + def.topic + "/" + key + "/state\",";
     if (writable)
-        p += std::string("\"command_topic\":\"heatingpump/") + def.topic + "/" + key + "/set\",\"max\":40,";
+        p += std::string("\"command_topic\":\"" HA_TOPIC_ROOT "/") + def.topic + "/" + key + "/set\",\"max\":40,";
     p += "\"icon\":\"mdi:calendar-clock\"," HA_MAIN_DEVICE_JSON "}";
     return mqttPublish(topic, p.c_str(), p.size());
 }
@@ -2827,8 +2829,8 @@ inline void timeProgramPublish(int prog, int day, bool force) {
     const std::string text = dhwprog::dayText(d.period);
     const uint32_t now = millis();
     if (!force && text == d.published && now - d.publishedMs < DHW_PROGRAM_HEARTBEAT_MS) return;
-    char topic[64];
-    snprintf(topic, sizeof(topic), "heatingpump/%s/%s/state", TIME_PROGRAMS[prog].topic, TIME_PROGRAM_KEYS[day]);
+    char topic[96];
+    snprintf(topic, sizeof(topic), HA_TOPIC_ROOT "/%s/%s/state", TIME_PROGRAMS[prog].topic, TIME_PROGRAM_KEYS[day]);
     if (mqttPublish(topic, text.c_str(), text.size())) {
         d.published = text;
         d.publishedMs = now;
@@ -2903,7 +2905,7 @@ inline bool handleHeating2ProgramCommand(int day, const std::string& payload) {
 // <A>/<B> is either <MEMBER>/<SIGNAL> (writable numbers and selects, looked up by signal
 // name and member) or <program>/<day> (time programs). Adding or removing a writable
 // entity only touches its table row. common.yaml subscribes "<root>/+/+/set" once.
-static const char* const MQTT_TOPIC_ROOT = "heatingpump";
+// Topic root: HA_TOPIC_ROOT in config.h, from the device_name substitution (#102).
 // Set from common.yaml: refreshes the native SG Ready entities after a change
 static std::function<void()> onSgReadyChanged;
 
@@ -2985,7 +2987,7 @@ inline bool handleSetCommand(const std::string& topic, const std::string& payloa
         if (slash == std::string::npos) break;
         pos = slash + 1;
     }
-    if (parts.size() != 4 || parts[0] != MQTT_TOPIC_ROOT || parts[3] != "set") return false;
+    if (parts.size() != 4 || parts[0] != HA_TOPIC_ROOT || parts[3] != "set") return false;
     ESP_LOGI("MQTT_CMD", "%s/%s = %s", parts[1].c_str(), parts[2].c_str(), payload.c_str());
     for (int prog = 0; prog < TP_COUNT; prog++) {
         if (parts[1] != TIME_PROGRAMS[prog].topic) continue;
@@ -3350,8 +3352,8 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
             break;
 
         case HASH_FEHLERMELDUNG: {
-            char topic[64], buf[192];
-            snprintf(topic, sizeof(topic), "heatingpump/%s/FEHLERMELDUNG/attributes", cm.Name);
+            char topic[96], buf[192];
+            snprintf(topic, sizeof(topic), HA_TOPIC_ROOT "/%s/FEHLERMELDUNG/attributes", cm.Name);
             snprintf(buf, sizeof(buf), "{\"abhilfe\":\"%s\"}", faultRemedy(value));
             mqttPublish(topic, buf, strlen(buf));
             break;
@@ -3469,9 +3471,9 @@ void publishCanDiagnostics() {
         snprintf(buf, sizeof(buf), "%lu", (unsigned long)v);
         publishCalculatedState(topic, buf);
     };
-    pub("heatingpump/calculated/can_tec/state", status.tx_error_counter);
-    pub("heatingpump/calculated/can_rec/state", status.rx_error_counter);
-    pub("heatingpump/calculated/can_bus_errors/state", status.bus_error_count);
+    pub(HA_TOPIC_ROOT "/calculated/can_tec/state", status.tx_error_counter);
+    pub(HA_TOPIC_ROOT "/calculated/can_rec/state", status.rx_error_counter);
+    pub(HA_TOPIC_ROOT "/calculated/can_bus_errors/state", status.bus_error_count);
     // Frames lost because the RX queue was full / the hardware FIFO overran, and
     // frames waiting in the RX queue right now (loop latency indicator)
     pub(calculatedSensors[CALC_IDX_CAN_RX_MISSED].stateTopic, status.rx_missed_count);
@@ -3486,7 +3488,7 @@ void publishCanDiagnostics() {
         case TWAI_STATE_RECOVERING: stateStr = "Erholung";  break;
         default:                    stateStr = "Unbekannt"; break;
     }
-    publishCalculatedState("heatingpump/calculated/can_state/state", stateStr);
+    publishCalculatedState(HA_TOPIC_ROOT "/calculated/can_state/state", stateStr);
 #endif  // HA_HAS_TWAI
 }
 
@@ -3590,7 +3592,7 @@ void publishScanStatus(const char* state) {
     snprintf(buf, sizeof(buf), "{\"state\":\"%s\",\"member\":\"%s\",\"done\":%u,\"total\":%u,\"hits\":%u,\"seconds\":%lu}",
              state, scanState.cm ? scanState.cm->Name : "", (unsigned)done, (unsigned)total, scanState.hits,
              (millis() - scanState.startMs) / 1000UL);
-    mqttPublish("heatingpump/scan/status", buf, strlen(buf));
+    mqttPublish(HA_TOPIC_ROOT "/scan/status", buf, strlen(buf));
 }
 
 // payload: "HEIZMODUL" (all table indices) or "HEIZMODUL 0x0000 0x0fff" (range)
@@ -3647,8 +3649,8 @@ bool handleScanFrame(const CanMember& cm, const ElsterIndex* ei, const std::vect
     uint16_t raw = longIdx ? (msg[5] << 8) | msg[6] : (msg[3] << 8) | msg[4];
     if (raw != 0x8000) {
         scanState.hits++;
-        char topic[48], buf[128];
-        snprintf(topic, sizeof(topic), "heatingpump/scan/%s/0x%04x", cm.Name, idx);
+        char topic[96], buf[128];
+        snprintf(topic, sizeof(topic), HA_TOPIC_ROOT "/scan/%s/0x%04x", cm.Name, idx);
         snprintf(buf, sizeof(buf), "{\"name\":\"%s\",\"raw\":%u,\"value\":\"%s\"}",
                  ei->Index == idx ? ei->Name : "", raw, value.c_str());
         mqttPublish(topic, buf, strlen(buf));
@@ -3709,11 +3711,11 @@ void publishFaultList() {
     if (!discovered) {
         const std::string cfgStr = "{\"name\":\"" LNAME_CALC_FEHLERLISTE "\",\"unique_id\":\"stiebel_calculated_fehlerliste\"," +
             defaultEntityIdJson("sensor", "stiebel_calculated_fehlerliste") +
-            "\"state_topic\":\"heatingpump/calculated/fehlerliste/state\","
-            "\"json_attributes_topic\":\"heatingpump/calculated/fehlerliste/attributes\","
-            "\"availability_topic\":\"heatingpump/status\",\"icon\":\"mdi:clipboard-alert-outline\","
+            "\"state_topic\":\"" HA_TOPIC_ROOT "/calculated/fehlerliste/state\","
+            "\"json_attributes_topic\":\"" HA_TOPIC_ROOT "/calculated/fehlerliste/attributes\","
+            "\"availability_topic\":\"" HA_TOPIC_ROOT "/status\",\"icon\":\"mdi:clipboard-alert-outline\","
             HA_MAIN_DEVICE_JSON "}";
-        mqttPublish("homeassistant/sensor/heatingpump/stiebel_calculated_fehlerliste/config", cfgStr.c_str(), cfgStr.size());
+        mqttPublish("homeassistant/sensor/" HA_TOPIC_ROOT "/stiebel_calculated_fehlerliste/config", cfgStr.c_str(), cfgStr.size());
         discovered = true;
     }
     std::ostringstream a;
@@ -3730,8 +3732,8 @@ void publishFaultList() {
     }
     a << "]}";
     std::string attrs = a.str();
-    mqttPublish("heatingpump/calculated/fehlerliste/attributes", attrs.c_str(), attrs.length());
-    mqttPublish("heatingpump/calculated/fehlerliste/state", newest.c_str(), newest.length());
+    mqttPublish(HA_TOPIC_ROOT "/calculated/fehlerliste/attributes", attrs.c_str(), attrs.length());
+    mqttPublish(HA_TOPIC_ROOT "/calculated/fehlerliste/state", newest.c_str(), newest.length());
 }
 
 // Called every second from common.yaml; pauses during a bus scan.

@@ -114,7 +114,7 @@ public:
 
         // Publish new state to MQTT
         char topic[128];
-        snprintf(topic, sizeof(topic), "heatingpump/MANAGER/SG_READY_STATE/state");
+        snprintf(topic, sizeof(topic), HA_TOPIC_ROOT "/MANAGER/SG_READY_STATE/state");
         io_.publishMqtt(topic, io_.stateLabel(newState));
 
         switch (newState) {

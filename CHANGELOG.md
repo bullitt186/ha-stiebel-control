@@ -32,6 +32,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Changed
 
+- The `device_name` and `friendly_name` substitutions take effect (#102). `device_name` is the
+  ESPHome node name and the root of every MQTT topic, discovery node ID and default entity ID
+  (`<device_name>/MANAGER/…`, `sensor.<device_name>_…`); the firmware has no hard-coded
+  `heatingpump/` topic left. `friendly_name` names the ESPHome device in HA. **Upgrade:** with the
+  default `device_name: heatingpump` nothing changes on the bus or in MQTT. If your
+  `heatingpump.yaml` sets another `device_name`, the hostname, the topics and the discovery configs
+  move to that name: set it back to `heatingpump` to keep everything as it is. The ESPHome device in
+  HA shows your `friendly_name` instead of "Heating Pump CAN Interface". The smoke test takes the
+  root from `device_name` (`make smoke-test`, `--root`).
 - Discovery configs carry a language-independent `default_entity_id`
   (`<domain>.heatingpump_<member>_<signal>`), so DE and EN builds create the same entity IDs on a
   fresh install. The shipped dashboards, `docs/CONFIGURATION.md`, `SG_READY.md` and the SG Ready

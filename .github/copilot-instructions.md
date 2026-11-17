@@ -27,7 +27,7 @@ built-in TWAI controller (recommended) and a classic ESP32 (`esp32dev`) with an 
     numbers/selects, time programs, paced writes, bus scan, fault list
   - `sg_ready_controller.h` — SG Ready state machine (pure C++, IO injected via `ISgReadyIO`)
   - `dhw_program.h` — WPMW II time program parsing/validation (pure C++)
-  - `config.h` — timing constants, `HA_DEVICE_MODEL_STR`
+  - `config.h` — timing constants, `HA_DEVICE_MODEL_STR`, `HA_TOPIC_ROOT`
   - `lang_base.h` (German `LNAME_*`), `lang_en.h` (English overrides), `language_select.h`
   - `elster/ElsterTable.h` — `ElsterTable[]` (name, index, type, blacklist, hasMetadata) and
     `ElsterMetaTable[]` (HA metadata); `elster/KElsterTable.cpp/.h`, `elster/NUtils.*`, `elster/NTypes.h`
@@ -39,7 +39,8 @@ built-in TWAI controller (recommended) and a classic ESP32 (`esp32dev`) with an 
    (`processSignalRequests()`, round-robin, one request per second).
 2. The answer is decoded in `processCanMessage()` with the type from `ElsterTable.h` and handled
    by `updateSensor()`: MQTT discovery on first value, then publish on change
-   (`heatingpump/<MEMBER>/<SIGNAL>/state`). Names, units and device classes come from
+   (`<root>/<MEMBER>/<SIGNAL>/state`, root `HA_TOPIC_ROOT` from `device_name`, default
+   `heatingpump`; never write the root as a literal). Names, units and device classes come from
    `ElsterMetaTable` (`LNAME_*`), otherwise from type defaults.
 3. Calculated values live in `calculatedSensors[]` in `ha-stiebel-control.h`; address rows by the
    `CalcIdx` enum (`CALC_IDX_*`, same order as the table, checked by a static_assert), never by

@@ -2558,3 +2558,73 @@ TEST_CASE("writeSignal: a second read-back follows once the value has settled", 
 }
 
 #include "wpl9_cases.inc"
+
+// ============================================================================
+// MQTT topic root from the device_name substitution (#102)
+// ============================================================================
+// CI builds this file a second time with -DHA_DEVICE_NAME=hp-2 -DTEST_EXPECTED_ROOT="hp-2"
+// and runs the [topic_root] tests: every topic and every topic in a discovery payload must
+// then live under hp-2/, and nothing may still name heatingpump.
+#ifndef TEST_EXPECTED_ROOT
+#define TEST_EXPECTED_ROOT "heatingpump"
+#endif
+
+TEST_CASE("topic root: every topic and discovery payload follows device_name (#102)", "[mqtt][topic_root]") {
+    const std::string root = TEST_EXPECTED_ROOT;
+    std::string entityRoot = root;
+    std::replace(entityRoot.begin(), entityRoot.end(), '-', '_');
+    resetDiscoveryState();
+    publishAllCalculatedSensorDiscoveries(true);
+    publishAllWritableNumberDiscoveries(true);
+    publishAllWritableSelectDiscoveries(true);
+    publishClimateDiscoveries();
+    publishSgReadyState();
+    publishTimeProgramDiscovery(0, 0);
+    const ElsterIndex* ei = GetElsterIndex("AUSSENTEMP");
+    REQUIRE(ei != nullptr);
+    publishMqttDiscovery(CanMembers[cm_manager], ei);
+    publishMqttState(CanMembers[cm_manager], ei, "4.5");
+    publishScanStatus("idle");
+
+    const auto& msgs = mqtt_client_instance().messages;
+    REQUIRE(msgs.size() > 20);
+    CHECK(mqttTopicPublished(root + "/MANAGER/AUSSENTEMP/state"));
+    CHECK(mqttTopicPublished(root + "/MANAGER/SG_READY_STATE/state"));
+    size_t topicFields = 0, entityIds = 0;
+    for (const auto& m : msgs) {
+        INFO(m.topic);
+        if (m.topic.rfind("homeassistant/", 0) == 0) {
+            // homeassistant/<component>/<root>/<unique_id>/config
+            size_t a = m.topic.find('/', 14);
+            REQUIRE(a != std::string::npos);
+            CHECK(m.topic.compare(a + 1, root.size() + 1, root + "/") == 0);
+        } else {
+            CHECK(m.topic.rfind(root + "/", 0) == 0);
+        }
+        if (root != "heatingpump") {
+            CHECK(m.topic.find("heatingpump") == std::string::npos);
+            CHECK(m.payload.find("heatingpump") == std::string::npos);
+        }
+        // every "..._topic":"<value>" in a payload starts with the root
+        for (size_t p = m.payload.find("_topic\":\""); p != std::string::npos;
+             p = m.payload.find("_topic\":\"", p + 1)) {
+            ++topicFields;
+            CHECK(m.payload.compare(p + 9, root.size() + 1, root + "/") == 0);
+        }
+        size_t d = m.payload.find("\"default_entity_id\":\"");
+        if (d != std::string::npos) {
+            ++entityIds;
+            size_t dot = m.payload.find('.', d);
+            REQUIRE(dot != std::string::npos);
+            CHECK(m.payload.compare(dot + 1, entityRoot.size() + 1, entityRoot + "_") == 0);
+        }
+    }
+    CHECK(topicFields > 20);
+    CHECK(entityIds > 10);
+
+    // set commands are accepted under the root only
+    fake_can().sent.clear();
+    CHECK(handleSetCommand(root + "/MANAGER/RAUMSOLLTEMP_I/set", "21.5"));
+    CHECK_FALSE(fake_can().sent.empty());
+    if (root != "heatingpump") CHECK_FALSE(handleSetCommand("heatingpump/MANAGER/RAUMSOLLTEMP_I/set", "21.5"));
+}

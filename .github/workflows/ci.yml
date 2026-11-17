@@ -29,6 +29,12 @@ jobs:
           COUNT=$(./tests/run_tests --reporter compact 2>&1 | grep -c "passed")
           echo "Test assertions passing: $COUNT"
 
+      - name: Topic root follows device_name (#102)
+        run: |
+          make clean-tests
+          make tests/run_tests MODEL_TEST_FLAGS='-DHA_DEVICE_MODEL=${{ matrix.model }} -DHA_DEVICE_NAME=hp-2 -DTEST_EXPECTED_ROOT=\"hp-2\"'
+          ./tests/run_tests "[topic_root]"
+
   compile-s3:
     name: Compile ESP32-S3
     runs-on: ubuntu-latest

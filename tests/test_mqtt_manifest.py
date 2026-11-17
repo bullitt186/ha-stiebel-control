@@ -53,10 +53,23 @@ class ModelManifestTests(unittest.TestCase):
             directory = Path(temp)
             model = directory / "example_smoke.json"
             model.write_text(json.dumps({"required_topics": [], "excluded_common_topics": ["disabled"]}))
-            args = SimpleNamespace(model="example", broker="unused", port=1883, user="", password="", window=0)
+            args = SimpleNamespace(model="example", root="heatingpump", broker="unused", port=1883, user="", password="", window=0)
             with patch.object(smoke, "MODELS_DIR", directory), patch.object(smoke, "create_client"), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(smoke.run_capture(args), 0)
             self.assertEqual(json.loads(model.read_text())["excluded_common_topics"], ["disabled"])
+
+
+    def test_manifests_use_the_root_placeholder(self):
+        for path in sorted(smoke.MODELS_DIR.glob("*_smoke.json")):
+            with self.subTest(manifest=path.name):
+                text = path.read_text()
+                self.assertNotIn('"heatingpump/', text)
+
+    def test_topics_follow_the_device_name(self):
+        common, _ = smoke.load_required_topics("wpl13e", "hp2")
+        self.assertIn("hp2/status", common)
+        self.assertTrue(all(t.startswith("hp2/") for t in common))
+        self.assertEqual(smoke.to_placeholder("hp2/MANAGER/X/state", "hp2"), "{root}/MANAGER/X/state")
 
 
 if __name__ == "__main__":
