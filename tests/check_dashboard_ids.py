@@ -5,7 +5,7 @@ The firmware sends default_entity_id = <domain>.<root>_<unique_id without "stieb
 (root "heatingpump"). This check rebuilds the possible suffixes from the sources:
 - raw signals:      <member>_<signal> (CanMembers[] x ElsterTable[] names), numbers add "_set"
 - calculated/COP:   unique IDs of calculatedSensors[] and the fault list
-- selects/climate:  writableSelects[] rows, climate_heizung / climate_warmwasser
+- selects/climate:  writableSelects[] rows, climate_heizung(_hk2) / climate_warmwasser
 - time programs:    ww_programm_<day>, heiz_programm_<day>, heiz_programm_hk2_<day>
 - ESPHome entities: <root>_<slug of a `name:` in esphome/ha-stiebel-control/*.yaml>
 Exit 1 if a dashboard references an ID outside this set.
@@ -40,7 +40,7 @@ def allowed_suffixes() -> set:
             base = f"{m}_{s}".lower()
             out.update({base, base + "_set"})
     out.update(u[len("stiebel_"):] for u in re.findall(r'"(stiebel_(?:calculated|cop)_\w+)"', header))
-    out.update({"climate_heizung", "climate_warmwasser"})
+    out.update({"climate_heizung", "climate_heizung_hk2", "climate_warmwasser"})
     for d in DAYS:
         out.update({f"ww_programm_{d}", f"heiz_programm_{d}", f"heiz_programm_hk2_{d}"})
     for y in SRC.glob("*.yaml"):
