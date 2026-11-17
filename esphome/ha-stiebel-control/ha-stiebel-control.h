@@ -89,6 +89,15 @@ inline SignalRoute resolveSignalRoute(uint16_t index, CanMemberType fallback) {
 #define HA_MAIN_DEVICE_JSON "\"device\":{\"identifiers\":[\"" HA_MAIN_DEVICE_ID "\"]," \
                             "\"name\":\"Stiebel Eltron Wärmepumpe\",\"manufacturer\":\"Stiebel Eltron\"}"
 
+// Language-independent entity ID for a fresh install (#96): <component>.<root>_<unique_id
+// without "stiebel_">, lower case, e.g. sensor.heatingpump_manager_aussentemp. Registered
+// entities keep their IDs.
+inline std::string defaultEntityIdJson(const char* component, const std::string& uniqueId) {
+    std::string id = uniqueId.rfind("stiebel_", 0) == 0 ? uniqueId.substr(8) : uniqueId;
+    std::transform(id.begin(), id.end(), id.begin(), ::tolower);
+    return std::string("\"default_entity_id\":\"") + component + "." HA_TOPIC_ROOT "_" + id + "\",";
+}
+
 // Device of one CAN member, linked to the heat pump device
 inline std::string memberDeviceJson(const char* member) {
     static const struct { const char* name; const char* label; } labels[] = {
@@ -1254,6 +1263,7 @@ void publishCalculatedSensorDiscovery(const CalculatedSensorConfig& config, bool
     std::ostringstream payload;
     payload << "{\"name\":\"" << config.name << "\","
             << "\"unique_id\":\"" << config.uniqueId << "\","
+            << defaultEntityIdJson(config.component, config.uniqueId)
             << "\"state_topic\":\"" << config.stateTopic << "\"";
     
     // Add device class if specified
@@ -1384,6 +1394,7 @@ void publishWritableNumberDiscovery(const WritableNumberConfig& config, bool for
     std::ostringstream payload;
     payload << "{\"name\":\"" << config.friendlyName << "\","
             << "\"unique_id\":\"" << uid << "\","
+            << defaultEntityIdJson("number", uid)
             << "\"command_topic\":\"" << commandTopic << "\","
             << "\"state_topic\":\"" << stateTopic << "\","
             << "\"min\":" << config.min << ","
@@ -1436,6 +1447,7 @@ void publishClimateDiscoveries() {
         const CanMember* cm = getWritableNumberMember(*room);
         std::ostringstream p;
         p << "{\"name\":\"" << LNAME_CLIMATE_HEIZUNG << "\",\"unique_id\":\"stiebel_climate_heizung\","
+          << defaultEntityIdJson("climate", "stiebel_climate_heizung")
           << "\"modes\":[\"heat\"],\"temperature_unit\":\"C\","
           << "\"min_temp\":" << room->min << ",\"max_temp\":" << room->max << ",\"temp_step\":" << room->step << ","
           << "\"temperature_command_topic\":\"heatingpump/" << cm->Name << "/RAUMSOLLTEMP_I/set\","
@@ -1457,6 +1469,7 @@ void publishClimateDiscoveries() {
         const CanMember* cm = getWritableNumberMember(*dhw);
         std::ostringstream p;
         p << "{\"name\":\"" << LNAME_CLIMATE_WARMWASSER << "\",\"unique_id\":\"stiebel_climate_warmwasser\","
+          << defaultEntityIdJson("climate", "stiebel_climate_warmwasser")
           << "\"modes\":[\"heat\"],\"temperature_unit\":\"C\","
           << "\"min_temp\":" << dhw->min << ",\"max_temp\":" << dhw->max << ",\"temp_step\":" << dhw->step << ","
           << "\"temperature_command_topic\":\"heatingpump/" << cm->Name << "/EINSTELL_SPEICHERSOLLTEMP/set\","
@@ -1554,6 +1567,7 @@ void publishWritableSelectDiscovery(const WritableSelectConfig& config, bool for
     std::ostringstream payload;
     payload << "{\"name\":\"" << config.friendlyName << "\","
             << "\"unique_id\":\"" << uniqueIdStr << "\","
+            << defaultEntityIdJson("select", uniqueIdStr)
             << "\"command_topic\":\"" << commandTopic << "\","
             << "\"state_topic\":\"" << stateTopic << "\","
             << "\"options\":[";
@@ -1920,6 +1934,7 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
     std::ostringstream payload;
     payload << "{\"name\":\"" << friendlyName << "\","
             << "\"unique_id\":\"" << uid << "\","
+            << defaultEntityIdJson(component, uid)
             << "\"state_topic\":\"" << stateTopic << "\","
             << "\"availability_topic\":\"heatingpump/status\"";
     
@@ -2797,8 +2812,8 @@ inline bool publishTimeProgramDiscovery(int prog, int day) {
     char uid[48], topic[112];
     snprintf(uid, sizeof(uid), "%s%s", def.uid, key);
     snprintf(topic, sizeof(topic), "homeassistant/%s/heatingpump/%s/config", writable ? "text" : "sensor", uid);
-    std::string p = std::string("{\"name\":\"") + def.names[day] + "\",\"unique_id\":\"" + uid +
-                    "\",\"state_topic\":\"heatingpump/" + def.topic + "/" + key + "/state\",";
+    std::string p = std::string("{\"name\":\"") + def.names[day] + "\",\"unique_id\":\"" + uid + "\"," +
+                    defaultEntityIdJson(writable ? "text" : "sensor", uid) + "\"state_topic\":\"heatingpump/" + def.topic + "/" + key + "/state\",";
     if (writable)
         p += std::string("\"command_topic\":\"heatingpump/") + def.topic + "/" + key + "/set\",\"max\":40,";
     p += "\"icon\":\"mdi:calendar-clock\"," HA_MAIN_DEVICE_JSON "}";
@@ -3692,12 +3707,13 @@ void publishFaultList() {
     if (entries.empty()) return;   // model without this list, or nothing read yet
     static bool discovered = false;
     if (!discovered) {
-        const char* cfg = "{\"name\":\"" LNAME_CALC_FEHLERLISTE "\",\"unique_id\":\"stiebel_calculated_fehlerliste\","
+        const std::string cfgStr = "{\"name\":\"" LNAME_CALC_FEHLERLISTE "\",\"unique_id\":\"stiebel_calculated_fehlerliste\"," +
+            defaultEntityIdJson("sensor", "stiebel_calculated_fehlerliste") +
             "\"state_topic\":\"heatingpump/calculated/fehlerliste/state\","
             "\"json_attributes_topic\":\"heatingpump/calculated/fehlerliste/attributes\","
             "\"availability_topic\":\"heatingpump/status\",\"icon\":\"mdi:clipboard-alert-outline\","
             HA_MAIN_DEVICE_JSON "}";
-        mqttPublish("homeassistant/sensor/heatingpump/stiebel_calculated_fehlerliste/config", cfg, strlen(cfg));
+        mqttPublish("homeassistant/sensor/heatingpump/stiebel_calculated_fehlerliste/config", cfgStr.c_str(), cfgStr.size());
         discovered = true;
     }
     std::ostringstream a;

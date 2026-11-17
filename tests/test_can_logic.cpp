@@ -2238,6 +2238,23 @@ TEST_CASE("discovery: one device block, COP from calculatedSensors, named rows (
     resetDiscoveryState();
 }
 
+TEST_CASE("discovery: language-independent default_entity_id in every payload (#96)", "[mqtt][discovery]") {
+    CHECK(defaultEntityIdJson("sensor", "stiebel_manager_aussentemp") ==
+          "\"default_entity_id\":\"sensor.heatingpump_manager_aussentemp\",");
+    CHECK(defaultEntityIdJson("number", "stiebel_MANAGER_HEIZKURVE_set") ==
+          "\"default_entity_id\":\"number.heatingpump_manager_heizkurve_set\",");
+    resetDiscoveryState();
+    publishMqttDiscovery(CanMembers[cm_kessel], GetElsterIndex("SPEICHERISTTEMP"));
+    CHECK(mqttFindPayload("homeassistant/").find("\"default_entity_id\":\"sensor.heatingpump_kessel_speicheristtemp\"") != std::string::npos);
+    resetDiscoveryState();
+    publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_COMPRESSOR_ACTIVE], true);
+    CHECK(mqttFindPayload("homeassistant/").find("binary_sensor.heatingpump_calculated_compressor_active") != std::string::npos);
+    resetDiscoveryState();
+    publishWritableSelectDiscovery(writableSelects[0], true);
+    CHECK(mqttFindPayload("homeassistant/select/").find("select.heatingpump_manager_programmschalter") != std::string::npos);
+    resetDiscoveryState();
+}
+
 TEST_CASE("handleSetCommand: one dispatcher for numbers, selects and programs (#92)", "[mqtt][set]") {
     resetDiscoveryState();
     fake_can().sent.clear();

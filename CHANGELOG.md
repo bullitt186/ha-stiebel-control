@@ -32,6 +32,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Changed
 
+- Discovery configs carry a language-independent `default_entity_id`
+  (`<domain>.heatingpump_<member>_<signal>`), so DE and EN builds create the same entity IDs on a
+  fresh install. The shipped dashboards, `docs/CONFIGURATION.md`, `SG_READY.md` and the SG Ready
+  example use these IDs; CI checks the dashboards (`tests/check_dashboard_ids.py`). **Existing
+  installs keep their entity IDs**; rename them in HA or adjust the dashboard IDs to use the shipped
+  dashboards (#96).
 - Discovery: the device block is defined once (`HA_MAIN_DEVICE_JSON`, `memberDeviceJson()`), the
   COP sensors are rows of `calculatedSensors[]` (same topics and unique IDs as before), rows are
   addressed by the `CalcIdx` enum and flagged `onDemand` instead of a hard-coded index threshold.

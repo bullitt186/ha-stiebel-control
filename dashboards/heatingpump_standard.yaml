@@ -3,12 +3,13 @@
 # Import: Settings → Dashboards → Add dashboard → "New dashboard from scratch",
 # open it, ⋮ → Edit dashboard → ⋮ → Raw configuration editor, paste this file.
 #
-# Entity IDs are the ones a fresh install creates. HA keeps the IDs an entity got
-# when it was first discovered, so after renames in the firmware (e.g. the IWS
-# outside temperature → "Luftansaugtemperatur") an older install may use the old
-# ID. Missing cards show "Entity not available": search for the entity under
-# Settings → Entities and adjust the ID here. Signals your model does not provide
-# are simply not created; remove those rows.
+# Entity IDs: the firmware sends a language-independent default entity ID with every
+# discovery config (<domain>.heatingpump_<member>_<signal>, e.g.
+# sensor.heatingpump_kessel_aussentemp), so DE and EN builds create the same IDs and
+# renames of display names no longer change them. Installs from before 2.8 keep the IDs
+# HA gave them then (derived from the display name): search for the entity under
+# Settings → Entities and adjust the ID here, or rename the entity ID in HA. Signals your
+# model does not provide are simply not created; remove those rows.
 title: Wärmepumpe
 views:
   - title: Übersicht
@@ -22,56 +23,56 @@ views:
           - type: heading
             heading: Steuerung
           - type: thermostat
-            entity: climate.stiebel_eltron_warmepumpe_heizung
+            entity: climate.heatingpump_climate_heizung
             features:
               - type: climate-preset-modes
                 style: dropdown
           - type: thermostat
-            entity: climate.stiebel_eltron_warmepumpe_warmwasser
+            entity: climate.heatingpump_climate_warmwasser
           - type: tile
-            entity: select.manager_programmschalter
+            entity: select.heatingpump_manager_programmschalter
             features:
               - type: select-options
           - type: tile
-            entity: number.manager_heizkurve_steigung_einstellung
+            entity: number.heatingpump_manager_heizkurve_set
           - type: tile
-            entity: select.manager_sg_ready_zustand
+            entity: select.heatingpump_manager_sg_ready_state
 
       - type: grid
         cards:
           - type: heading
             heading: Status
           - type: tile
-            entity: binary_sensor.stiebel_eltron_warmepumpe_wp_verdichter_aktiv
+            entity: binary_sensor.heatingpump_calculated_compressor_active
             name: Verdichter
           - type: tile
-            entity: binary_sensor.heizmodul_abtauung_aktiv
+            entity: binary_sensor.heatingpump_calculated_abtauung_laeuft
             name: Abtauen
           - type: tile
-            entity: binary_sensor.manager_evu_sperre_aktiv
+            entity: binary_sensor.heatingpump_manager_evu_sperre_aktiv
             name: EVU-Sperre
           - type: tile
-            entity: binary_sensor.stiebel_eltron_warmepumpe_sommerbetrieb_aktiv
+            entity: binary_sensor.heatingpump_calculated_sommerbetrieb_aktiv
             name: Sommerbetrieb
           - type: tile
-            entity: binary_sensor.manager_sommerbetrieb_automatik
+            entity: binary_sensor.heatingpump_manager_sommerbetrieb
             name: Sommer-Automatik
           - type: tile
-            entity: sensor.heizmodul_storung
+            entity: sensor.heatingpump_heizmodul_fehlermeldung
             name: Störung
             grid_options:
               columns: 12
           - type: heading
             heading: Effizienz
           - type: gauge
-            entity: sensor.stiebel_eltron_warmepumpe_cop_heizung
+            entity: sensor.heatingpump_cop_heiz
             name: COP Heizung
             min: 0
             max: 6
             needle: true
             severity: {red: 0, yellow: 2.5, green: 3.5}
           - type: gauge
-            entity: sensor.stiebel_eltron_warmepumpe_cop_warmwasser
+            entity: sensor.heatingpump_cop_ww
             name: COP Warmwasser
             min: 0
             max: 6
@@ -87,28 +88,28 @@ views:
             grid_options:
               columns: 12
             entities:
-              - entity: sensor.kessel_aussen_temperatur
+              - entity: sensor.heatingpump_kessel_aussentemp
                 name: Außen
-              - entity: sensor.stiebel_eltron_warmepumpe_aussentemperatur_gedampft
+              - entity: sensor.heatingpump_calculated_aussentemp_gedaempft
                 name: Außen gedämpft
-              - entity: sensor.heizmodul_luftansaugtemperatur
+              - entity: sensor.heatingpump_heizmodul_aussentemp
                 name: Luftansaugung
-              - entity: sensor.kessel_vorlauf_ist_temperatur
+              - entity: sensor.heatingpump_kessel_vorlaufisttemp
                 name: Vorlauf
-              - entity: sensor.kessel_vorlauf_soll_temperatur
+              - entity: sensor.heatingpump_kessel_vorlaufsolltemp
                 name: Vorlauf Soll
-              - entity: sensor.kessel_rucklauf_ist_temperatur
+              - entity: sensor.heatingpump_kessel_ruecklaufisttemp
                 name: Rücklauf
-              - entity: sensor.kessel_speicher_ist_temperatur
+              - entity: sensor.heatingpump_kessel_speicheristtemp
                 name: Speicher
           - type: history-graph
             hours_to_show: 24
             grid_options:
               columns: 12
             entities:
-              - entity: sensor.heizmodul_heissgastemperatur
+              - entity: sensor.heatingpump_heizmodul_heissgas_temp
                 name: Heißgas
-              - entity: sensor.heizmodul_verdampfer_temperatur
+              - entity: sensor.heatingpump_heizmodul_verdampfertemp
                 name: Verdampfer
 
   - title: Energie
@@ -127,9 +128,9 @@ views:
             grid_options:
               columns: 12
             entities:
-              - entity: sensor.stiebel_eltron_warmepumpe_energie_heizung_gesamt_kwh
+              - entity: sensor.heatingpump_calculated_energie_heiz_total_kwh
                 name: Heizung
-              - entity: sensor.stiebel_eltron_warmepumpe_energie_warmwasser_gesamt_kwh
+              - entity: sensor.heatingpump_calculated_energie_ww_total_kwh
                 name: Warmwasser
           - type: statistics-graph
             title: Wärme pro Tag (kWh)
@@ -140,9 +141,9 @@ views:
             grid_options:
               columns: 12
             entities:
-              - entity: sensor.stiebel_eltron_warmepumpe_waerme_ertrag_heizung_gesamt_kwh
+              - entity: sensor.heatingpump_calculated_waerme_heiz_total_kwh
                 name: Heizung
-              - entity: sensor.stiebel_eltron_warmepumpe_waerme_ertrag_warmwasser_gesamt_kwh
+              - entity: sensor.heatingpump_calculated_waerme_ww_total_kwh
                 name: Warmwasser
           - type: statistics-graph
             title: COP (Tagesmittel)
@@ -152,9 +153,9 @@ views:
             grid_options:
               columns: 12
             entities:
-              - sensor.stiebel_eltron_warmepumpe_cop_heizung
-              - sensor.stiebel_eltron_warmepumpe_cop_warmwasser
-              - sensor.stiebel_eltron_warmepumpe_cop_gesamt
+              - sensor.heatingpump_cop_heiz
+              - sensor.heatingpump_cop_ww
+              - sensor.heatingpump_cop_gesamt
 
   - title: Diagnose
     path: diagnose
@@ -165,12 +166,12 @@ views:
         column_span: 2
         cards:
           - type: tile
-            entity: sensor.stiebel_eltron_warmepumpe_fehlerliste
+            entity: sensor.heatingpump_calculated_fehlerliste
             name: Letzter Fehler
           - type: markdown
             title: Fehlerliste (Display, Parameter 48)
             content: |-
-              {% set e = state_attr('sensor.stiebel_eltron_warmepumpe_fehlerliste', 'eintraege') or [] %}
+              {% set e = state_attr('sensor.heatingpump_calculated_fehlerliste', 'eintraege') or [] %}
               {% if e %}
               | Zeitpunkt | Fehler |
               |---|---|
@@ -180,47 +181,47 @@ views:
           - type: entities
             title: Einstellungen
             entities:
-              - entity: sensor.manager_bivalenzpunkt_heizung
-              - entity: sensor.manager_bivalenzpunkt_warmwasser
-              - entity: sensor.manager_einsatzgrenze_warmepumpe_heizung
-              - entity: sensor.manager_einsatzgrenze_warmepumpe_warmwasser
-              - entity: sensor.manager_max_vorlauftemperatur_heizung
-              - entity: sensor.manager_max_rucklauftemperatur
-              - entity: sensor.manager_anlagenfrostschutz_temperatur
+              - entity: sensor.heatingpump_manager_bivalentparalleltemperatur_hzg
+              - entity: sensor.heatingpump_manager_bivalentparalleltemperatur_ww
+              - entity: sensor.heatingpump_manager_bivalenzalternativtemperatur_hzg
+              - entity: sensor.heatingpump_manager_bivalenzalternativtemperatur_ww
+              - entity: sensor.heatingpump_manager_max_heizung_temp
+              - entity: sensor.heatingpump_manager_max_temp_kessel
+              - entity: sensor.heatingpump_manager_aussen_frosttemp
       - type: grid
         cards:
           - type: entities
             title: Laufzeiten
             entities:
-              - entity: sensor.heizmodul_laufzeit_verdichter_heizen
-              - entity: sensor.heizmodul_laufzeit_verdichter_warmwasser
-              - entity: sensor.manager_laufzeit_nacherwarmung_gesamt
-              - entity: sensor.heizmodul_laufzeit_nacherwarmung_stufe_1
-              - entity: sensor.heizmodul_laufzeit_nacherwarmung_stufe_2
-              - entity: sensor.heizmodul_laufzeit_nacherwarmung_stufe_1_2
+              - entity: sensor.heatingpump_heizmodul_lz_verd_2_heizbetrieb
+              - entity: sensor.heatingpump_heizmodul_lz_verd_2_ww_betrieb
+              - entity: sensor.heatingpump_manager_laufzeit_2we
+              - entity: sensor.heatingpump_heizmodul_laufzeit_dhc1
+              - entity: sensor.heatingpump_heizmodul_laufzeit_dhc2
+              - entity: sensor.heatingpump_heizmodul_lz_dhc12
           - type: entities
             title: Kältekreis
             entities:
-              - entity: sensor.heizmodul_hochdruck
-              - entity: sensor.heizmodul_niederdruck
-              - entity: sensor.heizmodul_heissgastemperatur
-              - entity: sensor.heizmodul_verdampfer_temperatur
-              - entity: sensor.heizmodul_uberhitzung_ist
-              - entity: sensor.heizmodul_uberhitzung_soll
-              - entity: sensor.heizmodul_abtauungen_gesamt
-              - entity: sensor.heizmodul_dauer_letzte_abtauung
+              - entity: sensor.heatingpump_heizmodul_anzeige_hochdruck
+              - entity: sensor.heatingpump_heizmodul_anzeige_niederdruck
+              - entity: sensor.heatingpump_heizmodul_heissgas_temp
+              - entity: sensor.heatingpump_heizmodul_verdampfertemp
+              - entity: sensor.heatingpump_heizmodul_istwert_ueberhitzung_verdampfer
+              - entity: sensor.heatingpump_heizmodul_sollwert_ueberhitzung
+              - entity: sensor.heatingpump_heizmodul_starts_abtauung
+              - entity: sensor.heatingpump_heizmodul_zeitdauer_letzte_abtauung
           - type: entities
             title: Regelung
             entities:
-              - entity: sensor.manager_heizkurve
-              - entity: sensor.kessel_kessel_soll_temperatur
-              - entity: sensor.stiebel_eltron_warmepumpe_delta_t_wp_nur_bei_verdichter_an
-              - entity: sensor.manager_gebaeudeart
-              - entity: sensor.manager_sommerbetrieb_grenztemperatur
+              - entity: sensor.heatingpump_manager_heizkurve
+              - entity: sensor.heatingpump_kessel_kesselsolltemp
+              - entity: sensor.heatingpump_calculated_delta_t_running
+              - entity: sensor.heatingpump_manager_gebaeudeart
+              - entity: sensor.heatingpump_manager_sw_aussentemp
           - type: entities
             title: CAN-Bus
             entities:
-              - entity: sensor.stiebel_eltron_warmepumpe_can_bus_zustand
-              - entity: sensor.stiebel_eltron_warmepumpe_can_bus_fehler
-              - entity: sensor.stiebel_eltron_warmepumpe_can_tx_fehlerzahler
-              - entity: sensor.stiebel_eltron_warmepumpe_can_rx_fehlerzahler
+              - entity: sensor.heatingpump_calculated_can_state
+              - entity: sensor.heatingpump_calculated_can_bus_errors
+              - entity: sensor.heatingpump_calculated_can_tec
+              - entity: sensor.heatingpump_calculated_can_rec

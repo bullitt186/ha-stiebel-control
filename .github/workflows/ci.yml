@@ -187,6 +187,9 @@ jobs:
       - name: Check repo paths named in the agent and architecture docs
         run: python3 tests/check_doc_paths.py
 
+      - name: Check entity IDs in the shipped dashboards
+        run: python3 tests/check_dashboard_ids.py
+
       - name: Validate YAML files
         run: |
           yamllint -d '{extends: relaxed, rules: {line-length: {max: 120}}}' \
