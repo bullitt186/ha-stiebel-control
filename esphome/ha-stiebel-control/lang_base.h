@@ -179,6 +179,14 @@
 #define LNAME_SEL_SG_READY                     "SG Ready Zustand"
 #define LNAME_SEL_SG_READY_NORMAL_MODE         "SG Ready Betriebsart Zustand 2"
 
+// Heating circuit 2 (mixer circuit) settings on MISCHERMODUL_3 (0x602)
+#define LNAME_NUM_HK2_RAUMSOLL_TAG             "Raumsoll HK2 Tag Einstellung"
+#define LNAME_NUM_HK2_RAUMSOLL_NACHT           "Raumsoll HK2 Nacht Einstellung"
+#define LNAME_NUM_HK2_HEIZKURVE                "Heizkurve HK2 Einstellung"
+#define LNAME_HK2_RAUMSOLL_TAG                 "Raumsoll HK2 Tag"
+#define LNAME_HK2_RAUMSOLL_NACHT               "Raumsoll HK2 Nacht"
+#define LNAME_HK2_HEIZKURVE                    "Heizkurve HK2"
+
 // DHW time program, one text per day (#82)
 #define LNAME_WWPROG_MO                        "Warmwasser-Programm Montag"
 #define LNAME_WWPROG_DI                        "Warmwasser-Programm Dienstag"

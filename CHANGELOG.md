@@ -7,11 +7,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Fixed
+
+- A raw bus scan (`heatingpump/scan/start` with an index range) crashed the ESP after a few
+  thousand indices: `GetElsterIndex()` cached every index that is not in the table in a hash map,
+  which grew until a rehash failed (`exception/panic`, seen on a WPL13E at 0x601 0x0000-0x0fff).
+  Index lookups now use a table sorted once at startup (binary search, fixed size) and cache nothing.
+
 ### Added
 
-- WPL13E/WPL18E: heating program of heating circuit 2 (mixer circuit, `HEIZPROG_2_<day>`) as one
-  text entity per day, same format as the DHW and circuit 1 programs. In `Automatik` an empty
-  program keeps the circuit on its night setpoint.
+- WPMW II heating circuit 2 (mixer circuit): day and night room setpoint and heating curve as
+  number entities. The manager keeps them on the virtual member `MISCHERMODUL_3` (0x602), found by a
+  change of "Raumtemp. 2" on the display (20.0 -> 20.5 moved only `RAUMSOLLTEMP_I` @ 0x602);
+  `RAUMSOLLTEMP_II` on the manager is not circuit 2. Writable on WPL13E and TTL 33.
+- WPL13E/WPL18E/TTL 33: heating program of heating circuit 2 as one text entity per day, read from
+  and written to `HEIZPROG_1_<day>` on `MISCHERMODUL_3` (0x602). In `Automatik` an empty program keeps
+  the circuit on its night setpoint. TTL 33 now also polls the second and third period of both
+  heating programs, so the circuit 1 and 2 program texts appear there.
 
 ### Changed
 

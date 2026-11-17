@@ -98,10 +98,9 @@ inline std::string dayText(const std::string periods[PERIODS]) {
     return out.empty() ? std::string(NONE) : out;
 }
 
-// Programs shown in Home Assistant: DHW and heating circuits 1 and 2, same layout on the manager.
+// Programs shown in Home Assistant: DHW and heating circuits 1 and 2 (circuit 2: HEIZPROG_1 on 0x602).
 static constexpr const char* PREFIX_DHW = "W_WASSERPROG_1_";
 static constexpr const char* PREFIX_HEATING = "HEIZPROG_1_";
-static constexpr const char* PREFIX_HEATING2 = "HEIZPROG_2_";
 
 // "W_WASSERPROG_1_MO" → day 0 slot 0, "..._MO_SCHALT_3" → day 0 slot 2. Block setters
 // (MO_FR, SA_SO, MO_SO) and other names → false.

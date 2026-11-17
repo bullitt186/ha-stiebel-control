@@ -21,16 +21,23 @@
 #include <stdint.h>
 #include <string.h>
 #include <unordered_map>
+#include <vector>
+#include <algorithm>
+#include <utility>
 // This is the one translation unit that holds the Elster tables (see ElsterTable.h).
 #define ELSTER_TABLE_DEFINITIONS
 #include "NUtils.h"
 #include "KElsterTable.h"
 #include "ElsterTable.h"
 
-// Lazy-initialized caches for O(1) lookups after first access. The name cache is
-// keyed by the DJB2 hash of the name (no std::string per lookup); a hit is
-// confirmed with strcmp, so a hash collision only costs a table scan.
-static std::unordered_map<unsigned short, const ElsterIndex*> indexCache;
+// Index lookup: (index, row) pairs sorted once, binary search. Fixed size, built on the
+// first lookup. The former hash map also cached every miss; a raw bus scan
+// (e.g. 0x0000-0x0fff) answers thousands of indices that are not in the table, the map
+// grew until a rehash could not get a large enough block and the ESP aborted.
+static std::vector<std::pair<unsigned short, unsigned short>> indexOrder;
+// Name cache for O(1) lookups after first access, keyed by the DJB2 hash of the name
+// (no std::string per lookup); a hit is confirmed with strcmp, so a hash collision only
+// costs a table scan. Bounded by the names the firmware looks up.
 static std::unordered_map<uint32_t, const ElsterIndex*> nameCache;
 
 static uint32_t ElsterNameHash(const char * str)
@@ -188,27 +195,33 @@ const char * ElsterTypeToName(unsigned Type)
   return ElsterTypeStr[et_default];
 }
 
+static void BuildIndexOrder()
+{
+  indexOrder.reserve(High(ElsterTable) + 1);
+  for (int i = 0; i <= High(ElsterTable); i++)
+    indexOrder.emplace_back(ElsterTable[i].Index, static_cast<unsigned short>(i));
+  // stable: rows with the same index keep table order, so the first row wins (as before)
+  std::stable_sort(indexOrder.begin(), indexOrder.end(),
+                   [](const std::pair<unsigned short, unsigned short>& a,
+                      const std::pair<unsigned short, unsigned short>& b) { return a.first < b.first; });
+  indexOrder.erase(std::unique(indexOrder.begin(), indexOrder.end(),
+                               [](const std::pair<unsigned short, unsigned short>& a,
+                                  const std::pair<unsigned short, unsigned short>& b) { return a.first == b.first; }),
+                   indexOrder.end());
+  indexOrder.shrink_to_fit();
+}
+
 const ElsterIndex * GetElsterIndex(unsigned short Index)
 {
-  // Check cache first - O(1) for subsequent lookups
-  auto it = indexCache.find(Index);
-  if (it != indexCache.end()) {
-    return it->second;
-  }
-
-  // Cache miss - do linear search O(n)
-  int i;
-  for (i = 0; i <= High(ElsterTable); i++) {
-    if (ElsterTable[i].Index == Index) {
-      const ElsterIndex* result = &ElsterTable[i];
-      indexCache[Index] = result;  // Cache for next time
-      return result;
-    }
-  }
-
-  // Not found - cache default and return
-  indexCache[Index] = &ElsterTable[0];
-  return &ElsterTable[0];
+  if (indexOrder.empty())
+    BuildIndexOrder();
+  auto it = std::lower_bound(indexOrder.begin(), indexOrder.end(), Index,
+                             [](const std::pair<unsigned short, unsigned short>& e, unsigned short key) {
+                               return e.first < key;
+                             });
+  if (it != indexOrder.end() && it->first == Index)
+    return &ElsterTable[it->second];
+  return &ElsterTable[0];   // not in the table (nothing is cached)
 }
 
 const ElsterIndex * GetElsterIndex(const char* str)

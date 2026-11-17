@@ -1460,7 +1460,7 @@ TEST_CASE("writableNumbers: WPMW II parameters sit at the indices common.yaml us
     static const char* expected[] = {"SCHALTWERKDYNAMIKZEIT",
                                      "BIVALENTPARALLELTEMPERATUR_HZG", "BIVALENTPARALLELTEMPERATUR_WW",
                                      "STILLSTANDZEIT", "SW_AUSSENTEMP"};
-    REQUIRE(WRITABLE_NUMBER_COUNT == 16);
+    REQUIRE(WRITABLE_NUMBER_COUNT == 19);
     for (size_t i = 0; i < 5; ++i) {
         CHECK(std::string(writableNumbers[9 + i].signalName) == expected[i]);
         CHECK(writableNumbers[9 + i].member == cm_manager);
@@ -2228,6 +2228,29 @@ TEST_CASE("SG Ready state 2 mode: select command, NVS and state publish (#85)", 
     resetDiscoveryState();
 }
 
+TEST_CASE("WPMW II heating circuit 2 settings are numbers on MISCHERMODUL_3", "[writable]") {
+    const std::string model = HA_DEVICE_MODEL_STR;
+    const bool verified = model == "wpl13e" || model == "ttl33";
+    int found = 0;
+    for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; i++) {
+        if (writableNumbers[i].member != cm_mischermodul_3) continue;
+        found++;
+        CHECK(writableNumberApplies(writableNumbers[i]) == verified);
+        CHECK(getWritableNumberMember(writableNumbers[i]) == &CanMembers[cm_mischermodul_3]);
+    }
+    CHECK(found == 3);
+    // indices used in common.yaml
+    CHECK(std::string(writableNumbers[16].signalName) == "RAUMSOLLTEMP_I");
+    CHECK(std::string(writableNumbers[17].signalName) == "RAUMSOLLTEMP_NACHT");
+    CHECK(std::string(writableNumbers[18].signalName) == "HEIZKURVE");
+    if (verified) {
+        resetDiscoveryState();
+        publishWritableNumberDiscovery(writableNumbers[16], true);
+        const std::string p = mqttFindPayload("homeassistant/number/heatingpump/");
+        CHECK(p.find("heatingpump/MISCHERMODUL_3/RAUMSOLLTEMP_I/set") != std::string::npos);
+    }
+}
+
 TEST_CASE("dhwprog: parse and validate period texts (#82)", "[dhwprog]") {
     std::vector<dhwprog::Period> p;
     std::string err;
@@ -2328,15 +2351,18 @@ TEST_CASE("DHW program: three periods form one text per day, commands write chan
         CHECK(std::string(pacedWrites[0].value) == "00:00-24:00");
         pacedWriteCount = 0;
     }
-    // heating program of circuit 2 (mixer circuit)
-    updateSensor(CanMembers[cm_manager], GetElsterIndex("HEIZPROG_2_MO"), "not used time domain");
-    updateSensor(CanMembers[cm_manager], GetElsterIndex("HEIZPROG_2_MO_SCHALT_2"), "not used time domain");
-    updateSensor(CanMembers[cm_manager], GetElsterIndex("HEIZPROG_2_MO_SCHALT_3"), "not used time domain");
-    CHECK(mqttFindPayload("heating_program_2/mo/state") == "-");
+    // heating program of circuit 2 (mixer circuit): HEIZPROG_1 on MISCHERMODUL_3 (0x602)
+    mqtt_client_instance().clear();
+    updateSensor(CanMembers[cm_mischermodul_3], GetElsterIndex("HEIZPROG_1_MO"), "06:00-22:00");
+    updateSensor(CanMembers[cm_mischermodul_3], GetElsterIndex("HEIZPROG_1_MO_SCHALT_2"), "not used time domain");
+    updateSensor(CanMembers[cm_mischermodul_3], GetElsterIndex("HEIZPROG_1_MO_SCHALT_3"), "not used time domain");
+    CHECK(mqttFindPayload("heating_program_2/mo/state") == "06:00-22:00");
+    CHECK_FALSE(mqttTopicPublished("heating_program/mo/state"));   // circuit 1 untouched
     if (dhwProgramWritable()) {
         CHECK(handleHeating2ProgramCommand(0, "00:00-24:00"));
         REQUIRE(pacedWriteCount == 1);
-        CHECK(std::string(pacedWrites[0].ei->Name) == "HEIZPROG_2_MO");
+        CHECK(std::string(pacedWrites[0].ei->Name) == "HEIZPROG_1_MO");
+        CHECK(pacedWrites[0].writeCm == &CanMembers[cm_mischermodul_3]);
         pacedWriteCount = 0;
     }
     resetDiscoveryState();

@@ -380,7 +380,18 @@ static const WritableNumberConfig writableNumbers[] = {
      cm_manager, 0.0, 5.0, 0.5, "°C", "mdi:home-thermometer", "temperature"},
 
     {"SG_READY_ROOM_BOOST_STATE4", LNAME_NUM_SG_READY_ROOM_BOOST4,
-     cm_manager, 0.0, 5.0, 0.5, "°C", "mdi:home-thermometer", "temperature"}
+     cm_manager, 0.0, 5.0, 0.5, "°C", "mdi:home-thermometer", "temperature"},
+
+    // WPMW II heating circuit 2 (mixer circuit): the manager keeps its settings on the virtual
+    // member MISCHERMODUL_3 (0x602). Display "Raumtemp. 2" Tag/Absenk and "Heizkurve 2";
+    // the Tag value moved 20.0 -> 20.5 on 0x602 after a change on the display (WPL13E).
+    // Indices 16-18 are used in common.yaml.
+    {"RAUMSOLLTEMP_I", LNAME_NUM_HK2_RAUMSOLL_TAG,
+     cm_mischermodul_3, 10.0, 30.0, 0.5, "°C", "mdi:home-thermometer", "temperature"},
+    {"RAUMSOLLTEMP_NACHT", LNAME_NUM_HK2_RAUMSOLL_NACHT,
+     cm_mischermodul_3, 10.0, 30.0, 0.5, "°C", "mdi:home-thermometer-outline", "temperature"},
+    {"HEIZKURVE", LNAME_NUM_HK2_HEIZKURVE,
+     cm_mischermodul_3, 0.1, 3.0, 0.05, "", "mdi:chart-bell-curve", ""}
 };
 
 static const size_t WRITABLE_NUMBER_COUNT = sizeof(writableNumbers) / sizeof(WritableNumberConfig);
@@ -408,6 +419,10 @@ static const char* wpmw2MemberName(const char* member, const char* signal) {
         {"KESSEL",    "RUECKLAUFISTTEMP", LNAME_HK1_REGELFUEHLER},     // X2/3, control sensor HC1
         {"KESSEL",    "VORLAUFISTTEMP",   LNAME_HK2_MISCHER_VORLAUF},  // X2/7, mixer flow HC2
         {"KESSEL",    "KESSELSOLLTEMP",   LNAME_HK1_RUECKLAUF_SOLL},
+        // Heating circuit 2 settings on the manager's virtual member 0x602
+        {"MISCHERMODUL_3", "RAUMSOLLTEMP_I",     LNAME_HK2_RAUMSOLL_TAG},
+        {"MISCHERMODUL_3", "RAUMSOLLTEMP_NACHT", LNAME_HK2_RAUMSOLL_NACHT},
+        {"MISCHERMODUL_3", "HEIZKURVE",          LNAME_HK2_HEIZKURVE},
     };
     for (const Entry& e : names)
         if (strcmp(member, e.member) == 0 && strcmp(signal, e.signal) == 0) return e.name;
@@ -1375,6 +1390,9 @@ void publishAllCalculatedSensorDiscoveries(bool forceRepublish = false) {
 // Discovery follows state ownership, which may differ from the write target.
 static const CanMember* getWritableNumberMember(const WritableNumberConfig& config) {
     // WPMW II: the heating curve lives on the MANAGER, not on KESSEL_CANB
+    // WPMW II heating circuit 2 settings stay on MISCHERMODUL_3 (no model routing)
+    if (config.member == cm_mischermodul_3)
+        return &CanMembers[cm_mischermodul_3];
     if (isWpmw2Model() && strcmp(config.signalName, "HEIZKURVE") == 0)
         return &CanMembers[cm_manager];
     const SignalRoute route = resolveSignalRoute(
@@ -1533,7 +1551,8 @@ void publishClimateDiscoveries() {
 }
 
 // Whether the model gets a writable number entity for this signal
-static bool writableNumberApplies(const char* sig) {
+static bool writableNumberApplies(const WritableNumberConfig& config) {
+    const char* sig = config.signalName;
     const bool isWpl17 = (strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0);
     // WPL17 has only ONE heating circuit (RAUMSOLLTEMP_I). Skip II/III so the
     // number entities are not created on single-circuit models (-255 only).
@@ -1543,6 +1562,9 @@ static bool writableNumberApplies(const char* sig) {
     // changed over CAN and back, checked on the WPMW II display).
     const bool wpmw2Verified = (strcmp(HA_DEVICE_MODEL_STR, "wpl13e") == 0 ||
                                 strcmp(HA_DEVICE_MODEL_STR, "ttl33") == 0);
+    // Heating circuit 2 settings on MISCHERMODUL_3 (0x602): WPMW II with a mixer circuit.
+    if (config.member == cm_mischermodul_3)
+        return wpmw2Verified;
     // HEIZKURVE is verified writable on WPL17 (KESSEL_CANB) and WPL13E/TTL 33 (MANAGER) only.
     if (strcmp(sig, "HEIZKURVE") == 0 && !isWpl17 && !wpmw2Verified)
         return false;
@@ -1550,6 +1572,12 @@ static bool writableNumberApplies(const char* sig) {
     if (isWpmw2Parameter(sig) && !wpmw2Verified)
         return false;
     return true;
+}
+
+// By name: the first entry with this signal (the circuit 1 / manager one)
+static bool writableNumberApplies(const char* sig) {
+    const WritableNumberConfig* config = findWritableNumber(sig);
+    return config && writableNumberApplies(*config);
 }
 
 void publishAllWritableNumberDiscoveries(bool forceRepublish = false) {
@@ -1562,7 +1590,7 @@ void publishAllWritableNumberDiscoveries(bool forceRepublish = false) {
     ESP_LOGD("MQTT_DISC", "Publishing %d writable number discoveries", WRITABLE_NUMBER_COUNT);
     for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; i++) {
         const char* sig = writableNumbers[i].signalName;
-        if (!writableNumberApplies(sig)) {
+        if (!writableNumberApplies(writableNumbers[i])) {
             ESP_LOGD("MQTT_DISC", "Skipping %s on %s", sig, HA_DEVICE_MODEL_STR);
             continue;
         }
@@ -2108,7 +2136,7 @@ void discoveryRepublishStep() {
         switch (discoveryRepublishPhase) {
         case DR_NUMBERS:
             if (i >= WRITABLE_NUMBER_COUNT) { discoveryRepublishPhase = DR_SELECTS; discoveryRepublishPos = 0; continue; }
-            if (!writableNumberApplies(writableNumbers[i].signalName)) continue;
+            if (!writableNumberApplies(writableNumbers[i])) continue;
             publishWritableNumberDiscovery(writableNumbers[i], true);
             break;
         case DR_SELECTS:
@@ -2893,6 +2921,7 @@ struct DhwProgramDay {
     uint32_t publishedMs = 0;
 };
 struct TimeProgramDef {
+    CanMemberType member;       // bus member holding the program
     const char* prefix;         // signal name prefix
     const char* topic;          // heatingpump/<topic>/<day>/state|set
     const char* uid;            // unique_id prefix
@@ -2900,13 +2929,15 @@ struct TimeProgramDef {
 };
 static constexpr int TP_DHW = 0, TP_HEATING = 1, TP_HEATING2 = 2, TP_COUNT = 3;
 static const TimeProgramDef TIME_PROGRAMS[TP_COUNT] = {
-    {dhwprog::PREFIX_DHW, "dhw_program", "stiebel_ww_programm_",
+    {cm_manager, dhwprog::PREFIX_DHW, "dhw_program", "stiebel_ww_programm_",
      {LNAME_WWPROG_MO, LNAME_WWPROG_DI, LNAME_WWPROG_MI, LNAME_WWPROG_DO,
       LNAME_WWPROG_FR, LNAME_WWPROG_SA, LNAME_WWPROG_SO}},
-    {dhwprog::PREFIX_HEATING, "heating_program", "stiebel_heiz_programm_",
+    {cm_manager, dhwprog::PREFIX_HEATING, "heating_program", "stiebel_heiz_programm_",
      {LNAME_HZPROG_MO, LNAME_HZPROG_DI, LNAME_HZPROG_MI, LNAME_HZPROG_DO,
       LNAME_HZPROG_FR, LNAME_HZPROG_SA, LNAME_HZPROG_SO}},
-    {dhwprog::PREFIX_HEATING2, "heating_program_2", "stiebel_heiz_programm_hk2_",
+    // Heating circuit 2: the manager keeps its program as HEIZPROG_1 on MISCHERMODUL_3 (0x602);
+    // HEIZPROG_2 on the manager does not change circuit 2 (WPL13E, 0x602 kept 06:00-22:00)
+    {cm_mischermodul_3, dhwprog::PREFIX_HEATING, "heating_program_2", "stiebel_heiz_programm_hk2_",
      {LNAME_HZ2PROG_MO, LNAME_HZ2PROG_DI, LNAME_HZ2PROG_MI, LNAME_HZ2PROG_DO,
       LNAME_HZ2PROG_FR, LNAME_HZ2PROG_SA, LNAME_HZ2PROG_SO}},
 };
@@ -2964,9 +2995,10 @@ inline void dhwProgramRepublish() {
         }
 }
 
-// A manager value of a program period? Then it updates that day's text (no raw sensor).
-inline bool timeProgramUpdate(const char* signal, const std::string& value) {
+// A program period from its member? Then it updates that day's text (no raw sensor).
+inline bool timeProgramUpdate(const CanMember& cm, const char* signal, const std::string& value) {
     for (int prog = 0; prog < TP_COUNT; prog++) {
+        if (CanMembers[TIME_PROGRAMS[prog].member].CanId != cm.CanId) continue;
         int day, slot;
         if (!dhwprog::parseSignalName(signal, day, slot, TIME_PROGRAMS[prog].prefix)) continue;
         if (value == "-255") return true;   // not provided by this manager
@@ -3000,7 +3032,8 @@ inline bool handleTimeProgramCommand(int prog, int day, const std::string& paylo
         const std::string want = slot < static_cast<int>(periods.size()) ? dhwprog::formatPeriod(periods[slot]) : "";
         if ((d.known & (1u << slot)) && d.period[slot] == want) continue;   // unchanged
         const std::string name = dhwprog::signalName(day, slot, TIME_PROGRAMS[prog].prefix);
-        queuePacedWrite(&CanMembers[cm_manager], &CanMembers[cm_manager], GetElsterIndex(name.c_str()), want.c_str());
+        const CanMember* member = &CanMembers[TIME_PROGRAMS[prog].member];
+        queuePacedWrite(member, member, GetElsterIndex(name.c_str()), want.c_str());
     }
     return true;
 }
@@ -3182,9 +3215,7 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
         return;
     }
     pacedWriteNoteValue(cm, ei, value);
-    if (isWpmw2Model() && strcmp(cm.Name, "MANAGER") == 0) {
-        if (timeProgramUpdate(ei->Name, value)) return;   // shown as one text per day
-    }
+    if (isWpmw2Model() && timeProgramUpdate(cm, ei->Name, value)) return;   // shown as one text per day
     if (isIgnoredOnWpl13e(ei->Name)) return;
     if (isWpmw2Model() && strcmp(cm.Name, "HEIZMODUL") == 0) lastHeizmodulFrameMs = millis();
     // Bool fields carrying other bits decode to "?"; HA rejects that payload for a
