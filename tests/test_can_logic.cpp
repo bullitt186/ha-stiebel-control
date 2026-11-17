@@ -2679,3 +2679,16 @@ TEST_CASE("WPMW II: heating circuit 2 gets its own climate entity", "[mqtt][wpmw
         CHECK_FALSE(fake_can().sent.empty());
     }
 }
+
+TEST_CASE("climate: mode follows the ESP availability instead of staying off", "[mqtt]") {
+    resetDiscoveryState();
+    publishClimateDiscoveries();
+    const std::string expected = "\"mode_state_topic\":\"heatingpump/status\","
+                                 "\"mode_state_template\":\"{{ 'heat' if value == 'online' else 'off' }}\"";
+    for (const char* id : {"stiebel_climate_heizung", "stiebel_climate_warmwasser"}) {
+        INFO(id);
+        CHECK(mqttFindPayload(std::string("climate/heatingpump/") + id + "/config").find(expected) != std::string::npos);
+    }
+    const std::string hk2 = mqttFindPayload("climate/heatingpump/stiebel_climate_heizung_hk2/config");
+    if (kModel.wpmw2WritesVerified) CHECK(hk2.find(expected) != std::string::npos);
+}

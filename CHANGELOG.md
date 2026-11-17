@@ -9,6 +9,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Fixed
 
+- Climate entities (heating, HK2, hot water) showed the mode "off" in Home Assistant (thermostat
+  card "Aus"), because they announce no mode state. The mode now follows the availability of the
+  ESP: `heat` while it is online, `off` while it is offline.
 - WPMW II: `LZ_VERD_2_HEIZBETRIEB` used a signed type and would have turned negative above 32767 h;
   it is decoded as hours like the other runtime counters.
 - SG Ready with `language: "EN"`: the controller published German state labels while the select used
