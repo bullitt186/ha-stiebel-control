@@ -17,6 +17,10 @@
 #include "can_io.h"
 #include "bus_scan.h"
 
+// Extra step at the end of every processSignalRequests() call (#79: device limits of the
+// writable numbers). Set by the module that needs it; nullptr = none.
+static void (*requestManagerExtraStep)(unsigned long now) = nullptr;
+
 // Track next scheduled request time per signalKey (member + signal)
 static std::unordered_map<uint64_t, unsigned long> nextRequestTime;
 
@@ -190,6 +194,10 @@ void processSignalRequests() {
     // at index 0 and, with more due requests than one per second, the end of the table
     // was never polled.
     signalProcessingStartIndex = currentIndex;
+
+    // Device limits of the writable numbers, one request at a time (#79). Injected by
+    // writables.h, which owns those tables.
+    if (requestManagerExtraStep) requestManagerExtraStep(now);
 }
 
 #endif  // REQUEST_MANAGER_H

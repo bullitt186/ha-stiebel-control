@@ -52,7 +52,7 @@ above it. The shared configuration is only the build flags, `config.h` (`HA_TOPI
 | `request_manager.h` | polling of `signalRequests[]` (`processSignalRequests()`), back-off |
 | `calculated.h` | `calculatedSensors[]`/`CalcIdx`, date/time, Delta T, compressor, summer mode, diagnostics, `processCalculatedSensors()` |
 | `energy.h` | COP and the combined energy values |
-| `writables.h` | `writableNumbers[]`/`writableSelects[]`, `writableNumberApplies()`, number/select/climate discovery |
+| `writables.h` | `writableNumbers[]`/`writableSelects[]`, `writableNumberApplies()`, number/select/climate discovery, device limits (`numberLimitsStep()`, `handleLimitAnswer()`, `clampToNumberLimits()`) |
 | `sg_ready_io.h` | ESPHome adapter of `SgReadyController` (NVS, paced writes, MQTT), SG Ready commands |
 | `time_programs.h` | WPMW II time programs in HA (one text per day) |
 | `set_commands.h` | `handleSetCommand()`: every `<root>/<A>/<B>/set` topic |

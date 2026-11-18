@@ -46,6 +46,9 @@ inline bool queuePacedWrite(const CanMember* writeCm, const CanMember* readCm,
     ESP_LOGW("WRITE_Q", "read_only: not writing \"%s\" = \"%s\"", ei->Name, value);
     return false;
 #endif
+    // Clamp here already, so the read-back is compared with the value that goes on the bus (#79)
+    char clamped[16];
+    value = filterWriteValue(writeCm, ei, value, clamped, sizeof(clamped));
     // A newer value for a write still waiting replaces it (the one in flight stays)
     for (size_t i = 0; i < pacedWriteCount; i++) {
         PacedWrite& p = pacedWrites[i];

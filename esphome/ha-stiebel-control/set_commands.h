@@ -50,8 +50,12 @@ inline bool handleNumberCommand(const WritableNumberConfig& c, CanMemberType mem
     publishWritableNumberDiscovery(c);
     char* end;
     const float v = strtof(payload.c_str(), &end);
-    if (end == payload.c_str() || *end != '\0' || v < c.min - 0.001f || v > c.max + 0.001f) {
-        ESP_LOGW("MQTT_CMD", "%s: \"%s\" outside %.2f..%.2f", c.signalName, payload.c_str(), c.min, c.max);
+    // Learned device range (#79) if known, else the static one
+    const int limitIdx = writableNumberIndex(c);
+    const float rangeMin = limitIdx >= 0 ? writableNumberMin(limitIdx) : c.min;
+    const float rangeMax = limitIdx >= 0 ? writableNumberMax(limitIdx) : c.max;
+    if (end == payload.c_str() || *end != '\0' || v < rangeMin - 0.001f || v > rangeMax + 0.001f) {
+        ESP_LOGW("MQTT_CMD", "%s: \"%s\" outside %.2f..%.2f", c.signalName, payload.c_str(), rangeMin, rangeMax);
         return false;
     }
     // SG Ready values are kept on the ESP, not written to the heat pump

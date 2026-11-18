@@ -147,7 +147,7 @@ modules and not listed.
 | `request_manager.h` | Polling of the model's request table, back-off | signal_route, can_io, bus_scan |
 | `calculated.h` | `calculatedSensors[]` and the derived values, their scheduler | signal_route, mqtt_publish, discovery, request_manager |
 | `energy.h` | COP and the combined energy values | calculated |
-| `writables.h` | Writable numbers and selects, their discovery and the climate entities | signal_route, mqtt_publish, discovery |
+| `writables.h` | Writable numbers and selects, their discovery and the climate entities; device limits of the numbers (0xF8/0xF9, #79), hooked into `writeSignal()` and the request manager | signal_route, mqtt_publish, discovery, can_io, request_manager |
 | `sg_ready_io.h` | ESPHome adapter of `SgReadyController` (`sg_ready_controller.h`), SG Ready commands | signal_route, mqtt_publish, paced_writes, writables |
 | `time_programs.h` | WPMW II time programs in Home Assistant (parsing: `dhw_program.h`) | signal_route, mqtt_publish, discovery, paced_writes |
 | `set_commands.h` | Dispatcher of every `<root>/<A>/<B>/set` command | can_io, writables, sg_ready_io, time_programs |
@@ -254,6 +254,8 @@ code as `-DHA_DEVICE_NAME` and used there as `HA_TOPIC_ROOT` (`config.h`); YAML 
 All discovery configs are retained. They are sent again (a few per 250 ms, so the MQTT
 queue never sees a burst) on every broker connect and when Home Assistant publishes its
 birth message (`homeassistant/status` = `online`). There is no periodic republish.
+A writable number is also published once more when its device limits (switch bytes `0xF8`/`0xF9`)
+have been read, with the same `unique_id` and the device range.
 A republish can also be triggered manually:
 ```bash
 mosquitto_pub -h BROKER -u USER -P PASS -t "heatingpump/republish_discoveries" -m ""

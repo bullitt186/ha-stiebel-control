@@ -399,6 +399,9 @@ void processAndUpdate(uint32_t can_id, const std::vector<uint8_t> &msg)
     // A read request carries no value: decoding it attributed a fake 0 to the
     // requesting node (e.g. the WPMW II polling the IWS -> "MANAGER VERDICHTER 0.0").
     if ((msg[0] & 0x0F) == 1) return;
+    // Limit answers (switch byte 0xF8/0xF9) carry no current value and use the long layout,
+    // so they must not go through the short-form decoding below (#79)
+    if (handleLimitAnswer(can_id, msg)) return;
 
     std::string value;
     const CanMember *cm = nullptr;

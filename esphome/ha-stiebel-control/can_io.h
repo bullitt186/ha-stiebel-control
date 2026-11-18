@@ -173,7 +173,21 @@ inline void pendingReadbackStep() {
 }
 
 // Read request for a raw Elster index (also indices unknown to ElsterTable, bus scan)
-void readSignalRaw(const CanMember *cm, uint16_t index, [[maybe_unused]] const char *name = "?")
+// Elster switch byte in data[2]: 0xFA = current value, 0xF8 = minimum, 0xF9 = maximum (#79).
+// The answer to 0xF8/0xF9 uses the long layout [id1, id2, switch, idx_hi, idx_lo, val_hi, val_lo].
+static constexpr uint8_t ELSTER_SWITCH_MIN = 0xF8;
+static constexpr uint8_t ELSTER_SWITCH_MAX = 0xF9;
+static constexpr uint8_t ELSTER_SWITCH_VALUE = 0xFA;
+
+// Short form [id1, id2, idx_lo, ...] only for a plain value read of an index below 0x100.
+// Indices 0xF7..0xFA would be taken as a switch byte there, so they always use the long form.
+inline bool elsterShortForm(uint16_t index, uint8_t switchByte = ELSTER_SWITCH_VALUE) {
+    const uint8_t lo = static_cast<uint8_t>(index & 0xFF);
+    return switchByte == ELSTER_SWITCH_VALUE && (index >> 8) == 0 && !(lo >= 0xF7 && lo <= 0xFA);
+}
+
+void readSignalRaw(const CanMember *cm, uint16_t index, [[maybe_unused]] const char *name = "?",
+                   uint8_t switchByte = ELSTER_SWITCH_VALUE)
 {
     constexpr bool use_extended_id = false; // No use of extended ID
     const uint8_t IndexByte1 = static_cast<uint8_t>(index >> 8);
@@ -181,7 +195,7 @@ void readSignalRaw(const CanMember *cm, uint16_t index, [[maybe_unused]] const c
     std::vector<uint8_t> data;
     CanIdBytes readId = generate_read_id(cm->CanId);
 
-    if (IndexByte1 == 0x00)
+    if (elsterShortForm(index, switchByte))
     {
         data = {readId.first,
                 readId.second,
@@ -195,7 +209,7 @@ void readSignalRaw(const CanMember *cm, uint16_t index, [[maybe_unused]] const c
     {
         data = {readId.first,
                 readId.second,
-                0xFA,
+                switchByte,
                 IndexByte1,
                 IndexByte2,
                 0x00,
@@ -220,12 +234,26 @@ void readSignal(const CanMember *cm, const char *elsterName)
     return;
 }
 
-void writeSignal(const CanMember *cm, const ElsterIndex *ei, const char *&str)
+// Filter for numeric writes (#79): writables.h installs the clamp to the device limits of the
+// writable numbers. Injected instead of called, because the writable tables sit above this module.
+// Returns true and fills out when it changed the value.
+using WriteValueFilter = bool (*)(const CanMember* cm, const ElsterIndex* ei, const char* in,
+                                  char* out, size_t outSize);
+static WriteValueFilter writeValueFilter = nullptr;
+
+inline const char* filterWriteValue(const CanMember* cm, const ElsterIndex* ei, const char* in,
+                                    char* buf, size_t bufSize) {
+    return (writeValueFilter && writeValueFilter(cm, ei, in, buf, bufSize)) ? buf : in;
+}
+
+void writeSignal(const CanMember *cm, const ElsterIndex *ei, const char *&strIn)
 {
 #ifdef HA_READ_ONLY_true
-    ESP_LOGW("writeSignal()", "read_only: not writing \"%s\" = \"%s\" to %s", ei->Name, str, cm->Name);
+    ESP_LOGW("writeSignal()", "read_only: not writing \"%s\" = \"%s\" to %s", ei->Name, strIn, cm->Name);
     return;
 #endif
+    char clamped[16];
+    const char* str = filterWriteValue(cm, ei, strIn, clamped, sizeof(clamped));
     bool use_extended_id = false;
     int writeValue = TranslateString(str, ei->Type);
     if (writeValue == -1) {
@@ -237,7 +265,7 @@ void writeSignal(const CanMember *cm, const ElsterIndex *ei, const char *&str)
     std::vector<uint8_t> data;
     CanIdBytes writeId = generate_write_id(cm->CanId);
 
-    if (IndexByte1 == 0x00)
+    if (elsterShortForm(ei->Index))
     {
         data = {writeId.first,
                 writeId.second,
