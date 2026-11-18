@@ -201,6 +201,8 @@ code as `-DHA_DEVICE_NAME` and used there as `HA_TOPIC_ROOT` (`config.h`); YAML 
 All discovery configs are retained. They are sent again (a few per 250 ms, so the MQTT
 queue never sees a burst) on every broker connect and when Home Assistant publishes its
 birth message (`homeassistant/status` = `online`). There is no periodic republish.
+A writable number is also published once more when its device limits (switch bytes `0xF8`/`0xF9`)
+have been read, with the same `unique_id` and the device range.
 A republish can also be triggered manually:
 ```bash
 mosquitto_pub -h BROKER -u USER -P PASS -t "heatingpump/republish_discoveries" -m ""
