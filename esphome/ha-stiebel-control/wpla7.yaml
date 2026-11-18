@@ -1,0 +1,19 @@
+#
+#  WPL-A Heat Pump — Model Package (Air-Source, WPM3)
+#
+#  Selects the WPL-A signal request table (SIGNAL_REQUESTS_BASE + WPL-A-specific
+#  signals). All universal sensors live in common.yaml.
+#
+#  IMPORTANT: WPL-A needs can_bit_rate: 50kbps in heatingpump.yaml substitutions
+#  (the project default is 20kbps). See signal_requests_wpla7.h header comment.
+#
+#  VERIFIED ON REAL HARDWARE (WPL-A 07 230 Premium, built-in CAN at 50 kbit/s).
+#  See the signal_requests_wpla7.h header for the member layout.
+#
+#  To add a new model, create signal_requests_yourmodel.h and a thin yourmodel.yaml
+#  following this pattern. See CONTRIBUTING.md for full instructions.
+#
+
+esphome:
+  includes:
+    - signal_requests_wpla7.h

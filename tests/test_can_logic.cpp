@@ -1705,9 +1705,10 @@ TEST_CASE("climate: heating and hot water discoveries reuse the number /set topi
                     LNAME_OPT_ABSENKBETRIEB + "\",\"" + LNAME_OPT_WARMWASSER + "\"]") != std::string::npos);
     CHECK(dhw.find("EINSTELL_SPEICHERSOLLTEMP/set") != std::string::npos);
     const bool wpl17 = std::strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0;
-    const bool canbSetpoint = wpl17 || std::strcmp(HA_DEVICE_MODEL_STR, "wpl9") == 0;
+    const bool canbSetpoint = wpl17 || std::strcmp(HA_DEVICE_MODEL_STR, "wpl9") == 0 ||
+                              std::strcmp(HA_DEVICE_MODEL_STR, "wpla7") == 0;
     const std::string current = std::string("heatingpump/") +
-        (wpl17 ? "KESSEL_CANB" : "KESSEL") + "/SPEICHERISTTEMP/state";
+        ((wpl17 || std::strcmp(HA_DEVICE_MODEL_STR, "wpla7") == 0) ? "KESSEL_CANB" : "KESSEL") + "/SPEICHERISTTEMP/state";
     const std::string command = std::string("heatingpump/") +
         (canbSetpoint ? "KESSEL_CANB" : "MANAGER") + "/EINSTELL_SPEICHERSOLLTEMP/set";
     CHECK(dhw.find(current) != std::string::npos);
@@ -2281,7 +2282,8 @@ TEST_CASE("paced writes: values compare as encoded on the bus", "[sgready]") {
 
 TEST_CASE("SG Ready boost baseline is the setpoint read from the manager (#85)", "[sgready]") {
     resetDiscoveryState();
-    if (std::strcmp(HA_DEVICE_MODEL_STR, "wpl9") == 0) return;   // WPL9 reads the setpoints on CAN-B
+    // WPL9 and WPL-A 07 read the setpoints on CAN-B (canBDhwRoutes)
+    if (std::strcmp(HA_DEVICE_MODEL_STR, "wpl9") == 0 || std::strcmp(HA_DEVICE_MODEL_STR, "wpla7") == 0) return;
     applySgReadyState(2);                          // no boost active from an earlier test
     pacedWriteCount = 0;
     updateSensor(CanMembers[cm_manager], GetElsterIndex("EINSTELL_SPEICHERSOLLTEMP"), "50.0");
@@ -2414,16 +2416,27 @@ TEST_CASE("model profile: one place decides the model's capabilities (#94)", "[m
     CHECK(kModel.wpmw2 == wpmw2Switch);
     CHECK(kModel.wpmw2 == (m == "wpl13e" || m == "wpl18e" || m == "ttl33"));
     CHECK(kModel.wpmw2WritesVerified == (m == "wpl13e" || m == "ttl33"));
-    CHECK(kModel.canBDhwRoutes == (m == "wpl9"));
+    CHECK(kModel.canBDhwRoutes == (m == "wpl9" || m == "wpla7"));
     CHECK(kModel.canBRoutes == (m == "wpl17"));
-    CHECK(kModel.singleHeatingCircuit == (m == "wpl17"));
+    CHECK(kModel.singleHeatingCircuit == (m == "wpl17" || m == "wpla7"));
     CHECK(kModel.perMemberEnergy == (m == "wpl17"));
     CHECK(kModel.ignoreUnusedIwsRuntime == (m == "wpl13e"));
+    CHECK(kModel.dhwActualOnKesselCanb == (m == "wpla7"));
 #ifdef HA_CONTROLLER_WPM3
     CHECK(m == "wpl10ac");
     CHECK(std::string(SG_READY_NORMAL_MODE) == "Komfortbetrieb");
 #endif
 }
+
+#if HA_MODEL_ID == HA_MODEL_ID_wpla7
+TEST_CASE("model profile: WPL-A 07 selects its own profile (wpla7)", "[model][wpla7]") {
+    CHECK(&kModel == &kProfileWpla7);
+    CHECK_FALSE(kModel.wpmw2);
+    CHECK(kModel.singleHeatingCircuit);
+    CHECK(kModel.canBDhwRoutes);
+    CHECK(kModel.dhwActualOnKesselCanb);
+}
+#endif
 
 TEST_CASE("SG Ready labels: one set, the select options, for every publish (#93)", "[sgready]") {
     for (int st = 1; st <= 4; st++) {

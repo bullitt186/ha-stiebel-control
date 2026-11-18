@@ -16,7 +16,7 @@ jobs:
     name: Unit Tests (${{ matrix.model }})
     strategy:
       matrix:
-        model: [test_model, wpl9, wpl10ac, wpl13e, wpl17, wpf10, ttl33, wpl18e]
+        model: [test_model, wpl9, wpl10ac, wpl13e, wpl17, wpf10, ttl33, wpl18e, wpla7]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -95,6 +95,24 @@ jobs:
           restore-keys: esphome-idf-
       - run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
       - run: esphome compile esphome/ci_heatingpump_wpl9.yaml
+
+  compile-wpla7:
+    name: Compile WPL-A 07 (ESP32-S3)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install esphome==2026.10.1
+      - name: Cache ESP-IDF toolchain and framework
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/esphome
+          key: esphome-idf-esphome-2026.10.1
+          restore-keys: esphome-idf-
+      - run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
+      - run: esphome compile esphome/ci_heatingpump_wpla7.yaml
 
   compile-scan:
     name: Compile diagnostic scan firmware (tools/)

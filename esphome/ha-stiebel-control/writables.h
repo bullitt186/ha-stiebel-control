@@ -421,6 +421,7 @@ void publishClimateDiscoveries() {
 #endif
     const char* device = HA_MAIN_DEVICE_JSON;
     const bool wpl17 = kModel.canBRoutes;   // DHW state on KESSEL_CANB
+    const bool dhwActualOnCanb = wpl17 || kModel.dhwActualOnKesselCanb;
 
     // Heating: room setpoint (day) + operating mode (Programmschalter) as presets
     if (const WritableNumberConfig* room = findWritableNumber("RAUMSOLLTEMP_I")) {
@@ -477,7 +478,7 @@ void publishClimateDiscoveries() {
           << "\"min_temp\":" << writableNumberMin(writableNumberIndex(*dhw)) << ",\"max_temp\":" << writableNumberMax(writableNumberIndex(*dhw)) << ",\"temp_step\":" << dhw->step << ","
           << "\"temperature_command_topic\":\"" HA_TOPIC_ROOT "/" << cm->Name << "/EINSTELL_SPEICHERSOLLTEMP/set\","
           << "\"temperature_state_topic\":\"" HA_TOPIC_ROOT "/" << cm->Name << "/EINSTELL_SPEICHERSOLLTEMP/state\","
-          << "\"current_temperature_topic\":\"" HA_TOPIC_ROOT "/" << (wpl17 ? "KESSEL_CANB" : "KESSEL") << "/SPEICHERISTTEMP/state\","
+          << "\"current_temperature_topic\":\"" HA_TOPIC_ROOT "/" << (dhwActualOnCanb ? "KESSEL_CANB" : "KESSEL") << "/SPEICHERISTTEMP/state\","
           << "\"availability_topic\":\"" HA_TOPIC_ROOT "/status\",\"icon\":\"mdi:water-boiler\"," << device << "}";
         std::string s = p.str();
         mqttPublish("homeassistant/climate/" HA_TOPIC_ROOT "/stiebel_climate_warmwasser/config", s.c_str(), s.length());
