@@ -61,6 +61,7 @@
 #define LNAME_HEIZKURVE                        "Heizkurve"
 #define LNAME_NUM_HEIZKURVE                    "Heizkurve Steigung Einstellung"
 #define LNAME_CLIMATE_HEIZUNG                  "Heizung"
+#define LNAME_CLIMATE_HEIZUNG_HK2              "Heizung HK2"
 #define LNAME_CLIMATE_WARMWASSER               "Warmwasser"
 #define LNAME_PROGRAMMSCHALTER                 "Programmschalter"
 #define LNAME_TAG                              "Tag"
@@ -202,6 +203,17 @@
 #define LNAME_SEL_SG_READY                     "SG Ready Zustand"
 #define LNAME_SEL_SG_READY_NORMAL_MODE         "SG Ready Betriebsart Zustand 2"
 
+// Heating circuit 2 (mixer circuit) settings on MISCHERMODUL_3 (0x602)
+#define LNAME_NUM_HK2_RAUMSOLL_TAG             "Raumsoll HK2 Tag Einstellung"
+#define LNAME_NUM_HK2_RAUMSOLL_NACHT           "Raumsoll HK2 Nacht Einstellung"
+#define LNAME_NUM_HK2_HEIZKURVE                "Heizkurve HK2 Einstellung"
+#define LNAME_HK2_RAUMSOLL_TAG                 "Raumsoll HK2 Tag"
+#define LNAME_HK2_RAUMSOLL_NACHT               "Raumsoll HK2 Nacht"
+#define LNAME_HK2_HEIZKURVE                    "Heizkurve HK2"
+#define LNAME_RAUMIST_FE                        "Raum-Ist Fernbedienung"
+#define LNAME_RAUMSOLL_WIRKSAM_FE               "Raumsoll wirksam Fernbedienung"
+#define LNAME_FE_ZUORDNUNG                      "Fernbedienung Heizkreis"
+
 // DHW time program, one text per day (#82)
 #define LNAME_WWPROG_MO                        "Warmwasser-Programm Montag"
 #define LNAME_WWPROG_DI                        "Warmwasser-Programm Dienstag"
@@ -232,7 +244,7 @@
 // Select option strings (programmschalterOptions[], sgReadyOptions[])
 // ============================================================================
 #define LNAME_OPT_NOTBETRIEB                   "Notbetrieb"
-#ifdef HA_MODEL_wpl10ac
+#ifdef HA_CONTROLLER_WPM3
 // WPL 10 AC + WPM3 operating mode names (differ from the old WPM2 naming)
 #define LNAME_OPT_BEREITSCHAFT                 "Bereitschaftsbetrieb"
 #define LNAME_OPT_AUTOMATIK                    "Programmierbetrieb"
@@ -249,6 +261,8 @@
 #define LNAME_OPT_SG_NORMAL                    "2 - Normal"
 #define LNAME_OPT_SG_EMPFOHLEN                 "3 - Empfohlen"
 #define LNAME_OPT_SG_ZWANG                     "4 - Zwang"
+#define LNAME_SG_DEAKTIVIERT                   "Deaktiviert"
+#define LNAME_SG_UNBEKANNT                     "Unbekannt"
 
 // ============================================================================
 // COP sensor names (publishCOPDiscovery())

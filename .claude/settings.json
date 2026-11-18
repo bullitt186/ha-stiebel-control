@@ -11,5 +11,18 @@
       "Bash(git diff *)",
       "Bash(git status)"
     ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/agent-stop-check.sh",
+            "timeout": 180
+          }
+        ]
+      }
+    ]
   }
 }

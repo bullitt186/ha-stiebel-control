@@ -13,6 +13,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   now has the unit min, so HA asks once to update the unit of its statistics (Developer tools →
   Statistics).
 
+### Fixed
+
+- Climate entities (heating, HK2, hot water) showed the mode "off" in Home Assistant (thermostat
+  card "Aus"), because they announce no mode state. The mode now follows the availability of the
+  ESP: `heat` while it is online, `off` while it is offline.
+- WPMW II: `LZ_VERD_2_HEIZBETRIEB` used a signed type and would have turned negative above 32767 h;
+  it is decoded as hours like the other runtime counters.
+- SG Ready with `language: "EN"`: the controller published German state labels while the select used
+  the English ones, on the same topic. All state labels now come from the language files (one
+  `sgReadyStateLabel()`), and the command handler accepts either language (#93).
+- A raw bus scan (`heatingpump/scan/start` with an index range) crashed the ESP after a few
+  thousand indices: `GetElsterIndex()` cached every index that is not in the table in a hash map,
+  which grew until a rehash failed (`exception/panic`, seen on a WPL13E at 0x601 0x0000-0x0fff).
+  Index lookups now use a table sorted once at startup (binary search, fixed size) and cache nothing.
+- WPL13E/WPL18E/TTL 33 (WPMW II): `FEHLERMELDUNG` takes the fault number from the high byte, so a
+  high-pressure stop shows `HD-SENSOR-MAX` instead of `ERR 7424` (#52). The fault list is
+  unchanged.
+
 ### Added
 
 - WPL13E/WPL18E/TTL 33 (WPMW II): names, units and scaling for IWS values and parameters checked on a
@@ -21,15 +39,72 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   compressor off time and its countdown (`STILLSTANDZEIT_0`, in s), the current room setpoint, and
   names for eight further registers (#52). Most of them are not polled by default. Read-only; no new
   writes.
-- WPL13E/WPL18E: heating program of heating circuit 2 (mixer circuit, `HEIZPROG_2_<day>`) as one
-  text entity per day, same format as the DHW and circuit 1 programs. In `Automatik` an empty
-  program keeps the circuit on its night setpoint.
+- WPMW II (WPL13E, WPL18E, TTL 33): room actual temperature of the remote control FE 7 as sensor
+  "Raum-Ist Fernbedienung", and the circuit it is assigned to (parameter 22 "AUSWAHL FE",
+  `FERNBEDIENUNGSZUORDNUNG`). The manager does not answer `RAUMISTTEMP`; its virtual members mirror
+  the one FE sensor (a WPL13E's 0x601, 0x602, 0x301 and 0x302 all followed a heated FE). The room
+  temperature is the current temperature of the climate of the assigned circuit only.
+- WPMW II: effective room setpoint of the FE circuit as sensor "Raumsoll wirksam Fernbedienung"
+  (`VERSTELLTE_RAUMSOLLTEMP` on 0x602): day or night setpoint plus the FE knob (±5 K). It shows
+  the FE mode switch too (moon = night setpoint without correction).
+- WPL13E/TTL 33: climate entity "Heizung HK2" for heating circuit 2 (day room setpoint on 0x602,
+  current temperature from 0x602), so both circuits can use a thermostat card. The operating mode
+  stays on the heating climate.
+- WPMW II heating circuit 2 (mixer circuit): day and night room setpoint and heating curve as
+  number entities. The manager keeps them on the virtual member `MISCHERMODUL_3` (0x602), found by a
+  change of "Raumtemp. 2" on the display (20.0 -> 20.5 moved only `RAUMSOLLTEMP_I` @ 0x602);
+  `RAUMSOLLTEMP_II` on the manager is not circuit 2. Writable on WPL13E and TTL 33.
+- WPL13E/WPL18E/TTL 33: heating program of heating circuit 2 as one text entity per day, read from
+  and written to `HEIZPROG_1_<day>` on `MISCHERMODUL_3` (0x602). In `Automatik` an empty program keeps
+  the circuit on its night setpoint. TTL 33 now also polls the second and third period of both
+  heating programs, so the circuit 1 and 2 program texts appear there.
 
-### Fixed
+### Changed
 
-- WPL13E/WPL18E/TTL 33 (WPMW II): `FEHLERMELDUNG` takes the fault number from the high byte, so a
-  high-pressure stop shows `HD-SENSOR-MAX` instead of `ERR 7424` (#52). The fault list is
-  unchanged.
+- `dashboards/heatingpump_standard.yaml` follows one design language: every color has one meaning on
+  every view (heating orange, hot water blue, electricity grey, flow red, return indigo, setpoints light
+  grey, outdoor blue-grey, room pink/purple, compressor deep purple, COP green), the same names for the
+  same values, tiles with trend lines instead of entity lists, and graphs for pressures and
+  temperatures. New view "Heizkreise": both heating circuits side by side (thermostat, night setpoint,
+  heating curve card, week program card) and the hot water program; it needs
+  `dashboards/www/stiebel-cards.js`, the other views use built-in cards only.
+- The `device_name` and `friendly_name` substitutions take effect (#102). `device_name` is the
+  ESPHome node name and the root of every MQTT topic, discovery node ID and default entity ID
+  (`<device_name>/MANAGER/…`, `sensor.<device_name>_…`); the firmware has no hard-coded
+  `heatingpump/` topic left. `friendly_name` names the ESPHome device in HA. **Upgrade:** with the
+  default `device_name: heatingpump` nothing changes on the bus or in MQTT. If your
+  `heatingpump.yaml` sets another `device_name`, the hostname, the topics and the discovery configs
+  move to that name: set it back to `heatingpump` to keep everything as it is. The ESPHome device in
+  HA shows your `friendly_name` instead of "Heating Pump CAN Interface". The smoke test takes the
+  root from `device_name` (`make smoke-test`, `--root`).
+- Discovery configs carry a language-independent `default_entity_id`
+  (`<domain>.heatingpump_<member>_<signal>`), so DE and EN builds create the same entity IDs on a
+  fresh install. The shipped dashboards, `docs/CONFIGURATION.md`, `SG_READY.md` and the SG Ready
+  example use these IDs; CI checks the dashboards (`tests/check_dashboard_ids.py`). **Existing
+  installs keep their entity IDs**; rename them in HA or adjust the dashboard IDs to use the shipped
+  dashboards (#96).
+- Discovery: the device block is defined once (`HA_MAIN_DEVICE_JSON`, `memberDeviceJson()`), the
+  COP sensors are rows of `calculatedSensors[]` (same topics and unique IDs as before), rows are
+  addressed by the `CalcIdx` enum and flagged `onDemand` instead of a hard-coded index threshold.
+  `can_members.h` holds the bus members and `SignalRequest`, so the test stub uses the real type (#95).
+- MQTT set commands: one subscription on `heatingpump/+/+/set` and one C++ dispatcher
+  (`handleSetCommand()`) replace about 25 YAML handlers that addressed table rows by position. Rows
+  are found by signal name and member, values are checked against the row's min/max (#92).
+- `common.yaml` no longer declares unused internal template sensors or polls `PROGRAMMSCHALTER`
+  and `SOMMERBETRIEB` a second time; `WW_ECO` moved into the request tables (#98). Dead code
+  (`processCanMessageDebug()`, `tests/main.cpp`) removed, `ai_refine_friendly_names.py` archived (#99).
+- Agent instructions (`.github/copilot-instructions.md`, imported by `CLAUDE.md`), `docs/ARCHITECTURE.md`
+  and `README.md` describe the current code: request tables per model, `model_profile.h`, `id: my_can`,
+  no dispatcher. CI checks that every repo path named there exists (`tests/check_doc_paths.py`, #100).
+- Model capabilities live in one place, `model_profile.h` (`kModel` flags such as
+  `wpmw2WritesVerified`, `canBRoutes`, `perMemberEnergy`); no code compares model names any more
+  and the build flag `-DHA_MODEL_<model>` is gone (`HA_DEVICE_MODEL` is the only input). The unit
+  tests of each model now compile its real signal table and operating mode names (#94).
+- Energy counter request rows are defined once (`SIGNAL_REQUESTS_ENERGY_IWS`), and the wpl18e smoke
+  manifest refers to wpl13e (`same_as`) instead of copying it (#101).
+- Development: mutation testing of the C++ logic with Mull (`make mutate` for changed lines,
+  `make mutate-all`, weekly non-blocking CI workflow), a Claude Code Stop hook that runs the fast
+  local checks, and design-first test rules in `CLAUDE.md`.
 
 ## [2.7.0] — 2026-11-15
 

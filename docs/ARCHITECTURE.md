@@ -24,12 +24,12 @@ ha-stiebel-control/
 │       ├── no_captive_portal.yaml          # Optional: removes captive portal + fallback hotspot
 │       ├── can_esp32.yaml                  # Built-in TWAI CAN (256 RX / 64 TX queue)
 │       ├── can_mcp2515.yaml                # MCP2515 SPI CAN (legacy)
-│       ├── wpl13e.yaml                     # Model: WPL 13 E — includes signal table
-│       ├── wpf10.yaml                      # Model: WPF 10 / WPF 10M — community
-│       ├── signal_requests_base.h          # Universal signals macro (all models)
-│       ├── signal_requests_model.h         # Dispatcher (selects model at compile time)
-│       ├── signal_requests_wpl13e.h        # WPL13E signal polling table
-│       ├── signal_requests_wpf10.h         # WPF10 signal polling table
+│       ├── <model>.yaml                    # Model package (wpl9, wpl10ac, wpl13e, wpl17, wpl18e, wpf10, wpc7, ttl33):
+│       │                                   #   only selects its signal_requests_<model>.h
+│       ├── signal_requests_base.h          # Universal signals macro (all models) + shared row macros
+│       ├── signal_requests_<model>.h       # Request table of one model (e.g. signal_requests_wpl13e.h)
+│       ├── model_profile.h                 # Model capabilities (kModel), the only place that looks at the model
+│       ├── can_members.h                   # Bus members (CanMembers[], CanMemberType) and SignalRequest, no ESPHome deps
 │       ├── ha-stiebel-control.h            # Core C++: CAN, MQTT discovery, calculated sensors
 │       ├── sg_ready_controller.h           # SG Ready state machine (pure C++, testable)
 │       ├── dhw_program.h                   # WPMW II time programs: parsing/validation (pure C++, testable)
@@ -97,7 +97,7 @@ ESPHome firmware (ha-stiebel-control.h)
          │ MQTT
          ▼
 MQTT Broker
-  heatingpump/{MEMBER}/{SIGNAL}/state    ← raw sensor values
+  heatingpump/{MEMBER}/{SIGNAL}/state    ← raw sensor values (root = device_name, HA_TOPIC_ROOT)
   heatingpump/calculated/{name}/state    ← derived values
   homeassistant/{type}/heatingpump/+/config ← auto-discovery
          │
@@ -145,14 +145,16 @@ on all Elster heat pumps (date/time, EVU lock, operating mode, energy counters).
 **`signal_requests_<model>.h`** — model-specific file that starts with `SIGNAL_REQUESTS_BASE`
 and appends model-specific signals. Defines `signalRequests[]` and `SIGNAL_REQUEST_COUNT_VALUE`.
 
-**`signal_requests_model.h`** — dispatcher that `#include`s the right model file based on
-the `HA_MODEL_*` preprocessor flag (currently selects wpl13e or wpf10).
-
 **`<model>.yaml`** — thin ESPHome package that brings the model `.h` into the build via
-`esphome: includes:`.
+`esphome: includes:`. There is no dispatcher: the model YAML picks the table.
 
-The `HA_DEVICE_MODEL` string define (injected via `esphome: build_flags`) controls
-the HA device identifier: `stiebel_eltron_<model>`.
+**`model_profile.h`** — the build flag `-DHA_DEVICE_MODEL=<model>` (from the `device_model`
+substitution) is evaluated here only. It sets the preprocessor switches for the signal table and
+the language files (`HA_CONTROLLER_WPMW2`, `HA_CONTROLLER_WPM3`, `HA_ELSTER_WPL_FAMILY`) and the
+constexpr `kModel` with the capability flags (`wpmw2WritesVerified`, `canBRoutes`,
+`perMemberEnergy`, …). Code reads `kModel.<flag>` and never compares model names.
+
+The `HA_DEVICE_MODEL_STR` string also forms the HA device identifier: `stiebel_eltron_<model>`.
 
 ---
 
@@ -191,6 +193,10 @@ Writable entities (numbers, selects) have a matching command topic:
 ```
 heatingpump/{CAN_MEMBER}/{SIGNAL_NAME}/set
 ```
+
+`heatingpump` is the default topic root. It is the `device_name` substitution, passed to the C++
+code as `-DHA_DEVICE_NAME` and used there as `HA_TOPIC_ROOT` (`config.h`); YAML uses
+`${device_name}`.
 
 All discovery configs are retained. They are sent again (a few per 250 ms, so the MQTT
 queue never sees a burst) on every broker connect and when Home Assistant publishes its

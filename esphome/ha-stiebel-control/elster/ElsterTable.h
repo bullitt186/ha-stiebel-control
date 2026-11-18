@@ -35,10 +35,8 @@
   #include <string.h>
   #include "language_select.h"
 
-  // Models with a WPMW II manager share register corrections (same scaling and meaning).
-  #if defined(HA_MODEL_wpl13e) || defined(HA_MODEL_ttl33) || defined(HA_MODEL_wpl18e)
-    #define HA_CONTROLLER_WPMW2
-  #endif
+  // Model switches (HA_CONTROLLER_WPMW2, HA_CONTROLLER_WPM3, HA_ELSTER_WPL_FAMILY)
+  #include "model_profile.h"
 
   #define High(A)     (sizeof(A)/sizeof(A[0]) - 1)
 
@@ -2140,7 +2138,7 @@ const ElsterIndex ElsterTable[] =
   { "LZ_VERD_1_HEIZBETRIEB"                       , 0x07fc, et_hours        , false, true  },
 #ifdef HA_CONTROLLER_WPMW2
   // WPL13E: plain hours - verified: 1029 h heating + 4546 h DHW = LAUFZEIT_WP1 5576 h
-  { "LZ_VERD_2_HEIZBETRIEB"                       , 0x07fd, 0               , false, true  },
+  { "LZ_VERD_2_HEIZBETRIEB"                       , 0x07fd, et_hours        , false, true  },
 #else
   { "LZ_VERD_2_HEIZBETRIEB"                       , 0x07fd, et_hours        , false, true  },
 #endif
@@ -3998,7 +3996,7 @@ const ElsterIndex ElsterTable[] =
   // on a WPL13E next to SOMMERBETRIEB (0xfdb4) and GEBAEUDEART (0xfdb3); raw 2560 = 10 degC.
   { "SOMMERBETRIEB_TEMP"                          , 0xfdb5, et_little_endian, false, false },
   // kr0ner/OneESP32ToRuleThemAll index facts (WPM3 generation)
-#if defined(HA_MODEL_wpl17) || defined(HA_MODEL_wpl23) || defined(HA_MODEL_wpl10ac) || defined(HA_MODEL_wpc7)
+#ifdef HA_ELSTER_WPL_FAMILY
   { "UNTERK_COND"                                 , 0x0aff, et_dec_val      , false, false },
   { "REGLERDYNAMIK_HEIZEN"                        , 0x4e8a, 0               , false, false },
   { "SILENT_LEISTUNG"                             , 0x4e9f, 0               , false, false },
@@ -4348,7 +4346,7 @@ const ElsterMeta ElsterMetaTable[] =
   { 0xfdb4, "SOMMERBETRIEB", LNAME_SOMMERBETRIEB, "binary_sensor", "", "", "", "mdi:weather-sunny", "on", "off" },
   { 0xfdf5, "ANTILEGIONELLEN_ZEITPUNKT", LNAME_ANTILEGIONELLEN_ZEITPUNKT, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
   { 0x0075, "RAUMFEUCHTE", "Raumfeuchte", "sensor", "humidity", "%", "measurement", "mdi:water-percent", NULL, NULL },
-#if defined(HA_MODEL_wpl17) || defined(HA_MODEL_wpl23) || defined(HA_MODEL_wpl10ac) || defined(HA_MODEL_wpc7)
+#ifdef HA_ELSTER_WPL_FAMILY
 #endif
 };
 const unsigned ElsterMetaCount = sizeof(ElsterMetaTable) / sizeof(ElsterMetaTable[0]);
@@ -4404,7 +4402,7 @@ static const ErrorIndex ErrorList[] =
   { 0x1fcd, "INV FEHLERGRENZE"}
 };
 
-#ifdef HA_MODEL_wpl10ac
+#ifdef HA_CONTROLLER_WPM3
 // WPL 10 AC + WPM3 operating mode names
 const ErrorIndex BetriebsartList[] =
 {

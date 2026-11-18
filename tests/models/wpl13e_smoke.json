@@ -1,20 +1,23 @@
 {
   "description": "Required topics for WPL13E (air-source heat pump, 3 heating circuits). Based on 5-minute baseline captured 2026-06-13.",
   "required_topics": [
-    "heatingpump/KESSEL/AUSSENTEMP/state",
-    "heatingpump/KESSEL/EINSTELL_SPEICHERSOLLTEMP/state",
-    "heatingpump/KESSEL/RUECKLAUFISTTEMP/state",
-    "heatingpump/KESSEL/SPEICHERISTTEMP/state",
-    "heatingpump/KESSEL/SPEICHERSOLLTEMP/state",
-    "heatingpump/KESSEL/WPVORLAUFIST/state",
-    "heatingpump/HEIZMODUL/AUSSENTEMP/state",
-    "heatingpump/HEIZMODUL/WPVORLAUFIST/state",
-    "heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP/state",
-    "heatingpump/MANAGER/RUECKLAUFISTTEMP/state",
-    "heatingpump/MANAGER/RAUMSOLLTEMP_I/state",
-    "heatingpump/MANAGER/RAUMSOLLTEMP_II/state",
-    "heatingpump/MANAGER/RAUMSOLLTEMP_III/state",
-    "heatingpump/MANAGER/SPEICHERSOLLTEMP/state",
-    "heatingpump/calculated/delta_t_continuous/state"
+    "{root}/HEIZMODUL/AUSSENTEMP/state",
+    "{root}/HEIZMODUL/WPVORLAUFIST/state",
+    "{root}/KESSEL/AUSSENTEMP/state",
+    "{root}/KESSEL/EINSTELL_SPEICHERSOLLTEMP/state",
+    "{root}/KESSEL/RUECKLAUFISTTEMP/state",
+    "{root}/KESSEL/SPEICHERISTTEMP/state",
+    "{root}/KESSEL/SPEICHERSOLLTEMP/state",
+    "{root}/KESSEL/WPVORLAUFIST/state",
+    "{root}/MANAGER/EINSTELL_SPEICHERSOLLTEMP/state",
+    "{root}/MANAGER/FERNBEDIENUNGSZUORDNUNG/state",
+    "{root}/MANAGER/RAUMSOLLTEMP_I/state",
+    "{root}/MANAGER/RAUMSOLLTEMP_II/state",
+    "{root}/MANAGER/RAUMSOLLTEMP_III/state",
+    "{root}/MANAGER/RUECKLAUFISTTEMP/state",
+    "{root}/MANAGER/SPEICHERSOLLTEMP/state",
+    "{root}/MISCHERMODUL_3/RAUMISTTEMP/state",
+    "{root}/MISCHERMODUL_3/VERSTELLTE_RAUMSOLLTEMP/state",
+    "{root}/calculated/delta_t_continuous/state"
   ]
 }

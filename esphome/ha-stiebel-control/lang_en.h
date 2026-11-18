@@ -364,6 +364,24 @@
 #define LNAME_SEL_SG_READY                     "SG Ready State"
 #undef  LNAME_SEL_SG_READY_NORMAL_MODE
 #define LNAME_SEL_SG_READY_NORMAL_MODE         "SG Ready State 2 Operating Mode"
+#undef  LNAME_NUM_HK2_RAUMSOLL_TAG
+#define LNAME_NUM_HK2_RAUMSOLL_TAG             "Room Setpoint HC2 Day Setting"
+#undef  LNAME_NUM_HK2_RAUMSOLL_NACHT
+#define LNAME_NUM_HK2_RAUMSOLL_NACHT           "Room Setpoint HC2 Night Setting"
+#undef  LNAME_NUM_HK2_HEIZKURVE
+#define LNAME_NUM_HK2_HEIZKURVE                "Heating Curve HC2 Setting"
+#undef  LNAME_HK2_RAUMSOLL_TAG
+#define LNAME_HK2_RAUMSOLL_TAG                 "Room Setpoint HC2 Day"
+#undef  LNAME_HK2_RAUMSOLL_NACHT
+#define LNAME_HK2_RAUMSOLL_NACHT               "Room Setpoint HC2 Night"
+#undef  LNAME_HK2_HEIZKURVE
+#define LNAME_HK2_HEIZKURVE                    "Heating Curve HC2"
+#undef  LNAME_RAUMIST_FE
+#define LNAME_RAUMIST_FE                        "Room Temperature Remote Control"
+#undef  LNAME_RAUMSOLL_WIRKSAM_FE
+#define LNAME_RAUMSOLL_WIRKSAM_FE               "Effective Room Setpoint Remote Control"
+#undef  LNAME_FE_ZUORDNUNG
+#define LNAME_FE_ZUORDNUNG                      "Remote Control Heating Circuit"
 #undef  LNAME_WWPROG_MO
 #define LNAME_WWPROG_MO                        "DHW Program Monday"
 #undef  LNAME_WWPROG_DI
@@ -424,6 +442,10 @@
 #define LNAME_OPT_SG_EMPFOHLEN                 "3 - Recommended"
 #undef  LNAME_OPT_SG_ZWANG
 #define LNAME_OPT_SG_ZWANG                     "4 - Forced"
+#undef  LNAME_SG_DEAKTIVIERT
+#define LNAME_SG_DEAKTIVIERT                   "Disabled"
+#undef  LNAME_SG_UNBEKANNT
+#define LNAME_SG_UNBEKANNT                     "Unknown"
 
 // ============================================================================
 // COP sensor names
@@ -436,6 +458,8 @@
 #define LNAME_COP_GESAMT                       "COP Total"
 #undef  LNAME_CLIMATE_HEIZUNG
 #define LNAME_CLIMATE_HEIZUNG                  "Heating"
+#undef  LNAME_CLIMATE_HEIZUNG_HK2
+#define LNAME_CLIMATE_HEIZUNG_HK2              "Heating HC2"
 #undef  LNAME_CLIMATE_WARMWASSER
 #define LNAME_CLIMATE_WARMWASSER               "Hot Water"
 #endif // HA_LANGUAGE_EN
