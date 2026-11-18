@@ -125,6 +125,12 @@ TEST_CASE("getTypeDefaults: et_err_nr → alert-circle sensor", "[can]") {
     CHECK(std::string(comp) == "sensor");
     CHECK(std::string(icon) == "mdi:alert-circle");
 }
+TEST_CASE("getTypeDefaults: et_err_status → alert-circle sensor", "[can]") {
+    const char *comp, *dc, *unit, *sc, *icon;
+    getTypeDefaults(et_err_status, comp, dc, unit, sc, icon);
+    CHECK(std::string(comp) == "sensor");
+    CHECK(std::string(icon) == "mdi:alert-circle");
+}
 TEST_CASE("getTypeDefaults: et_dev_id → text", "[can]") {
     const char *comp, *dc, *unit, *sc, *icon;
     getTypeDefaults(et_dev_id, comp, dc, unit, sc, icon);
@@ -1455,6 +1461,52 @@ TEST_CASE("ABTAUUNGAKTIV is a binary sensor with on/off payloads", "[meta]") {
     CHECK(std::string(meta->payloadOff) == "off");
 }
 
+TEST_CASE("WPMW II: IWS values and parameters carry read-only metadata (#52)", "[meta][wpmw2]") {
+    // type with / without HA_CONTROLLER_WPMW2, then the HA metadata under WPMW II
+    struct Row { const char* name; unsigned type; unsigned typeOther; const char* deviceClass; const char* unit; };
+    static const Row rows[] = {
+        {"VERDAMPFERISTTEMP_KOMPENSIERT", et_dec_val, et_default, "temperature", "°C"},
+        {"REKUPERATORISTTEMP", et_dec_val, et_default, "temperature", "°C"},
+        {"LEISTUNGSREDUZIERUNG_KUEHLEN", et_dec_val, et_default, "temperature", "°C"},
+        {"MESSSTROM_HOCHDRUCK", et_dec_val, et_default, "current", "mA"},
+        {"MESSSTROM_NIEDERDRUCK", et_dec_val, et_default, "current", "mA"},
+        {"VORLAUFISTTEMP_WP_IWS", et_dec_val, et_dec_val, "temperature", "°C"},
+        {"LUEFTERDREHZAHL", et_default, et_default, "", "%"},
+        {"STILLSTANDZEIT", et_little_endian, et_little_endian, "duration", "min"},
+        {"STILLSTANDZEIT_0", et_default, et_default, "duration", "s"},
+    };
+    for (const Row& r : rows) {
+        INFO(r.name);
+        const ElsterIndex* ei = GetElsterIndex(r.name);
+        REQUIRE(std::string(ei->Name) == r.name);   // unknown names return INDEX_NOT_FOUND
+        const ElsterMeta* meta = GetElsterMeta(ei);
+        if (!isWpmw2Model()) {
+            CHECK(ei->Type == r.typeOther);
+            CHECK(meta == nullptr);
+            continue;
+        }
+        CHECK(ei->Type == r.type);
+        REQUIRE(meta != nullptr);
+        CHECK(std::string(meta->haComponent) == "sensor");
+        CHECK(std::string(meta->haDeviceClass) == r.deviceClass);
+        CHECK(std::string(meta->unit) == r.unit);
+    }
+    // Name only: unit and device class stay the type defaults, so existing HA statistics keep their unit
+    const ElsterIndex* hyst = GetElsterIndex("HYSTERESEZEIT");
+    REQUIRE(std::string(hyst->Name) == "HYSTERESEZEIT");
+    if (isWpmw2Model()) {
+        const ElsterMeta* meta = GetElsterMeta(hyst);
+        REQUIRE(meta != nullptr);
+        CHECK(meta->unit == nullptr);
+        CHECK(meta->haDeviceClass == nullptr);
+        resetDiscoveryState();
+        publishMqttDiscovery(CanMembers[cm_manager], GetElsterIndex("STILLSTANDZEIT"));
+        const std::string payload = mqttFindPayload("stillstandzeit");
+        CHECK(payload.find("\"device_class\":\"duration\"") != std::string::npos);
+        CHECK(payload.find("\"unit_of_measurement\":\"min\"") != std::string::npos);
+    }
+}
+
 TEST_CASE("writableNumbers: WPMW II parameters sit at the indices common.yaml uses", "[writable]") {
     // The WPMW II parameter rows (set commands find them by name, #92)
     static const char* expected[] = {"SCHALTWERKDYNAMIKZEIT",
@@ -1630,9 +1682,15 @@ TEST_CASE("fault: code decoding and remedy attribute", "[fault]") {
     resetDiscoveryState();
     const ElsterIndex* ei = GetElsterIndex("FEHLERMELDUNG");
     REQUIRE(ei != nullptr);
+#ifdef HA_CONTROLLER_WPMW2
+    CHECK(ei->Type == et_err_status);
+    // HEIZMODUL answers fault 4 (Hochdruck) in the high byte
+    processAndUpdate(0x500, {0xD2, 0x00, 0x01, 0x04, 0x00, 0x00, 0x00});
+#else
     CHECK(ei->Type == et_err_nr);
     // HEIZMODUL answers fault 0x0004 (Hochdruck)
     processAndUpdate(0x500, {0xD2, 0x00, 0x01, 0x00, 0x04, 0x00, 0x00});
+#endif
     CHECK(mqttFindPayload("HEIZMODUL/FEHLERMELDUNG/state") == "Hochdruck");
     CHECK(mqttFindPayload("HEIZMODUL/FEHLERMELDUNG/attributes").find("Volumenstrom") != std::string::npos);
     CHECK(mqttFindPayload("homeassistant/sensor/heatingpump/").find("json_attributes_topic") != std::string::npos);

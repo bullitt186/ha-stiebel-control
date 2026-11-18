@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Upgrade notes
+
+- WPL13E/WPL18E/TTL 33: some existing sensors get new display names; entity IDs stay. `STILLSTANDZEIT`
+  now has the unit min, so HA asks once to update the unit of its statistics (Developer tools →
+  Statistics).
+
 ### Fixed
 
 - Climate entities (heating, HK2, hot water) showed the mode "off" in Home Assistant (thermostat
@@ -21,9 +27,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   thousand indices: `GetElsterIndex()` cached every index that is not in the table in a hash map,
   which grew until a rehash failed (`exception/panic`, seen on a WPL13E at 0x601 0x0000-0x0fff).
   Index lookups now use a table sorted once at startup (binary search, fixed size) and cache nothing.
+- WPL13E/WPL18E/TTL 33 (WPMW II): `FEHLERMELDUNG` takes the fault number from the high byte, so a
+  high-pressure stop shows `HD-SENSOR-MAX` instead of `ERR 7424` (#52). The fault list is
+  unchanged.
 
 ### Added
 
+- WPL13E/WPL18E/TTL 33 (WPMW II): names, units and scaling for IWS values and parameters checked on a
+  WPL 18 E display: evaporator outlet, compressor inlet and vapour injection temperature, the pressure
+  sensor currents, condenser outlet (`FROSTTEMP`), fan output, controller and mixer dynamics,
+  compressor off time and its countdown (`STILLSTANDZEIT_0`, in s), the current room setpoint, and
+  names for eight further registers (#52). Most of them are not polled by default. Read-only; no new
+  writes.
 - WPMW II (WPL13E, WPL18E, TTL 33): room actual temperature of the remote control FE 7 as sensor
   "Raum-Ist Fernbedienung", and the circuit it is assigned to (parameter 22 "AUSWAHL FE",
   `FERNBEDIENUNGSZUORDNUNG`). The manager does not answer `RAUMISTTEMP`; its virtual members mirror
