@@ -130,7 +130,7 @@ The firmware C++ code is split by responsibility (#109). `ha-stiebel-control.h` 
 CAN entry points (`processAndUpdate()` for every received frame, `updateSensor()` for every
 decoded value) and includes the modules. Each module owns its global state and includes the
 modules it uses; the includes form no cycle. Everything still compiles into one translation unit
-(ESPHome's `main.cpp`, or `tests/test_can_logic.cpp`), so the split does not change the firmware.
+(the sketch ESPHome generates, or `tests/test_can_logic.cpp`), so the split does not change the firmware.
 
 The table is in include order: a module includes only modules above it. `config.h`,
 `model_profile.h`, `can_members.h`, the language files and the Elster library are used by many
