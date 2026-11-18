@@ -1,226 +1,738 @@
-# ha-stiebel-control — standard dashboard (built-in cards only)
+# ha-stiebel-control — standard dashboard
 #
 # Import: Settings → Dashboards → Add dashboard → "New dashboard from scratch",
 # open it, ⋮ → Edit dashboard → ⋮ → Raw configuration editor, paste this file.
 #
-# Entity IDs are the ones a fresh install creates. HA keeps the IDs an entity got
-# when it was first discovered, so after renames in the firmware (e.g. the IWS
-# outside temperature → "Luftansaugtemperatur") an older install may use the old
-# ID. Missing cards show "Entity not available": search for the entity under
-# Settings → Entities and adjust the ID here. Signals your model does not provide
-# are simply not created; remove those rows.
+# Entity IDs: the firmware sends a language-independent default entity ID with every
+# discovery config (<domain>.heatingpump_<member>_<signal>, e.g.
+# sensor.heatingpump_kessel_aussentemp), so DE and EN builds create the same IDs and
+# renames of display names no longer change them. Installs from before 2.8 keep the IDs
+# HA gave them then (derived from the display name): search for the entity under
+# Settings → Entities and adjust the ID here, or rename the entity ID in HA. Signals your
+# model does not provide are simply not created; remove those rows. Heating circuit 2,
+# the room temperatures per circuit and the time programs exist on WPMW II models.
+#
+# Cards: the views Übersicht, Verlauf, Energie and Diagnose use built-in cards only. The view
+# "Heizkreise" also uses the heating curve and week program cards from
+# dashboards/www/stiebel-cards.js (install: docs/CONFIGURATION.md, "Dashboards"); without
+# them, delete that view.
+#
+# Design language — every view uses the same meaning per color:
+#   heating orange #ff9800 · hot water blue #2196f3 · electricity grey #9e9e9e
+#   flow red #f44336 · return indigo #3f51b5 · setpoint light grey #bdbdbd
+#   outdoor blue-grey #607d8b (second outdoor value #b0bec5) · room pink #e91e63 (HC2 purple)
+#   compressor deep purple #673ab7 · efficiency/COP green #4caf50 · defrost teal · fault red
+# Tiles use the matching theme color name (orange, blue, grey, ...), graphs the hex value.
 title: Wärmepumpe
 views:
   - title: Übersicht
     path: waermepumpe
     icon: mdi:heat-pump
     type: sections
-    max_columns: 3
+    max_columns: 2
     sections:
       - type: grid
         cards:
           - type: heading
-            heading: Steuerung
-          - type: thermostat
-            entity: climate.stiebel_eltron_warmepumpe_heizung
+            heading: Jetzt
+            icon: mdi:heat-pump
+            badges:
+              - type: entity
+                entity: binary_sensor.heatingpump_calculated_compressor_active
+                name: Verdichter
+                show_name: true
+                color: deep-purple
+              - type: entity
+                entity: binary_sensor.heatingpump_calculated_abtauung_laeuft
+                name: Abtauen
+                show_name: true
+                show_state: false
+                color: teal
+                visibility:
+                  - condition: state
+                    entity: binary_sensor.heatingpump_calculated_abtauung_laeuft
+                    state: 'on'
+              - type: entity
+                entity: binary_sensor.heatingpump_manager_evu_sperre_aktiv
+                name: EVU-Sperre
+                show_name: true
+                show_state: false
+                color: red
+                visibility:
+                  - condition: state
+                    entity: binary_sensor.heatingpump_manager_evu_sperre_aktiv
+                    state: 'on'
+              - type: entity
+                entity: binary_sensor.heatingpump_calculated_sommerbetrieb_aktiv
+                name: Sommerbetrieb
+                show_name: true
+                show_state: false
+                color: yellow
+                visibility:
+                  - condition: state
+                    entity: binary_sensor.heatingpump_calculated_sommerbetrieb_aktiv
+                    state: 'on'
+          - type: tile
+            entity: sensor.heatingpump_kessel_aussentemp
+            name: Außentemperatur
+            color: blue-grey
+            grid_options:
+              columns: 6
             features:
-              - type: climate-preset-modes
-                style: dropdown
-          - type: thermostat
-            entity: climate.stiebel_eltron_warmepumpe_warmwasser
+              - type: trend-graph
+                hours_to_show: 24
           - type: tile
-            entity: select.manager_programmschalter
+            entity: sensor.heatingpump_kessel_speicheristtemp
+            name: Warmwasser
+            icon: mdi:water-boiler
+            color: blue
+            grid_options:
+              columns: 6
             features:
-              - type: select-options
+              - type: trend-graph
+                hours_to_show: 24
           - type: tile
-            entity: number.manager_heizkurve_steigung_einstellung
+            entity: sensor.heatingpump_kessel_wpvorlaufist
+            name: Vorlauf
+            icon: mdi:thermometer-chevron-up
+            color: red
+            grid_options:
+              columns: 6
+            features:
+              - type: trend-graph
+                hours_to_show: 24
           - type: tile
-            entity: select.manager_sg_ready_zustand
-
+            entity: sensor.heatingpump_calculated_el_leistung_w
+            name: Leistung
+            icon: mdi:flash
+            color: grey
+            grid_options:
+              columns: 6
+            features:
+              - type: trend-graph
+                hours_to_show: 24
+          - type: tile
+            entity: sensor.heatingpump_calculated_verdichter_starts_heute
+            name: Verdichterstarts heute
+            icon: mdi:counter
+            color: deep-purple
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_calculated_verdichter_laufzeit_heute
+            name: Verdichterlaufzeit heute
+            icon: mdi:timer-outline
+            color: deep-purple
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_heizmodul_fehlermeldung
+            name: Störung
+            color: red
+            grid_options:
+              columns: 12
       - type: grid
         cards:
           - type: heading
-            heading: Status
+            heading: Bedienung
+            icon: mdi:tune
           - type: tile
-            entity: binary_sensor.stiebel_eltron_warmepumpe_wp_verdichter_aktiv
-            name: Verdichter
-          - type: tile
-            entity: binary_sensor.heizmodul_abtauung_aktiv
-            name: Abtauen
-          - type: tile
-            entity: binary_sensor.manager_evu_sperre_aktiv
-            name: EVU-Sperre
-          - type: tile
-            entity: binary_sensor.stiebel_eltron_warmepumpe_sommerbetrieb_aktiv
-            name: Sommerbetrieb
-          - type: tile
-            entity: binary_sensor.manager_sommerbetrieb_automatik
-            name: Sommer-Automatik
-          - type: tile
-            entity: sensor.heizmodul_storung
-            name: Störung
+            entity: climate.heatingpump_climate_heizung
+            name: Heizung HK1
+            icon: mdi:radiator
+            color: orange
+            state_content:
+              - hvac_action
+              - current_temperature
             grid_options:
               columns: 12
+            features:
+              - type: target-temperature
+          - type: tile
+            entity: climate.heatingpump_climate_heizung_hk2
+            name: Heizung HK2
+            icon: mdi:heating-coil
+            color: orange
+            state_content:
+              - hvac_action
+              - current_temperature
+            grid_options:
+              columns: 12
+            features:
+              - type: target-temperature
+          - type: tile
+            entity: select.heatingpump_manager_programmschalter
+            name: Betriebsart
+            icon: mdi:calendar-clock
+            color: orange
+            grid_options:
+              columns: 12
+            features:
+              - type: select-options
+            features_position: inline
+          - type: tile
+            entity: climate.heatingpump_climate_warmwasser
+            name: Warmwasser
+            icon: mdi:water-boiler
+            color: blue
+            state_content:
+              - current_temperature
+            grid_options:
+              columns: 12
+            features:
+              - type: target-temperature
+          - type: tile
+            entity: select.heatingpump_manager_sg_ready_state
+            name: SG Ready
+            icon: mdi:solar-power
+            color: green
+            grid_options:
+              columns: 12
+            features:
+              - type: select-options
+            features_position: inline
           - type: heading
             heading: Effizienz
+            icon: mdi:leaf
+            heading_style: subtitle
           - type: gauge
-            entity: sensor.stiebel_eltron_warmepumpe_cop_heizung
-            name: COP Heizung
+            entity: sensor.heatingpump_cop_heiz
+            name: COP Heizen
             min: 0
             max: 6
             needle: true
-            severity: {red: 0, yellow: 2.5, green: 3.5}
+            severity:
+              red: 0
+              yellow: 2.5
+              green: 3.5
+            grid_options:
+              columns: 6
           - type: gauge
-            entity: sensor.stiebel_eltron_warmepumpe_cop_warmwasser
+            entity: sensor.heatingpump_cop_ww
             name: COP Warmwasser
             min: 0
             max: 6
             needle: true
-            severity: {red: 0, yellow: 2, green: 3}
-
+            severity:
+              red: 0
+              yellow: 2
+              green: 3
+            grid_options:
+              columns: 6
+  - title: Heizkreise
+    path: heizkreise
+    icon: mdi:radiator
+    type: sections
+    max_columns: 2
+    sections:
       - type: grid
         cards:
           - type: heading
-            heading: Temperaturen
-          - type: history-graph
-            hours_to_show: 24
-            grid_options:
-              columns: 12
-            entities:
-              - entity: sensor.kessel_aussen_temperatur
-                name: Außen
-              - entity: sensor.stiebel_eltron_warmepumpe_aussentemperatur_gedampft
-                name: Außen gedämpft
-              - entity: sensor.heizmodul_luftansaugtemperatur
-                name: Luftansaugung
-              - entity: sensor.kessel_vorlauf_ist_temperatur
-                name: Vorlauf
-              - entity: sensor.kessel_vorlauf_soll_temperatur
-                name: Vorlauf Soll
-              - entity: sensor.kessel_rucklauf_ist_temperatur
+            heading: HK1
+            icon: mdi:radiator
+            heading_style: subtitle
+            badges:
+              - type: entity
+                entity: sensor.heatingpump_mischermodul_2_raumisttemp
+                name: Raum
+                show_name: true
+                color: pink
+              - type: entity
+                entity: sensor.heatingpump_kessel_ruecklaufisttemp
                 name: Rücklauf
-              - entity: sensor.kessel_speicher_ist_temperatur
-                name: Speicher
+                show_name: true
+                color: indigo
+          - type: thermostat
+            entity: climate.heatingpump_climate_heizung
+            name: Raumsoll Tag
+          - type: tile
+            entity: number.heatingpump_manager_raumsolltemp_nacht
+            name: Raumsoll Nacht
+            icon: mdi:weather-night
+            color: orange
+            grid_options:
+              columns: 12
+            features:
+              - type: numeric-input
+                style: buttons
+            features_position: inline
+          - type: custom:stiebel-heating-curve-card
+            title: Heizkurve
+            y_label: Rücklaufsoll HK1
+            color: orange
+            slope: number.heatingpump_manager_heizkurve_set
+            room: climate.heatingpump_climate_heizung
+            room_night: number.heatingpump_manager_raumsolltemp_nacht
+            outdoor: sensor.heatingpump_kessel_aussentemp
+            setpoint: sensor.heatingpump_kessel_kesselsolltemp
+          - type: custom:stiebel-week-program-card
+            title: Heizprogramm
+            color: orange
+            entities:
+              - text.heatingpump_heiz_programm_mo
+              - text.heatingpump_heiz_programm_di
+              - text.heatingpump_heiz_programm_mi
+              - text.heatingpump_heiz_programm_do
+              - text.heatingpump_heiz_programm_fr
+              - text.heatingpump_heiz_programm_sa
+              - text.heatingpump_heiz_programm_so
+      - type: grid
+        cards:
+          - type: heading
+            heading: HK2
+            icon: mdi:heating-coil
+            heading_style: subtitle
+            badges:
+              - type: entity
+                entity: sensor.heatingpump_mischermodul_3_raumisttemp
+                name: Raum
+                show_name: true
+                color: purple
+              - type: entity
+                entity: sensor.heatingpump_kessel_vorlaufisttemp
+                name: Vorlauf
+                show_name: true
+                color: red
+          - type: thermostat
+            entity: climate.heatingpump_climate_heizung_hk2
+            name: Raumsoll Tag
+          - type: tile
+            entity: number.heatingpump_mischermodul_3_raumsolltemp_nacht
+            name: Raumsoll Nacht
+            icon: mdi:weather-night
+            color: orange
+            grid_options:
+              columns: 12
+            features:
+              - type: numeric-input
+                style: buttons
+            features_position: inline
+          - type: custom:stiebel-heating-curve-card
+            title: Heizkurve
+            y_label: Mischer-Vorlaufsoll HK2
+            color: orange
+            slope: number.heatingpump_mischermodul_3_heizkurve_set
+            room: climate.heatingpump_climate_heizung_hk2
+            room_night: number.heatingpump_mischermodul_3_raumsolltemp_nacht
+            outdoor: sensor.heatingpump_kessel_aussentemp
+            setpoint: sensor.heatingpump_kessel_vorlaufsolltemp
+          - type: custom:stiebel-week-program-card
+            title: Heizprogramm
+            color: orange
+            entities:
+              - text.heatingpump_heiz_programm_hk2_mo
+              - text.heatingpump_heiz_programm_hk2_di
+              - text.heatingpump_heiz_programm_hk2_mi
+              - text.heatingpump_heiz_programm_hk2_do
+              - text.heatingpump_heiz_programm_hk2_fr
+              - text.heatingpump_heiz_programm_hk2_sa
+              - text.heatingpump_heiz_programm_hk2_so
+      - type: grid
+        column_span: 2
+        cards:
+          - type: heading
+            heading: Warmwasser
+            icon: mdi:water-boiler
+          - type: thermostat
+            entity: climate.heatingpump_climate_warmwasser
+            name: Komfort-Temperatur
+            grid_options:
+              columns: 12
+          - type: custom:stiebel-week-program-card
+            title: Warmwasserprogramm
+            color: blue
+            grid_options:
+              columns: 12
+            entities:
+              - text.heatingpump_ww_programm_mo
+              - text.heatingpump_ww_programm_di
+              - text.heatingpump_ww_programm_mi
+              - text.heatingpump_ww_programm_do
+              - text.heatingpump_ww_programm_fr
+              - text.heatingpump_ww_programm_sa
+              - text.heatingpump_ww_programm_so
+  - title: Verlauf
+    path: verlauf
+    icon: mdi:chart-timeline-variant
+    type: sections
+    max_columns: 2
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Heizkreise
+            icon: mdi:radiator
           - type: history-graph
+            title: Vorlauf und Rücklauf
             hours_to_show: 24
             grid_options:
               columns: 12
             entities:
-              - entity: sensor.heizmodul_heissgastemperatur
-                name: Heißgas
-              - entity: sensor.heizmodul_verdampfer_temperatur
-                name: Verdampfer
-
+              - entity: sensor.heatingpump_kessel_wpvorlaufist
+                name: Vorlauf
+                color: '#f44336'
+              - entity: sensor.heatingpump_kessel_ruecklaufisttemp
+                name: Rücklauf HK1
+                color: '#3f51b5'
+              - entity: sensor.heatingpump_kessel_kesselsolltemp
+                name: Rücklaufsoll HK1
+                color: '#bdbdbd'
+          - type: history-graph
+            title: Mischer-Vorlauf HK2
+            hours_to_show: 24
+            grid_options:
+              columns: 12
+            entities:
+              - entity: sensor.heatingpump_kessel_vorlaufisttemp
+                name: Mischer-Vorlauf HK2
+                color: '#f44336'
+              - entity: sensor.heatingpump_kessel_vorlaufsolltemp
+                name: Mischer-Vorlaufsoll HK2
+                color: '#bdbdbd'
+          - type: history-graph
+            title: Raum und Außen
+            hours_to_show: 24
+            grid_options:
+              columns: 12
+            entities:
+              - entity: sensor.heatingpump_mischermodul_2_raumisttemp
+                name: Raum-Ist HK1
+                color: '#e91e63'
+              - entity: sensor.heatingpump_mischermodul_3_raumisttemp
+                name: Raum-Ist HK2
+                color: '#9c27b0'
+              - entity: sensor.heatingpump_kessel_aussentemp
+                name: Außentemperatur
+                color: '#607d8b'
+              - entity: sensor.heatingpump_calculated_aussentemp_gedaempft
+                name: Außentemperatur gedämpft
+                color: '#b0bec5'
+      - type: grid
+        cards:
+          - type: heading
+            heading: Warmwasser und Strom
+            icon: mdi:water-boiler
+          - type: history-graph
+            title: Warmwasserspeicher
+            hours_to_show: 24
+            grid_options:
+              columns: 12
+            entities:
+              - entity: sensor.heatingpump_kessel_speicheristtemp
+                name: Warmwasser
+                color: '#2196f3'
+              - entity: sensor.heatingpump_kessel_speichersolltemp
+                name: Warmwassersoll
+                color: '#bdbdbd'
+          - type: history-graph
+            title: Elektrische Leistung
+            hours_to_show: 24
+            grid_options:
+              columns: 12
+            entities:
+              - entity: sensor.heatingpump_calculated_el_leistung_w
+                name: Leistung
+                color: '#9e9e9e'
+          - type: history-graph
+            title: Spreizung und Regelabweichung
+            hours_to_show: 24
+            grid_options:
+              columns: 12
+            entities:
+              - entity: sensor.heatingpump_calculated_delta_t_running
+                name: Spreizung bei laufendem Verdichter
+                color: '#673ab7'
+              - entity: sensor.heatingpump_calculated_regelabweichung
+                name: Regelabweichung HK1
+                color: '#3f51b5'
   - title: Energie
     path: energie
     icon: mdi:lightning-bolt
     type: sections
+    max_columns: 2
     sections:
       - type: grid
         cards:
           - type: statistics-graph
-            title: Strom pro Tag (kWh)
+            title: Heizen – 30 Tage
             chart_type: bar
             period: day
             days_to_show: 30
-            stat_types: [change]
+            stat_types:
+              - change
             grid_options:
               columns: 12
             entities:
-              - entity: sensor.stiebel_eltron_warmepumpe_energie_heizung_gesamt_kwh
-                name: Heizung
-              - entity: sensor.stiebel_eltron_warmepumpe_energie_warmwasser_gesamt_kwh
-                name: Warmwasser
+              - entity: sensor.heatingpump_calculated_energie_heiz_total_kwh
+                name: Strom
+                color: '#9e9e9e'
+              - entity: sensor.heatingpump_calculated_waerme_heiz_total_kwh
+                name: Wärme
+                color: '#ff9800'
           - type: statistics-graph
-            title: Wärme pro Tag (kWh)
+            title: Warmwasser – 30 Tage
             chart_type: bar
             period: day
             days_to_show: 30
-            stat_types: [change]
+            stat_types:
+              - change
             grid_options:
               columns: 12
             entities:
-              - entity: sensor.stiebel_eltron_warmepumpe_waerme_ertrag_heizung_gesamt_kwh
-                name: Heizung
-              - entity: sensor.stiebel_eltron_warmepumpe_waerme_ertrag_warmwasser_gesamt_kwh
-                name: Warmwasser
+              - entity: sensor.heatingpump_calculated_energie_ww_total_kwh
+                name: Strom
+                color: '#9e9e9e'
+              - entity: sensor.heatingpump_calculated_waerme_ww_total_kwh
+                name: Wärme
+                color: '#2196f3'
+      - type: grid
+        cards:
           - type: statistics-graph
-            title: COP (Tagesmittel)
+            title: COP – 30 Tage
+            chart_type: line
             period: day
             days_to_show: 30
-            stat_types: [mean]
+            stat_types:
+              - mean
             grid_options:
               columns: 12
             entities:
-              - sensor.stiebel_eltron_warmepumpe_cop_heizung
-              - sensor.stiebel_eltron_warmepumpe_cop_warmwasser
-              - sensor.stiebel_eltron_warmepumpe_cop_gesamt
-
+              - entity: sensor.heatingpump_cop_heiz
+                name: Heizen
+                color: '#ff9800'
+              - entity: sensor.heatingpump_cop_ww
+                name: Warmwasser
+                color: '#2196f3'
+              - entity: sensor.heatingpump_cop_gesamt
+                name: Gesamt
+                color: '#4caf50'
   - title: Diagnose
     path: diagnose
     icon: mdi:stethoscope
     type: sections
+    max_columns: 2
     sections:
       - type: grid
-        column_span: 2
         cards:
+          - type: heading
+            heading: Fehler
+            icon: mdi:alert-circle-outline
           - type: tile
-            entity: sensor.stiebel_eltron_warmepumpe_fehlerliste
+            entity: sensor.heatingpump_calculated_fehlerliste
             name: Letzter Fehler
+            icon: mdi:alert-circle-outline
+            color: red
+            grid_options:
+              columns: 12
           - type: markdown
             title: Fehlerliste (Display, Parameter 48)
-            content: |-
-              {% set e = state_attr('sensor.stiebel_eltron_warmepumpe_fehlerliste', 'eintraege') or [] %}
+            content: '{% set e = state_attr(''sensor.heatingpump_calculated_fehlerliste'', ''eintraege'') or []
+              %}
+
               {% if e %}
+
               | Zeitpunkt | Fehler |
+
               |---|---|
+
               {% for x in e %}| {{ x.zeit }} | {{ x.fehler }} |
+
               {% endfor %}
-              {% else %}Keine Einträge gelesen.{% endif %}
-          - type: entities
-            title: Einstellungen
-            entities:
-              - entity: sensor.manager_bivalenzpunkt_heizung
-              - entity: sensor.manager_bivalenzpunkt_warmwasser
-              - entity: sensor.manager_einsatzgrenze_warmepumpe_heizung
-              - entity: sensor.manager_einsatzgrenze_warmepumpe_warmwasser
-              - entity: sensor.manager_max_vorlauftemperatur_heizung
-              - entity: sensor.manager_max_rucklauftemperatur
-              - entity: sensor.manager_anlagenfrostschutz_temperatur
+
+              {% else %}Keine Einträge gelesen.{% endif %}'
+          - type: heading
+            heading: Regelung und Grenzen
+            icon: mdi:tune-variant
+            heading_style: subtitle
+          - type: tile
+            entity: sensor.heatingpump_manager_heizkurve
+            name: Heizkurve HK1
+            color: orange
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_kessel_kesselsolltemp
+            name: Rücklaufsoll HK1
+            color: grey
+            grid_options:
+              columns: 6
+            features:
+              - type: trend-graph
+          - type: tile
+            entity: sensor.heatingpump_manager_gebaeudeart
+            name: Gebäudeart
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_manager_sw_aussentemp
+            name: Sommerbetrieb ab
+            color: yellow
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_manager_bivalentparalleltemperatur_hzg
+            name: Bivalenzpunkt Heizen
+            color: orange
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_manager_bivalentparalleltemperatur_ww
+            name: Bivalenzpunkt Warmwasser
+            color: blue
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_manager_bivalenzalternativtemperatur_hzg
+            name: Einsatzgrenze Heizen
+            color: orange
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_manager_bivalenzalternativtemperatur_ww
+            name: Einsatzgrenze Warmwasser
+            color: blue
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_manager_max_heizung_temp
+            name: Max. Vorlauf Heizen
+            color: red
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_manager_max_temp_kessel
+            name: Max. Rücklauf
+            color: indigo
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_manager_aussen_frosttemp
+            name: Anlagenfrostschutz
+            color: blue-grey
+            grid_options:
+              columns: 6
       - type: grid
         cards:
-          - type: entities
-            title: Laufzeiten
+          - type: heading
+            heading: Kältekreis
+            icon: mdi:snowflake
+          - type: history-graph
+            title: Drücke
+            hours_to_show: 24
+            grid_options:
+              columns: 12
             entities:
-              - entity: sensor.heizmodul_laufzeit_verdichter_heizen
-              - entity: sensor.heizmodul_laufzeit_verdichter_warmwasser
-              - entity: sensor.manager_laufzeit_nacherwarmung_gesamt
-              - entity: sensor.heizmodul_laufzeit_nacherwarmung_stufe_1
-              - entity: sensor.heizmodul_laufzeit_nacherwarmung_stufe_2
-              - entity: sensor.heizmodul_laufzeit_nacherwarmung_stufe_1_2
-          - type: entities
-            title: Kältekreis
-            entities:
-              - entity: sensor.heizmodul_hochdruck
-              - entity: sensor.heizmodul_niederdruck
-              - entity: sensor.heizmodul_heissgastemperatur
-              - entity: sensor.heizmodul_verdampfer_temperatur
-              - entity: sensor.heizmodul_uberhitzung_ist
-              - entity: sensor.heizmodul_uberhitzung_soll
-              - entity: sensor.heizmodul_abtauungen_gesamt
-              - entity: sensor.heizmodul_dauer_letzte_abtauung
-          - type: entities
-            title: Regelung
-            entities:
-              - entity: sensor.manager_heizkurve
-              - entity: sensor.kessel_kessel_soll_temperatur
-              - entity: sensor.stiebel_eltron_warmepumpe_delta_t_wp_nur_bei_verdichter_an
-              - entity: sensor.manager_gebaeudeart
-              - entity: sensor.manager_sommerbetrieb_grenztemperatur
-          - type: entities
-            title: CAN-Bus
-            entities:
-              - entity: sensor.stiebel_eltron_warmepumpe_can_bus_zustand
-              - entity: sensor.stiebel_eltron_warmepumpe_can_bus_fehler
-              - entity: sensor.stiebel_eltron_warmepumpe_can_tx_fehlerzahler
-              - entity: sensor.stiebel_eltron_warmepumpe_can_rx_fehlerzahler
+              - entity: sensor.heatingpump_heizmodul_anzeige_hochdruck
+                name: Hochdruck
+                color: '#f44336'
+              - entity: sensor.heatingpump_heizmodul_anzeige_niederdruck
+                name: Niederdruck
+                color: '#3f51b5'
+          - type: tile
+            entity: sensor.heatingpump_heizmodul_heissgas_temp
+            name: Heißgas
+            color: red
+            grid_options:
+              columns: 6
+            features:
+              - type: trend-graph
+          - type: tile
+            entity: sensor.heatingpump_heizmodul_verdampfertemp
+            name: Verdampfer
+            color: blue-grey
+            grid_options:
+              columns: 6
+            features:
+              - type: trend-graph
+          - type: tile
+            entity: sensor.heatingpump_heizmodul_istwert_ueberhitzung_verdampfer
+            name: Überhitzung
+            color: deep-purple
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_heizmodul_sollwert_ueberhitzung
+            name: Überhitzungssoll
+            color: grey
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_heizmodul_starts_abtauung
+            name: Abtauungen gesamt
+            color: teal
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_heizmodul_zeitdauer_letzte_abtauung
+            name: Letzte Abtauung
+            color: teal
+            grid_options:
+              columns: 6
+          - type: heading
+            heading: Laufzeiten
+            icon: mdi:timer-outline
+            heading_style: subtitle
+          - type: tile
+            entity: sensor.heatingpump_heizmodul_lz_verd_2_heizbetrieb
+            name: Verdichter Heizen
+            color: orange
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_heizmodul_lz_verd_2_ww_betrieb
+            name: Verdichter Warmwasser
+            color: blue
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_manager_laufzeit_2we
+            name: Nacherwärmung gesamt
+            color: red
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_heizmodul_laufzeit_dhc1
+            name: Nacherwärmung Stufe 1
+            color: red
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_heizmodul_laufzeit_dhc2
+            name: Nacherwärmung Stufe 2
+            color: red
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_heizmodul_lz_dhc12
+            name: Nacherwärmung Stufe 1+2
+            color: red
+            grid_options:
+              columns: 6
+          - type: heading
+            heading: CAN-Bus
+            icon: mdi:lan
+            heading_style: subtitle
+          - type: tile
+            entity: sensor.heatingpump_calculated_can_state
+            name: CAN-Bus
+            color: green
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_calculated_can_bus_errors
+            name: CAN-Bus-Fehler
+            color: red
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_calculated_can_tec
+            name: CAN TX-Fehler
+            color: red
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.heatingpump_calculated_can_rec
+            name: CAN RX-Fehler
+            color: red
+            grid_options:
+              columns: 6

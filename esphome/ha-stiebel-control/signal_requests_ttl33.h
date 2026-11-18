@@ -37,6 +37,7 @@
 
 extern const SignalRequest signalRequests[] = {
     SIGNAL_REQUESTS_BASE   // date/time, EVU lock, operating mode, energy counters
+    {"WW_ECO",                     FREQ_1MIN,  cm_manager},  // DHW eco mode (was a YAML poller, #98)
 
     // ========================================================================
     // TTL33-SPECIFIC: temperatures and setpoints
@@ -58,37 +59,86 @@ extern const SignalRequest signalRequests[] = {
     {"RAUMSOLLTEMP_NACHT",         FREQ_10MIN, cm_manager},
     {"HEIZKURVE",                  FREQ_10MIN, cm_manager},
     {"HEIZPROG_1_MO",              FREQ_10MIN, cm_manager},
+    {"HEIZPROG_1_MO_SCHALT_2",      FREQ_10MIN, cm_manager},
+    {"HEIZPROG_1_MO_SCHALT_3",      FREQ_10MIN, cm_manager},
     {"HEIZPROG_1_DI",              FREQ_10MIN, cm_manager},
+    {"HEIZPROG_1_DI_SCHALT_2",      FREQ_10MIN, cm_manager},
+    {"HEIZPROG_1_DI_SCHALT_3",      FREQ_10MIN, cm_manager},
     {"HEIZPROG_1_MI",              FREQ_10MIN, cm_manager},
+    {"HEIZPROG_1_MI_SCHALT_2",      FREQ_10MIN, cm_manager},
+    {"HEIZPROG_1_MI_SCHALT_3",      FREQ_10MIN, cm_manager},
     {"HEIZPROG_1_DO",              FREQ_10MIN, cm_manager},
+    {"HEIZPROG_1_DO_SCHALT_2",      FREQ_10MIN, cm_manager},
+    {"HEIZPROG_1_DO_SCHALT_3",      FREQ_10MIN, cm_manager},
     {"HEIZPROG_1_FR",              FREQ_10MIN, cm_manager},
+    {"HEIZPROG_1_FR_SCHALT_2",      FREQ_10MIN, cm_manager},
+    {"HEIZPROG_1_FR_SCHALT_3",      FREQ_10MIN, cm_manager},
     {"HEIZPROG_1_SA",              FREQ_10MIN, cm_manager},
+    {"HEIZPROG_1_SA_SCHALT_2",      FREQ_10MIN, cm_manager},
+    {"HEIZPROG_1_SA_SCHALT_3",      FREQ_10MIN, cm_manager},
     {"HEIZPROG_1_SO",              FREQ_10MIN, cm_manager},
+    {"HEIZPROG_1_SO_SCHALT_2",      FREQ_10MIN, cm_manager},
+    {"HEIZPROG_1_SO_SCHALT_3",      FREQ_10MIN, cm_manager},
 
     // ========================================================================
     // Heating circuit 2, mixer circuit (MISCHERMODUL_3, 0x602)
     // ========================================================================
+    // Remote control FE 7: room actual temperature (the manager itself does not answer it, its
+    // virtual members mirror the one FE sensor) and the circuit it is assigned to (parameter 22)
+    {"RAUMISTTEMP",                 FREQ_1MIN,  cm_mischermodul_3},
+    // Effective room setpoint of the FE circuit: day/night setpoint plus the FE knob (+-5 K);
+    // the FE mode switch shows here too (moon = night setpoint without correction)
+    {"VERSTELLTE_RAUMSOLLTEMP",     FREQ_1MIN,  cm_mischermodul_3},
+    {"FERNBEDIENUNGSZUORDNUNG",     FREQ_10MIN, cm_manager},
     {"RAUMSOLLTEMP_I",             FREQ_10MIN, cm_mischermodul_3},
     {"RAUMSOLLTEMP_NACHT",         FREQ_10MIN, cm_mischermodul_3},
     {"HEIZKURVE",                  FREQ_10MIN, cm_mischermodul_3},
     {"HEIZPROG_1_MO",              FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_MO_SCHALT_2",      FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_MO_SCHALT_3",      FREQ_10MIN, cm_mischermodul_3},
     {"HEIZPROG_1_DI",              FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_DI_SCHALT_2",      FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_DI_SCHALT_3",      FREQ_10MIN, cm_mischermodul_3},
     {"HEIZPROG_1_MI",              FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_MI_SCHALT_2",      FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_MI_SCHALT_3",      FREQ_10MIN, cm_mischermodul_3},
     {"HEIZPROG_1_DO",              FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_DO_SCHALT_2",      FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_DO_SCHALT_3",      FREQ_10MIN, cm_mischermodul_3},
     {"HEIZPROG_1_FR",              FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_FR_SCHALT_2",      FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_FR_SCHALT_3",      FREQ_10MIN, cm_mischermodul_3},
     {"HEIZPROG_1_SA",              FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_SA_SCHALT_2",      FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_SA_SCHALT_3",      FREQ_10MIN, cm_mischermodul_3},
     {"HEIZPROG_1_SO",              FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_SO_SCHALT_2",      FREQ_10MIN, cm_mischermodul_3},
+    {"HEIZPROG_1_SO_SCHALT_3",      FREQ_10MIN, cm_mischermodul_3},
 
     // ========================================================================
-    // DHW time program (manager)
+    // DHW time program (manager): three periods per day, one text per day (#82)
     // ========================================================================
-    {"W_WASSERPROG_1_MO",          FREQ_10MIN, cm_manager},
-    {"W_WASSERPROG_1_DI",          FREQ_10MIN, cm_manager},
-    {"W_WASSERPROG_1_MI",          FREQ_10MIN, cm_manager},
-    {"W_WASSERPROG_1_DO",          FREQ_10MIN, cm_manager},
-    {"W_WASSERPROG_1_FR",          FREQ_10MIN, cm_manager},
-    {"W_WASSERPROG_1_SA",          FREQ_10MIN, cm_manager},
-    {"W_WASSERPROG_1_SO",          FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_MO",           FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_MO_SCHALT_2",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_MO_SCHALT_3",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_DI",           FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_DI_SCHALT_2",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_DI_SCHALT_3",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_MI",           FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_MI_SCHALT_2",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_MI_SCHALT_3",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_DO",           FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_DO_SCHALT_2",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_DO_SCHALT_3",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_FR",           FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_FR_SCHALT_2",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_FR_SCHALT_3",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_SA",           FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_SA_SCHALT_2",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_SA_SCHALT_3",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_SO",           FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_SO_SCHALT_2",  FREQ_10MIN, cm_manager},
+    {"W_WASSERPROG_1_SO_SCHALT_3",  FREQ_10MIN, cm_manager},
 
     // ========================================================================
     // SETTINGS (WPMW II parameters)

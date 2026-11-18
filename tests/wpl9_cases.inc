@@ -1,27 +1,27 @@
 // Included by test_can_logic.cpp after the firmware and test helpers.
 TEST_CASE("model routes preserve defaults and WPL17 ownership", "[routes]") {
-    for (const char* model : {"wpl10ac", "wpl13e", "wpf10", "unknown"}) {
+    for (const ModelProfile* model : {&kProfileGeneric, &kProfileWpl13e, &kProfileWpl18e, &kProfileTtl33}) {
         for (uint16_t index : {0x0013, 0x0a06, 0x010e}) {
-            auto r = resolveSignalRoute(model, index, cm_manager);
+            auto r = resolveSignalRoute(*model, index, cm_manager);
             CHECK(r.writeMember == cm_manager);
             CHECK(r.readMember == cm_manager);
             CHECK(r.stateMember == cm_manager);
         }
     }
     for (uint16_t index : {0x0013, 0x0a06, 0x010e}) {
-        auto r = resolveSignalRoute("wpl17", index, cm_manager);
+        auto r = resolveSignalRoute(kProfileWpl17, index, cm_manager);
         CHECK(r.writeMember == cm_kessel_canb);
         CHECK(r.readMember == cm_kessel_canb);
         CHECK(r.stateMember == cm_kessel_canb);
     }
-    auto room = resolveSignalRoute("wpl9", 0x0005, cm_manager);
+    auto room = resolveSignalRoute(kProfileWpl9, 0x0005, cm_manager);
     CHECK(room.writeMember == cm_manager);
     CHECK(room.readMember == cm_manager);
 }
 
 TEST_CASE("WPL9 DHW writes and feedback use CAN-B", "[routes]") {
-    auto primary = resolveSignalRoute("wpl9", 0x0013, cm_manager);
-    auto secondary = resolveSignalRoute("wpl9", 0x0a06, cm_manager);
+    auto primary = resolveSignalRoute(kProfileWpl9, 0x0013, cm_manager);
+    auto secondary = resolveSignalRoute(kProfileWpl9, 0x0a06, cm_manager);
     CHECK(primary.writeMember == cm_kessel_canb);
     CHECK(primary.readMember == cm_kessel_canb);
     CHECK(primary.stateMember == cm_kessel_canb);
@@ -65,27 +65,34 @@ TEST_CASE("WPL9 SG Ready adapter shares DHW destinations and keeps room writes",
     if (std::strcmp(HA_DEVICE_MODEL_STR, "wpl9") != 0) return;
     EspHomeSgReadyIO adapter;
     pendingReadbackCount = 0;
+    pacedWriteCount = 0;
+    pacedSentBefore = false;
     fake_millis() = 1000;
     fake_can().sent.clear();
     adapter.writeCanSignal("EINSTELL_SPEICHERSOLLTEMP", "49");
+    CHECK(fake_can().sent.empty());       // queued (#85)
+    pacedWriteStep();
     REQUIRE(fake_can().sent.size() == 1);
-    REQUIRE(pendingReadbackCount == 2);   // early read-back plus the settle read-back
-    pendingReadbackStep();
-    CHECK(fake_can().sent.size() == 1);
-    fake_millis() += READBACK_DELAY_MS;
+    REQUIRE(pendingReadbackCount == 1);   // settled read-back on the same CAN-B member
+    fake_millis() += READBACK_SETTLE_MS;
     pendingReadbackStep();
     REQUIRE(fake_can().sent.size() == 2);
     CHECK(fake_can().sent[0] == std::vector<uint8_t>{0x40, 1, 0x13, 1, 0xea, 0, 0});
     CHECK(fake_can().sent[1] == std::vector<uint8_t>{0x41, 1, 0x13, 0, 0, 0, 0});
-    pendingReadbackCount = 0;   // drop the settle read-back, covered elsewhere
+    pacedWriteCount = 0;
+    pendingReadbackCount = 0;
     fake_can().sent.clear();
     adapter.writeCanSignal("RAUMSOLLTEMP_I", "20");
+    fake_millis() += PACED_WRITE_GAP_MS;
+    pacedWriteStep();
     REQUIRE(fake_can().sent.size() == 1);
-    fake_millis() += READBACK_DELAY_MS;
+    fake_millis() += READBACK_SETTLE_MS;
     pendingReadbackStep();
     REQUIRE(fake_can().sent.size() == 2);
     CHECK(fake_can().sent[0][0] == 0x90);
     CHECK(fake_can().sent[1][0] == 0x91);
+    pacedWriteCount = 0;
+    pacedSentBefore = false;
     pendingReadbackCount = 0;
     fake_millis() = 0;
 }

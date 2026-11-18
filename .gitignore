@@ -13,3 +13,6 @@ config/
 
 /target
 tests/*.o
+
+# Mutation testing output (scripts/mutate.sh)
+/.mull/

@@ -12,12 +12,19 @@ SG Ready is a standard for smart heat pump control with 4 operating states:
 | State | Name | Typical PV situation | Heat pump action |
 |-------|------|---------------------|-----------------|
 | **1** | EVU Sperre | Grid demand / no PV | **Bereitschaft** — standby only |
-| **2** | Normal | Standard operation | **Tagbetrieb** — comfort mode |
+| **2** | Normal | Standard operation | **Tagbetrieb** — comfort mode (or **Automatik**, see below) |
 | **3** | Empfohlen | 1–2 kW surplus available | **Tagbetrieb** + DHW boost + room boost (+1°C) |
 | **4** | Zwang | >2 kW surplus available | **Tagbetrieb** + larger DHW boost + room boost (+2°C) |
 
 > **Important:** States 3 and 4 use `Tagbetrieb` (continuous comfort mode, ignores schedule)
 > rather than `Warmwasser` — this keeps space heating active alongside DHW heating.
+
+**Mode in state 2.** `select.heatingpump_manager_sg_ready_normal_mode` chooses what
+state 2 writes: `Tagbetrieb` (default) or `Automatik`. In `Tagbetrieb` the manager ignores all time
+programs, so the DHW program and the DHW setpoint 2 never apply. With `Automatik` they do, e.g. to
+charge hot water in the PV hours (see the DHW program entities in `docs/CONFIGURATION.md`). For
+continuous heating in `Automatik`, set the heating program to 00:00–24:00 or the night setpoint to
+the day setpoint. In state 2 a change of this select is written at once; it is kept on the ESP.
 
 ---
 
@@ -36,9 +43,9 @@ make smoke-test
 
 After flashing, these entities appear automatically:
 
-- **Select**: `select.manager_sg_ready_zustand` — control SG Ready state
-- **Number**: `number.manager_sg_ready_boost_zustand_3` — DHW boost for state 3 (default 5°C)
-- **Number**: `number.manager_sg_ready_boost_zustand_4` — DHW boost for state 4 (default 8°C)
+- **Select**: `select.heatingpump_manager_sg_ready_state` — control SG Ready state
+- **Number**: `number.heatingpump_manager_sg_ready_boost_state3` — DHW boost for state 3 (default 5°C)
+- **Number**: `number.heatingpump_manager_sg_ready_boost_state4` — DHW boost for state 4 (default 8°C)
 - **Sensor**: `sensor.heatingpump_sg_ready_aktueller_zustand` — read-only current state
 - **Sensor**: `sensor.heatingpump_sg_ready_boost_state_3` / `_4` — read-only boost values
 
@@ -61,7 +68,7 @@ automation:
     action:
       - service: select.select_option
         target:
-          entity_id: select.manager_sg_ready_zustand
+          entity_id: select.heatingpump_manager_sg_ready_state
         data:
           option: >
             {% set s = states('sensor.s10x_sg_ready_numeric') | int %}
@@ -81,21 +88,26 @@ A ready-to-use example is in [`packages/sg_ready_automation_example.yaml`](packa
 The boost is applied **automatically by the firmware** — no extra HA automation needed.
 
 When state 3 is activated:
-1. Current DHW setpoint baseline is recorded (default: 48°C if not previously set)
+1. The DHW and room setpoints last read from the heat pump are recorded as baseline (48°C / 20°C
+   only if none was read yet). While a boost is active the baseline stays.
 2. `PROGRAMMSCHALTER` → `Tagbetrieb`
 3. DHW setpoint → baseline + `boost_state3` (e.g. 48 + 5 = 53°C, capped at 60°C)
 4. Room setpoint → baseline + 1°C (capped at 25°C)
 
 When returning to state 2 (Normal):
-1. `PROGRAMMSCHALTER` → `Tagbetrieb`
-2. DHW setpoint → restored to baseline
-3. Room setpoint → restored to baseline
+1. DHW setpoint → restored to baseline
+2. Room setpoint → restored to baseline
+3. `PROGRAMMSCHALTER` → the state-2 mode (`Tagbetrieb` or `Automatik`)
+
+The writes go out one at a time, 1.5 s apart at least. Each is checked against the read-back a few
+seconds later and sent once more if the heat pump still reports the old value; the log shows
+`WRITE_Q ... confirmed` or `... failed`. Writes sent back to back were partly lost on a WPMW II.
 
 State 1 (EVU Sperre):
 1. Temperatures restored to baseline
 2. `PROGRAMMSCHALTER` → `Bereitschaft`
 
-Boost amounts are configurable via `number.manager_sg_ready_boost_zustand_3` and `_4`.
+Boost amounts are configurable via `number.heatingpump_manager_sg_ready_boost_state3` and `_4`.
 Values persist across firmware restarts (stored in ESP32 flash via NVS).
 
 ### Recommended boost values
@@ -145,17 +157,17 @@ Maximum DHW temperature is typically 55–60°C per manufacturer — check your 
 type: entities
 title: SG Ready Status
 entities:
-  - entity: select.manager_sg_ready_zustand
+  - entity: select.heatingpump_manager_sg_ready_state
     name: SG Ready State
   - entity: sensor.heatingpump_sg_ready_aktueller_zustand
     name: Current State (read-only)
-  - entity: select.manager_programmschalter
+  - entity: select.heatingpump_manager_programmschalter
     name: Operating Mode
-  - entity: number.manager_sg_ready_boost_zustand_3
+  - entity: number.heatingpump_manager_sg_ready_boost_state3
     name: Boost State 3 (°C)
-  - entity: number.manager_sg_ready_boost_zustand_4
+  - entity: number.heatingpump_manager_sg_ready_boost_state4
     name: Boost State 4 (°C)
-  - entity: number.manager_speicher_soll_temperatur_einstellung
+  - entity: number.heatingpump_manager_einstell_speichersolltemp
     name: DHW Setpoint
 ```
 
@@ -177,7 +189,7 @@ condition:
 ```yaml
 condition:
   - condition: numeric_state
-    entity_id: sensor.kessel_speicher_ist_temperatur
+    entity_id: sensor.heatingpump_kessel_speicheristtemp
     below: 50
 ```
 
@@ -187,13 +199,13 @@ condition:
 - alias: "Heat pump: SG Ready state 4 timeout"
   trigger:
     - platform: state
-      entity_id: select.manager_sg_ready_zustand
+      entity_id: select.heatingpump_manager_sg_ready_state
       to: "4 - Zwang"
       for: "01:00:00"
   action:
     - service: select.select_option
       target:
-        entity_id: select.manager_sg_ready_zustand
+        entity_id: select.heatingpump_manager_sg_ready_state
       data:
         option: "2 - Normal"
 ```
@@ -220,7 +232,7 @@ is no longer needed**. Remove it for a simpler, faster, more reliable setup.
 ### Heat pump doesn't change mode
 
 1. Check logs: `[SG_READY] Applying SG Ready state 3`
-2. Verify `select.manager_programmschalter` changes in HA
+2. Verify `select.heatingpump_manager_programmschalter` changes in HA
 3. Check for CAN write errors in `heatingpump/debug`
 
 ### Boost not applied

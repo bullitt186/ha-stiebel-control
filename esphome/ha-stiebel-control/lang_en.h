@@ -318,6 +318,68 @@
 #define LNAME_SEL_PROGRAMMSCHALTER             "Operating Mode"
 #undef  LNAME_SEL_SG_READY
 #define LNAME_SEL_SG_READY                     "SG Ready State"
+#undef  LNAME_SEL_SG_READY_NORMAL_MODE
+#define LNAME_SEL_SG_READY_NORMAL_MODE         "SG Ready State 2 Operating Mode"
+#undef  LNAME_NUM_HK2_RAUMSOLL_TAG
+#define LNAME_NUM_HK2_RAUMSOLL_TAG             "Room Setpoint HC2 Day Setting"
+#undef  LNAME_NUM_HK2_RAUMSOLL_NACHT
+#define LNAME_NUM_HK2_RAUMSOLL_NACHT           "Room Setpoint HC2 Night Setting"
+#undef  LNAME_NUM_HK2_HEIZKURVE
+#define LNAME_NUM_HK2_HEIZKURVE                "Heating Curve HC2 Setting"
+#undef  LNAME_HK2_RAUMSOLL_TAG
+#define LNAME_HK2_RAUMSOLL_TAG                 "Room Setpoint HC2 Day"
+#undef  LNAME_HK2_RAUMSOLL_NACHT
+#define LNAME_HK2_RAUMSOLL_NACHT               "Room Setpoint HC2 Night"
+#undef  LNAME_HK2_HEIZKURVE
+#define LNAME_HK2_HEIZKURVE                    "Heating Curve HC2"
+#undef  LNAME_RAUMIST_FE
+#define LNAME_RAUMIST_FE                        "Room Temperature Remote Control"
+#undef  LNAME_RAUMSOLL_WIRKSAM_FE
+#define LNAME_RAUMSOLL_WIRKSAM_FE               "Effective Room Setpoint Remote Control"
+#undef  LNAME_FE_ZUORDNUNG
+#define LNAME_FE_ZUORDNUNG                      "Remote Control Heating Circuit"
+#undef  LNAME_WWPROG_MO
+#define LNAME_WWPROG_MO                        "DHW Program Monday"
+#undef  LNAME_WWPROG_DI
+#define LNAME_WWPROG_DI                        "DHW Program Tuesday"
+#undef  LNAME_WWPROG_MI
+#define LNAME_WWPROG_MI                        "DHW Program Wednesday"
+#undef  LNAME_WWPROG_DO
+#define LNAME_WWPROG_DO                        "DHW Program Thursday"
+#undef  LNAME_WWPROG_FR
+#define LNAME_WWPROG_FR                        "DHW Program Friday"
+#undef  LNAME_WWPROG_SA
+#define LNAME_WWPROG_SA                        "DHW Program Saturday"
+#undef  LNAME_WWPROG_SO
+#define LNAME_WWPROG_SO                        "DHW Program Sunday"
+#undef  LNAME_HZPROG_MO
+#define LNAME_HZPROG_MO                             "Heating Program HC1 Monday"
+#undef  LNAME_HZPROG_DI
+#define LNAME_HZPROG_DI                             "Heating Program HC1 Tuesday"
+#undef  LNAME_HZPROG_MI
+#define LNAME_HZPROG_MI                             "Heating Program HC1 Wednesday"
+#undef  LNAME_HZPROG_DO
+#define LNAME_HZPROG_DO                             "Heating Program HC1 Thursday"
+#undef  LNAME_HZPROG_FR
+#define LNAME_HZPROG_FR                             "Heating Program HC1 Friday"
+#undef  LNAME_HZPROG_SA
+#define LNAME_HZPROG_SA                             "Heating Program HC1 Saturday"
+#undef  LNAME_HZPROG_SO
+#define LNAME_HZPROG_SO                             "Heating Program HC1 Sunday"
+#undef  LNAME_HZ2PROG_MO
+#define LNAME_HZ2PROG_MO                            "Heating Program HC2 Monday"
+#undef  LNAME_HZ2PROG_DI
+#define LNAME_HZ2PROG_DI                            "Heating Program HC2 Tuesday"
+#undef  LNAME_HZ2PROG_MI
+#define LNAME_HZ2PROG_MI                            "Heating Program HC2 Wednesday"
+#undef  LNAME_HZ2PROG_DO
+#define LNAME_HZ2PROG_DO                            "Heating Program HC2 Thursday"
+#undef  LNAME_HZ2PROG_FR
+#define LNAME_HZ2PROG_FR                            "Heating Program HC2 Friday"
+#undef  LNAME_HZ2PROG_SA
+#define LNAME_HZ2PROG_SA                            "Heating Program HC2 Saturday"
+#undef  LNAME_HZ2PROG_SO
+#define LNAME_HZ2PROG_SO                            "Heating Program HC2 Sunday"
 
 // ============================================================================
 // Select option strings
@@ -336,6 +398,10 @@
 #define LNAME_OPT_SG_EMPFOHLEN                 "3 - Recommended"
 #undef  LNAME_OPT_SG_ZWANG
 #define LNAME_OPT_SG_ZWANG                     "4 - Forced"
+#undef  LNAME_SG_DEAKTIVIERT
+#define LNAME_SG_DEAKTIVIERT                   "Disabled"
+#undef  LNAME_SG_UNBEKANNT
+#define LNAME_SG_UNBEKANNT                     "Unknown"
 
 // ============================================================================
 // COP sensor names
@@ -348,6 +414,8 @@
 #define LNAME_COP_GESAMT                       "COP Total"
 #undef  LNAME_CLIMATE_HEIZUNG
 #define LNAME_CLIMATE_HEIZUNG                  "Heating"
+#undef  LNAME_CLIMATE_HEIZUNG_HK2
+#define LNAME_CLIMATE_HEIZUNG_HK2              "Heating HC2"
 #undef  LNAME_CLIMATE_WARMWASSER
 #define LNAME_CLIMATE_WARMWASSER               "Hot Water"
 #endif // HA_LANGUAGE_EN

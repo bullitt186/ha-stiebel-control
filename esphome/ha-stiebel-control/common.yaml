@@ -17,6 +17,8 @@
 #
 # Defaults — override in your top-level heatingpump.yaml substitutions
 substitutions:
+  device_name: heatingpump    # ESPHome node name, hostname and root of every MQTT topic (lower case, a-z 0-9 -)
+  friendly_name: "Heating Pump CAN Interface"   # ESPHome device name in Home Assistant
   disable_sg_ready: "false"   # "true" hides all SG Ready entities (e.g. WPC7, which has no SG Ready input)
   read_only: "false"          # "true": never write to the heat pump (no setpoints/modes/clock; reading and bus scan only)
   # Network package from this folder: network_wifi.yaml (default) or network_ethernet_w5500.yaml
@@ -27,11 +29,11 @@ packages:
 
 esphome:
   min_version: 2026.7.0
-  name: heatingpump
-  friendly_name: "Heating Pump CAN Interface"
+  name: ${device_name}
+  friendly_name: ${friendly_name}
   project:
     name: "bullitt186.ha-stiebel-control"
-    version: "2.6.0"
+    version: "2.7.0"
   on_boot:
     priority: 600
     then:
@@ -39,6 +41,14 @@ esphome:
           initBoostStatePrefs();
           loadBoostState();
           initSummerPrefs();
+          // One subscription for all set commands (#92)
+          id(mqtt_client).subscribe(HA_TOPIC_ROOT "/+/+/set",
+              [](const std::string &topic, const std::string &payload) { handleSetCommand(topic, payload); });
+          onSgReadyChanged = []() {
+            id(SG_READY_CURRENT_STATE).update();
+            id(sg_ready_boost_state3_sensor).update();
+            id(sg_ready_boost_state4_sensor).update();
+          };
   # Paths are relative to this file, so local copies and remote packages both resolve them.
   includes:
     - elster/ElsterTable.h
@@ -48,22 +58,24 @@ esphome:
     - elster/NUtils.cpp
     - elster/NTypes.h
     - config.h
+    - model_profile.h
+    - can_members.h
     # language_select.h picks the language (lang_base.h for DE, lang_en.h for EN).
     # lang_en.h must be listed so ESPHome copies it; its overrides only apply with HA_LANGUAGE_EN.
     - language_select.h
     - lang_base.h
     - lang_en.h
     - sg_ready_controller.h
+    - dhw_program.h
     - ha-stiebel-control.h
     - signal_requests_base.h
     # model-specific signal_requests_*.h is declared by each model yaml package
   build_flags:
     - "-DHA_DEVICE_MODEL=${device_model}"
-    - "-DHA_MODEL_${device_model}"
+    - "-DHA_DEVICE_NAME=${device_name}"
     - "-DHA_LANGUAGE_${language}"
     - "-DHA_DISABLE_SG_READY_${disable_sg_ready}"
     - "-DHA_READ_ONLY_${read_only}"
-
 
 #########################################
 #                                       #
@@ -78,7 +90,6 @@ logger:
 # (brownout vs. watchdog vs. software reset). Read by text_sensor platform: debug.
 debug:
   update_interval: 60s
-
 
 #########################################
 #                                       #
@@ -110,15 +121,16 @@ mqtt:
   # Disable native ESPHome discovery - using custom auto-discovery instead
   discovery: false
   discovery_prefix: homeassistant
+  topic_prefix: ${device_name}
   # Birth message - sent when ESP32 connects
   birth_message:
-    topic: heatingpump/status
+    topic: ${device_name}/status
     payload: online
     qos: 1
     retain: true
   # Last Will Testament - sent by broker if ESP32 disconnects unexpectedly
   will_message:
-    topic: heatingpump/status
+    topic: ${device_name}/status
     payload: offline
     qos: 1
     retain: true
@@ -129,7 +141,7 @@ mqtt:
   # Remote log via MQTT: warnings and errors only. Per-frame CAN logs are DEBUG and
   # INFO stays on the API/serial log (esphome logs).
   log_topic:
-    topic: heatingpump/debug
+    topic: ${device_name}/debug
     level: WARN
   # Keepalive for connection monitoring
   keepalive: 15s
@@ -156,19 +168,13 @@ mqtt:
         // Update sensors with initial values
         id(sg_ready_boost_state3_sensor).publish_state(sgReadyBoostState3Value());
         id(sg_ready_boost_state4_sensor).publish_state(sgReadyBoostState4Value());
-        id(SG_READY_CURRENT_STATE).publish_state(
-          currentSgReadyState == 0 ? "Deaktiviert" :
-          currentSgReadyState == 1 ? "1 - EVU Sperre" :
-          currentSgReadyState == 2 ? "2 - Normal" :
-          currentSgReadyState == 3 ? "3 - Empfohlen" :
-          currentSgReadyState == 4 ? "4 - Zwang" : "Unbekannt"
-        );
+        id(SG_READY_CURRENT_STATE).publish_state(sgReadyStateLabel(sgReadyController.currentState()));
   on_disconnect:
     - logger.log:
         level: WARN
         format: "Disconnected from MQTT broker - will automatically retry"
   on_message:
-    - topic: heatingpump/reconnect
+    - topic: ${device_name}/reconnect
       then:
         - logger.log: "Manual reconnect triggered"
 
@@ -180,298 +186,22 @@ mqtt:
             if (x == "online") republishAllDiscoveries();
 
     # Bus scan: payload "<MEMBER>" (all table indices) or "<MEMBER> 0x0000 0x0fff"
-    - topic: heatingpump/scan/start
+    - topic: ${device_name}/scan/start
       then:
         - lambda: startScan(x);
-    - topic: heatingpump/scan/stop
+    - topic: ${device_name}/scan/stop
       then:
         - lambda: stopScan();
 
     # Force republish all discoveries (including writable entities)
-    - topic: heatingpump/republish_discoveries
+    - topic: ${device_name}/republish_discoveries
       then:
         - lambda: |-
             ESP_LOGI("MQTT_CMD", "Manual discovery republish triggered");
             republishAllDiscoveries();
 
-    # Temperature setpoint controls
-    # HINWEIS: EINSTELL_SPEICHERSOLLTEMP wird auf WPL17 (CAN-B) vom KESSEL_CANB
-    # (0x201) gehalten. Das writable number-Feld erscheint dort am KESSEL_CANB-Geraet
-    # und nutzt den Topic heatingpump/KESSEL_CANB/.../set. Fuer andere Modelle
-    # bleibt der MANAGER-Topic aktiv. Beide Topics werden abonniert.
-    - topic: heatingpump/KESSEL_CANB/EINSTELL_SPEICHERSOLLTEMP/set
-      then:
-        - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP (Kessel CANB) command: %s", x.c_str());
-            publishWritableNumberDiscovery(writableNumbers[0]);
-            const char* value = x.c_str();
-            writeConfiguredSignal(cm_kessel_canb, "EINSTELL_SPEICHERSOLLTEMP", value);
-
-    - topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP/set
-      then:
-        - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP command: %s", x.c_str());
-            publishWritableNumberDiscovery(writableNumbers[0]);
-            const char* value = x.c_str();
-            writeConfiguredSignal(cm_manager, "EINSTELL_SPEICHERSOLLTEMP", value);
-
-    - topic: heatingpump/KESSEL_CANB/EINSTELL_SPEICHERSOLLTEMP2/set
-      then:
-        - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP2 (Kessel CANB) command: %s", x.c_str());
-            publishWritableNumberDiscovery(writableNumbers[1]);
-            const char* value = x.c_str();
-            writeConfiguredSignal(cm_kessel_canb, "EINSTELL_SPEICHERSOLLTEMP2", value);
-
-    - topic: heatingpump/MANAGER/EINSTELL_SPEICHERSOLLTEMP2/set
-      then:
-        - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received EINSTELL_SPEICHERSOLLTEMP2 command: %s", x.c_str());
-            publishWritableNumberDiscovery(writableNumbers[1]);
-            const char* value = x.c_str();
-            writeConfiguredSignal(cm_manager, "EINSTELL_SPEICHERSOLLTEMP2", value);
-
-    # WPL9 compatibility: keep existing KESSEL command topics usable.
-    - topic: heatingpump/KESSEL/EINSTELL_SPEICHERSOLLTEMP/set
-      then:
-        - lambda: |-
-            if (strcmp(HA_DEVICE_MODEL_STR, "wpl9") != 0) return;
-            writeConfiguredSignal(cm_kessel, "EINSTELL_SPEICHERSOLLTEMP", x.c_str());
-
-    - topic: heatingpump/KESSEL/EINSTELL_SPEICHERSOLLTEMP2/set
-      then:
-        - lambda: |-
-            if (strcmp(HA_DEVICE_MODEL_STR, "wpl9") != 0) return;
-            writeConfiguredSignal(cm_kessel, "EINSTELL_SPEICHERSOLLTEMP2", x.c_str());
-
-    # Operating mode control
-    - topic: heatingpump/MANAGER/PROGRAMMSCHALTER/set
-      then:
-        - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received PROGRAMMSCHALTER command: %s", x.c_str());
-            // Ensure discovery is published
-            publishWritableSelectDiscovery(writableSelects[0]);
-            // Write to CAN bus
-            const char* value = x.c_str();
-            writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", value);
-            // Read back to update state
-            readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
-
-    # SG Ready state control
-    - topic: heatingpump/MANAGER/SG_READY_STATE/set
-      then:
-        - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received SG_READY_STATE command: %s", x.c_str());
-            // Ensure discovery is published
-            publishWritableSelectDiscovery(writableSelects[1]);
-
-            // Parse the state from the string (format: "1 - EVU Sperre", "2 - Normal", etc.)
-            int state = 0;
-            if (x.find("1 - ") == 0) state = 1;
-            else if (x.find("2 - ") == 0) state = 2;
-            else if (x.find("3 - ") == 0) state = 3;
-            else if (x.find("4 - ") == 0) state = 4;
-
-            if (state >= 1 && state <= 4) {
-                applySgReadyState(state);
-                // Publish the new state right away (the sensor polls only every 60 s)
-                id(SG_READY_CURRENT_STATE).update();
-            } else {
-                ESP_LOGW("MQTT_CMD", "Invalid SG Ready state received: %s", x.c_str());
-            }
-
-    # SG Ready boost temperature for State 3
-    - topic: heatingpump/MANAGER/SG_READY_BOOST_STATE3/set
-      then:
-        - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received SG_READY_BOOST_STATE3 command: %s", x.c_str());
-            // Ensure discovery is published
-            publishWritableNumberDiscovery(writableNumbers[2]);
-            // Parse and store the boost value
-            char* endPtr;
-            float boost = strtof(x.c_str(), &endPtr);
-            if (endPtr != x.c_str() && *endPtr == '\0' && boost >= 0.0 && boost <= 10.0) {
-                setSgReadyBoost3(boost);
-                ESP_LOGI("SG_READY", "State 3 boost set to %.1f°C", boost);
-                // Publish state back
-                char stateTopic[128];
-                snprintf(stateTopic, sizeof(stateTopic), "heatingpump/MANAGER/SG_READY_BOOST_STATE3/state");
-                char valueStr[16];
-                snprintf(valueStr, sizeof(valueStr), "%.1f", sgReadyBoostState3Value());
-                id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
-                // Update sensor
-                id(sg_ready_boost_state3_sensor).publish_state(sgReadyBoostState3Value());
-            } else {
-                ESP_LOGW("MQTT_CMD", "Invalid boost value: %s", x.c_str());
-            }
-
-    # SG Ready boost temperature for State 4
-    - topic: heatingpump/MANAGER/SG_READY_BOOST_STATE4/set
-      then:
-        - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received SG_READY_BOOST_STATE4 command: %s", x.c_str());
-            // Ensure discovery is published
-            publishWritableNumberDiscovery(writableNumbers[3]);
-            // Parse and store the boost value
-            char* endPtr;
-            float boost = strtof(x.c_str(), &endPtr);
-            if (endPtr != x.c_str() && *endPtr == '\0' && boost >= 0.0 && boost <= 15.0) {
-                setSgReadyBoost4(boost);
-                ESP_LOGI("SG_READY", "State 4 boost set to %.1f°C", boost);
-                // Publish state back
-                char stateTopic[128];
-                snprintf(stateTopic, sizeof(stateTopic), "heatingpump/MANAGER/SG_READY_BOOST_STATE4/state");
-                char valueStr[16];
-                snprintf(valueStr, sizeof(valueStr), "%.1f", sgReadyBoostState4Value());
-                id(mqtt_client).publish(stateTopic, valueStr, strlen(valueStr), 0, true);
-                // Update sensor
-                id(sg_ready_boost_state4_sensor).publish_state(sgReadyBoostState4Value());
-            } else {
-                ESP_LOGW("MQTT_CMD", "Invalid boost value: %s", x.c_str());
-            }
-
-    # Room temperature setpoints for heating circuits 1–3 and night/reduced mode
-    - topic: heatingpump/MANAGER/RAUMSOLLTEMP_I/set
-      then:
-        - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received RAUMSOLLTEMP_I command: %s", x.c_str());
-            publishWritableNumberDiscovery(writableNumbers[4]);
-            const char* value = x.c_str();
-            writeSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I", value);
-            readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_I");
-
-    - topic: heatingpump/MANAGER/RAUMSOLLTEMP_II/set
-      then:
-        - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received RAUMSOLLTEMP_II command: %s", x.c_str());
-            publishWritableNumberDiscovery(writableNumbers[5]);
-            const char* value = x.c_str();
-            writeSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_II", value);
-            readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_II");
-
-    - topic: heatingpump/MANAGER/RAUMSOLLTEMP_III/set
-      then:
-        - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received RAUMSOLLTEMP_III command: %s", x.c_str());
-            publishWritableNumberDiscovery(writableNumbers[6]);
-            const char* value = x.c_str();
-            writeSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_III", value);
-            readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_III");
-
-    - topic: heatingpump/MANAGER/RAUMSOLLTEMP_NACHT/set
-      then:
-        - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received RAUMSOLLTEMP_NACHT command: %s", x.c_str());
-            publishWritableNumberDiscovery(writableNumbers[7]);
-            const char* value = x.c_str();
-            writeSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_NACHT", value);
-            readSignal(&CanMembers[cm_manager], "RAUMSOLLTEMP_NACHT");
-
-    - topic: heatingpump/KESSEL_CANB/HEIZKURVE/set
-      then:
-        - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received HEIZKURVE command: %s", x.c_str());
-            publishWritableNumberDiscovery(writableNumbers[8]);
-            const char* value = x.c_str();
-            writeSignal(&CanMembers[cm_kessel_canb], "HEIZKURVE", value);
-            readSignal(&CanMembers[cm_kessel_canb], "HEIZKURVE");
-
-    - topic: heatingpump/MANAGER/HEIZKURVE/set
-      then:
-        - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received MANAGER HEIZKURVE command: %s", x.c_str());
-            publishWritableNumberDiscovery(writableNumbers[8]);
-            const char* value = x.c_str();
-            writeSignal(&CanMembers[cm_manager], "HEIZKURVE", value);
-            readSignal(&CanMembers[cm_manager], "HEIZKURVE");
-
-    # WPMW II parameters (WPL13E only; see writableNumberApplies)
-    - topic: heatingpump/MANAGER/SCHALTWERKDYNAMIKZEIT/set
-      then:
-        - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received SCHALTWERKDYNAMIKZEIT command: %s", x.c_str());
-            if (!writableNumberApplies("SCHALTWERKDYNAMIKZEIT")) {
-              ESP_LOGW("MQTT_CMD", "SCHALTWERKDYNAMIKZEIT is not writable on %s", HA_DEVICE_MODEL_STR);
-              return;
-            }
-            publishWritableNumberDiscovery(writableNumbers[9]);
-            const char* value = x.c_str();
-            writeSignal(&CanMembers[cm_manager], "SCHALTWERKDYNAMIKZEIT", value);
-            readSignal(&CanMembers[cm_manager], "SCHALTWERKDYNAMIKZEIT");
-
-    - topic: heatingpump/MANAGER/BIVALENTPARALLELTEMPERATUR_HZG/set
-      then:
-        - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received BIVALENTPARALLELTEMPERATUR_HZG command: %s", x.c_str());
-            if (!writableNumberApplies("BIVALENTPARALLELTEMPERATUR_HZG")) {
-              ESP_LOGW("MQTT_CMD", "BIVALENTPARALLELTEMPERATUR_HZG is not writable on %s", HA_DEVICE_MODEL_STR);
-              return;
-            }
-            publishWritableNumberDiscovery(writableNumbers[10]);
-            const char* value = x.c_str();
-            writeSignal(&CanMembers[cm_manager], "BIVALENTPARALLELTEMPERATUR_HZG", value);
-            readSignal(&CanMembers[cm_manager], "BIVALENTPARALLELTEMPERATUR_HZG");
-
-    - topic: heatingpump/MANAGER/BIVALENTPARALLELTEMPERATUR_WW/set
-      then:
-        - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received BIVALENTPARALLELTEMPERATUR_WW command: %s", x.c_str());
-            if (!writableNumberApplies("BIVALENTPARALLELTEMPERATUR_WW")) {
-              ESP_LOGW("MQTT_CMD", "BIVALENTPARALLELTEMPERATUR_WW is not writable on %s", HA_DEVICE_MODEL_STR);
-              return;
-            }
-            publishWritableNumberDiscovery(writableNumbers[11]);
-            const char* value = x.c_str();
-            writeSignal(&CanMembers[cm_manager], "BIVALENTPARALLELTEMPERATUR_WW", value);
-            readSignal(&CanMembers[cm_manager], "BIVALENTPARALLELTEMPERATUR_WW");
-
-    - topic: heatingpump/MANAGER/STILLSTANDZEIT/set
-      then:
-        - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received STILLSTANDZEIT command: %s", x.c_str());
-            if (!writableNumberApplies("STILLSTANDZEIT")) {
-              ESP_LOGW("MQTT_CMD", "STILLSTANDZEIT is not writable on %s", HA_DEVICE_MODEL_STR);
-              return;
-            }
-            publishWritableNumberDiscovery(writableNumbers[12]);
-            const char* value = x.c_str();
-            writeSignal(&CanMembers[cm_manager], "STILLSTANDZEIT", value);
-            readSignal(&CanMembers[cm_manager], "STILLSTANDZEIT");
-
-    - topic: heatingpump/MANAGER/SW_AUSSENTEMP/set
-      then:
-        - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received SW_AUSSENTEMP command: %s", x.c_str());
-            if (!writableNumberApplies("SW_AUSSENTEMP")) {
-              ESP_LOGW("MQTT_CMD", "SW_AUSSENTEMP is not writable on %s", HA_DEVICE_MODEL_STR);
-              return;
-            }
-            publishWritableNumberDiscovery(writableNumbers[13]);
-            const char* value = x.c_str();
-            writeSignal(&CanMembers[cm_manager], "SW_AUSSENTEMP", value);
-            readSignal(&CanMembers[cm_manager], "SW_AUSSENTEMP");
-
-    # SG Ready room setpoint boost (heating circuit 1) for State 3, 0 = off
-    - topic: heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE3/set
-      then:
-        - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received SG_READY_ROOM_BOOST_STATE3 command: %s", x.c_str());
-            publishWritableNumberDiscovery(writableNumbers[14]);
-            if (!handleSgReadyRoomBoost(3, x)) {
-              ESP_LOGW("MQTT_CMD", "Invalid room boost value: %s", x.c_str());
-            }
-
-    # SG Ready room setpoint boost (heating circuit 1) for State 4, 0 = off
-    - topic: heatingpump/MANAGER/SG_READY_ROOM_BOOST_STATE4/set
-      then:
-        - lambda: |-
-            ESP_LOGI("MQTT_CMD", "Received SG_READY_ROOM_BOOST_STATE4 command: %s", x.c_str());
-            publishWritableNumberDiscovery(writableNumbers[15]);
-            if (!handleSgReadyRoomBoost(4, x)) {
-              ESP_LOGW("MQTT_CMD", "Invalid room boost value: %s", x.c_str());
-            }
-
-
+    # Every "<root>/<A>/<B>/set" command (writable numbers, selects, time programs) is
+    # subscribed once in on_boot and dispatched by handleSetCommand() (#92).
 #########################################
 #                                       #
 #   INTERVAL TIMER                      #
@@ -489,7 +219,7 @@ interval:
     then:
       - lambda: faultListStep();
 
-  # Bus scan (idle unless started via heatingpump/scan/start)
+  # Bus scan (idle unless started via <device_name>/scan/start)
   - interval: 150ms
     then:
       - lambda: scanStep();
@@ -516,6 +246,7 @@ interval:
           discoveryRepublishStep();
           stateRepublishStep();
           pendingReadbackStep();
+          pacedWriteStep();
           sgReadyPublishStep();
 
 #########################################
@@ -566,31 +297,7 @@ text_sensor:
     # the interval only refreshes the unchanged value.
     update_interval: 60s
     lambda: |-
-      if (currentSgReadyState == 0) {
-        return std::string("Deaktiviert");
-      } else if (currentSgReadyState == 1) {
-        return std::string("1 - EVU Sperre");
-      } else if (currentSgReadyState == 2) {
-        return std::string("2 - Normal");
-      } else if (currentSgReadyState == 3) {
-        return std::string("3 - Empfohlen");
-      } else if (currentSgReadyState == 4) {
-        return std::string("4 - Zwang");
-      } else {
-        return std::string("Unbekannt");
-      }
-
-  - platform: template
-    name: "DATUM"
-    id: DATUM
-    internal: true
-    icon: "mdi:calendar"
-
-  - platform: template
-    name: "ZEIT"
-    id: ZEIT
-    internal: true
-    icon: "mdi:clock"
+      return std::string(sgReadyStateLabel(sgReadyController.currentState()));
 
 #########################################
 #                                       #
@@ -717,143 +424,3 @@ sensor:
     entity_category: diagnostic
     icon: "mdi:timer-outline"
 
-  # -----------------------------------------------------------------------
-  # COP energy accumulator sensors (universal - present on all Elster models)
-  # -----------------------------------------------------------------------
-  - platform: template
-    name: "EL_AUFNAHMELEISTUNG_HEIZ_SUM"
-    id: EL_AUFNAHMELEISTUNG_HEIZ_SUM
-    internal: true
-    unit_of_measurement: MWh
-    device_class: energy
-    accuracy_decimals: 3
-    state_class: "total_increasing"
-
-  - platform: template
-    name: "EL_AUFNAHMELEISTUNG_WW_SUM"
-    id: EL_AUFNAHMELEISTUNG_WW_SUM
-    internal: true
-    unit_of_measurement: MWh
-    device_class: energy
-    accuracy_decimals: 3
-    state_class: "total_increasing"
-
-  - platform: template
-    name: "WAERMEERTRAG_2WE_HEIZ_SUM"
-    id: WAERMEERTRAG_2WE_HEIZ_SUM
-    internal: true
-    unit_of_measurement: MWh
-    device_class: energy
-    accuracy_decimals: 3
-    state_class: "total_increasing"
-
-  - platform: template
-    name: "WAERMEERTRAG_2WE_WW_SUM"
-    id: WAERMEERTRAG_2WE_WW_SUM
-    internal: true
-    unit_of_measurement: MWh
-    device_class: energy
-    accuracy_decimals: 3
-    state_class: "total_increasing"
-
-  - platform: template
-    name: "WAERMEERTRAG_HEIZ_SUM"
-    id: WAERMEERTRAG_HEIZ_SUM
-    internal: true
-    unit_of_measurement: MWh
-    device_class: energy
-    accuracy_decimals: 3
-    state_class: "total_increasing"
-
-  - platform: template
-    name: "WAERMEERTRAG_WW_SUM"
-    id: WAERMEERTRAG_WW_SUM
-    internal: true
-    unit_of_measurement: MWh
-    device_class: energy
-    accuracy_decimals: 3
-    state_class: "total_increasing"
-
-  # DHW and heating temperature sensors
-  - platform: template
-    name: "EINSTELL_SPEICHERSOLLTEMP"
-    id: EINSTELL_SPEICHERSOLLTEMP
-    internal: true
-    unit_of_measurement: "°C"
-    accuracy_decimals: 1
-
-  - platform: template
-    name: "EINSTELL_SPEICHERSOLLTEMP2"
-    id: EINSTELL_SPEICHERSOLLTEMP2
-    internal: true
-    unit_of_measurement: "°C"
-    accuracy_decimals: 1
-
-  - platform: template
-    name: "SPEICHERISTTEMP"
-    id: SPEICHERISTTEMP
-    internal: true
-    unit_of_measurement: "°C"
-    accuracy_decimals: 1
-    filters:
-      - offset: 3.9
-
-  - platform: template
-    name: "SPEICHERSOLLTEMP"
-    id: SPEICHERSOLLTEMP
-    internal: true
-    unit_of_measurement: "°C"
-    accuracy_decimals: 1
-
-  # COP output sensors
-  - platform: template
-    name: "COP_WW"
-    id: COP_WW
-    internal: true
-    device_class: "power_factor"
-    accuracy_decimals: 2
-
-  - platform: template
-    name: "COP_HEIZ"
-    id: COP_HEIZ
-    internal: true
-    device_class: "power_factor"
-    accuracy_decimals: 2
-
-  - platform: template
-    name: "COP_GESAMT"
-    id: COP_GESAMT
-    internal: true
-    device_class: "power_factor"
-    accuracy_decimals: 2
-
-  # Operating mode and season sensors - used to trigger CAN reads
-  - platform: template
-    name: "PROGRAMMSCHALTER"
-    id: PROGRAMMSCHALTER
-    internal: true
-    lambda: |-
-      readSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER");
-      return {};
-
-  - platform: template
-    name: "SOMMERBETRIEB"
-    id: SOMMERBETRIEB
-    internal: true
-    lambda: |-
-      readSignal(&CanMembers[cm_manager], "SOMMERBETRIEB");
-      return {};
-
-  - platform: template
-    name: "WW_ECO"
-    id: WW_ECO
-    internal: true
-    lambda: |-
-      #if defined(HA_MODEL_wpl9)
-      // Not validated on WPL9: MANAGER/WW_ECO repeatedly returned -255.
-      // Keep the read for future source/register investigation:
-      // readSignal(&CanMembers[cm_manager], "WW_ECO");
-      #else
-      readSignal(&CanMembers[cm_manager], "WW_ECO");
-      #endif
-      return {};

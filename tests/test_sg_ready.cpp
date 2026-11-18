@@ -80,6 +80,23 @@ struct FakeIO : ISgReadyIO {
     }
 
     void reset() { calls.clear(); }
+
+    // Labels as the firmware's German select options (injected, #93)
+    const char* stateLabel(int state) override {
+        static const char* labels[] = {"Deaktiviert", "1 - EVU Sperre", "2 - Normal", "3 - Empfohlen", "4 - Zwang"};
+        return (state >= 0 && state <= 4) ? labels[state] : "Unbekannt";
+    }
+
+    // Setpoints "read from the heat pump" (NAN = not read yet)
+    float dhwSetpoint = NAN;
+    float roomSetpoint = NAN;
+    bool currentSetpoint(const char* signal, float& value) override {
+        const float v = std::string(signal) == "EINSTELL_SPEICHERSOLLTEMP" ? dhwSetpoint
+                      : std::string(signal) == "RAUMSOLLTEMP_I" ? roomSetpoint : NAN;
+        if (v != v) return false;
+        value = v;
+        return true;
+    }
 };
 
 // ============================================================================
@@ -91,16 +108,19 @@ TEST_CASE("parseStateString", "[sg_ready]") {
     CHECK(SgReadyController::parseStateString("2 - Normal")     == 2);
     CHECK(SgReadyController::parseStateString("3 - Empfohlen")  == 3);
     CHECK(SgReadyController::parseStateString("4 - Zwang")      == 4);
+    CHECK(SgReadyController::parseStateString("1 - Grid Lock")  == 1);   // EN labels
+    CHECK(SgReadyController::parseStateString("4 - Forced")     == 4);
     CHECK(SgReadyController::parseStateString("garbage")        == 0);
     CHECK(SgReadyController::parseStateString("")               == 0);
 }
 
-TEST_CASE("stateLabel", "[sg_ready]") {
-    CHECK(std::string(SgReadyController::stateLabel(1)) == "1 - EVU Sperre");
-    CHECK(std::string(SgReadyController::stateLabel(2)) == "2 - Normal");
-    CHECK(std::string(SgReadyController::stateLabel(3)) == "3 - Empfohlen");
-    CHECK(std::string(SgReadyController::stateLabel(4)) == "4 - Zwang");
-    CHECK(std::string(SgReadyController::stateLabel(0)) == "Unbekannt");
+TEST_CASE("state label comes from the IO (one label set for all publishes, #93)", "[sg_ready]") {
+    struct LabelIO : FakeIO {
+        const char* stateLabel(int state) override { return state == 3 ? "3 - Recommended" : "x"; }
+    } io;
+    SgReadyController c(io);
+    c.applyState(3);
+    CHECK(io.hadMqtt("3 - Recommended"));
 }
 
 TEST_CASE("applyState rejects invalid states", "[sg_ready]") {
@@ -148,7 +168,7 @@ TEST_CASE("state 3 (Recommended): boosts DHW and room temp", "[sg_ready]") {
     ctrl.applyState(SgReadyController::STATE_RECOMMENDED);
 
     CHECK(ctrl.isActive() == true);
-    CHECK(io.hadCan("PROGRAMMSCHALTER", "Tagbetrieb"));
+    CHECK(io.hadCan("PROGRAMMSCHALTER", SG_READY_NORMAL_MODE));
     // DHW: 48.0 + 5.0 = 53.0
     CHECK(io.lastCan("EINSTELL_SPEICHERSOLLTEMP") == "53.0");
     // Room: 20.0 + 1.0 = 21.0
@@ -164,7 +184,7 @@ TEST_CASE("state 4 (Forced): boosts DHW and room temp more", "[sg_ready]") {
     ctrl.applyState(SgReadyController::STATE_FORCED);
 
     CHECK(ctrl.isActive() == true);
-    CHECK(io.hadCan("PROGRAMMSCHALTER", "Tagbetrieb"));
+    CHECK(io.hadCan("PROGRAMMSCHALTER", SG_READY_NORMAL_MODE));
     // DHW: 48.0 + 8.0 = 56.0
     CHECK(io.lastCan("EINSTELL_SPEICHERSOLLTEMP") == "56.0");
     // Room: 20.0 + 2.0 = 22.0
@@ -213,7 +233,7 @@ TEST_CASE("state 3 → state 2: restores original DHW and room temps", "[sg_read
     CHECK(io.lastCan("EINSTELL_SPEICHERSOLLTEMP") == "48.0");
     // Should restore room to 20.0
     CHECK(io.lastCan("RAUMSOLLTEMP_I") == "20.0");
-    CHECK(io.hadCan("PROGRAMMSCHALTER", "Tagbetrieb"));
+    CHECK(io.hadCan("PROGRAMMSCHALTER", SG_READY_NORMAL_MODE));
     CHECK(ctrl.isActive() == false);
 }
 
@@ -233,7 +253,7 @@ TEST_CASE("state 1 → state 2: restores temps if active", "[sg_ready]") {
     // Now back to normal — state was EVU lock, active=true, but originals already cleared
     // EVU lock already restored temps; state 2 should still run Tagbetrieb
     ctrl.applyState(SgReadyController::STATE_NORMAL);
-    CHECK(io.hadCan("PROGRAMMSCHALTER", "Tagbetrieb"));
+    CHECK(io.hadCan("PROGRAMMSCHALTER", SG_READY_NORMAL_MODE));
     CHECK(ctrl.isActive() == false);
 }
 
@@ -315,7 +335,7 @@ TEST_CASE("state 3 with zero boost: skips DHW write", "[sg_ready]") {
     ctrl.applyState(SgReadyController::STATE_RECOMMENDED);
 
     CHECK(io.countCan("EINSTELL_SPEICHERSOLLTEMP") == 0);
-    CHECK(io.hadCan("PROGRAMMSCHALTER", "Tagbetrieb"));  // mode still set
+    CHECK(io.hadCan("PROGRAMMSCHALTER", SG_READY_NORMAL_MODE));  // mode still set
 }
 
 TEST_CASE("boost state is persisted after state 3", "[sg_ready]") {
@@ -390,4 +410,52 @@ TEST_CASE("room boost setters reject values outside 0-5 K", "[sg_ready]") {
     ctrl.setRoomBoostState4(6.0f);
     CHECK(ctrl.roomBoostState3() == Approx(1.0f));
     CHECK(ctrl.roomBoostState4() == Approx(2.0f));
+}
+
+// ── #85: baseline from the heat pump, state-2 mode ──────────────────────────
+
+TEST_CASE("boost baseline: setpoints read from the heat pump, restored afterwards (#85)", "[sg_ready]") {
+    FakeIO io;
+    io.dhwSetpoint = 50.0f;
+    io.roomSetpoint = 21.0f;
+    SgReadyController c(io);
+    c.applyState(3);
+    CHECK(io.lastCan("EINSTELL_SPEICHERSOLLTEMP") == "55.0");
+    CHECK(io.lastCan("RAUMSOLLTEMP_I") == "22.0");
+    io.dhwSetpoint = 55.0f;          // the boosted value is read back meanwhile
+    io.roomSetpoint = 22.0f;
+    c.applyState(4);                 // originals stay while a boost is active
+    CHECK(io.lastCan("EINSTELL_SPEICHERSOLLTEMP") == "58.0");
+    c.applyState(2);
+    CHECK(io.lastCan("EINSTELL_SPEICHERSOLLTEMP") == "50.0");
+    CHECK(io.lastCan("RAUMSOLLTEMP_I") == "21.0");
+}
+
+TEST_CASE("boost baseline: implausible or missing reads fall back to the constants", "[sg_ready]") {
+    FakeIO io;
+    io.dhwSetpoint = -255.0f;
+    SgReadyController c(io);
+    c.applyState(3);
+    CHECK(io.lastCan("EINSTELL_SPEICHERSOLLTEMP") == "53.0");   // 48 + 5
+    CHECK(io.lastCan("RAUMSOLLTEMP_I") == "21.0");              // 20 + 1
+}
+
+TEST_CASE("state 2 mode: default Tagbetrieb, Automatik on request (#85)", "[sg_ready]") {
+    FakeIO io;
+    SgReadyController c(io);
+    CHECK_FALSE(c.normalAutomatik());
+    CHECK(std::string(c.normalMode()) == SG_READY_NORMAL_MODE);
+    c.setNormalAutomatik(true);                    // state 2 (initial): written at once
+    CHECK(io.lastCan("PROGRAMMSCHALTER") == SG_READY_AUTO_MODE);
+    io.reset();
+    c.setNormalAutomatik(true, false);             // NVS restore on boot: no write
+    CHECK(io.countCan("PROGRAMMSCHALTER") == 0);
+    c.applyState(3);
+    CHECK(io.lastCan("PROGRAMMSCHALTER") == SG_READY_NORMAL_MODE);   // boosts keep Tagbetrieb
+    io.reset();
+    c.setNormalAutomatik(false);                   // not in state 2: no write now
+    CHECK(io.countCan("PROGRAMMSCHALTER") == 0);
+    c.setNormalAutomatik(true);
+    c.applyState(2);
+    CHECK(io.lastCan("PROGRAMMSCHALTER") == SG_READY_AUTO_MODE);
 }

@@ -2,11 +2,13 @@
 """
 MQTT smoke test for ha-stiebel-control firmware.
 
-Subscribes to heatingpump/# for a configurable window and checks that all
+Subscribes to <root>/# for a configurable window and checks that all
 required topics (common + model-specific) publish at least once.
 
 Model manifests live in tests/models/_common_smoke.json and
 tests/models/<model>_smoke.json.  The test requires the union of both.
+Topics in the manifests start with the placeholder {root}; the test replaces it with the
+device_name (--root, default heatingpump), so the manifests fit any device name (#102).
 
 Usage:
   # Run regression test (exits 0=pass, 1=fail):
@@ -18,7 +20,7 @@ Usage:
       --user mqtt_user --password secret --window 300 --capture-baseline
 
 Environment variables (override CLI flags):
-  MQTT_BROKER, MQTT_USER, MQTT_PASS, MQTT_WINDOW, DEVICE_MODEL
+  MQTT_BROKER, MQTT_USER, MQTT_PASS, MQTT_WINDOW, DEVICE_MODEL, DEVICE_NAME
 """
 
 import argparse
@@ -37,6 +39,18 @@ except ImportError:
 
 MODELS_DIR = Path(__file__).parent / "models"
 COMMON_FILE = MODELS_DIR / "_common_smoke.json"
+ROOT_PLACEHOLDER = "{root}"
+DEFAULT_ROOT = "heatingpump"
+
+
+def with_root(topics: list[str], root: str) -> list[str]:
+    """Replace the {root} placeholder of manifest topics with the device_name."""
+    return [t.replace(ROOT_PLACEHOLDER, root, 1) if t.startswith(ROOT_PLACEHOLDER + "/") else t for t in topics]
+
+
+def to_placeholder(topic: str, root: str) -> str:
+    """Inverse of with_root for one observed topic."""
+    return ROOT_PLACEHOLDER + topic[len(root):] if topic.startswith(root + "/") else topic
 
 
 def create_client():
@@ -47,8 +61,8 @@ def create_client():
         return mqtt.Client()
 
 
-def load_required_topics(model: str) -> tuple[list[str], list[str]]:
-    """Return (common_topics, model_topics). Raises if files not found."""
+def load_required_topics(model: str, root: str = DEFAULT_ROOT) -> tuple[list[str], list[str]]:
+    """Return (common_topics, model_topics) with {root} replaced. Raises if files not found."""
     if not COMMON_FILE.exists():
         raise FileNotFoundError(f"Common smoke file not found: {COMMON_FILE}")
     with open(COMMON_FILE) as f:
@@ -58,23 +72,34 @@ def load_required_topics(model: str) -> tuple[list[str], list[str]]:
     if not model_file.exists():
         print(f"WARNING: No model smoke file found at {model_file}. "
               f"Testing common topics only.", file=sys.stderr)
-        return common, []
+        return with_root(common, root), []
     with open(model_file) as f:
         model_config = json.load(f)
+    # "same_as": another model's manifest applies unchanged (e.g. wpl18e polls the wpl13e table)
+    alias = model_config.get("same_as")
+    if alias:
+        if alias == model:
+            raise ValueError(f"Model {model} refers to itself in same_as")
+        alias_file = MODELS_DIR / f"{alias}_smoke.json"
+        with open(alias_file) as f:
+            target = json.load(f)
+        if "same_as" in target:
+            raise ValueError(f"Model {model}: same_as target {alias} is an alias itself")
+        model_config = target
     excluded = set(model_config.get("excluded_common_topics", []))
     unknown = excluded - set(common)
     if unknown:
         raise ValueError(f"Model {model} excludes topics absent from the common baseline: {sorted(unknown)}")
     model_topics = model_config["required_topics"]
-    return [topic for topic in common if topic not in excluded], model_topics
+    return with_root([topic for topic in common if topic not in excluded], root), with_root(model_topics, root)
 
 
 def run_test(args) -> int:
     """Subscribe, collect topics, compare. Returns 0=pass, 1=fail."""
-    common_topics, model_topics = load_required_topics(args.model)
+    common_topics, model_topics = load_required_topics(args.model, args.root)
     required = sorted(set(common_topics + model_topics))
 
-    print(f"Smoke test: model={args.model}, broker={args.broker}, window={args.window}s")
+    print(f"Smoke test: model={args.model}, root={args.root}, broker={args.broker}, window={args.window}s")
     print(f"Required topics: {len(common_topics)} common + {len(model_topics)} model-specific"
           f" = {len(required)} total")
 
@@ -83,7 +108,7 @@ def run_test(args) -> int:
 
     def on_connect(client, userdata, flags, rc, props=None):
         if rc == 0:
-            client.subscribe("heatingpump/#")
+            client.subscribe(f"{args.root}/#")
         else:
             print(f"ERROR: MQTT connect failed, rc={rc}", file=sys.stderr)
 
@@ -151,12 +176,20 @@ def run_test(args) -> int:
 
 def run_capture(args) -> int:
     """Subscribe for window, write all observed topics to <model>_smoke.json."""
+    alias_file = MODELS_DIR / f"{args.model}_smoke.json"
+    if alias_file.exists():
+        with open(alias_file) as f:
+            alias = json.load(f).get("same_as")
+        if alias:
+            print(f"ERROR: {alias_file} uses the {alias} manifest (same_as); capture for {alias} instead.",
+                  file=sys.stderr)
+            return 1
     print(f"Capture mode: model={args.model}, broker={args.broker}, window={args.window}s")
     observed: dict[str, str] = {}
 
     def on_connect(client, userdata, flags, rc, props=None):
         if rc == 0:
-            client.subscribe("heatingpump/#")
+            client.subscribe(f"{args.root}/#")
 
     def on_message(client, userdata, msg):
         try:
@@ -182,12 +215,12 @@ def run_capture(args) -> int:
     # State topics only for the baseline (filter out debug, set, etc.)
     state_topics = sorted(
         t for t in observed
-        if t.endswith("/state") or t == "heatingpump/status"
+        if t.endswith("/state") or t == f"{args.root}/status"
     )
     # Exclude debug, ephemeral, or clearly optional topics from the required list
     exclude_patterns = ["/debug", "MISCHERMODUL", "SAMMLERISTTEMP", "/set"]
     required = [
-        t for t in state_topics
+        to_placeholder(t, args.root) for t in state_topics
         if not any(p in t for p in exclude_patterns)
     ]
 
@@ -198,7 +231,7 @@ def run_capture(args) -> int:
     out = {
         "description": f"Required topics for {args.model} — captured {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}",
         "required_topics": required,
-        "observed_topics": {t: observed[t] for t in sorted(observed)},
+        "observed_topics": {to_placeholder(t, args.root): observed[t] for t in sorted(observed)},
     }
     if model_file.exists():
         with open(model_file) as f:
@@ -226,6 +259,8 @@ def main():
     p.add_argument("--password", default=os.getenv("MQTT_PASS", ""))
     p.add_argument("--model",    default=os.getenv("DEVICE_MODEL", "wpl13e"),
                    help="Heat pump model (selects tests/models/<model>_smoke.json)")
+    p.add_argument("--root",     default=os.getenv("DEVICE_NAME", DEFAULT_ROOT),
+                   help="MQTT topic root = device_name substitution (default: heatingpump)")
     p.add_argument("--window",   type=int, default=int(os.getenv("MQTT_WINDOW", "120")),
                    help="Observation window in seconds (default: 120)")
     p.add_argument("--capture-baseline", action="store_true",

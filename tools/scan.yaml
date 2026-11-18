@@ -8,9 +8,9 @@
 #
 #  Fuer die PRODUKTION verwende stattdessen wpl17.yaml (signal_requests_wpl17.h).
 #
-#  HINWEIS: Der Header ha-stiebel-control.h enthaelt zusaetzliche Diagnose-
-#  Funktionen (processCanMessageDebug, disableCanRequests), die hier genutzt
-#  werden, aber in der Produktion inaktiv bleiben (disableCanRequests default false).
+#  HINWEIS: Der Header ha-stiebel-control.h enthaelt den Diagnose-Schalter
+#  disableCanRequests (default false), der hier genutzt wird. Fuer Register-Suchen
+#  ist der Bus-Scan (heatingpump/scan/start) der normale Weg.
 #
 
 esphome:
