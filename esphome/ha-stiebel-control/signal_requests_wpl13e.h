@@ -51,8 +51,9 @@ extern const SignalRequest signalRequests[] = {
     // ========================================================================
     {"HEIZKURVE",                  FREQ_10MIN, cm_manager},
     {"ANTILEGIONELLEN",            FREQ_10MIN, cm_manager},
-    // Fault code of the heat pump module (IWS), decoded via ErrorList. The MANAGER
-    // answers a constant 69 on this index (no known fault code) - not requested.
+    // Fault code of the heat pump module (IWS), decoded via ErrorList (fault number in
+    // the high byte). The MANAGER answers 69 = 0x0045 on this index, which is "no
+    // fault" with 0x45 in the low byte - not requested.
     {"FEHLERMELDUNG",              FREQ_1MIN,  cm_heizmodul},
     {"GEBAEUDEART",                FREQ_10MIN, cm_manager},
     // Display parameters compared with the bus. 42 Reglerdynamik (0xfdb0, named

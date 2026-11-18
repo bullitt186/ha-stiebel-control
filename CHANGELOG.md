@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Upgrade notes
+
+- WPL13E/WPL18E/TTL 33: some existing sensors get new display names; entity IDs stay. `STILLSTANDZEIT`
+  now has the unit min, so HA asks once to update the unit of its statistics (Developer tools →
+  Statistics).
+
 ### Fixed
 
 - Climate entities (heating, HK2, hot water) showed the mode "off" in Home Assistant (thermostat
@@ -21,9 +27,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   thousand indices: `GetElsterIndex()` cached every index that is not in the table in a hash map,
   which grew until a rehash failed (`exception/panic`, seen on a WPL13E at 0x601 0x0000-0x0fff).
   Index lookups now use a table sorted once at startup (binary search, fixed size) and cache nothing.
+- WPL13E/WPL18E/TTL 33 (WPMW II): `FEHLERMELDUNG` takes the fault number from the high byte, so a
+  high-pressure stop shows `HD-SENSOR-MAX` instead of `ERR 7424` (#52). The fault list is
+  unchanged.
 
 ### Added
 
+- WPL13E/WPL18E/TTL 33 (WPMW II): names, units and scaling for IWS values and parameters checked on a
+  WPL 18 E display: evaporator outlet, compressor inlet and vapour injection temperature, the pressure
+  sensor currents, condenser outlet (`FROSTTEMP`), fan output, controller and mixer dynamics,
+  compressor off time and its countdown (`STILLSTANDZEIT_0`, in s), the current room setpoint, and
+  names for eight further registers (#52). Most of them are not polled by default. Read-only; no new
+  writes.
 - WPMW II (WPL13E, WPL18E, TTL 33): room actual temperature of the remote control FE 7 as sensor
   "Raum-Ist Fernbedienung", and the circuit it is assigned to (parameter 22 "AUSWAHL FE",
   `FERNBEDIENUNGSZUORDNUNG`). The manager does not answer `RAUMISTTEMP`; its virtual members mirror
@@ -46,10 +61,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - Writable numbers take their range from the heat pump (#79). The firmware reads each number's
   limits once with the Elster switch bytes `0xF8` (minimum) and `0xF9` (maximum), starting about a
   minute after the request manager and at least 2 s apart, and then publishes the number and
-  climate discovery again with that range (same entity). `0x8000` on one side keeps that side from
-  `writableNumbers[]`; `0x8000` on both sides, no answer after one retry, or minimum ≥ maximum keep
-  the whole range from `writableNumbers[]`. Once the device range is known, numeric writes of these
-  numbers are clamped to it, also those from automations or plain MQTT; with the static range
+  climate discovery again with that range (same entity). The effective range is the overlap of the
+  device range and the default range from `writableNumbers[]`: lower bound = max(device, default),
+  upper bound = min(device, default). The defaults are deliberate limits (e.g. standstill time
+  >= 20 min), so the device range can only narrow them (e.g. heating curve 0.0 -> 0.2), never widen
+  them. An empty overlap uses the default range. The raw device range is written to the log.
+  `0x8000` on one side keeps that side at the default; `0x8000` on both sides, a range with
+  minimum >= maximum, or an empty overlap keeps the default range for good. No answer after one
+  retry: the default range applies for now, and the request is repeated after 1 hour until an
+  answer comes; on success, discovery is sent again with the same unique_id. Clamping applies per
+  row (name and member): heating circuit 2 (`MISCHERMODUL_3`) has its own limits, separate from
+  heating circuit 1. Once the device range is known, numeric writes of these numbers are clamped to
+  the effective range, also those from automations or plain MQTT; without a known device range
   writes are not changed (as before). Limit answers never reach the sensor path, and read and
   write requests for the indices 0xF7–0xFA always use the long form, because in the short form
   that byte is the switch byte.

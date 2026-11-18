@@ -142,6 +142,33 @@ TEST_CASE("SetValueType: et_default formats as signed int", "[kelster]") {
     SetValueType(val, et_default, (unsigned short)(short)(-1));
     CHECK(std::string(val) == "-1");
 }
+TEST_CASE("SetValueType: et_err_status takes the fault number from the high byte", "[kelster][fault]") {
+    char val[32];
+    // Seen on a WPL 18 E (WPMW II) during high-pressure stops
+    SetValueType(val, et_err_status, 0x1D00);   // HEIZMODUL
+    CHECK(std::string(val) == "HD-SENSOR-MAX");
+    SetValueType(val, et_err_status, 0x0400);   // HEIZMODUL, one second before 0x1D00
+    CHECK(std::string(val) == "Hochdruck");
+    SetValueType(val, et_err_status, 0x1D45);   // 0x601 (WPM II) at the same time
+    CHECK(std::string(val) == "HD-SENSOR-MAX");
+    // WPM II without a fault: 0x45 in the low byte only
+    SetValueType(val, et_err_status, 0x0045);
+    CHECK(std::string(val) == "Keine Stoerung");
+    SetValueType(val, et_err_status, 0x0000);
+    CHECK(std::string(val) == "Keine Stoerung");
+    // Unknown fault numbers show the number, not the raw word
+    SetValueType(val, et_err_status, 0x6345);
+    CHECK(std::string(val) == "ERR 99");
+}
+TEST_CASE("SetValueType: et_err_nr keeps the code as is (fault list)", "[kelster][fault]") {
+    char val[32];
+    SetValueType(val, et_err_nr, 0x001d);
+    CHECK(std::string(val) == "HD-SENSOR-MAX");
+    SetValueType(val, et_err_nr, 0x0004);
+    CHECK(std::string(val) == "Hochdruck");
+    SetValueType(val, et_err_nr, 0x1D00);
+    CHECK(std::string(val) == "ERR 7424");
+}
 TEST_CASE("SetValueType: et_little_endian swaps bytes", "[kelster]") {
     char val[32];
     // little endian: result = (value >> 8) + 256*(value & 0xff)
@@ -190,6 +217,10 @@ TEST_CASE("GetElsterType: unknown name returns et_default", "[kelster]") {
 TEST_CASE("ElsterTypeToName: known index returns name", "[kelster]") {
     CHECK(std::string(ElsterTypeToName(et_dec_val)) == "et_dec_val");
     CHECK(std::string(ElsterTypeToName(et_bool))    == "et_bool");
+}
+TEST_CASE("ElsterTypeToName: et_err_status round-trips", "[kelster]") {
+    CHECK(std::string(ElsterTypeToName(et_err_status)) == "et_err_status");
+    CHECK(GetElsterType("et_err_status") == et_err_status);
 }
 TEST_CASE("ElsterTypeToName: out-of-range returns et_default string", "[kelster]") {
     CHECK(std::string(ElsterTypeToName(999)) == "et_default");

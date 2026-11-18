@@ -21,8 +21,8 @@
  *   here, while circuit 2 is set to 26.0 °C); circuit 2 lives on 0x602.
  * - VORLAUFISTTEMP/VORLAUFSOLLTEMP on KESSEL are the mixer flow of circuit 2 (same values as on
  *   0x601/0x602 when read at the same moment; matches the display "Mischer-Ist").
- * - FEHLERMELDUNG on MANAGER and KESSEL is a constant 69 here as well (see the WPL13E table);
- *   only the heat pump module is requested.
+ * - FEHLERMELDUNG on MANAGER and KESSEL is a constant 69 = 0x0045 here as well, "no fault"
+ *   (see the WPL13E table); only the heat pump module is requested.
  * - Summer mode: display parameter 8 (16.0 °C here) is SW_AUSSENTEMP (0x01bf).
  *   SOMMERBETRIEB_TEMP (0xfdb5) reads 10 °C on this unit; its meaning is unclear.
  * - Left out: unconnected sensors (-40.0: SAMMLERISTTEMP, WPVORLAUFIST on KESSEL),

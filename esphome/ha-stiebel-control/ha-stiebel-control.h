@@ -711,6 +711,7 @@ inline void getTypeDefaults(ElsterType type, const char*& component, const char*
             component = "sensor"; deviceClass = ""; unit = ""; stateClass = "measurement"; icon = "mdi:counter";
             break;
         case et_err_nr:
+        case et_err_status:
             component = "sensor"; deviceClass = ""; unit = ""; stateClass = ""; icon = "mdi:alert-circle";
             break;
         case et_dev_id:
@@ -1083,16 +1084,19 @@ void readSignal(const CanMember *cm, const char *elsterName)
 // ============================================================================
 // DEVICE LIMITS OF WRITABLE NUMBERS (#79)
 // Read once per writable number with the switch bytes 0xF8 (min) and 0xF9 (max),
-// after the request manager has started and one request at a time. Until both
-// answers are in, or on 0x8000, a timeout or min >= max, writableNumbers[] applies.
+// after the request manager has started and one request at a time. The range that applies is the
+// intersection of the device range and writableNumbers[] (static ranges are deliberate bounds).
+// Until both answers are in, on 0x8000, an empty intersection or no answer, writableNumbers[]
+// applies. Entries that never got an answer are asked again every NUMBER_LIMITS_RETRY_MS.
 // ============================================================================
-enum class NumberLimitState : uint8_t { Pending, WaitMin, WaitMax, Device, Static };
+// Static: answered but unusable (0x8000, implausible, no overlap), stays. NoAnswer: timeout, asked again later.
+enum class NumberLimitState : uint8_t { Pending, WaitMin, WaitMax, Device, Static, NoAnswer };
 
 struct NumberLimits {
     NumberLimitState state;
     uint8_t tries;           // requests sent for the current switch byte
     unsigned long sentMs;    // time of the last request
-    float min;               // valid when state == Device
+    float min;               // valid when state == Device: device range cut to the static one
     float max;
 };
 
@@ -1105,19 +1109,33 @@ static constexpr unsigned long NUMBER_LIMITS_START_DELAY_MS = 60000;  // after t
 static constexpr unsigned long NUMBER_LIMITS_GAP_MS = 2000;           // between two limit requests
 static constexpr unsigned long NUMBER_LIMITS_TIMEOUT_MS = 3000;       // per request
 static constexpr uint8_t NUMBER_LIMITS_MAX_TRIES = 2;                 // per switch byte
+static constexpr unsigned long NUMBER_LIMITS_RETRY_MS = 3600000;      // ask again after no answer
 
 inline int writableNumberIndex(const WritableNumberConfig& config) {
     if (&config < writableNumbers || &config >= writableNumbers + WRITABLE_NUMBER_COUNT) return -1;
     return static_cast<int>(&config - writableNumbers);
 }
 
-inline int writableNumberIndexByName(const char* signal) {
-    for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; i++)
-        if (strcmp(writableNumbers[i].signalName, signal) == 0) return static_cast<int>(i);
+static const CanMember* getWritableNumberMember(const WritableNumberConfig& config);
+
+// Row of a write: by name and member, because some names exist twice (heating circuit 2 on
+// MISCHERMODUL_3). Member = discovery member, table owner or write route of the row.
+inline int writableNumberIndexFor(const CanMember* cm, const char* signal) {
+    if (!cm) return -1;
+    const ElsterIndex* ei = GetElsterIndex(signal);
+    for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; i++) {
+        const WritableNumberConfig& c = writableNumbers[i];
+        if (strcmp(c.signalName, signal) != 0) continue;
+        if (getWritableNumberMember(c)->CanId == cm->CanId || CanMembers[c.member].CanId == cm->CanId)
+            return static_cast<int>(i);
+        if (ei && CanMembers[resolveSignalRoute(ei->Index, c.member).writeMember].CanId == cm->CanId)
+            return static_cast<int>(i);
+    }
     return -1;
 }
 
-// Range that applies now: the device range once both answers are in, else the static one.
+// Range that applies now: the device range (cut to the static one) once both answers are in,
+// else the static one.
 inline float writableNumberMin(size_t i) {
     return numberLimits[i].state == NumberLimitState::Device ? numberLimits[i].min : writableNumbers[i].min;
 }
@@ -1128,8 +1146,8 @@ inline float writableNumberMax(size_t i) {
 // Clamps a numeric write of a writable number to the device range, so values from automations
 // or plain MQTT cannot leave it either. Only once the device range is known: with the static
 // range (before the answers, fallback) writes stay as they were. Returns false if unchanged.
-bool clampToNumberLimits(const ElsterIndex* ei, const char* in, char* out, size_t outSize) {
-    const int i = writableNumberIndexByName(ei->Name);
+bool clampToNumberLimits(const CanMember* cm, const ElsterIndex* ei, const char* in, char* out, size_t outSize) {
+    const int i = writableNumberIndexFor(cm, ei->Name);
     if (i < 0 || numberLimits[i].state != NumberLimitState::Device) return false;
     char* end;
     const float v = strtof(in, &end);
@@ -1149,7 +1167,7 @@ void writeSignal(const CanMember *cm, const ElsterIndex *ei, const char *&strIn)
     return;
 #endif
     char clamped[16];
-    const char* str = clampToNumberLimits(ei, strIn, clamped, sizeof(clamped)) ? clamped : strIn;
+    const char* str = clampToNumberLimits(cm, ei, strIn, clamped, sizeof(clamped)) ? clamped : strIn;
     bool use_extended_id = false;
     int writeValue = TranslateString(str, ei->Type);
     if (writeValue == -1) {
@@ -1246,7 +1264,7 @@ inline bool queuePacedWrite(const CanMember* writeCm, const CanMember* readCm,
 #endif
     // Clamp here already, so the read-back is compared with the value that goes on the bus (#79)
     char clamped[16];
-    if (clampToNumberLimits(ei, value, clamped, sizeof(clamped))) value = clamped;
+    if (clampToNumberLimits(writeCm, ei, value, clamped, sizeof(clamped))) value = clamped;
     // A newer value for a write still waiting replaces it (the one in flight stays)
     for (size_t i = 0; i < pacedWriteCount; i++) {
         PacedWrite& p = pacedWrites[i];
@@ -1694,26 +1712,34 @@ static void numberLimitsSend(size_t i, uint8_t switchByte, unsigned long now) {
     numberLimitsLastSendMs = now;
 }
 
-static void numberLimitsUseStatic(size_t i, [[maybe_unused]] const char* why) {
-    numberLimits[i].state = NumberLimitState::Static;
+static void numberLimitsUseStatic(size_t i, [[maybe_unused]] const char* why, bool retryLater = false) {
+    numberLimits[i].state = retryLater ? NumberLimitState::NoAnswer : NumberLimitState::Static;   // sentMs = last request
     numberLimitsActive = -1;
     ESP_LOGI("LIMITS", "%s: %s, keeping %g..%g", writableNumbers[i].signalName, why,
              writableNumbers[i].min, writableNumbers[i].max);
 }
 
-// Both answers in: 0x8000 on one side keeps that side static; nothing usable or min >= max keeps
-// the static range. Otherwise the discovery is published again with the device range.
+// Both answers in: 0x8000 on one side keeps that side static; nothing usable, min >= max or an
+// empty intersection with the static range keeps the static range. Otherwise the discovery is
+// published again with the intersection (lo = max, hi = min).
 static void numberLimitsFinish(size_t i, bool haveMin, float devMin, bool haveMax, float devMax) {
     if (!haveMin && !haveMax) { numberLimitsUseStatic(i, "no device limits"); return; }
     const WritableNumberConfig& c = writableNumbers[i];
-    const float lo = haveMin ? devMin : c.min;
-    const float hi = haveMax ? devMax : c.max;
-    if (!(lo < hi)) { numberLimitsUseStatic(i, "implausible device range"); return; }
+    const float rawLo = haveMin ? devMin : c.min;
+    const float rawHi = haveMax ? devMax : c.max;
+    if (!(rawLo < rawHi)) { numberLimitsUseStatic(i, "implausible device range"); return; }
+    const float lo = rawLo > c.min ? rawLo : c.min;
+    const float hi = rawHi < c.max ? rawHi : c.max;
+    if (!(lo < hi)) {
+        ESP_LOGW("LIMITS", "%s: device range %g..%g does not overlap static %g..%g", c.signalName, rawLo, rawHi, c.min, c.max);
+        numberLimitsUseStatic(i, "no overlap");
+        return;
+    }
     numberLimits[i].min = lo;
     numberLimits[i].max = hi;
     numberLimits[i].state = NumberLimitState::Device;
     numberLimitsActive = -1;
-    ESP_LOGI("LIMITS", "%s: device range %g..%g (static %g..%g)", c.signalName, lo, hi, c.min, c.max);
+    ESP_LOGI("LIMITS", "%s: device range %g..%g, static %g..%g, using %g..%g", c.signalName, rawLo, rawHi, c.min, c.max, lo, hi);
     publishWritableNumberDiscovery(c, true);
     if (strcmp(c.signalName, "RAUMSOLLTEMP_I") == 0 || strcmp(c.signalName, "EINSTELL_SPEICHERSOLLTEMP") == 0)
         publishClimateDiscoveries();
@@ -1745,11 +1771,14 @@ void numberLimitsStep(unsigned long now) {
             return;
         }
         if (now - L.sentMs < NUMBER_LIMITS_TIMEOUT_MS) return;
-        if (L.tries >= NUMBER_LIMITS_MAX_TRIES) { numberLimitsUseStatic(i, "no answer"); return; }
+        if (L.tries >= NUMBER_LIMITS_MAX_TRIES) { numberLimitsUseStatic(i, "no answer, asking again later", true); return; }
         numberLimitsSend(i, L.state == NumberLimitState::WaitMin ? ELSTER_SWITCH_MIN : ELSTER_SWITCH_MAX, now);
         return;
     }
 
+    for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; i++)   // ask again where nobody answered
+        if (numberLimits[i].state == NumberLimitState::NoAnswer && now - numberLimits[i].sentMs >= NUMBER_LIMITS_RETRY_MS)
+            numberLimits[i].state = NumberLimitState::Pending;
     for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; i++) {
         if (numberLimits[i].state != NumberLimitState::Pending) continue;
         if (!numberLimitsWanted(i)) { numberLimits[i].state = NumberLimitState::Static; continue; }
