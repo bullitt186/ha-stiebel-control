@@ -45,7 +45,7 @@
  *    ISTDREHZAHL/SOLLDREHZAHL_VERDICHTER, LAUFZEIT_VERDICHTER_*.
  *
  * Writables (HEIZKURVE, EINSTELL_SPEICHERSOLLTEMP, RAUMSOLLTEMP_I/NACHT,
- * PROGRAMMSCHALTER) are defined in ha-stiebel-control.h writableNumbers[] /
+ * PROGRAMMSCHALTER) are defined in writables.h writableNumbers[] /
  * writableSelects[] and are addressed via the MQTT set-topics; the read-requests
  * here keep their state_topics populated.
  */
@@ -156,7 +156,7 @@ extern const SignalRequest signalRequests[] = {
 
     // Energie-Register (MWh = et_double_val, kWh = separate Register).
     // Die kombinierten "Gesamt kWh" berechneten Sensoren (MWh*1000+kWh) werden
-    // in ha-stiebel-control.h aus diesen Werten abgeleitet.
+    // in energy.h aus diesen Werten abgeleitet.
     {"EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", FREQ_1MIN, cm_heizmodul_wpl},
     {"EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH", FREQ_1MIN, cm_heizmodul_wpl},
     {"EL_AUFNAHMELEISTUNG_WW_SUM_MWH",   FREQ_1MIN, cm_heizmodul_wpl},
@@ -168,7 +168,7 @@ extern const SignalRequest signalRequests[] = {
 
     // --- AKTUELLE ELEKTRISCHE LEISTUNG (W): aus feinen Tageszählern (Wh) abgeleitet ---
     // Diese Wh-Zähler werden alle 30s gelesen; aus der Differenz pro Zeit berechnet
-    // ha-stiebel-control.h den berechneten Sensor "Aktuelle elektrische Leistung" (W).
+    // energy.h den berechneten Sensor "Aktuelle elektrische Leistung" (W).
     // HINWEIS: Die TAG_WH-Zaehler liegen auf dem WPL17-Heizmodul (0x514), das sie
     // passiv sendet (sensor.heizmodul_wpl_*). Von 0x500 lieferten sie 0.
     {"EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH", FREQ_30S, cm_heizmodul_wpl},

@@ -1,8 +1,7 @@
 /*
- * Minimal stubs that satisfy the preprocessor symbols used inside
- * #if !defined(HA_DUMMY_BUILD) in ha-stiebel-control.h, so that
- * pure-logic functions (generate_read_id, processCanMessage, hash, …)
- * can be compiled and tested on the host.
+ * Minimal stubs for the ESPHome API used by ha-stiebel-control.h and its module headers
+ * (id(), millis(), ESP_LOGx, preferences, …), so that the firmware logic
+ * (generate_read_id, processCanMessage, hash, …) can be compiled and tested on the host.
  *
  * Only the symbols actually referenced by the tested functions are defined.
  * Nothing here emulates real ESPHome behaviour.
@@ -94,7 +93,7 @@ struct FakeSensor {
     void publish_state(float v) { last_state = v; }
 };
 // Named sensor globals referenced from common.yaml lambdas — not used in our tests
-// but needed so the header compiles when included alongside HA_DUMMY_BUILD.
+// but needed so the firmware headers compile on the host.
 inline FakeSensor& sg_ready_boost_state3_sensor_instance() { static FakeSensor s; return s; }
 inline FakeSensor& sg_ready_boost_state4_sensor_instance() { static FakeSensor s; return s; }
 struct FakeTextSensor {

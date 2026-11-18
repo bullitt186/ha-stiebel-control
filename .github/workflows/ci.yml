@@ -196,6 +196,9 @@ jobs:
       - name: Check entity IDs in the shipped dashboards
         run: python3 tests/check_dashboard_ids.py
 
+      - name: Check firmware module includes (no cycles, main header size, common.yaml list)
+        run: python3 tests/check_modules.py
+
       - name: Validate YAML files
         run: |
           yamllint -d '{extends: relaxed, rules: {line-length: {max: 120}}}' \

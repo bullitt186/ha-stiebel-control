@@ -61,6 +61,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Changed
 
+- Firmware code split into modules (#109): `ha-stiebel-control.h` keeps only the CAN entry points;
+  MQTT publishing, CAN I/O, discovery, calculated sensors, energy/COP, writables, SG Ready glue,
+  time programs, set commands, bus scan, fault list and republish each have their own header (see
+  `docs/ARCHITECTURE.md`). No change in behavior. Custom configs that list the firmware headers
+  in `esphome: includes:` instead of using `common.yaml` must add the new headers.
 - `dashboards/heatingpump_standard.yaml` follows one design language: every color has one meaning on
   every view (heating orange, hot water blue, electricity grey, flow red, return indigo, setpoints light
   grey, outdoor blue-grey, room pink/purple, compressor deep purple, COP green), the same names for the
