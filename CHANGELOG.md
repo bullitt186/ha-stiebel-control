@@ -125,6 +125,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   tests of each model now compile its real signal table and operating mode names (#94).
 - Energy counter request rows are defined once (`SIGNAL_REQUESTS_ENERGY_IWS`), and the wpl18e smoke
   manifest refers to wpl13e (`same_as`) instead of copying it (#101).
+- Firmware builds without compiler warnings (#120), and one runtime DJB2 hash, `elsterNameHash()`,
+  replaces the duplicate `hash_runtime()` (#121).
 - Development: mutation testing of the C++ logic with Mull (`make mutate` for changed lines,
   `make mutate-all`, weekly non-blocking CI workflow), a Claude Code Stop hook that runs the fast
   local checks, and design-first test rules in `CLAUDE.md`.

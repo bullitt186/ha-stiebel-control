@@ -274,31 +274,42 @@ TEST_CASE("getOrCreateUID: different members produce different UIDs", "[can]") {
 }
 
 // ============================================================================
-// hash / hash_runtime
+// hash / elsterNameHash
 // ============================================================================
 
 TEST_CASE("hash: compile-time and runtime hashes agree", "[can]") {
     constexpr uint32_t compile = hash("TEMP_AUSSEN");
-    uint32_t runtime = hash_runtime("TEMP_AUSSEN");
+    uint32_t runtime = elsterNameHash("TEMP_AUSSEN");
     CHECK(compile == runtime);
 }
 TEST_CASE("hash: known signal hashes match pre-computed constants", "[can]") {
-    CHECK(hash_runtime("JAHR")           == HASH_JAHR);
-    CHECK(hash_runtime("MONAT")          == HASH_MONAT);
-    CHECK(hash_runtime("TAG")            == HASH_TAG);
-    CHECK(hash_runtime("STUNDE")         == HASH_STUNDE);
-    CHECK(hash_runtime("MINUTE")         == HASH_MINUTE);
-    CHECK(hash_runtime("SEKUNDE")        == HASH_SEKUNDE);
-    CHECK(hash_runtime("WPVORLAUFIST")   == HASH_WPVORLAUFIST);
-    CHECK(hash_runtime("RUECKLAUFISTTEMP") == HASH_RUECKLAUFISTTEMP);
-    CHECK(hash_runtime("VERDICHTER")     == HASH_VERDICHTER);
+    CHECK(elsterNameHash("JAHR")           == HASH_JAHR);
+    CHECK(elsterNameHash("MONAT")          == HASH_MONAT);
+    CHECK(elsterNameHash("TAG")            == HASH_TAG);
+    CHECK(elsterNameHash("STUNDE")         == HASH_STUNDE);
+    CHECK(elsterNameHash("MINUTE")         == HASH_MINUTE);
+    CHECK(elsterNameHash("SEKUNDE")        == HASH_SEKUNDE);
+    CHECK(elsterNameHash("WPVORLAUFIST")   == HASH_WPVORLAUFIST);
+    CHECK(elsterNameHash("RUECKLAUFISTTEMP") == HASH_RUECKLAUFISTTEMP);
+    CHECK(elsterNameHash("VERDICHTER")     == HASH_VERDICHTER);
+}
+// Expected values worked out by hand from the DJB2 definition: h0 = 5381, h = h * 33 + c (#121).
+TEST_CASE("elsterNameHash: DJB2 values from the definition", "[can]") {
+    CHECK(elsterNameHash("") == 5381u);
+    CHECK(elsterNameHash("a") == 177670u);        // 5381*33 + 97
+    CHECK(elsterNameHash("ab") == 5863208u);      // 177670*33 + 98
+    CHECK(elsterNameHash("TAG") == 193470689u);   // ((5381*33 + 84)*33 + 65)*33 + 71
+    CHECK(hash("TAG") == 193470689u);             // compile-time twin, same value
+    // uint32_t wrap-around: 33 characters overflow 32 bits; both versions must wrap the same way
+    constexpr const char* longName = "EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH_X";
+    CHECK(elsterNameHash(longName) == hash(longName));
 }
 TEST_CASE("hash: different strings produce different hashes", "[can]") {
-    CHECK(hash_runtime("STUNDE") != hash_runtime("MINUTE"));
-    CHECK(hash_runtime("JAHR")   != hash_runtime("MONAT"));
+    CHECK(elsterNameHash("STUNDE") != elsterNameHash("MINUTE"));
+    CHECK(elsterNameHash("JAHR")   != elsterNameHash("MONAT"));
 }
 TEST_CASE("hash: empty string does not crash", "[can]") {
-    CHECK_NOTHROW(hash_runtime(""));
+    CHECK_NOTHROW(elsterNameHash(""));
 }
 
 // ============================================================================
@@ -2145,7 +2156,7 @@ TEST_CASE("signalKey: ElsterTable names have distinct hashes", "[kelster][lookup
         auto it = seen.find(h);
         if (it != seen.end()) CHECK(std::string(it->second) == ElsterTable[i].Name);
         else seen.emplace(h, ElsterTable[i].Name);
-        CHECK(h == hash_runtime(ElsterTable[i].Name));
+        CHECK(h == elsterNameHash(ElsterTable[i].Name));
     }
 }
 

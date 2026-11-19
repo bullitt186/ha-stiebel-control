@@ -363,8 +363,7 @@ void publishCombinedEnergySensors() {
     // (SUM_MWH*1000 + SUM_KWH + TAG_KWH + TAG_WH/1000) aus HEIZMODUL_WPL nutzen.
     // Damit ist der totale Zaehler fortlaufend (kein Sprung beim naechtlichen
     // Rollover). Die SUM-Register werden dazu mit FREQ_1MIN gelesen.
-    const bool useMember = kModel.perMemberEnergy;
-    auto publishTotal = [useMember](const CalculatedSensorConfig& cfg, const char* topic, const char* key, int slot,
+    auto publishTotal = [](const CalculatedSensorConfig& cfg, const char* topic, const char* key, int slot,
                            const char* sumMwh, const char* sumKwh, const char* tagKwh, const char* tagWh) {
         float rawTotal; bool have = false;
         if (wplBaseTotal(slot, sumMwh, sumKwh, tagKwh, tagWh, rawTotal)) {

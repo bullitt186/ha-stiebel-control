@@ -516,7 +516,7 @@ void publishAllWritableNumberDiscoveries(bool forceRepublish = false) {
     
     ESP_LOGD("MQTT_DISC", "Publishing %d writable number discoveries", WRITABLE_NUMBER_COUNT);
     for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; i++) {
-        const char* sig = writableNumbers[i].signalName;
+        [[maybe_unused]] const char* sig = writableNumbers[i].signalName;   // logs only
         if (!writableNumberApplies(writableNumbers[i])) {
             ESP_LOGD("MQTT_DISC", "Skipping %s on %s", sig, HA_DEVICE_MODEL_STR);
             continue;

@@ -45,7 +45,7 @@ inline bool parseTime(const std::string& t, int& q) {
 }
 
 inline std::string formatTime(int q) {
-    char b[8];
+    char b[16];   // "hh:mm" needs 6; sized for any int so -Wformat-truncation cannot fire
     std::snprintf(b, sizeof(b), "%02d:%02d", q / 4, 15 * (q % 4));
     return b;
 }
