@@ -636,8 +636,10 @@ TEST_CASE("VD CAN feedback publishes whole hours with existing MQTT identity", "
     processAndUpdate(0x500, {0xd2, 0x00, 0xfa, 0x07, 0xff, 0x0a, 0xf3});
     CHECK(mqttFindPayload("heatingpump/HEIZMODUL/LZ_VERD_1_KUEHLBETRIEB/state") == "2803");
     mqtt_client_instance().clear();
+    // 0x8000 (-255, not available): a total_increasing counter keeps its last state, because
+    // HA reads a drop as a new meter cycle and would add the next real value to the sum again.
     processAndUpdate(0x500, {0xd2, 0x00, 0xfa, 0x07, 0xfc, 0x80, 0x00});
-    CHECK(mqttFindPayload("heatingpump/HEIZMODUL/LZ_VERD_1_HEIZBETRIEB/state") == "-255");
+    CHECK_FALSE(mqttTopicPublished("heatingpump/HEIZMODUL/LZ_VERD_1_HEIZBETRIEB/state"));
 }
 
 TEST_CASE("updateSensor: publishes discovery and state on first call", "[mqtt]") {

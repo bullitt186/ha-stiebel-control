@@ -253,6 +253,25 @@ inline std::string getOrCreateUID(const CanMember &cm, const char* signalName) {
     return result;
 }
 
+// Value types that decode to a number (SetValueType() in KElsterTable.cpp). Only these may carry
+// a state_class; HA rejects one on a text state. et_default is a plain integer (%d).
+inline bool isNumericElsterType(uint8_t type) {
+    return type == et_default || type == et_dec_val || type == et_cent_val || type == et_mil_val ||
+           type == et_hours || type == et_byte || type == et_double_val || type == et_triple_val ||
+           type == et_little_endian;
+}
+
+// State class a raw signal is announced with: its ElsterMetaTable row, else the type defaults;
+// "" for non-numeric types. Used by the discovery and by updateSensor() (-255 on counters).
+inline const char* signalStateClass(const ElsterIndex* ei) {
+    if (!isNumericElsterType(ei->Type)) return "";
+    const ElsterMeta* meta = GetElsterMeta(ei);
+    if (meta && meta->haComponent) return meta->stateClass ? meta->stateClass : "";
+    const char *component, *deviceClass, *unit, *stateClass, *icon;
+    getTypeDefaults((ElsterType)ei->Type, component, deviceClass, unit, stateClass, icon);
+    return stateClass;
+}
+
 // Publish MQTT Discovery config for a signal
 void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
     
@@ -322,18 +341,8 @@ void publishMqttDiscovery(const CanMember &cm, const ElsterIndex *ei) {
         payload << ",\"unit_of_measurement\":\"" << unit << "\"";
     }
     // State class only for numeric sensors
-    if (stateClass[0] != '\0') {
-        bool isNumericType = (ei->Type == et_dec_val || 
-                              ei->Type == et_cent_val || 
-                              ei->Type == et_mil_val || 
-                              ei->Type == et_hours ||
-                              ei->Type == et_byte ||
-                              ei->Type == et_double_val ||
-                              ei->Type == et_triple_val ||
-                              ei->Type == et_little_endian);
-        if (isNumericType) {
-            payload << ",\"state_class\":\"" << stateClass << "\"";
-        }
+    if (stateClass[0] != '\0' && isNumericElsterType(ei->Type)) {
+        payload << ",\"state_class\":\"" << stateClass << "\"";
     }
     if (icon[0] != '\0') {
         payload << ",\"icon\":\"" << icon << "\"";

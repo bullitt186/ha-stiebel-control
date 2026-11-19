@@ -561,8 +561,8 @@ TEST_CASE("power and operating state from the EL_*_TAG_WH counters", "[calc][ene
     step(t0, 100, 50);   // start of the window (or end of one left by an earlier test)
     mqtt_client_instance().clear();
     resetStateCache();
-    // WPMW II: the counter sums decide only until the pump status is known and are never
-    // reset there (no power window), so the counter-based state is checked on other models.
+    // WPMW II: the counter sums decide only until the pump status is known; the
+    // counter-based state on the WPMW II is covered by the 5 minute window test below.
 
     step(t0 + 29999, 100, 50);
     CHECK(mmCount(st) == 0);   // not yet 30 s
@@ -619,6 +619,33 @@ TEST_CASE("power and operating state from the EL_*_TAG_WH counters", "[calc][ene
         step(t0 + 1320000, 220, 5);
         CHECK(mmPayload(st) == "Heizen");
     }
+    mmResetEnergy();
+    fake_millis() = 0;
+}
+
+TEST_CASE("operating state from the counters follows the last 5 minute window on every model", "[calc][energy]") {
+    // energy.h: "Heizen/Warmwasser aus den Energie-Deltas der letzten Minuten". Until the pump
+    // status is known this also applies on the WPMW II, so its sums must restart with every
+    // 5 minute window there too (no power is published on the WPMW II).
+    mmResetEnergy();
+    lastVerdichterValue = 2.4f;   // running
+    lastPumpenstatus = -1;        // pump status not seen yet
+    const std::string st = kRoot + "/calculated/betriebsstatus/state";
+    const unsigned long t0 = 2100000000UL;
+    auto step = [](unsigned long t, float heizWh, float wwWh) {
+        fake_millis() = t;
+        copEnergyValues["EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH"] = heizWh;
+        copEnergyValues["EL_AUFNAHMELEISTUNG_WW_TAG_WH"] = wwWh;
+        publishCombinedEnergySensors();
+    };
+    step(t0, 100, 50);              // closes any window an earlier test left open
+    mqtt_client_instance().clear();
+    resetStateCache();
+    step(t0 + 30000, 100, 550);     // window 1: 500 Wh hot water
+    CHECK(mmPayload(st) == "Warmwasser");
+    step(t0 + 300000, 100, 550);    // window 1 ends
+    step(t0 + 330000, 200, 550);    // window 2: 100 Wh heating, no hot water
+    CHECK(mmPayload(st) == "Heizen");
     mmResetEnergy();
     fake_millis() = 0;
 }
@@ -795,4 +822,39 @@ TEST_CASE("discovery: calculated sensor payload from its calculatedSensors row",
     CHECK(mmField(cfg, "entity_category") == "diagnostic");
     CHECK(mmField(cfg, "enabled_by_default") == "false");
     resetDiscoveryState();
+}
+
+TEST_CASE("discovery: et_default counters keep the state_class of their metadata row", "[mqtt][discovery]") {
+    // et_default decodes to a plain integer (%d, KElsterTable.cpp), so it is numeric. ElsterMetaTable:
+    // { 0x091e, "EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH", ..., "energy", "Wh", "total_increasing" }
+    // { 0x0930, "WAERMEERTRAG_HEIZ_SUM_KWH", ..., "energy", "kWh", "total_increasing" }
+    for (const char* sig : {"EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH", "WAERMEERTRAG_HEIZ_SUM_KWH"}) {
+        INFO(sig);
+        resetDiscoveryState();
+        const ElsterIndex* ei = GetElsterIndex(sig);
+        REQUIRE(ei != nullptr);
+        REQUIRE(ei->Type == et_default);
+        publishMqttDiscovery(CanMembers[cm_heizmodul], ei);
+        REQUIRE(mqtt_client_instance().messages.size() == 1);
+        CHECK(mmField(mqtt_client_instance().messages[0].payload, "state_class") == "total_increasing");
+    }
+}
+
+TEST_CASE("updateSensor: a total_increasing counter keeps its last state on -255", "[mqtt][discovery]") {
+    // HA reads a drop of a total_increasing sensor as a meter reset and adds the next real
+    // value to the sum again, so "not available" (0x8000 -> -255) must not reach the state.
+    resetDiscoveryState();
+    resetStateCache();
+    const ElsterIndex* ei = GetElsterIndex("EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH");
+    REQUIRE(ei != nullptr);
+    const std::string topic = kRoot + "/HEIZMODUL/EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH/state";
+    updateSensor(CanMembers[cm_heizmodul], ei, "412");
+    REQUIRE(mmPayload(topic) == "412");
+    updateSensor(CanMembers[cm_heizmodul], ei, "-255");
+    CHECK(mmPayload(topic) == "412");
+    CHECK(mmCount(topic) == 1);
+    updateSensor(CanMembers[cm_heizmodul], ei, "415");   // a real value goes through again
+    CHECK(mmPayload(topic) == "415");
+    resetDiscoveryState();
+    resetStateCache();
 }

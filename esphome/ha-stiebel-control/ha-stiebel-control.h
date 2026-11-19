@@ -146,6 +146,9 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
             ESP_LOGD("BACKOFF", "%s_%s streak=%u", cm.Name, signalName, streak);
         }
         if (discoveredSignals.find(key) == discoveredSignals.end()) return;
+        // A counter must not drop to -255: HA reads a drop of a total_increasing sensor as a
+        // meter reset and adds the next real value to its sum again. Keep the last state.
+        if (strcmp(signalStateClass(ei), "total_increasing") == 0) return;
     } else if (!invalidStreak.empty()) {
         invalidStreak.erase(key);
     }
