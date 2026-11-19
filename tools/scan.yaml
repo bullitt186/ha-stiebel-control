@@ -8,7 +8,7 @@
 #
 #  Fuer die PRODUKTION verwende stattdessen wpl17.yaml (signal_requests_wpl17.h).
 #
-#  HINWEIS: Der Header ha-stiebel-control.h enthaelt den Diagnose-Schalter
+#  HINWEIS: Der Header can_io.h enthaelt den Diagnose-Schalter
 #  disableCanRequests (default false), der hier genutzt wird. Fuer Register-Suchen
 #  ist der Bus-Scan (heatingpump/scan/start) der normale Weg.
 #

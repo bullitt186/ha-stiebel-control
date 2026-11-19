@@ -135,10 +135,13 @@ void SetValueType(char * Val, unsigned char Type, unsigned short Value)
        break;
 
      case et_err_nr:
+     case et_err_status:
      {
+       // et_err_status: fault number in the high byte, the low byte is not part of it
+       const unsigned short code = Type == et_err_status ? (unsigned short)(Value >> 8) : Value;
        int idx = -1;
        for (unsigned i = 0; i <= High(ErrorList); i++)
-         if (ErrorList[i].Index == Value)
+         if (ErrorList[i].Index == code)
          {
            idx = i;
            break;
@@ -146,7 +149,7 @@ void SetValueType(char * Val, unsigned char Type, unsigned short Value)
        if (idx >= 0)
          strcpy(Val, ErrorList[idx].Name);
        else
-         sprintf(Val, "ERR %d", Value);
+         sprintf(Val, "ERR %d", code);
        break;
      }
 
@@ -431,6 +434,7 @@ int TranslateString(const char * & str, unsigned char elster_type)
     }
     case et_dev_nr:
     case et_err_nr:
+    case et_err_status:
     case et_dev_id:
     case et_double_val:
     case et_triple_val:

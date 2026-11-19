@@ -29,7 +29,9 @@ def slug(text: str) -> str:
 
 
 def allowed_suffixes() -> set:
-    header = (SRC / "ha-stiebel-control.h").read_text(encoding="utf-8")
+    # The firmware headers (ha-stiebel-control.h and its modules, #109): calculatedSensors[],
+    # writable numbers/selects and the fault list live in different files.
+    header = "\n".join(h.read_text(encoding="utf-8") for h in sorted(SRC.glob("*.h")))
     members = re.findall(r'\{"([A-Z0-9_]+)",\s*0x[0-9a-fA-F]+\}', (SRC / "can_members.h").read_text(encoding="utf-8"))
     signals = re.findall(r'\{\s*"([A-Z0-9_]+)"\s*,\s*0x[0-9a-fA-F]+\s*,', (SRC / "elster" / "ElsterTable.h").read_text(encoding="utf-8"))
     # SG Ready values handled on the ESP (writable numbers and selects without a table row)

@@ -1,7 +1,6 @@
 /*
- * Tests for pure CAN/signal functions in ha-stiebel-control.h.
- * ESPHome symbols are provided by esphome_stubs.h — do NOT define HA_DUMMY_BUILD,
- * as that guard excludes all function implementations in ha-stiebel-control.h.
+ * Tests for the firmware logic in ha-stiebel-control.h and its module headers (#109).
+ * ESPHome symbols are provided by esphome_stubs.h.
  *
  * Catch2 must be included BEFORE esphome_stubs.h: the stubs define id(x) as a macro
  * which collides with std::locale::id in gcc-13's STL headers pulled in by Catch2.
@@ -10,8 +9,8 @@
 
 #include "esphome_stubs.h"
 
-// ha-stiebel-control.h pulls in all elster headers and signal_requests_wpl13e.h
-// via its own includes. The elster .cpp files are compiled as separate objects.
+// ha-stiebel-control.h pulls in the elster headers and every firmware module via its own
+// includes. The elster .cpp files are compiled as separate objects.
 #include "../esphome/ha-stiebel-control/ha-stiebel-control.h"
 #include "../esphome/ha-stiebel-control/lang_en.h"
 
@@ -122,6 +121,12 @@ TEST_CASE("getTypeDefaults: et_byte → counter sensor", "[can]") {
 TEST_CASE("getTypeDefaults: et_err_nr → alert-circle sensor", "[can]") {
     const char *comp, *dc, *unit, *sc, *icon;
     getTypeDefaults(et_err_nr, comp, dc, unit, sc, icon);
+    CHECK(std::string(comp) == "sensor");
+    CHECK(std::string(icon) == "mdi:alert-circle");
+}
+TEST_CASE("getTypeDefaults: et_err_status → alert-circle sensor", "[can]") {
+    const char *comp, *dc, *unit, *sc, *icon;
+    getTypeDefaults(et_err_status, comp, dc, unit, sc, icon);
     CHECK(std::string(comp) == "sensor");
     CHECK(std::string(icon) == "mdi:alert-circle");
 }
@@ -269,31 +274,42 @@ TEST_CASE("getOrCreateUID: different members produce different UIDs", "[can]") {
 }
 
 // ============================================================================
-// hash / hash_runtime
+// hash / elsterNameHash
 // ============================================================================
 
 TEST_CASE("hash: compile-time and runtime hashes agree", "[can]") {
     constexpr uint32_t compile = hash("TEMP_AUSSEN");
-    uint32_t runtime = hash_runtime("TEMP_AUSSEN");
+    uint32_t runtime = elsterNameHash("TEMP_AUSSEN");
     CHECK(compile == runtime);
 }
 TEST_CASE("hash: known signal hashes match pre-computed constants", "[can]") {
-    CHECK(hash_runtime("JAHR")           == HASH_JAHR);
-    CHECK(hash_runtime("MONAT")          == HASH_MONAT);
-    CHECK(hash_runtime("TAG")            == HASH_TAG);
-    CHECK(hash_runtime("STUNDE")         == HASH_STUNDE);
-    CHECK(hash_runtime("MINUTE")         == HASH_MINUTE);
-    CHECK(hash_runtime("SEKUNDE")        == HASH_SEKUNDE);
-    CHECK(hash_runtime("WPVORLAUFIST")   == HASH_WPVORLAUFIST);
-    CHECK(hash_runtime("RUECKLAUFISTTEMP") == HASH_RUECKLAUFISTTEMP);
-    CHECK(hash_runtime("VERDICHTER")     == HASH_VERDICHTER);
+    CHECK(elsterNameHash("JAHR")           == HASH_JAHR);
+    CHECK(elsterNameHash("MONAT")          == HASH_MONAT);
+    CHECK(elsterNameHash("TAG")            == HASH_TAG);
+    CHECK(elsterNameHash("STUNDE")         == HASH_STUNDE);
+    CHECK(elsterNameHash("MINUTE")         == HASH_MINUTE);
+    CHECK(elsterNameHash("SEKUNDE")        == HASH_SEKUNDE);
+    CHECK(elsterNameHash("WPVORLAUFIST")   == HASH_WPVORLAUFIST);
+    CHECK(elsterNameHash("RUECKLAUFISTTEMP") == HASH_RUECKLAUFISTTEMP);
+    CHECK(elsterNameHash("VERDICHTER")     == HASH_VERDICHTER);
+}
+// Expected values worked out by hand from the DJB2 definition: h0 = 5381, h = h * 33 + c (#121).
+TEST_CASE("elsterNameHash: DJB2 values from the definition", "[can]") {
+    CHECK(elsterNameHash("") == 5381u);
+    CHECK(elsterNameHash("a") == 177670u);        // 5381*33 + 97
+    CHECK(elsterNameHash("ab") == 5863208u);      // 177670*33 + 98
+    CHECK(elsterNameHash("TAG") == 193470689u);   // ((5381*33 + 84)*33 + 65)*33 + 71
+    CHECK(hash("TAG") == 193470689u);             // compile-time twin, same value
+    // uint32_t wrap-around: 33 characters overflow 32 bits; both versions must wrap the same way
+    constexpr const char* longName = "EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH_X";
+    CHECK(elsterNameHash(longName) == hash(longName));
 }
 TEST_CASE("hash: different strings produce different hashes", "[can]") {
-    CHECK(hash_runtime("STUNDE") != hash_runtime("MINUTE"));
-    CHECK(hash_runtime("JAHR")   != hash_runtime("MONAT"));
+    CHECK(elsterNameHash("STUNDE") != elsterNameHash("MINUTE"));
+    CHECK(elsterNameHash("JAHR")   != elsterNameHash("MONAT"));
 }
 TEST_CASE("hash: empty string does not crash", "[can]") {
-    CHECK_NOTHROW(hash_runtime(""));
+    CHECK_NOTHROW(elsterNameHash(""));
 }
 
 // ============================================================================
@@ -458,6 +474,7 @@ static void resetDiscoveryState() {
     lastSgDhwSetpoint = NAN;
     lastSgRoomSetpoint = NAN;
     for (auto& prog : timeProgram) for (auto& d : prog) d = DhwProgramDay{};
+    resetNumberLimits();
 }
 
 // ============================================================================
@@ -619,8 +636,10 @@ TEST_CASE("VD CAN feedback publishes whole hours with existing MQTT identity", "
     processAndUpdate(0x500, {0xd2, 0x00, 0xfa, 0x07, 0xff, 0x0a, 0xf3});
     CHECK(mqttFindPayload("heatingpump/HEIZMODUL/LZ_VERD_1_KUEHLBETRIEB/state") == "2803");
     mqtt_client_instance().clear();
+    // 0x8000 (-255, not available): a total_increasing counter keeps its last state, because
+    // HA reads a drop as a new meter cycle and would add the next real value to the sum again.
     processAndUpdate(0x500, {0xd2, 0x00, 0xfa, 0x07, 0xfc, 0x80, 0x00});
-    CHECK(mqttFindPayload("heatingpump/HEIZMODUL/LZ_VERD_1_HEIZBETRIEB/state") == "-255");
+    CHECK_FALSE(mqttTopicPublished("heatingpump/HEIZMODUL/LZ_VERD_1_HEIZBETRIEB/state"));
 }
 
 TEST_CASE("updateSensor: publishes discovery and state on first call", "[mqtt]") {
@@ -1397,6 +1416,29 @@ TEST_CASE("publishWritableSelectDiscovery: payload contains options array", "[mq
     CHECK(payload.find("\"options\"") != std::string::npos);
 }
 
+// The options list is exactly the select's values, in table order and nothing after the last one
+// (#109: an off-by-one past the option array was only caught by chance through the memory layout).
+// PROGRAMMSCHALTER: the operating modes of the manager (LNAME_OPT_* protocol values); SG Ready:
+// the four states 1-4; state-2 mode: Tagbetrieb or Automatik.
+TEST_CASE("publishWritableSelectDiscovery: options list is exactly the select's options", "[mqtt]") {
+    const std::string modes = std::string("[\"") + LNAME_OPT_NOTBETRIEB + "\",\"" + LNAME_OPT_BEREITSCHAFT +
+        "\",\"" + LNAME_OPT_AUTOMATIK + "\",\"" + LNAME_OPT_TAGBETRIEB + "\",\"" + LNAME_OPT_ABSENKBETRIEB +
+        "\",\"" + LNAME_OPT_WARMWASSER + "\"]";
+    const struct { const char* uid; std::string options; } cases[] = {
+        {"stiebel_manager_programmschalter/config", "\"options\":" + modes},
+        {"stiebel_manager_sg_ready_state/config", std::string("\"options\":[\"") + LNAME_OPT_SG_EVU_SPERRE + "\",\"" +
+             LNAME_OPT_SG_NORMAL + "\",\"" + LNAME_OPT_SG_EMPFOHLEN + "\",\"" + LNAME_OPT_SG_ZWANG + "\"]"},
+        {"stiebel_manager_sg_ready_normal_mode/config", std::string("\"options\":[\"") + LNAME_OPT_TAGBETRIEB +
+             "\",\"" + LNAME_OPT_AUTOMATIK + "\"]"},
+    };
+    resetDiscoveryState();
+    publishAllWritableSelectDiscoveries(true);
+    for (const auto& c : cases) {
+        INFO(c.uid);
+        CHECK(mqttFindPayload(c.uid).find(c.options) != std::string::npos);
+    }
+}
+
 TEST_CASE("publishWritableSelectDiscovery: cached — second call skips publish", "[mqtt]") {
     resetDiscoveryState();
     publishWritableSelectDiscovery(writableSelects[0]);
@@ -1483,6 +1525,52 @@ TEST_CASE("ABTAUUNGAKTIV is a binary sensor with on/off payloads", "[meta]") {
     REQUIRE(meta->payloadOff != nullptr);
     CHECK(std::string(meta->payloadOn) == "on");
     CHECK(std::string(meta->payloadOff) == "off");
+}
+
+TEST_CASE("WPMW II: IWS values and parameters carry read-only metadata (#52)", "[meta][wpmw2]") {
+    // type with / without HA_CONTROLLER_WPMW2, then the HA metadata under WPMW II
+    struct Row { const char* name; unsigned type; unsigned typeOther; const char* deviceClass; const char* unit; };
+    static const Row rows[] = {
+        {"VERDAMPFERISTTEMP_KOMPENSIERT", et_dec_val, et_default, "temperature", "°C"},
+        {"REKUPERATORISTTEMP", et_dec_val, et_default, "temperature", "°C"},
+        {"LEISTUNGSREDUZIERUNG_KUEHLEN", et_dec_val, et_default, "temperature", "°C"},
+        {"MESSSTROM_HOCHDRUCK", et_dec_val, et_default, "current", "mA"},
+        {"MESSSTROM_NIEDERDRUCK", et_dec_val, et_default, "current", "mA"},
+        {"VORLAUFISTTEMP_WP_IWS", et_dec_val, et_dec_val, "temperature", "°C"},
+        {"LUEFTERDREHZAHL", et_default, et_default, "", "%"},
+        {"STILLSTANDZEIT", et_little_endian, et_little_endian, "duration", "min"},
+        {"STILLSTANDZEIT_0", et_default, et_default, "duration", "s"},
+    };
+    for (const Row& r : rows) {
+        INFO(r.name);
+        const ElsterIndex* ei = GetElsterIndex(r.name);
+        REQUIRE(std::string(ei->Name) == r.name);   // unknown names return INDEX_NOT_FOUND
+        const ElsterMeta* meta = GetElsterMeta(ei);
+        if (!isWpmw2Model()) {
+            CHECK(ei->Type == r.typeOther);
+            CHECK(meta == nullptr);
+            continue;
+        }
+        CHECK(ei->Type == r.type);
+        REQUIRE(meta != nullptr);
+        CHECK(std::string(meta->haComponent) == "sensor");
+        CHECK(std::string(meta->haDeviceClass) == r.deviceClass);
+        CHECK(std::string(meta->unit) == r.unit);
+    }
+    // Name only: unit and device class stay the type defaults, so existing HA statistics keep their unit
+    const ElsterIndex* hyst = GetElsterIndex("HYSTERESEZEIT");
+    REQUIRE(std::string(hyst->Name) == "HYSTERESEZEIT");
+    if (isWpmw2Model()) {
+        const ElsterMeta* meta = GetElsterMeta(hyst);
+        REQUIRE(meta != nullptr);
+        CHECK(meta->unit == nullptr);
+        CHECK(meta->haDeviceClass == nullptr);
+        resetDiscoveryState();
+        publishMqttDiscovery(CanMembers[cm_manager], GetElsterIndex("STILLSTANDZEIT"));
+        const std::string payload = mqttFindPayload("stillstandzeit");
+        CHECK(payload.find("\"device_class\":\"duration\"") != std::string::npos);
+        CHECK(payload.find("\"unit_of_measurement\":\"min\"") != std::string::npos);
+    }
 }
 
 TEST_CASE("writableNumbers: WPMW II parameters sit at the indices common.yaml uses", "[writable]") {
@@ -1641,6 +1729,10 @@ TEST_CASE("climate: heating and hot water discoveries reuse the number /set topi
     CHECK(heat.find("heatingpump/MANAGER/RAUMSOLLTEMP_I/set") != std::string::npos);
     CHECK(heat.find("PROGRAMMSCHALTER/set") != std::string::npos);
     CHECK(heat.find(std::string("\"") + LNAME_OPT_TAGBETRIEB + "\"") != std::string::npos);
+    // Presets = exactly the six PROGRAMMSCHALTER operating modes, nothing after the last (#109)
+    CHECK(heat.find(std::string("\"preset_modes\":[\"") + LNAME_OPT_NOTBETRIEB + "\",\"" + LNAME_OPT_BEREITSCHAFT +
+                    "\",\"" + LNAME_OPT_AUTOMATIK + "\",\"" + LNAME_OPT_TAGBETRIEB + "\",\"" +
+                    LNAME_OPT_ABSENKBETRIEB + "\",\"" + LNAME_OPT_WARMWASSER + "\"]") != std::string::npos);
     CHECK(dhw.find("EINSTELL_SPEICHERSOLLTEMP/set") != std::string::npos);
     const bool wpl17 = std::strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0;
     const bool canbSetpoint = wpl17 || std::strcmp(HA_DEVICE_MODEL_STR, "wpl9") == 0;
@@ -1660,9 +1752,15 @@ TEST_CASE("fault: code decoding and remedy attribute", "[fault]") {
     resetDiscoveryState();
     const ElsterIndex* ei = GetElsterIndex("FEHLERMELDUNG");
     REQUIRE(ei != nullptr);
+#ifdef HA_CONTROLLER_WPMW2
+    CHECK(ei->Type == et_err_status);
+    // HEIZMODUL answers fault 4 (Hochdruck) in the high byte
+    processAndUpdate(0x500, {0xD2, 0x00, 0x01, 0x04, 0x00, 0x00, 0x00});
+#else
     CHECK(ei->Type == et_err_nr);
     // HEIZMODUL answers fault 0x0004 (Hochdruck)
     processAndUpdate(0x500, {0xD2, 0x00, 0x01, 0x00, 0x04, 0x00, 0x00});
+#endif
     CHECK(mqttFindPayload("HEIZMODUL/FEHLERMELDUNG/state") == "Hochdruck");
     CHECK(mqttFindPayload("HEIZMODUL/FEHLERMELDUNG/attributes").find("Volumenstrom") != std::string::npos);
     CHECK(mqttFindPayload("homeassistant/sensor/heatingpump/").find("json_attributes_topic") != std::string::npos);
@@ -2090,7 +2188,7 @@ TEST_CASE("signalKey: ElsterTable names have distinct hashes", "[kelster][lookup
         auto it = seen.find(h);
         if (it != seen.end()) CHECK(std::string(it->second) == ElsterTable[i].Name);
         else seen.emplace(h, ElsterTable[i].Name);
-        CHECK(h == hash_runtime(ElsterTable[i].Name));
+        CHECK(h == elsterNameHash(ElsterTable[i].Name));
     }
 }
 
@@ -2107,6 +2205,7 @@ TEST_CASE("request manager: table resolved once, unknown/blacklisted skipped", "
     CHECK(resolvedRequests[2].ei == nullptr);
     CHECK(resolvedRequests[3].ei == nullptr);
 
+    resetNumberLimits(true);   // device limits (#79) have their own test
     // Startup delay, then one request per call; only the two known signals are polled
     requestManagerStarted = false;
     requestManagerStartTime = 0;
@@ -2135,6 +2234,7 @@ TEST_CASE("request manager: table resolved once, unknown/blacklisted skipped", "
     requestManagerStartTime = 0;
     nextRequestTime.clear();
     signalProcessingStartIndex = 0;
+    resetNumberLimits();
     fake_millis() = 0;
 }
 
@@ -2587,7 +2687,353 @@ TEST_CASE("writeSignal: a second read-back follows once the value has settled", 
     fake_millis() = 0;
 }
 
+// ============================================================================
+// #79: device limits of writable numbers (switch bytes 0xF8 = min, 0xF9 = max)
+// ============================================================================
+
+static std::string lastPayload(const std::string& topicSubstr) {
+    std::string last;
+    for (const auto& m : mqtt_client_instance().messages)
+        if (m.topic.find(topicSubstr) != std::string::npos) last = m.payload;
+    return last;
+}
+
+static std::vector<uint8_t> limitAnswer(uint8_t switchByte, uint16_t index, uint16_t raw) {
+    return {0xD2, 0x00, switchByte, static_cast<uint8_t>(index >> 8), static_cast<uint8_t>(index & 0xFF),
+            static_cast<uint8_t>(raw >> 8), static_cast<uint8_t>(raw & 0xFF)};
+}
+
+// Runs the limit reads of writableNumbers[0] (DHW setpoint) up to the first request.
+static const CanMember* startLimitReads(unsigned long& t) {
+    resetDiscoveryState();
+    fake_can().sent.clear();
+    t = 1000;
+    fake_millis() = t;
+    numberLimitsStep(t);                        // only sets the start time
+    REQUIRE(fake_can().sent.empty());
+    t += NUMBER_LIMITS_START_DELAY_MS;
+    fake_millis() = t;
+    numberLimitsStep(t);
+    REQUIRE(fake_can().sent.size() == 1);
+    return getWritableNumberMember(writableNumbers[0]);
+}
+
+TEST_CASE("limits: frame layout, indices 0xF7-0xFA always long form", "[limits][can]") {
+    CHECK(elsterShortForm(0x0005));
+    CHECK(elsterShortForm(0x00F6));
+    for (uint16_t idx = 0x00F7; idx <= 0x00FA; idx++) CHECK_FALSE(elsterShortForm(idx));
+    CHECK_FALSE(elsterShortForm(0x0013, ELSTER_SWITCH_MIN));
+    CHECK_FALSE(elsterShortForm(0x0100));
+
+    fake_can().sent.clear();
+    readSignalRaw(&CanMembers[cm_manager], 0x0013, "T", ELSTER_SWITCH_MIN);
+    readSignalRaw(&CanMembers[cm_manager], 0x0013, "T", ELSTER_SWITCH_MAX);
+    readSignalRaw(&CanMembers[cm_manager], 0x00F8, "T");
+    readSignalRaw(&CanMembers[cm_manager], 0x0005, "T");
+    REQUIRE(fake_can().sent.size() == 4);
+    const auto& mn = fake_can().sent[0];
+    CHECK((mn[2] == 0xF8 && mn[3] == 0x00 && mn[4] == 0x13 && mn[5] == 0 && mn[6] == 0));
+    CHECK((fake_can().sent[1][2] == 0xF9 && fake_can().sent[1][4] == 0x13));
+    const auto& f8 = fake_can().sent[2];          // index 0x00F8: long form, not a switch byte
+    CHECK((f8[2] == 0xFA && f8[3] == 0x00 && f8[4] == 0xF8));
+    CHECK(fake_can().sent[3][2] == 0x05);         // short form unchanged
+}
+
+TEST_CASE("limits: an answer to 0xF8/0xF9 is not a sensor value", "[limits][can]") {
+    resetDiscoveryState();
+    // nobody waits for it (e.g. another bus node asked): dropped, not decoded as index 0xF8
+    processAndUpdate(0x480, limitAnswer(ELSTER_SWITCH_MIN, 0x0005, 0x0032));
+    processAndUpdate(0x480, limitAnswer(ELSTER_SWITCH_MAX, 0x0005, 0x012C));
+    CHECK(mqtt_client_instance().messages.empty());
+}
+
+TEST_CASE("limits: device range narrows the static one after both answers", "[limits][mqtt]") {
+    unsigned long t;
+    const CanMember* m = startLimitReads(t);
+    const uint16_t idx = GetElsterIndex(writableNumbers[0].signalName)->Index;
+    const auto& req = fake_can().sent[0];
+    CHECK((req[2] == ELSTER_SWITCH_MIN && req[3] == (idx >> 8) && req[4] == (idx & 0xFF)));
+
+    // same step time again: no second request
+    numberLimitsStep(t);
+    CHECK(fake_can().sent.size() == 1);
+
+    processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MIN, idx, 0x012C));   // 30.0 (static 20..60)
+    CHECK(numberLimits[0].state == NumberLimitState::WaitMax);
+    CHECK(lastPayload("homeassistant/number/").empty());   // static range until both are in
+    numberLimitsStep(t + 100);                                // gap not over yet
+    CHECK(fake_can().sent.size() == 1);
+    t += NUMBER_LIMITS_GAP_MS;
+    fake_millis() = t;
+    numberLimitsStep(t);
+    REQUIRE(fake_can().sent.size() == 2);
+    CHECK(fake_can().sent[1][2] == ELSTER_SWITCH_MAX);
+    processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MAX, idx, 0x0258));   // 60.0
+
+    CHECK(numberLimits[0].state == NumberLimitState::Device);
+    CHECK(writableNumberMin(0) == Approx(30.0f));
+    CHECK(writableNumberMax(0) == Approx(60.0f));
+    std::string uid = std::string("stiebel_") + m->Name + "_" + writableNumbers[0].signalName;
+    std::transform(uid.begin(), uid.end(), uid.begin(), ::tolower);
+    const std::string disc = lastPayload("homeassistant/number/heatingpump/" + uid + "/config");
+    REQUIRE_FALSE(disc.empty());
+    CHECK(disc.find("\"unique_id\":\"" + uid + "\"") != std::string::npos);   // same entity, no second one
+    CHECK(disc.find("\"min\":30,") != std::string::npos);
+    CHECK(disc.find("\"max\":60,") != std::string::npos);
+    CHECK(mqttFindPayload(writableNumbers[0].signalName + std::string("/state")).empty());   // no fake state
+
+    // writes are clamped to the device range
+    fake_can().sent.clear();
+    writeSignal(m, writableNumbers[0].signalName, "70");
+    REQUIRE(fake_can().sent.size() == 1);
+    const auto& w = fake_can().sent[0];
+    const bool shortForm = elsterShortForm(idx);
+    CHECK(w[shortForm ? 3 : 5] == 0x02);
+    CHECK(w[shortForm ? 4 : 6] == 0x58);   // 600 = 60.0
+    fake_can().sent.clear();
+    writeSignal(m, writableNumbers[0].signalName, "5");
+    REQUIRE(fake_can().sent.size() == 1);
+    CHECK(fake_can().sent[0][shortForm ? 4 : 6] == 0x2C);   // 300 = 30.0
+    resetNumberLimits();
+    pendingReadbackCount = 0;
+}
+
+TEST_CASE("limits: 0x8000 on one side keeps that side static", "[limits]") {
+    unsigned long t;
+    const CanMember* m = startLimitReads(t);
+    const uint16_t idx = GetElsterIndex(writableNumbers[0].signalName)->Index;
+    processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MIN, idx, 0x8000));
+    t += NUMBER_LIMITS_GAP_MS;
+    numberLimitsStep(t);
+    processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MAX, idx, 0x0258));
+    CHECK(numberLimits[0].state == NumberLimitState::Device);
+    CHECK(writableNumberMin(0) == Approx(writableNumbers[0].min));
+    CHECK(writableNumberMax(0) == Approx(60.0f));
+    resetNumberLimits();
+}
+
+TEST_CASE("limits: 0x8000 on both sides, min >= max or no answer keep the static range", "[limits]") {
+    const uint16_t idx = GetElsterIndex(writableNumbers[0].signalName)->Index;
+    bool noAnswer = false;
+    SECTION("both 0x8000") {
+        unsigned long t;
+        const CanMember* m = startLimitReads(t);
+        processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MIN, idx, 0x8000));
+        numberLimitsStep(t + NUMBER_LIMITS_GAP_MS);
+        processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MAX, idx, 0x8000));
+    }
+    SECTION("min >= max") {
+        unsigned long t;
+        const CanMember* m = startLimitReads(t);
+        processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MIN, idx, 0x0258));
+        numberLimitsStep(t + NUMBER_LIMITS_GAP_MS);
+        processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MAX, idx, 0x0064));
+    }
+    SECTION("no answer: one retry, then static, then the next number") {
+        unsigned long t;
+        startLimitReads(t);
+        t += NUMBER_LIMITS_TIMEOUT_MS;
+        numberLimitsStep(t);
+        CHECK(fake_can().sent.size() == 2);          // retry of 0xF8
+        CHECK(fake_can().sent[1][2] == ELSTER_SWITCH_MIN);
+        t += NUMBER_LIMITS_TIMEOUT_MS;
+        numberLimitsStep(t);                         // second timeout: give up
+        CHECK(numberLimitsActive != 0);
+        noAnswer = true;
+    }
+    CHECK(numberLimits[0].state == (noAnswer ? NumberLimitState::NoAnswer : NumberLimitState::Static));
+    CHECK(writableNumberMin(0) == Approx(writableNumbers[0].min));
+    CHECK(writableNumberMax(0) == Approx(writableNumbers[0].max));
+    CHECK(lastPayload("homeassistant/number/").empty());   // nothing republished
+    resetNumberLimits();
+}
+
+TEST_CASE("limits: answers from another member or index are ignored", "[limits]") {
+    unsigned long t;
+    const CanMember* m = startLimitReads(t);
+    const uint16_t idx = GetElsterIndex(writableNumbers[0].signalName)->Index;
+    processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MIN, static_cast<uint16_t>(idx + 1), 0x0064));
+    processAndUpdate(m->CanId == 0x180 ? 0x480 : 0x180, limitAnswer(ELSTER_SWITCH_MIN, idx, 0x0064));
+    CHECK(numberLimits[0].state == NumberLimitState::WaitMin);
+    CHECK(mqtt_client_instance().messages.empty());
+    resetNumberLimits();
+}
+
+TEST_CASE("limits: virtual SG Ready numbers are never requested", "[limits]") {
+    for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; i++)
+        if (strncmp(writableNumbers[i].signalName, "SG_READY_", 9) == 0) CHECK_FALSE(numberLimitsWanted(i));
+}
+
+TEST_CASE("limits: only rows that apply to the model are requested", "[limits]") {
+    for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; i++) {
+        INFO(writableNumbers[i].signalName << " member " << writableNumbers[i].member);
+        if (!writableNumberApplies(writableNumbers[i])) CHECK_FALSE(numberLimitsWanted(i));
+        if (writableNumbers[i].member == cm_mischermodul_3 && !kModel.wpmw2WritesVerified)
+            CHECK_FALSE(numberLimitsWanted(i));
+    }
+}
+
+TEST_CASE("limits: device range is cut to the static range, empty cut keeps static", "[limits]") {
+    const uint16_t idx = GetElsterIndex(writableNumbers[0].signalName)->Index;   // static 20..60
+    struct Case { uint16_t mn, mx; float lo, hi; NumberLimitState st; };
+    const Case cases[] = {
+        {0x0064, 0x0258, 20.0f, 60.0f, NumberLimitState::Device},   // 10..60: wider below, cut to static
+        {0x00C8, 0x03E8, 20.0f, 60.0f, NumberLimitState::Device},   // 20..100: wider above
+        {0x012C, 0x0190, 30.0f, 40.0f, NumberLimitState::Device},   // 30..40: narrower
+        {0x0320, 0x0384, 20.0f, 60.0f, NumberLimitState::Static},   // 80..90: no overlap
+    };
+    for (const Case& c : cases) {
+        unsigned long t;
+        const CanMember* m = startLimitReads(t);
+        processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MIN, idx, c.mn));
+        numberLimitsStep(t + NUMBER_LIMITS_GAP_MS);
+        processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MAX, idx, c.mx));
+        CHECK(numberLimits[0].state == c.st);
+        CHECK(writableNumberMin(0) == Approx(c.lo));
+        CHECK(writableNumberMax(0) == Approx(c.hi));
+        resetNumberLimits();
+    }
+}
+
+TEST_CASE("limits: entries without an answer are asked again after the retry interval", "[limits]") {
+    unsigned long t;
+    const CanMember* m = startLimitReads(t);
+    const uint16_t idx = GetElsterIndex(writableNumbers[0].signalName)->Index;
+    for (int k = 0; k < 2; k++) { t += NUMBER_LIMITS_TIMEOUT_MS; numberLimitsStep(t); }   // gives up
+    CHECK(numberLimits[0].state == NumberLimitState::NoAnswer);
+    const unsigned long gaveUp = numberLimits[0].sentMs;
+    numberLimitsActive = -1;
+    for (size_t i = 1; i < WRITABLE_NUMBER_COUNT; i++) numberLimits[i].state = NumberLimitState::Static;   // only entry 0 is open
+    t = gaveUp + NUMBER_LIMITS_RETRY_MS - 1;
+    fake_can().sent.clear();
+    numberLimitsStep(t);
+    CHECK(numberLimits[0].state == NumberLimitState::NoAnswer);
+    t = gaveUp + NUMBER_LIMITS_RETRY_MS;
+    numberLimitsStep(t);
+    CHECK(numberLimits[0].state == NumberLimitState::WaitMin);
+    REQUIRE(fake_can().sent.size() >= 1);
+    CHECK(fake_can().sent.back()[2] == ELSTER_SWITCH_MIN);
+    processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MIN, idx, 0x012C));
+    t += NUMBER_LIMITS_GAP_MS;
+    numberLimitsStep(t);
+    processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MAX, idx, 0x0258));
+    CHECK(numberLimits[0].state == NumberLimitState::Device);
+    std::string uid = std::string("stiebel_") + m->Name + "_" + writableNumbers[0].signalName;
+    std::transform(uid.begin(), uid.end(), uid.begin(), ::tolower);
+    const std::string disc = lastPayload("homeassistant/number/heatingpump/" + uid + "/config");
+    CHECK(disc.find("\"unique_id\":\"" + uid + "\"") != std::string::npos);   // same entity again
+    CHECK(disc.find("\"min\":30,") != std::string::npos);
+    resetNumberLimits();
+
+    // a final answer (0x8000 on both sides) is never retried
+    startLimitReads(t);
+    processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MIN, idx, 0x8000));
+    numberLimitsStep(t + NUMBER_LIMITS_GAP_MS);
+    processAndUpdate(m->CanId, limitAnswer(ELSTER_SWITCH_MAX, idx, 0x8000));
+    CHECK(numberLimits[0].state == NumberLimitState::Static);
+    numberLimitsStep(t + 10 * NUMBER_LIMITS_RETRY_MS);
+    CHECK(numberLimits[0].state == NumberLimitState::Static);
+    resetNumberLimits();
+}
+
+TEST_CASE("limits: raw limits are decoded per type (cent, negative dec, 0x9000)", "[limits]") {
+    const ElsterIndex* hk = GetElsterIndex("HEIZKURVE");       // et_cent_val
+    const ElsterIndex* rt = GetElsterIndex("RAUMSOLLTEMP_I");  // et_dec_val
+    float v = 0.0f;
+    REQUIRE(decodeNumberLimit(hk, 20, v));
+    CHECK(v == Approx(0.20f));
+    REQUIRE(decodeNumberLimit(hk, 300, v));
+    CHECK(v == Approx(3.00f));
+    REQUIRE(decodeNumberLimit(rt, 0xFF06, v));                 // -250
+    CHECK(v == Approx(-25.0f));
+    CHECK_FALSE(decodeNumberLimit(rt, 0x9000, v));             // function switched off
+    CHECK_FALSE(decodeNumberLimit(hk, 0x9000, v));
+    CHECK_FALSE(decodeNumberLimit(rt, 0x8000, v));
+}
+
+TEST_CASE("limits: heating circuit 2 rows are looked up by member and name", "[limits]") {
+    resetDiscoveryState();
+    const CanMember* hk2m = &CanMembers[cm_mischermodul_3];
+    int hk1 = -1, hk2 = -1;
+    for (size_t i = 0; i < WRITABLE_NUMBER_COUNT; i++) {
+        if (strcmp(writableNumbers[i].signalName, "HEIZKURVE") != 0) continue;
+        if (writableNumbers[i].member == cm_mischermodul_3) hk2 = static_cast<int>(i); else if (hk1 < 0) hk1 = static_cast<int>(i);
+    }
+    REQUIRE(hk1 >= 0);
+    REQUIRE(hk2 >= 0);
+    REQUIRE(hk1 < hk2);   // a lookup by name alone would return the circuit 1 row
+    CHECK(writableNumberIndexFor(hk2m, "HEIZKURVE") == hk2);
+    CHECK(writableNumberIndexFor(getWritableNumberMember(writableNumbers[hk1]), "HEIZKURVE") == hk1);
+    const ElsterIndex* ei = GetElsterIndex("HEIZKURVE");
+    char out[16];
+
+    // circuit 1 has device limits, circuit 2 has its own
+    numberLimits[hk1] = {NumberLimitState::Device, 0, 0, 0.5f, 1.0f};
+    numberLimits[hk2] = {NumberLimitState::Device, 0, 0, 0.2f, 2.5f};
+    CHECK_FALSE(clampToNumberLimits(hk2m, ei, "2.2", out, sizeof(out)));   // fits circuit 2, not circuit 1
+    CHECK(clampToNumberLimits(hk2m, ei, "3.0", out, sizeof(out)));
+    CHECK(std::string(out) == "2.5");
+    CHECK(clampToNumberLimits(hk2m, ei, "0.1", out, sizeof(out)));
+    CHECK(std::string(out) == "0.2");
+
+    // circuit 1 fell back to static, circuit 2 has device limits: circuit 2 is still clamped
+    numberLimits[hk1].state = NumberLimitState::Static;
+    CHECK(clampToNumberLimits(hk2m, ei, "3.0", out, sizeof(out)));
+    CHECK(std::string(out) == "2.5");
+    // circuit 2 static, circuit 1 with device limits: circuit 2 writes stay unchanged
+    numberLimits[hk1].state = NumberLimitState::Device;
+    numberLimits[hk2].state = NumberLimitState::Static;
+    CHECK_FALSE(clampToNumberLimits(hk2m, ei, "3.0", out, sizeof(out)));
+
+    // paced write on circuit 2 stores the circuit 2 value; read-back compares it
+    numberLimits[hk2].state = NumberLimitState::Device;
+    pacedWriteCount = 0;
+    REQUIRE(queuePacedWrite(hk2m, hk2m, ei, "3.0"));
+    REQUIRE(pacedWriteCount == 1);
+    CHECK(std::string(pacedWrites[0].value) == "2.5");
+    pacedWriteCount = 0;
+    // writeSignal() on circuit 2 puts the circuit 2 value on the bus: 2.5 -> raw 250
+    fake_can().sent.clear();
+    writeSignal(hk2m, "HEIZKURVE", "3.0");
+    REQUIRE(fake_can().sent.size() == 1);
+    const auto& w = fake_can().sent[0];
+    const bool sf = elsterShortForm(ei->Index);
+    CHECK(w[sf ? 3 : 5] == 0x00);
+    CHECK(w[sf ? 4 : 6] == 0xFA);
+    resetNumberLimits();
+    pendingReadbackCount = 0;
+}
+
+TEST_CASE("limits: no clamping with the static range, clamping with the device range", "[limits]") {
+    resetDiscoveryState();
+    const int i = writableNumberIndexFor(&CanMembers[cm_manager], "RAUMSOLLTEMP_I");
+    REQUIRE(i >= 0);
+    const ElsterIndex* ei = GetElsterIndex("RAUMSOLLTEMP_I");
+    char out[16];
+    CHECK_FALSE(clampToNumberLimits(&CanMembers[cm_manager], ei, "45", out, sizeof(out)));   // static range: unchanged behaviour
+    numberLimits[i].state = NumberLimitState::Device;
+    numberLimits[i].min = 5.0f;
+    numberLimits[i].max = 30.0f;
+    CHECK(clampToNumberLimits(&CanMembers[cm_manager], ei, "45", out, sizeof(out)));
+    CHECK(std::string(out) == "30");
+    CHECK(clampToNumberLimits(&CanMembers[cm_manager], ei, "2", out, sizeof(out)));
+    CHECK(std::string(out) == "5");
+    CHECK_FALSE(clampToNumberLimits(&CanMembers[cm_manager], ei, "21.5", out, sizeof(out)));
+    CHECK_FALSE(clampToNumberLimits(&CanMembers[cm_manager], ei, "nan", out, sizeof(out)));
+    CHECK_FALSE(clampToNumberLimits(&CanMembers[cm_manager], GetElsterIndex("PROGRAMMSCHALTER"), "Automatik", out, sizeof(out)));
+    CHECK_FALSE(clampToNumberLimits(&CanMembers[cm_manager], GetElsterIndex("AUSSENTEMP"), "99", out, sizeof(out)));   // not writable
+
+    // paced writes store the clamped value, so the read-back check compares the right value
+    pacedWriteCount = 0;
+    REQUIRE(queuePacedWrite(&CanMembers[cm_manager], &CanMembers[cm_manager], ei, "45"));
+    REQUIRE(pacedWriteCount == 1);
+    CHECK(std::string(pacedWrites[0].value) == "30");
+    pacedWriteCount = 0;
+    resetNumberLimits();
+}
+
 #include "wpl9_cases.inc"
+#include "module_cases.inc"
 
 // ============================================================================
 // MQTT topic root from the device_name substitution (#102)

@@ -7,12 +7,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Upgrade notes
+
+- WPL13E/WPL18E/TTL 33: some existing sensors get new display names; entity IDs stay. `STILLSTANDZEIT`
+  now has the unit min, so HA asks once to update the unit of its statistics (Developer tools →
+  Statistics).
+
 ### Fixed
 
 - TTL 33: `compressor_active` stayed off, because the heat pump module answers `VERDICHTER` with
   placeholders. On `ttl33` the compressor state now comes from KESSEL `WP_PUMPENSTATUS` (polled every
   30 s), which is on exactly while a compressor runs. The compressor statistics and the operating
   state build on it. Other models are unchanged (#83).
+- Raw energy counters decoded as plain integers (`*_TAG_WH`, `*_SUM_KWH`, `WAERMEERTRAG_RUECKGE_*`,
+  solar yields; 24 signals with metadata) had no `state_class` in their discovery although their
+  metadata says `total_increasing`/`measurement`, so Home Assistant kept no long-term statistics
+  for them. They now carry it, and HA starts recording statistics for them after the update.
+- A `total_increasing` signal (energy counters, runtime hours) that answers "not available"
+  (`0x8000`) now keeps its last state instead of publishing `-255`: HA reads a drop as a new
+  meter cycle and would add the next real value to the statistics sum again.
+- WPMW II: until `PUMPENSTATUS` is known, the operating state compared the energy counter sums
+  since boot instead of the last 5 minutes, because the 5-minute window never restarted there.
+- Diagnostic scan firmware (`tools/heatingpump_scan.yaml`): it no longer keeps its own copy of the
+  firmware header list, which had to be updated with every new module; the headers come from
+  `common.yaml` like in every other config. CI now compiles the scan config in the layout
+  `tools/README.md` describes (#122).
 - Climate entities (heating, HK2, hot water) showed the mode "off" in Home Assistant (thermostat
   card "Aus"), because they announce no mode state. The mode now follows the availability of the
   ESP: `heat` while it is online, `off` while it is offline.
@@ -25,9 +44,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   thousand indices: `GetElsterIndex()` cached every index that is not in the table in a hash map,
   which grew until a rehash failed (`exception/panic`, seen on a WPL13E at 0x601 0x0000-0x0fff).
   Index lookups now use a table sorted once at startup (binary search, fixed size) and cache nothing.
+- WPL13E/WPL18E/TTL 33 (WPMW II): `FEHLERMELDUNG` takes the fault number from the high byte, so a
+  high-pressure stop shows `HD-SENSOR-MAX` instead of `ERR 7424` (#52). The fault list is
+  unchanged.
 
 ### Added
 
+- WPL13E/WPL18E/TTL 33 (WPMW II): names, units and scaling for IWS values and parameters checked on a
+  WPL 18 E display: evaporator outlet, compressor inlet and vapour injection temperature, the pressure
+  sensor currents, condenser outlet (`FROSTTEMP`), fan output, controller and mixer dynamics,
+  compressor off time and its countdown (`STILLSTANDZEIT_0`, in s), the current room setpoint, and
+  names for eight further registers (#52). Most of them are not polled by default. Read-only; no new
+  writes.
 - WPMW II (WPL13E, WPL18E, TTL 33): room actual temperature of the remote control FE 7 as sensor
   "Raum-Ist Fernbedienung", and the circuit it is assigned to (parameter 22 "AUSWAHL FE",
   `FERNBEDIENUNGSZUORDNUNG`). The manager does not answer `RAUMISTTEMP`; its virtual members mirror
@@ -47,9 +75,32 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   and written to `HEIZPROG_1_<day>` on `MISCHERMODUL_3` (0x602). In `Automatik` an empty program keeps
   the circuit on its night setpoint. TTL 33 now also polls the second and third period of both
   heating programs, so the circuit 1 and 2 program texts appear there.
+- Writable numbers take their range from the heat pump (#79). The firmware reads each number's
+  limits once with the Elster switch bytes `0xF8` (minimum) and `0xF9` (maximum), starting about a
+  minute after the request manager and at least 2 s apart, and then publishes the number and
+  climate discovery again with that range (same entity). The effective range is the overlap of the
+  device range and the default range from `writableNumbers[]`: lower bound = max(device, default),
+  upper bound = min(device, default). The defaults are deliberate limits (e.g. standstill time
+  >= 20 min), so the device range can only narrow them (e.g. heating curve 0.0 -> 0.2), never widen
+  them. An empty overlap uses the default range. The raw device range is written to the log.
+  `0x8000` on one side keeps that side at the default; `0x8000` on both sides, a range with
+  minimum >= maximum, or an empty overlap keeps the default range for good. No answer after one
+  retry: the default range applies for now, and the request is repeated after 1 hour until an
+  answer comes; on success, discovery is sent again with the same unique_id. Clamping applies per
+  row (name and member): heating circuit 2 (`MISCHERMODUL_3`) has its own limits, separate from
+  heating circuit 1. Once the device range is known, numeric writes of these numbers are clamped to
+  the effective range, also those from automations or plain MQTT; without a known device range
+  writes are not changed (as before). Limit answers never reach the sensor path, and read and
+  write requests for the indices 0xF7–0xFA always use the long form, because in the short form
+  that byte is the switch byte.
 
 ### Changed
 
+- Firmware code split into modules (#109): `ha-stiebel-control.h` keeps only the CAN entry points;
+  MQTT publishing, CAN I/O, discovery, calculated sensors, energy/COP, writables, SG Ready glue,
+  time programs, set commands, bus scan, fault list and republish each have their own header (see
+  `docs/ARCHITECTURE.md`). No change in behavior. Custom configs that list the firmware headers
+  in `esphome: includes:` instead of using `common.yaml` must add the new headers.
 - `dashboards/heatingpump_standard.yaml` follows one design language: every color has one meaning on
   every view (heating orange, hot water blue, electricity grey, flow red, return indigo, setpoints light
   grey, outdoor blue-grey, room pink/purple, compressor deep purple, COP green), the same names for the
@@ -91,6 +142,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   tests of each model now compile its real signal table and operating mode names (#94).
 - Energy counter request rows are defined once (`SIGNAL_REQUESTS_ENERGY_IWS`), and the wpl18e smoke
   manifest refers to wpl13e (`same_as`) instead of copying it (#101).
+- Firmware builds without compiler warnings (#120), and one runtime DJB2 hash, `elsterNameHash()`,
+  replaces the duplicate `hash_runtime()` (#121).
 - Development: mutation testing of the C++ logic with Mull (`make mutate` for changed lines,
   `make mutate-all`, weekly non-blocking CI workflow), a Claude Code Stop hook that runs the fast
   local checks, and design-first test rules in `CLAUDE.md`.

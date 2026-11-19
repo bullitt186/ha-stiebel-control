@@ -23,8 +23,9 @@ built-in TWAI controller (recommended) and a classic ESP32 (`esp32dev`) with an 
   - `signal_requests_<model>.h` — what the model polls: `{"SIGNAL", FREQ_xx, cm_member}` rows
   - `model_profile.h` — model capabilities (`kModel`), see below
   - `can_members.h` — bus members (`CanMembers[]`, `CanMemberType`) and `SignalRequest`
-  - `ha-stiebel-control.h` — core: CAN decode, MQTT discovery/state, calculated sensors, writable
-    numbers/selects, time programs, paced writes, bus scan, fault list
+  - `ha-stiebel-control.h` — only the CAN entry points: `processAndUpdate()` (every received
+    frame) and `updateSensor()` (publish a decoded value, hand it to the module that uses it).
+    It includes the firmware modules below (#109); see "Firmware modules".
   - `sg_ready_controller.h` — SG Ready state machine (pure C++, IO injected via `ISgReadyIO`)
   - `dhw_program.h` — WPMW II time program parsing/validation (pure C++)
   - `config.h` — timing constants, `HA_DEVICE_MODEL_STR`, `HA_TOPIC_ROOT`
@@ -34,21 +35,52 @@ built-in TWAI controller (recommended) and a classic ESP32 (`esp32dev`) with an 
 - `packages/ha_stiebel_control.yaml` — HA helpers (clock/date sync). Docs: `docs/`, `SG_READY.md`.
 - `manuals/` — Stiebel PDFs; consult them for signal meaning.
 
+## Firmware modules (`esphome/ha-stiebel-control/`, #109)
+One header per responsibility. Each module owns its global state and includes the modules it
+uses; the includes form no cycle. The table is in include order: a module includes only modules
+above it. The shared configuration is only the build flags, `config.h` (`HA_TOPIC_ROOT`) and
+`model_profile.h` (`kModel`).
+
+| Module | Owns |
+|---|---|
+| `signal_route.h` | `SignalRoute`/`resolveSignalRoute()`, `isWpmw2Model()`, `elsterNameHash()`, `signalKey()` (pure C++) |
+| `mqtt_publish.h` | `mqttPublish()`, failure counter, publish-on-change state cache, `publishMqttState()` |
+| `can_io.h` | frame decode (`processCanMessage()`), `readSignal()`/`writeSignal()`, read-back queue, `disableCanRequests`, clock/date writes |
+| `paced_writes.h` | `queuePacedWrite()`/`pacedWriteStep()`: one write at a time, checked by read-back |
+| `discovery.h` | device blocks (`HA_MAIN_DEVICE_JSON`, `memberDeviceJson()`), `defaultEntityIdJson()`, discovery of raw signals and calculated sensors |
+| `bus_scan.h` | bus scan (`startScan()`, `scanStep()`, `handleScanFrame()`) |
+| `request_manager.h` | polling of `signalRequests[]` (`processSignalRequests()`), back-off |
+| `calculated.h` | `calculatedSensors[]`/`CalcIdx`, date/time, Delta T, compressor, summer mode, diagnostics, `processCalculatedSensors()` |
+| `energy.h` | COP and the combined energy values |
+| `writables.h` | `writableNumbers[]`/`writableSelects[]`, `writableNumberApplies()`, number/select/climate discovery, device limits (`numberLimitsStep()`, `handleLimitAnswer()`, `clampToNumberLimits()`) |
+| `sg_ready_io.h` | ESPHome adapter of `SgReadyController` (NVS, paced writes, MQTT), SG Ready commands |
+| `time_programs.h` | WPMW II time programs in HA (one text per day) |
+| `set_commands.h` | `handleSetCommand()`: every `<root>/<A>/<B>/set` topic |
+| `fault_list.h` | manager fault list, `faultRemedy()` |
+| `republish.h` | discovery and state republish after an MQTT connect or HA birth message |
+
+**Adding code:** put it in the module that owns the data; `ha-stiebel-control.h` stays below
+800 lines. A module may include only modules higher up in this table, never one that includes
+it. A new header goes into `common.yaml` `includes:` (ESPHome copies only listed files) and into
+this table and `docs/ARCHITECTURE.md`. `python3 tests/check_modules.py` checks cycles, the size
+of `ha-stiebel-control.h` and the `includes:` list (CI).
+
 ## How a signal reaches Home Assistant
 1. A row in `signal_requests_<model>.h` makes the request manager poll it
-   (`processSignalRequests()`, round-robin, one request per second).
-2. The answer is decoded in `processCanMessage()` with the type from `ElsterTable.h` and handled
-   by `updateSensor()`: MQTT discovery on first value, then publish on change
+   (`processSignalRequests()` in `request_manager.h`, round-robin, one request per second).
+2. The answer is decoded in `processCanMessage()` (`can_io.h`) with the type from `ElsterTable.h`
+   and handled by `updateSensor()`: MQTT discovery on first value, then publish on change
    (`<root>/<MEMBER>/<SIGNAL>/state`, root `HA_TOPIC_ROOT` from `device_name`, default
    `heatingpump`; never write the root as a literal). Names, units and device classes come from
    `ElsterMetaTable` (`LNAME_*`), otherwise from type defaults.
-3. Calculated values live in `calculatedSensors[]` in `ha-stiebel-control.h`; address rows by the
+3. Calculated values live in `calculatedSensors[]` in `calculated.h`; address rows by the
    `CalcIdx` enum (`CALC_IDX_*`, same order as the table, checked by a static_assert), never by
    number. `onDemand` rows are announced with their first value. Discovery payloads use
    `HA_MAIN_DEVICE_JSON` / `memberDeviceJson()` for the device block.
-4. Writable settings are `writableNumbers[]` / `writableSelects[]`. Every `<root>/<A>/<B>/set`
-   command goes through `handleSetCommand()`, which finds the row by signal name and member and
-   checks `writableNumberApplies()` and min/max; adding a writable entity only touches its row.
+4. Writable settings are `writableNumbers[]` / `writableSelects[]` (`writables.h`). Every
+   `<root>/<A>/<B>/set` command goes through `handleSetCommand()` (`set_commands.h`), which finds
+   the row by signal name and member and checks `writableNumberApplies()` and min/max; adding a
+   writable entity only touches its row.
    Writes go through `writeSignal()` (read-back is scheduled automatically); SG Ready and time
    program writes go through the paced queue (`queuePacedWrite()`), one at a time with read-back.
 
@@ -93,6 +125,8 @@ including its room setpoints, heating curve and program (`HEIZPROG_1_*`).
 - After every OTA flash: `make smoke-test` must pass (`tests/models/_common_smoke.json` +
   `<device_model>_smoke.json`).
 - `python3 tests/check_doc_paths.py` — every repo path named in these docs must exist (CI).
+- `python3 tests/check_modules.py` — no include cycle between the firmware headers,
+  `ha-stiebel-control.h` below 800 lines, every included module listed in `common.yaml` (CI).
 
 ## Pitfalls
 - Template sensor lambdas that only trigger reads return `{}`; the C++ side publishes values.

@@ -1,5 +1,5 @@
 .PHONY: compile compile-esp32 compile-s2 check logs upload config test test-all clean-tests smoke-test capture-baseline \
-        mutate mutate-all
+        mutate mutate-all FORCE
 
 # Extract model and MQTT credentials from local config files
 DEVICE_MODEL ?= $(shell grep 'device_model:' esphome/heatingpump.yaml | grep -v '^\s*\#' | head -1 | sed 's/.*"\(.*\)".*/\1/')
@@ -76,20 +76,27 @@ TEST_EXTRA_OBJS = $(patsubst tests/%.cpp,tests/%.o,$(TEST_EXTRA))
 # Every object includes these headers (ElsterTable.h is compiled into KElsterTable.o)
 TEST_HDRS = $(wildcard esphome/ha-stiebel-control/*.h esphome/ha-stiebel-control/elster/*.h tests/*.h tests/*.inc tools/*.h)
 
-tests/%.o: tests/%.cpp $(TEST_HDRS)
+# Compiler and flags of the last test build. Rewritten only when they change, so a new
+# MODEL_TEST_FLAGS (e.g. another HA_DEVICE_MODEL) rebuilds every test object instead of
+# silently linking objects built for the previous model.
+TEST_FLAGS_STAMP = tests/.build-flags
+$(TEST_FLAGS_STAMP): FORCE
+	@echo '$(CXX) $(CXXFLAGS)' | cmp -s - $@ || echo '$(CXX) $(CXXFLAGS)' > $@
+
+tests/%.o: tests/%.cpp $(TEST_HDRS) $(TEST_FLAGS_STAMP)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-tests/NUtils.o: esphome/ha-stiebel-control/elster/NUtils.cpp $(TEST_HDRS)
+tests/NUtils.o: esphome/ha-stiebel-control/elster/NUtils.cpp $(TEST_HDRS) $(TEST_FLAGS_STAMP)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-tests/KElsterTable.o: esphome/ha-stiebel-control/elster/KElsterTable.cpp $(TEST_HDRS)
+tests/KElsterTable.o: esphome/ha-stiebel-control/elster/KElsterTable.cpp $(TEST_HDRS) $(TEST_FLAGS_STAMP)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(TEST_BIN): $(TEST_SRCS) $(TEST_EXTRA_OBJS) $(ELSTER_OBJS) $(TEST_HDRS)
+$(TEST_BIN): $(TEST_SRCS) $(TEST_EXTRA_OBJS) $(ELSTER_OBJS) $(TEST_HDRS) $(TEST_FLAGS_STAMP)
 	$(CXX) $(CXXFLAGS) $(TEST_SRCS) $(TEST_EXTRA_OBJS) $(ELSTER_OBJS) -o $(TEST_BIN)
 
 clean-tests:
-	rm -f $(TEST_BIN) $(TEST_EXTRA_OBJS) $(ELSTER_OBJS)
+	rm -f $(TEST_BIN) $(TEST_EXTRA_OBJS) $(ELSTER_OBJS) $(TEST_FLAGS_STAMP)
 
 # ── Mutation testing (Mull) ──────────────────────────────────────────────────
 

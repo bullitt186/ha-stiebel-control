@@ -178,6 +178,24 @@ These entities appear automatically in HA via MQTT discovery:
 | `number.heatingpump_manager_sg_ready_room_boost_state3` | SG Ready room setpoint boost (heating circuit 1) for state 3, default 1 K, 0 = off | 0–5 K | 0.5 K |
 | `number.heatingpump_manager_sg_ready_room_boost_state4` | SG Ready room setpoint boost (heating circuit 1) for state 4, default 2 K, 0 = off | 0–5 K | 0.5 K |
 
+**Range from the device:** the ranges above are defaults and bound the result. About a minute after the request
+manager starts, the firmware asks the heat pump for the limits of each writable number (Elster
+switch bytes `0xF8` = minimum, `0xF9` = maximum), at least 2 s apart. The effective range is the
+overlap of the device range and the default range: lower bound = max(device, default), upper bound
+= min(device, default). The defaults are deliberate limits (e.g. standstill time >= 20 min), so the
+device can only narrow them (e.g. heating curve 0.0 -> 0.2), never widen them. An empty overlap uses
+the default range. The raw device range is written to the log. Once both answers are in, the number
+(and the matching climate card) is published again with the effective range. A side the device does
+not provide (`0x8000`) keeps its default on that side; `0x8000` on both sides, a range with minimum
+≥ maximum, or an empty overlap keeps the default range for good. No answer after one retry: the
+default range applies for now, and the request is repeated after 1 hour until an answer comes. On
+success, discovery is sent again with the same unique_id. The limits are checked per row (name and
+member): heating circuit 2 (`MISCHERMODUL_3`) has its own limits, separate from heating circuit 1.
+Once the device range is known, every numeric write of the number is clamped to the effective range,
+also from automations or plain MQTT; without a known device range writes are not changed. The limits
+are read from the member the number's state comes from (model routing applies). The SG Ready boost
+numbers are not on the bus and keep their range.
+
 The room boost raises `RAUMSOLLTEMP_I` and with it the heating curve, which can add compressor
 starts. With 0 the room setpoint is not written at all, neither on entering nor on leaving the
 SG Ready state. All four boost values are stored on the ESP and survive a reboot.
@@ -473,10 +491,11 @@ They use the same `/set` topics as the number entities, so the CAN member mappin
 
 ## Fault text
 
-`FEHLERMELDUNG` is decoded via `ErrorList` in `ElsterTable.h` ("Keine Stoerung" when 0). The
-`abhilfe` attribute holds a short remedy (`heatingpump/<MEMBER>/FEHLERMELDUNG/attributes`).
-WPL13E requests the heat pump module (IWS); the WPMW II manager answers a constant 69 on this
-index, which is no known fault code, so it is not requested.
+`FEHLERMELDUNG` is decoded via `ErrorList` in `ElsterTable.h` ("Keine Stoerung" when 0). On the
+WPMW II (WPL13E, WPL18E, TTL 33) the fault number is in the high byte (`0x1D00` = HD-SENSOR-MAX);
+the low byte is not part of it. The `abhilfe` attribute holds a short remedy
+(`heatingpump/<MEMBER>/FEHLERMELDUNG/attributes`). WPL13E requests the heat pump module (IWS);
+the WPMW II manager answers 69 (`0x0045`, no fault) on this index, so it is not requested.
 
 ## Bus scan
 
