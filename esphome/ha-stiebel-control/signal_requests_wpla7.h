@@ -9,7 +9,7 @@
  *   KESSEL_CANB    0x201 - DHW actual/setpoint temps; the display writes the DHW setpoints here
  *   MANAGER        0x480 - clock, operating mode, status word 0x4eef, pump and tuning params
  *   HEIZMODUL      0x500 - compressor state (base table)
- *   HEIZMODUL_WPL  0x514 - compressor, inverter and refrigerant circuit, energy counters
+ *   HEIZMODUL_WPL  0x514 - compressor, inverter and refrigerant circuit
  *   MISCHERMODUL_2 0x601 - heating circuit 1 (min/max/setpoint/comfort/eco/curve)
  *   FES            0x100 - the display. It answers reads from 0x680 with 0x8000 (not
  *                          supported), so nothing is polled there.
@@ -131,10 +131,6 @@ extern const SignalRequest signalRequests[] = {
     {"P_ANTEIL_EXV",                          FREQ_1MIN,  cm_heizmodul_wpl},   // 0x07f7
     {"I_ANTEIL_EXV",                          FREQ_1MIN,  cm_heizmodul_wpl},   // 0x07f8
     {"UNTERK_COND",                           FREQ_1MIN,  cm_heizmodul_wpl},   // 0x0aff condenser subcooling
-    {"EINGANG14",                             FREQ_1MIN,  cm_heizmodul_wpl},   // 0x0a36 °C
-    {"EINGANG15",                             FREQ_1MIN,  cm_heizmodul_wpl},   // 0x0a37 °C
-    {"EINGANG17",                             FREQ_1MIN,  cm_heizmodul_wpl},   // 0x0a39 °C
-    {"WE_KONFIGURATION",                      FREQ_1MIN,  cm_heizmodul_wpl},   // 0x02e2 l/min
 
     // ========================================================================
     // MISCHERMODUL_2 (0x601) - heating circuit 1
