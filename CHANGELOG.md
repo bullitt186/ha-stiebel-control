@@ -15,6 +15,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Fixed
 
+- Diagnostic scan firmware (`tools/heatingpump_scan.yaml`): it no longer keeps its own copy of the
+  firmware header list, which had to be updated with every new module; the headers come from
+  `common.yaml` like in every other config. CI now compiles the scan config in the layout
+  `tools/README.md` describes (#122).
 - Climate entities (heating, HK2, hot water) showed the mode "off" in Home Assistant (thermostat
   card "Aus"), because they announce no mode state. The mode now follows the availability of the
   ESP: `heat` while it is online, `off` while it is offline.

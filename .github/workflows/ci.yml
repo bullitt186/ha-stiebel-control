@@ -96,6 +96,29 @@ jobs:
       - run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
       - run: esphome compile esphome/ci_heatingpump_wpl9.yaml
 
+  compile-scan:
+    name: Compile diagnostic scan firmware (tools/)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install esphome==2026.10.1
+      - name: Cache ESP-IDF toolchain and framework
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/esphome
+          key: esphome-idf-esphome-2026.10.1
+          restore-keys: esphome-idf-
+      - name: Set up the layout from tools/README.md (scan files next to ha-stiebel-control/)
+        run: |
+          mkdir -p /tmp/scan
+          cp -r esphome/ha-stiebel-control /tmp/scan/
+          cp tools/heatingpump_scan.yaml tools/scan.yaml tools/signal_requests_scan.h /tmp/scan/
+          cp esphome/ci_secrets.yaml /tmp/scan/secrets.yaml
+      - run: esphome compile /tmp/scan/heatingpump_scan.yaml
+
   compile-esp32:
     name: Compile ESP32 (MCP2515)
     runs-on: ubuntu-latest

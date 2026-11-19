@@ -41,37 +41,9 @@ esphome:
           publishAllWritableSelectDiscoveries(true);
           publishAllCalculatedSensorDiscoveries(true);
 
-  includes:
-    - ha-stiebel-control/elster/ElsterTable.h
-    - ha-stiebel-control/elster/KElsterTable.h
-    - ha-stiebel-control/elster/NUtils.h
-    - ha-stiebel-control/elster/NTypes.h
-    - ha-stiebel-control/config.h
-    - ha-stiebel-control/language_select.h
-    - ha-stiebel-control/lang_base.h
-    - ha-stiebel-control/signal_requests_base.h
-    - ha-stiebel-control/sg_ready_controller.h
-    # Same headers as common.yaml (firmware modules, #109)
-    - ha-stiebel-control/model_profile.h
-    - ha-stiebel-control/can_members.h
-    - ha-stiebel-control/dhw_program.h
-    - ha-stiebel-control/signal_route.h
-    - ha-stiebel-control/mqtt_publish.h
-    - ha-stiebel-control/can_io.h
-    - ha-stiebel-control/paced_writes.h
-    - ha-stiebel-control/discovery.h
-    - ha-stiebel-control/bus_scan.h
-    - ha-stiebel-control/request_manager.h
-    - ha-stiebel-control/calculated.h
-    - ha-stiebel-control/energy.h
-    - ha-stiebel-control/writables.h
-    - ha-stiebel-control/sg_ready_io.h
-    - ha-stiebel-control/time_programs.h
-    - ha-stiebel-control/set_commands.h
-    - ha-stiebel-control/fault_list.h
-    - ha-stiebel-control/republish.h
-    - ha-stiebel-control/ha-stiebel-control.h
-
+  # No includes: here. common.yaml (package `base`) lists every firmware header and
+  # scan.yaml adds signal_requests_scan.h; ESPHome appends package lists, so a second
+  # list here would include headers twice (#122).
 
 wifi:
   ssid: !secret wifi_ssid
