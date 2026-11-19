@@ -2990,6 +2990,7 @@ TEST_CASE("limits: no clamping with the static range, clamping with the device r
 }
 
 #include "wpl9_cases.inc"
+#include "module_cases.inc"
 
 // ============================================================================
 // MQTT topic root from the device_name substitution (#102)
