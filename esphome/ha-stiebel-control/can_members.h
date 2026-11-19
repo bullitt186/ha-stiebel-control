@@ -1,7 +1,7 @@
 /*
  * can_members.h — bus members and the request row type, without ESPHome dependencies (#95).
  *
- * Shared by ha-stiebel-control.h, the model request tables and the native test stubs, so the
+ * Shared by the firmware modules, the model request tables and the native test stubs, so the
  * tests use the real SignalRequest layout instead of a copy.
  */
 

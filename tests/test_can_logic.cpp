@@ -1,7 +1,6 @@
 /*
- * Tests for pure CAN/signal functions in ha-stiebel-control.h.
- * ESPHome symbols are provided by esphome_stubs.h — do NOT define HA_DUMMY_BUILD,
- * as that guard excludes all function implementations in ha-stiebel-control.h.
+ * Tests for the firmware logic in ha-stiebel-control.h and its module headers (#109).
+ * ESPHome symbols are provided by esphome_stubs.h.
  *
  * Catch2 must be included BEFORE esphome_stubs.h: the stubs define id(x) as a macro
  * which collides with std::locale::id in gcc-13's STL headers pulled in by Catch2.
@@ -10,8 +9,8 @@
 
 #include "esphome_stubs.h"
 
-// ha-stiebel-control.h pulls in all elster headers and signal_requests_wpl13e.h
-// via its own includes. The elster .cpp files are compiled as separate objects.
+// ha-stiebel-control.h pulls in the elster headers and every firmware module via its own
+// includes. The elster .cpp files are compiled as separate objects.
 #include "../esphome/ha-stiebel-control/ha-stiebel-control.h"
 #include "../esphome/ha-stiebel-control/lang_en.h"
 
@@ -1374,6 +1373,29 @@ TEST_CASE("publishWritableSelectDiscovery: payload contains options array", "[mq
     CHECK(payload.find("\"options\"") != std::string::npos);
 }
 
+// The options list is exactly the select's values, in table order and nothing after the last one
+// (#109: an off-by-one past the option array was only caught by chance through the memory layout).
+// PROGRAMMSCHALTER: the operating modes of the manager (LNAME_OPT_* protocol values); SG Ready:
+// the four states 1-4; state-2 mode: Tagbetrieb or Automatik.
+TEST_CASE("publishWritableSelectDiscovery: options list is exactly the select's options", "[mqtt]") {
+    const std::string modes = std::string("[\"") + LNAME_OPT_NOTBETRIEB + "\",\"" + LNAME_OPT_BEREITSCHAFT +
+        "\",\"" + LNAME_OPT_AUTOMATIK + "\",\"" + LNAME_OPT_TAGBETRIEB + "\",\"" + LNAME_OPT_ABSENKBETRIEB +
+        "\",\"" + LNAME_OPT_WARMWASSER + "\"]";
+    const struct { const char* uid; std::string options; } cases[] = {
+        {"stiebel_manager_programmschalter/config", "\"options\":" + modes},
+        {"stiebel_manager_sg_ready_state/config", std::string("\"options\":[\"") + LNAME_OPT_SG_EVU_SPERRE + "\",\"" +
+             LNAME_OPT_SG_NORMAL + "\",\"" + LNAME_OPT_SG_EMPFOHLEN + "\",\"" + LNAME_OPT_SG_ZWANG + "\"]"},
+        {"stiebel_manager_sg_ready_normal_mode/config", std::string("\"options\":[\"") + LNAME_OPT_TAGBETRIEB +
+             "\",\"" + LNAME_OPT_AUTOMATIK + "\"]"},
+    };
+    resetDiscoveryState();
+    publishAllWritableSelectDiscoveries(true);
+    for (const auto& c : cases) {
+        INFO(c.uid);
+        CHECK(mqttFindPayload(c.uid).find(c.options) != std::string::npos);
+    }
+}
+
 TEST_CASE("publishWritableSelectDiscovery: cached — second call skips publish", "[mqtt]") {
     resetDiscoveryState();
     publishWritableSelectDiscovery(writableSelects[0]);
@@ -1664,6 +1686,10 @@ TEST_CASE("climate: heating and hot water discoveries reuse the number /set topi
     CHECK(heat.find("heatingpump/MANAGER/RAUMSOLLTEMP_I/set") != std::string::npos);
     CHECK(heat.find("PROGRAMMSCHALTER/set") != std::string::npos);
     CHECK(heat.find(std::string("\"") + LNAME_OPT_TAGBETRIEB + "\"") != std::string::npos);
+    // Presets = exactly the six PROGRAMMSCHALTER operating modes, nothing after the last (#109)
+    CHECK(heat.find(std::string("\"preset_modes\":[\"") + LNAME_OPT_NOTBETRIEB + "\",\"" + LNAME_OPT_BEREITSCHAFT +
+                    "\",\"" + LNAME_OPT_AUTOMATIK + "\",\"" + LNAME_OPT_TAGBETRIEB + "\",\"" +
+                    LNAME_OPT_ABSENKBETRIEB + "\",\"" + LNAME_OPT_WARMWASSER + "\"]") != std::string::npos);
     CHECK(dhw.find("EINSTELL_SPEICHERSOLLTEMP/set") != std::string::npos);
     const bool wpl17 = std::strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0;
     const bool canbSetpoint = wpl17 || std::strcmp(HA_DEVICE_MODEL_STR, "wpl9") == 0;

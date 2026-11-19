@@ -141,7 +141,7 @@
 #define LNAME_ZWEITER_WE_STATUS                "Zweiter WE Status"
 
 // ============================================================================
-// Calculated sensor names (ha-stiebel-control.h calculatedSensors[])
+// Calculated sensor names (calculated.h calculatedSensors[])
 // ============================================================================
 #define LNAME_CALC_DATE                        "Datum"
 #define LNAME_CALC_TIME                        "Uhrzeit"

@@ -19,7 +19,7 @@
  * - cm_other queries all three main CAN members (kessel, manager, heizmodul).
  *   Use it when the responding member varies by heat pump model.
  * - Energy counter signals are included here because COP calculations in
- *   ha-stiebel-control.h depend on them universally. If a model lacks them,
+ *   energy.h depend on them universally. If a model lacks them,
  *   the signals simply never respond and COP stays unpublished — no harm done.
  */
 

@@ -30,7 +30,22 @@ ha-stiebel-control/
 │       ├── signal_requests_<model>.h       # Request table of one model (e.g. signal_requests_wpl13e.h)
 │       ├── model_profile.h                 # Model capabilities (kModel), the only place that looks at the model
 │       ├── can_members.h                   # Bus members (CanMembers[], CanMemberType) and SignalRequest, no ESPHome deps
-│       ├── ha-stiebel-control.h            # Core C++: CAN, MQTT discovery, calculated sensors
+│       ├── ha-stiebel-control.h            # CAN entry points: processAndUpdate(), updateSensor()
+│       ├── signal_route.h                  # Signal key and model route (pure C++)
+│       ├── mqtt_publish.h                  # MQTT publish, publish-on-change state cache
+│       ├── can_io.h                        # Frame decode, read/write requests, read-back
+│       ├── paced_writes.h                  # Paced write queue (SG Ready, time programs)
+│       ├── discovery.h                     # HA device blocks and discovery payloads
+│       ├── bus_scan.h                      # Bus scan of one member
+│       ├── request_manager.h               # Polling of the model's request table
+│       ├── calculated.h                    # calculatedSensors[] and derived values
+│       ├── energy.h                        # COP and combined energy values
+│       ├── writables.h                     # Writable numbers/selects, climate discovery
+│       ├── sg_ready_io.h                   # SG Ready glue (ESPHome adapter, commands)
+│       ├── time_programs.h                 # WPMW II time programs in HA
+│       ├── set_commands.h                  # MQTT set dispatcher handleSetCommand()
+│       ├── fault_list.h                    # Manager fault list
+│       ├── republish.h                     # Discovery/state republish after a connect
 │       ├── sg_ready_controller.h           # SG Ready state machine (pure C++, testable)
 │       ├── dhw_program.h                   # WPMW II time programs: parsing/validation (pure C++, testable)
 │       ├── config.h                        # Timing constants, limits
@@ -49,6 +64,7 @@ ha-stiebel-control/
 │   ├── signal_requests_stub.cpp            # Stub for native test builds
 │   ├── esphome_stubs.h                     # ESPHome API stubs for host compilation
 │   ├── test_mqtt_smoke.py                  # MQTT regression test (post-OTA)
+│   ├── check_modules.py                    # Firmware headers: no include cycle, main header size
 │   └── models/
 │       ├── _common_smoke.json              # Required MQTT topics: all models
 │       ├── wpl13e_smoke.json               # Required MQTT topics: WPL13E
@@ -80,20 +96,20 @@ ESP32-S3 (built-in TWAI controller)
   — other boards: check schematic
          │
          ▼
-ESPHome firmware (ha-stiebel-control.h)
-  ┌──────────────────────────────────────┐
-  │ processSignalRequests()              │  ← periodic CAN read requests
-  │   └─ readSignal(member, "SIGNAL")    │
-  │                                      │
-  │ processAndUpdate(can_id, frame)      │  ← incoming CAN frames
-  │   └─ processCanMessage()             │  ← decode Elster value
-  │   └─ updateSensor(cm, ei, value)     │  ← publish MQTT + track for calcs
-  │                                      │
-  │ processCalculatedSensors()           │  ← scheduled derived values
-  │   └─ publishDeltaTContinuous()       │
-  │   └─ updateCOPCalculations()         │
-  │   └─ publishDate(), publishTime()    │
-  └──────────────────────────────────────┘
+ESPHome firmware
+  ┌────────────────────────────────────────────────────────┐
+  │ processSignalRequests()          request_manager.h     │  ← periodic CAN read requests
+  │   └─ readSignal(member, "SIGNAL")  can_io.h            │
+  │                                                        │
+  │ processAndUpdate(can_id, frame)  ha-stiebel-control.h  │  ← incoming CAN frames
+  │   └─ processCanMessage()           can_io.h            │  ← decode Elster value
+  │   └─ updateSensor(cm, ei, value)   ha-stiebel-control.h│  ← publish MQTT + track for calcs
+  │                                                        │
+  │ processCalculatedSensors()       calculated.h          │  ← scheduled derived values
+  │   └─ publishDeltaTContinuous()                         │
+  │   └─ publishDate(), publishTime()                      │
+  │ updateCOPCalculations()          energy.h              │  ← on each energy counter value
+  └────────────────────────────────────────────────────────┘
          │ MQTT
          ▼
 MQTT Broker
@@ -105,6 +121,43 @@ MQTT Broker
 Home Assistant
   sensor.*, number.*, select.*           ← auto-created entities
 ```
+
+---
+
+## Firmware Modules
+
+The firmware C++ code is split by responsibility (#109). `ha-stiebel-control.h` holds only the
+CAN entry points (`processAndUpdate()` for every received frame, `updateSensor()` for every
+decoded value) and includes the modules. Each module owns its global state and includes the
+modules it uses; the includes form no cycle. Everything still compiles into one translation unit
+(the sketch ESPHome generates, or `tests/test_can_logic.cpp`), so the split does not change the firmware.
+
+The table is in include order: a module includes only modules above it. `config.h`,
+`model_profile.h`, `can_members.h`, the language files and the Elster library are used by many
+modules and not listed.
+
+| Module | Responsibility | Includes (modules) |
+|---|---|---|
+| `signal_route.h` | Signal key (`signalKey()`) and model route (`resolveSignalRoute()`), pure C++ | — |
+| `mqtt_publish.h` | `mqttPublish()` with failure counter, publish-on-change state cache | signal_route |
+| `can_io.h` | Frame decode, read/write requests, read-back after a write, clock/date writes | signal_route, mqtt_publish |
+| `paced_writes.h` | Paced write queue for SG Ready and the time programs | can_io |
+| `discovery.h` | HA device blocks, default entity IDs, discovery of raw signals and calculated sensors | signal_route, mqtt_publish |
+| `bus_scan.h` | Bus scan of one CAN member | can_io, mqtt_publish |
+| `request_manager.h` | Polling of the model's request table, back-off | signal_route, can_io, bus_scan |
+| `calculated.h` | `calculatedSensors[]` and the derived values, their scheduler | signal_route, mqtt_publish, discovery, request_manager |
+| `energy.h` | COP and the combined energy values | calculated |
+| `writables.h` | Writable numbers and selects, their discovery and the climate entities; device limits of the numbers (0xF8/0xF9, #79), hooked into `writeSignal()` and the request manager | signal_route, mqtt_publish, discovery, can_io, request_manager |
+| `sg_ready_io.h` | ESPHome adapter of `SgReadyController` (`sg_ready_controller.h`), SG Ready commands | signal_route, mqtt_publish, paced_writes, writables |
+| `time_programs.h` | WPMW II time programs in Home Assistant (parsing: `dhw_program.h`) | signal_route, mqtt_publish, discovery, paced_writes |
+| `set_commands.h` | Dispatcher of every `<root>/<A>/<B>/set` command | can_io, writables, sg_ready_io, time_programs |
+| `fault_list.h` | Fault list of the manager, remedy texts | can_io, bus_scan, mqtt_publish, discovery |
+| `republish.h` | Discovery and state republish after an MQTT connect or HA birth message | mqtt_publish, discovery, writables, calculated, energy, time_programs |
+| `ha-stiebel-control.h` | CAN entry points `processAndUpdate()`, `updateSensor()` | all of the above |
+
+`common.yaml` lists every module in `esphome: includes:` so ESPHome copies it.
+`tests/check_modules.py` (CI) checks that the includes form no cycle, that
+`ha-stiebel-control.h` stays below 800 lines and that every included module is listed.
 
 ---
 
@@ -169,7 +222,7 @@ This separation allows the state machine logic to be tested with Catch2 on the h
 without any ESP32 or ESPHome toolchain.
 
 `EspHomeSgReadyIO` does not write directly: it puts each write into a paced queue
-(`queuePacedWrite()` / `pacedWriteStep()` in `ha-stiebel-control.h`). The queue sends one write
+(`queuePacedWrite()` / `pacedWriteStep()` in `paced_writes.h`). The queue sends one write
 at a time, at least 1.5 s apart, checks the settled read-back and sends a write once more if
 the heat pump still reports another value. Writes sent back to back were partly lost on a
 WPMW II (#85). The time-program commands (DHW, heating circuit 1) use the same queue.

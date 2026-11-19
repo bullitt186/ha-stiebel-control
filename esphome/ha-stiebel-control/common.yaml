@@ -67,6 +67,23 @@ esphome:
     - lang_en.h
     - sg_ready_controller.h
     - dhw_program.h
+    # Firmware modules (#109), in include order; each header includes what it needs,
+    # ha-stiebel-control.h includes all of them. Listed so ESPHome copies them.
+    - signal_route.h
+    - mqtt_publish.h
+    - can_io.h
+    - paced_writes.h
+    - discovery.h
+    - bus_scan.h
+    - request_manager.h
+    - calculated.h
+    - energy.h
+    - writables.h
+    - sg_ready_io.h
+    - time_programs.h
+    - set_commands.h
+    - fault_list.h
+    - republish.h
     - ha-stiebel-control.h
     - signal_requests_base.h
     # model-specific signal_requests_*.h is declared by each model yaml package
