@@ -15,6 +15,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Fixed
 
+- Raw energy counters decoded as plain integers (`*_TAG_WH`, `*_SUM_KWH`, `WAERMEERTRAG_RUECKGE_*`,
+  solar yields; 24 signals with metadata) had no `state_class` in their discovery although their
+  metadata says `total_increasing`/`measurement`, so Home Assistant kept no long-term statistics
+  for them. They now carry it, and HA starts recording statistics for them after the update.
+- A `total_increasing` signal (energy counters, runtime hours) that answers "not available"
+  (`0x8000`) now keeps its last state instead of publishing `-255`: HA reads a drop as a new
+  meter cycle and would add the next real value to the statistics sum again.
+- WPMW II: until `PUMPENSTATUS` is known, the operating state compared the energy counter sums
+  since boot instead of the last 5 minutes, because the 5-minute window never restarted there.
 - Diagnostic scan firmware (`tools/heatingpump_scan.yaml`): it no longer keeps its own copy of the
   firmware header list, which had to be updated with every new module; the headers come from
   `common.yaml` like in every other config. CI now compiles the scan config in the layout

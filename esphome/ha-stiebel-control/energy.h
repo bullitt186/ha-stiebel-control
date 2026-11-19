@@ -455,8 +455,10 @@ void publishCombinedEnergySensors() {
         }
 
         // Leistung als 5-Minuten-Mittel (die TAG-Zaehler springen grob). Auf dem WPMW II
-        // stehen sie waehrend eines Laufs still, eine Live-Leistung waere dort falsch.
-        if (!isWpmw2Model() && nowMs - windowStartMs >= 300000UL) {
+        // stehen sie waehrend eines Laufs still, eine Live-Leistung waere dort falsch; das
+        // Fenster laeuft dort trotzdem, damit die Summen fuer den Betriebszustand (bis
+        // PUMPENSTATUS bekannt ist) nur die letzten Minuten zaehlen.
+        if (nowMs - windowStartMs >= 300000UL && !isWpmw2Model()) {
             float dtSec = (nowMs - windowStartMs) / 1000.0f;
             float pHeiz = running ? accHeizWh / dtSec * 3600.0f : 0.0f;
             float pWw   = running ? accWwWh   / dtSec * 3600.0f : 0.0f;
@@ -471,6 +473,8 @@ void publishCombinedEnergySensors() {
             publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_EL_LEISTUNG_WW_W], false);
             publishCalculatedState(HA_TOPIC_ROOT "/calculated/el_leistung_ww_w/state", pw);
             ESP_LOGD("ENERGIE", "Leistung: %.0f W (Heiz %.0f, WW %.0f) in %.0fs", pHeiz + pWw, pHeiz, pWw, dtSec);
+        }
+        if (nowMs - windowStartMs >= 300000UL) {   // new window on every model
             accHeizWh = 0.0f; accWwWh = 0.0f; windowStartMs = nowMs;
         }
     }
