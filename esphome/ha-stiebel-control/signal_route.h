@@ -37,7 +37,8 @@ inline SignalRoute resolveSignalRoute(uint16_t index, CanMemberType fallback) {
 // Models with a WPMW II manager. Writes stay limited per model in writableNumberApplies().
 static constexpr bool isWpmw2Model() { return kModel.wpmw2; }
 
-// DJB2 hash of a signal name (same function as hash_runtime() in ha-stiebel-control.h)
+// DJB2 hash of a signal name: h = 5381, then h = h * 33 + c per character (uint32_t wrap).
+// The one runtime implementation; hash() in ha-stiebel-control.h is its compile-time twin.
 inline uint32_t elsterNameHash(const char* str) {
     uint32_t h = 5381;
     while (*str) h = ((h << 5) + h) + static_cast<uint32_t>(*str++);

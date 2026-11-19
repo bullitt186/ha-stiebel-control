@@ -56,23 +56,14 @@
 // COMPILE-TIME STRING HASHING FOR FAST SIGNAL DISPATCH
 // ============================================================================
 
-// Compile-time DJB2 hash function (constexpr for C++11 compatibility)
+// Compile-time DJB2 hash function (constexpr for C++11 compatibility). The runtime version is
+// elsterNameHash() in signal_route.h; a test checks that both agree.
 constexpr uint32_t hash_impl(const char* str, uint32_t hash = 5381) {
     return (*str == '\0') ? hash : hash_impl(str + 1, ((hash << 5) + hash) + static_cast<uint32_t>(*str));
 }
 
 constexpr uint32_t hash(const char* str) {
     return hash_impl(str);
-}
-
-// Runtime hash for signal names (inline for performance)
-inline uint32_t hash_runtime(const char* str) {
-    uint32_t h = 5381;
-    while (*str) {
-        h = ((h << 5) + h) + static_cast<uint32_t>(*str);
-        str++;
-    }
-    return h;
 }
 
 // Pre-computed compile-time hashes for all monitored signals
@@ -143,7 +134,7 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
     // Per frame: no std::string temporaries. The name hash drives the member/signal
     // key (discovery, back-off) and the dispatch switch below.
     const char* signalName = ei->Name;
-    const uint32_t signalHash = hash_runtime(signalName);
+    const uint32_t signalHash = elsterNameHash(signalName);
     const uint64_t key = signalKey(cm, signalHash);
 
     // -255 = the device does not provide this value: count it for the poll
