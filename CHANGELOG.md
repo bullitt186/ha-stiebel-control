@@ -19,6 +19,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Fixed
 
+- TTL 33: `compressor_active` stayed off, because the heat pump module answers `VERDICHTER` with
+  placeholders. On `ttl33` the compressor state now comes from KESSEL `BETRIEBS_STATUS` (polled every
+  30 s): bit `0x0001`/`0x0002` is set while compressor 1/2 runs. `WP_PUMPENSTATUS` is no source for
+  it, it reads `0x0200`/`0x0300` while running and carries other bits at rest. The compressor
+  statistics and the operating state build on it. Other models are unchanged (#83, #131).
 - Values decoded as plain integers (`et_default`, e.g. `SOLAR_AKT_LEISTUNG_W`) were announced
   without the `state_class` of their metadata row; they now carry it.
 - Remainder registers of split energy counters (`*_TAG_WH` = Wh part of `*_TAG_KWH`, `*_SUM_KWH` =

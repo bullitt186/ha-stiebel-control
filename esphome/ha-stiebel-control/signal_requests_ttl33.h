@@ -171,7 +171,8 @@ extern const SignalRequest signalRequests[] = {
     {"KESSELSTATUS",               FREQ_1MIN,  cm_kessel},
     {"PUMPENSTATUS",               FREQ_1MIN,  cm_kessel},
     {"HZK_PUMPE",                  FREQ_1MIN,  cm_kessel},
-    {"WP_PUMPENSTATUS",            FREQ_1MIN,  cm_kessel},
+    {"WP_PUMPENSTATUS",            FREQ_30S,   cm_kessel},          // bit field, not used for the compressor state
+    {"BETRIEBS_STATUS",            FREQ_30S,   cm_kessel},          // bits 0x0001/0x0002 = compressors (compressor_active)
     {"ZWEITER_WE_STATUS",          FREQ_1MIN,  cm_manager},
     {"HEIZKREIS_STATUS",           FREQ_1MIN,  cm_manager},         // circuit 1
     {"HEIZKREIS_STATUS",           FREQ_1MIN,  cm_mischermodul_3},  // circuit 2

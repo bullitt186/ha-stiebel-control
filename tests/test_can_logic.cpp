@@ -875,7 +875,10 @@ TEST_CASE("updateSensor: VERDICHTER value updates lastVerdichterValue", "[mqtt]"
     const ElsterIndex* ei = GetElsterIndex("VERDICHTER");
     REQUIRE(ei != nullptr);
     updateSensor(heizmodul, ei, "50.0");
-    CHECK(lastVerdichterValue == Approx(50.0f));
+    if (kModel.compressorFromKessel)
+        CHECK(std::isnan(lastVerdichterValue));   // TTL 33: BETRIEBS_STATUS decides (#83, #131)
+    else
+        CHECK(lastVerdichterValue == Approx(50.0f));
 }
 
 // ============================================================================
@@ -1204,6 +1207,60 @@ TEST_CASE("defrost running: last defrost duration 0 means a defrost is running (
     mqtt_client_instance().clear();
     updateSensor(CanMembers[cm_heizmodul], ei, "-255"); // not provided: no state
     CHECK(mqttFindPayload("calculated/abtauung_laeuft/state").empty());
+}
+
+TEST_CASE("ttl33: compressor state from KESSEL BETRIEBS_STATUS bits 0x0001/0x0002 (#83, #131)", "[calc]") {
+    // Recorded on a TTL 33 / WPMW II (#131): BETRIEBS_STATUS (KESSEL 0x0176) bit 0x0001 / 0x0002 is
+    // set while compressor 1 / 2 runs; WP_PUMPENSTATUS reads 0x0200 / 0x0300 while running and
+    // carries other bits at rest, so it is no source for the state. et_default decodes as signed
+    // short, 0x8000 alone is "not available" (-255).
+    resetDiscoveryState();
+    const ElsterIndex* bs = GetElsterIndex("BETRIEBS_STATUS");
+    const ElsterIndex* wp = GetElsterIndex("WP_PUMPENSTATUS");
+    const ElsterIndex* vd = GetElsterIndex("VERDICHTER");
+    REQUIRE(bs != nullptr);
+    REQUIRE(wp != nullptr);
+    REQUIRE(vd != nullptr);
+    lastVerdichterValue = NAN;
+    if (kModel.compressorFromKessel) {
+        updateSensor(CanMembers[cm_kessel], bs, "0");
+        CHECK(lastVerdichterValue == 0.0f);
+        updateSensor(CanMembers[cm_kessel], bs, "1");        // compressor 1
+        CHECK(lastVerdichterValue == COMPRESSOR_ON_VALUE);
+        updateSensor(CanMembers[cm_kessel], bs, "512");      // 0x0200: another bit, compressors off
+        CHECK(lastVerdichterValue == 0.0f);
+        updateSensor(CanMembers[cm_kessel], bs, "2");        // compressor 2
+        CHECK(lastVerdichterValue == COMPRESSOR_ON_VALUE);
+        updateSensor(CanMembers[cm_kessel], bs, "0");
+        updateSensor(CanMembers[cm_kessel], bs, "771");      // 0x0303: both, other bits set
+        CHECK(lastVerdichterValue == COMPRESSOR_ON_VALUE);
+        updateSensor(CanMembers[cm_kessel], bs, "-32768");   // 0x8000 as signed short: compressors off
+        CHECK(lastVerdichterValue == 0.0f);
+        updateSensor(CanMembers[cm_kessel], bs, "-32767");   // 0x8001: bit 15 + compressor 1
+        CHECK(lastVerdichterValue == COMPRESSOR_ON_VALUE);
+        updateSensor(CanMembers[cm_kessel], bs, "-255");     // not available: keep last state
+        CHECK(lastVerdichterValue == COMPRESSOR_ON_VALUE);
+        updateSensor(CanMembers[cm_kessel], bs, "abc");      // unparsable: keep last state
+        CHECK(lastVerdichterValue == COMPRESSOR_ON_VALUE);
+        updateSensor(CanMembers[cm_manager], bs, "0");       // other member: no effect
+        CHECK(lastVerdichterValue == COMPRESSOR_ON_VALUE);
+        updateSensor(CanMembers[cm_kessel], wp, "off");      // WP_PUMPENSTATUS: no effect
+        CHECK(lastVerdichterValue == COMPRESSOR_ON_VALUE);
+        updateSensor(CanMembers[cm_heizmodul], vd, "0.8");   // HEIZMODUL placeholder: no effect
+        CHECK(lastVerdichterValue == COMPRESSOR_ON_VALUE);
+        updateSensor(CanMembers[cm_kessel], bs, "0");
+        CHECK(lastVerdichterValue == 0.0f);
+        updateSensor(CanMembers[cm_kessel], wp, "on");       // WP_PUMPENSTATUS: no effect
+        CHECK(lastVerdichterValue == 0.0f);
+    } else {
+        updateSensor(CanMembers[cm_kessel], bs, "3");        // other models: VERDICHTER decides
+        CHECK(std::isnan(lastVerdichterValue));
+        updateSensor(CanMembers[cm_kessel], wp, "on");
+        CHECK(std::isnan(lastVerdichterValue));
+        updateSensor(CanMembers[cm_heizmodul], vd, "50");
+        CHECK(lastVerdichterValue == 50.0f);
+    }
+    lastVerdichterValue = NAN;
 }
 
 TEST_CASE("publishCompressorActive: value > 2 → on", "[calc]") {
