@@ -132,6 +132,10 @@ typedef struct
 // outside that file (the array size is not visible through an extern declaration).
 extern const ElsterIndex ElsterTable[];
 extern const unsigned ElsterTableCount;
+// Remainder registers of split counters carry no state_class: *_WH is the Wh part (0..999) of the
+// matching *_KWH day counter, *_SUM_KWH the kWh part of the matching *_MWH total. They fall at
+// every carry, which HA reads as a meter reset, so a statistic of them loses the remainder. The
+// counters are the coarse register (total_increasing) and the combined totals in energy.h.
 extern const ElsterMeta ElsterMetaTable[];
 extern const unsigned ElsterMetaCount;
 extern const ErrorIndex BetriebsartList[];
@@ -4171,10 +4175,10 @@ const ElsterMeta ElsterMetaTable[] =
 #endif
   { 0x0074, "EVU_SPERRE_AKTIV", LNAME_EVU_SPERRE_AKTIV, "binary_sensor", "", "", "", "mdi:lock", "on", "off" },
   { 0x0084, "SOLAR_AKT_LEISTUNG_W", LNAME_SOLAR_AKT_LEISTUNG_W, "sensor", "power", "W", "measurement", "mdi:solar-power", NULL, NULL },
-  { 0x0085, "SOLAR_TAGESERTRAG_WH", LNAME_SOLAR_TAGESERTRAG_WH, "sensor", "energy", "Wh", "total_increasing", "mdi:solar-power", NULL, NULL },
+  { 0x0085, "SOLAR_TAGESERTRAG_WH", LNAME_SOLAR_TAGESERTRAG_WH, "sensor", "energy", "Wh", "", "mdi:solar-power", NULL, NULL },
   { 0x0086, "SOLAR_TAGESERTRAG_KWH", LNAME_SOLAR_TAGESERTRAG_KWH, "sensor", "energy", "kWh", "total_increasing", "mdi:solar-power", NULL, NULL },
-  { 0x0087, "SOLAR_GESAMTERTRAG_WH", LNAME_SOLAR_GESAMTERTRAG_WH, "sensor", "energy", "Wh", "total_increasing", "mdi:solar-power", NULL, NULL },
-  { 0x0088, "SOLAR_GESAMTERTRAG_KWH", LNAME_SOLAR_GESAMTERTRAG_KWH, "sensor", "energy", "kWh", "total_increasing", "mdi:solar-power", NULL, NULL },
+  { 0x0087, "SOLAR_GESAMTERTRAG_WH", LNAME_SOLAR_GESAMTERTRAG_WH, "sensor", "energy", "Wh", "", "mdi:solar-power", NULL, NULL },
+  { 0x0088, "SOLAR_GESAMTERTRAG_KWH", LNAME_SOLAR_GESAMTERTRAG_KWH, "sensor", "energy", "kWh", "", "mdi:solar-power", NULL, NULL },
   { 0x0089, "SOLAR_GESAMTERTRAG_MWH", LNAME_SOLAR_GESAMTERTRAG_MWH, "sensor", "energy", "MWh", "total_increasing", "mdi:solar-power", NULL, NULL },
   { 0x0101, "ANTILEGIONELLEN", LNAME_ANTILEGIONELLEN, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
   { 0x010e, "HEIZKURVE", LNAME_HEIZKURVE, "sensor", NULL, NULL, "measurement", "mdi:chart-line", NULL, NULL },
@@ -4216,15 +4220,15 @@ const ElsterMeta ElsterMetaTable[] =
   { 0x025a, "LAUFZEIT_DHC2", "Laufzeit Nacherwärmung Stufe 2", "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL },
   { 0x0265, "HEISSGAS_TEMP", "Heißgastemperatur", "sensor", "temperature", "°C", "measurement", "mdi:thermometer-high", NULL, NULL },
   { 0x027e, "WW_ECO", LNAME_WW_ECO, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
-  { 0x02e6, "SOLAR_WOCHENERTRAG_WH", LNAME_SOLAR_WOCHENERTRAG_WH, "sensor", "energy", "Wh", "total_increasing", "mdi:solar-power", NULL, NULL },
-  { 0x02e7, "SOLAR_WOCHENERTRAG_KWH", LNAME_SOLAR_WOCHENERTRAG_KWH, "sensor", "energy", "kWh", "total_increasing", "mdi:solar-power", NULL, NULL },
+  { 0x02e6, "SOLAR_WOCHENERTRAG_WH", LNAME_SOLAR_WOCHENERTRAG_WH, "sensor", "energy", "Wh", "", "mdi:solar-power", NULL, NULL },
+  { 0x02e7, "SOLAR_WOCHENERTRAG_KWH", LNAME_SOLAR_WOCHENERTRAG_KWH, "sensor", "energy", "kWh", "", "mdi:solar-power", NULL, NULL },
   { 0x02e8, "SOLAR_WOCHENERTRAG_MWH", LNAME_SOLAR_WOCHENERTRAG_MWH, "sensor", "energy", "MWh", "total_increasing", "mdi:solar-power", NULL, NULL },
-  { 0x02e9, "SOLAR_JAHRESERTRAG_WH", LNAME_SOLAR_JAHRESERTRAG_WH, "sensor", "energy", "Wh", "total_increasing", "mdi:solar-power", NULL, NULL },
-  { 0x02ea, "SOLAR_JAHRESERTRAG_KWH", LNAME_SOLAR_JAHRESERTRAG_KWH, "sensor", "energy", "kWh", "total_increasing", "mdi:solar-power", NULL, NULL },
+  { 0x02e9, "SOLAR_JAHRESERTRAG_WH", LNAME_SOLAR_JAHRESERTRAG_WH, "sensor", "energy", "Wh", "", "mdi:solar-power", NULL, NULL },
+  { 0x02ea, "SOLAR_JAHRESERTRAG_KWH", LNAME_SOLAR_JAHRESERTRAG_KWH, "sensor", "energy", "kWh", "", "mdi:solar-power", NULL, NULL },
   { 0x02eb, "SOLAR_JAHRESERTRAG_MWH", LNAME_SOLAR_JAHRESERTRAG_MWH, "sensor", "energy", "MWh", "total_increasing", "mdi:solar-power", NULL, NULL },
-  { 0x03af, "WAERMEERTRAG_RUECKGE_TAG_WH", LNAME_WAERMEERTRAG_RUECKGE_TAG_WH, "sensor", "energy", "Wh", "total_increasing", "mdi:fire", NULL, NULL },
+  { 0x03af, "WAERMEERTRAG_RUECKGE_TAG_WH", LNAME_WAERMEERTRAG_RUECKGE_TAG_WH, "sensor", "energy", "Wh", "", "mdi:fire", NULL, NULL },
   { 0x03b0, "WAERMEERTRAG_RUECKGE_TAG_KWH", LNAME_WAERMEERTRAG_RUECKGE_TAG_KWH, "sensor", "energy", "kWh", "total_increasing", "mdi:fire", NULL, NULL },
-  { 0x03b1, "WAERMEERTRAG_RUECKGE_SUMME_KWH", LNAME_WAERMEERTRAG_RUECKGE_SUMME_KWH, "sensor", "energy", "kWh", "total_increasing", "mdi:fire", NULL, NULL },
+  { 0x03b1, "WAERMEERTRAG_RUECKGE_SUMME_KWH", LNAME_WAERMEERTRAG_RUECKGE_SUMME_KWH, "sensor", "energy", "kWh", "", "mdi:fire", NULL, NULL },
   { 0x03b6, "WAERMEERTRAG_RUECKGE_SUMME_MWH", LNAME_WAERMEERTRAG_RUECKGE_SUMME_MWH, "sensor", "energy", "MWh", "total_increasing", "mdi:fire", NULL, NULL },
 #ifdef HA_CONTROLLER_WPMW2
   { 0x05d7, "LEISTUNGSREDUZIERUNG_KUEHLEN", LNAME_LEISTUNGSREDUZIERUNG_KUEHLEN, "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL },
@@ -4303,29 +4307,29 @@ const ElsterMeta ElsterMetaTable[] =
   { 0x0833, "LUEFTERDREHZAHL", LNAME_LUEFTERDREHZAHL, "sensor", "", "%", "", "mdi:fan", NULL, NULL },
 #else
 #endif
-  { 0x091a, "EL_AUFNAHMELEISTUNG_WW_TAG_WH", LNAME_EL_AUFNAHMELEISTUNG_WW_TAG_WH, "sensor", "energy", "Wh", "total_increasing", "mdi:flash", NULL, NULL },
+  { 0x091a, "EL_AUFNAHMELEISTUNG_WW_TAG_WH", LNAME_EL_AUFNAHMELEISTUNG_WW_TAG_WH, "sensor", "energy", "Wh", "", "mdi:flash", NULL, NULL },
   { 0x091b, "EL_AUFNAHMELEISTUNG_WW_TAG_KWH", LNAME_EL_AUFNAHMELEISTUNG_WW_TAG_KWH, "sensor", "energy", "kWh", "total_increasing", "mdi:flash", NULL, NULL },
-  { 0x091c, "EL_AUFNAHMELEISTUNG_WW_SUM_KWH", LNAME_EL_AUFNAHMELEISTUNG_WW_SUM_KWH, "sensor", "energy", "kWh", "total_increasing", "mdi:flash", NULL, NULL },
+  { 0x091c, "EL_AUFNAHMELEISTUNG_WW_SUM_KWH", LNAME_EL_AUFNAHMELEISTUNG_WW_SUM_KWH, "sensor", "energy", "kWh", "", "mdi:flash", NULL, NULL },
   { 0x091d, "EL_AUFNAHMELEISTUNG_WW_SUM_MWH", LNAME_EL_AUFNAHMELEISTUNG_WW_SUM_MWH, "sensor", "energy", "MWh", "total_increasing", "mdi:flash", NULL, NULL },
-  { 0x091e, "EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH", LNAME_EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH, "sensor", "energy", "Wh", "total_increasing", "mdi:flash", NULL, NULL },
+  { 0x091e, "EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH", LNAME_EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH, "sensor", "energy", "Wh", "", "mdi:flash", NULL, NULL },
   { 0x091f, "EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", LNAME_EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH, "sensor", "energy", "kWh", "total_increasing", "mdi:flash", NULL, NULL },
-  { 0x0920, "EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH", LNAME_EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH, "sensor", "energy", "kWh", "total_increasing", "mdi:flash", NULL, NULL },
+  { 0x0920, "EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH", LNAME_EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH, "sensor", "energy", "kWh", "", "mdi:flash", NULL, NULL },
   { 0x0921, "EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", LNAME_EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH, "sensor", "energy", "MWh", "total_increasing", "mdi:flash", NULL, NULL },
-  { 0x0922, "WAERMEERTRAG_2WE_WW_TAG_WH", LNAME_WAERMEERTRAG_2WE_WW_TAG_WH, "sensor", "energy", "Wh", "total_increasing", "mdi:fire", NULL, NULL },
+  { 0x0922, "WAERMEERTRAG_2WE_WW_TAG_WH", LNAME_WAERMEERTRAG_2WE_WW_TAG_WH, "sensor", "energy", "Wh", "", "mdi:fire", NULL, NULL },
   { 0x0923, "WAERMEERTRAG_2WE_WW_TAG_KWH", LNAME_WAERMEERTRAG_2WE_WW_TAG_KWH, "sensor", "energy", "kWh", "total_increasing", "mdi:fire", NULL, NULL },
-  { 0x0924, "WAERMEERTRAG_2WE_WW_SUM_KWH", LNAME_WAERMEERTRAG_2WE_WW_SUM_KWH, "sensor", "energy", "kWh", "total_increasing", "mdi:fire", NULL, NULL },
+  { 0x0924, "WAERMEERTRAG_2WE_WW_SUM_KWH", LNAME_WAERMEERTRAG_2WE_WW_SUM_KWH, "sensor", "energy", "kWh", "", "mdi:fire", NULL, NULL },
   { 0x0925, "WAERMEERTRAG_2WE_WW_SUM_MWH", LNAME_WAERMEERTRAG_2WE_WW_SUM_MWH, "sensor", "energy", "MWh", "total_increasing", "mdi:fire", NULL, NULL },
-  { 0x0926, "WAERMEERTRAG_2WE_HEIZ_TAG_WH", LNAME_WAERMEERTRAG_2WE_HEIZ_TAG_WH, "sensor", "energy", "Wh", "total_increasing", "mdi:fire", NULL, NULL },
+  { 0x0926, "WAERMEERTRAG_2WE_HEIZ_TAG_WH", LNAME_WAERMEERTRAG_2WE_HEIZ_TAG_WH, "sensor", "energy", "Wh", "", "mdi:fire", NULL, NULL },
   { 0x0927, "WAERMEERTRAG_2WE_HEIZ_TAG_KWH", LNAME_WAERMEERTRAG_2WE_HEIZ_TAG_KWH, "sensor", "energy", "kWh", "total_increasing", "mdi:fire", NULL, NULL },
-  { 0x0928, "WAERMEERTRAG_2WE_HEIZ_SUM_KWH", LNAME_WAERMEERTRAG_2WE_HEIZ_SUM_KWH, "sensor", "energy", "kWh", "total_increasing", "mdi:fire", NULL, NULL },
+  { 0x0928, "WAERMEERTRAG_2WE_HEIZ_SUM_KWH", LNAME_WAERMEERTRAG_2WE_HEIZ_SUM_KWH, "sensor", "energy", "kWh", "", "mdi:fire", NULL, NULL },
   { 0x0929, "WAERMEERTRAG_2WE_HEIZ_SUM_MWH", LNAME_WAERMEERTRAG_2WE_HEIZ_SUM_MWH, "sensor", "energy", "MWh", "total_increasing", "mdi:fire", NULL, NULL },
-  { 0x092a, "WAERMEERTRAG_WW_TAG_WH", LNAME_WAERMEERTRAG_WW_TAG_WH, "sensor", "energy", "Wh", "total_increasing", "mdi:fire", NULL, NULL },
+  { 0x092a, "WAERMEERTRAG_WW_TAG_WH", LNAME_WAERMEERTRAG_WW_TAG_WH, "sensor", "energy", "Wh", "", "mdi:fire", NULL, NULL },
   { 0x092b, "WAERMEERTRAG_WW_TAG_KWH", LNAME_WAERMEERTRAG_WW_TAG_KWH, "sensor", "energy", "kWh", "total_increasing", "mdi:fire", NULL, NULL },
-  { 0x092c, "WAERMEERTRAG_WW_SUM_KWH", LNAME_WAERMEERTRAG_WW_SUM_KWH, "sensor", "energy", "kWh", "total_increasing", "mdi:fire", NULL, NULL },
+  { 0x092c, "WAERMEERTRAG_WW_SUM_KWH", LNAME_WAERMEERTRAG_WW_SUM_KWH, "sensor", "energy", "kWh", "", "mdi:fire", NULL, NULL },
   { 0x092d, "WAERMEERTRAG_WW_SUM_MWH", LNAME_WAERMEERTRAG_WW_SUM_MWH, "sensor", "energy", "MWh", "total_increasing", "mdi:fire", NULL, NULL },
-  { 0x092e, "WAERMEERTRAG_HEIZ_TAG_WH", LNAME_WAERMEERTRAG_HEIZ_TAG_WH, "sensor", "energy", "Wh", "total_increasing", "mdi:fire", NULL, NULL },
+  { 0x092e, "WAERMEERTRAG_HEIZ_TAG_WH", LNAME_WAERMEERTRAG_HEIZ_TAG_WH, "sensor", "energy", "Wh", "", "mdi:fire", NULL, NULL },
   { 0x092f, "WAERMEERTRAG_HEIZ_TAG_KWH", LNAME_WAERMEERTRAG_HEIZ_TAG_KWH, "sensor", "energy", "kWh", "total_increasing", "mdi:fire", NULL, NULL },
-  { 0x0930, "WAERMEERTRAG_HEIZ_SUM_KWH", LNAME_WAERMEERTRAG_HEIZ_SUM_KWH, "sensor", "energy", "kWh", "total_increasing", "mdi:fire", NULL, NULL },
+  { 0x0930, "WAERMEERTRAG_HEIZ_SUM_KWH", LNAME_WAERMEERTRAG_HEIZ_SUM_KWH, "sensor", "energy", "kWh", "", "mdi:fire", NULL, NULL },
   { 0x0931, "WAERMEERTRAG_HEIZ_SUM_MWH", LNAME_WAERMEERTRAG_HEIZ_SUM_MWH, "sensor", "energy", "MWh", "total_increasing", "mdi:fire", NULL, NULL },
   { 0x0a00, "AUSSEN_FROSTTEMP", "Anlagenfrostschutz Temperatur", "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL },
   { 0x0a06, "EINSTELL_SPEICHERSOLLTEMP2", LNAME_EINSTELL_SPEICHERSOLLTEMP2, "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL },
