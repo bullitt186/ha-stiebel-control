@@ -163,6 +163,16 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
     // CAN: 1 = lock inactive (off), 0 = lock active (on)
     // MQTT: "off" = lock inactive, "on" = lock active
     const char* publishValue = value.c_str();
+    // TTL 33 (compressorFromKessel): compressor state from KESSEL BETRIEBS_STATUS, bit 0x0001 / 0x0002 =
+    // one compressor each. WP_PUMPENSTATUS is not a plain bool on this unit (0x0200 / 0x0300 while running,
+    // other bits at rest), see the WP_PUMPENSTATUS case below.
+    if (kModel.compressorFromKessel && strcmp(signalName, "BETRIEBS_STATUS") == 0
+        && strcmp(cm.Name, "KESSEL") == 0) {
+        char* endRaw;
+        const long raw = strtol(value.c_str(), &endRaw, 10);
+        if (endRaw != value.c_str() && *endRaw == '\0' && raw >= 0)
+            lastVerdichterValue = (raw & 0x3) ? COMPRESSOR_ON_VALUE : 0.0f;
+    }
     if (signalHash == HASH_EVU_SPERRE_AKTIV && strcmp(signalName, "EVU_SPERRE_AKTIV") == 0) {
         if (value == "on") {
             publishValue = "off";
@@ -352,8 +362,8 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
 
         case HASH_WP_PUMPENSTATUS:
             if (kModel.compressorFromKessel && strcmp(cm.Name, "KESSEL") == 0) {
-                if (value == "on") lastVerdichterValue = COMPRESSOR_ON_VALUE;
-                else if (value == "off") lastVerdichterValue = 0.0f;
+                // Not used for the compressor state any more: decodes to "?" for 0x0200 / 0x0300
+                // (compressor running) and is dropped; the state comes from BETRIEBS_STATUS above.
             }
             break;
 
