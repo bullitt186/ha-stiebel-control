@@ -66,7 +66,7 @@ struct ModelProfile {
     bool ignoreUnusedIwsRuntime;  // drop VERD_1/KUEHL runtime answers the manager polls itself
                                   // (WPL13E: one compressor, no cooling)
     bool compressorFromKessel;    // HEIZMODUL answers VERDICHTER with placeholders; the compressor
-                                  // state comes from KESSEL WP_PUMPENSTATUS (TTL 33, #68, #83)
+                                  // state comes from KESSEL BETRIEBS_STATUS (TTL 33, #68, #83, #131)
 
     constexpr bool heatingCurveWritable() const { return canBRoutes || wpmw2WritesVerified; }
 };

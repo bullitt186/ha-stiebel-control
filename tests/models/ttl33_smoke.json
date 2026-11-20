@@ -12,6 +12,7 @@
     "{root}/KESSEL/PUMPENSTATUS/state",
     "{root}/KESSEL/HZK_PUMPE/state",
     "{root}/KESSEL/WP_PUMPENSTATUS/state",
+    "{root}/KESSEL/BETRIEBS_STATUS/state",
     "{root}/MANAGER/EINSTELL_SPEICHERSOLLTEMP/state",
     "{root}/MANAGER/EINSTELL_SPEICHERSOLLTEMP2/state",
     "{root}/MANAGER/RAUMSOLLTEMP_I/state",

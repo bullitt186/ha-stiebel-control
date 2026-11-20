@@ -77,7 +77,7 @@ constexpr uint32_t HASH_WPVORLAUFIST = hash("WPVORLAUFIST");
 constexpr uint32_t HASH_RUECKLAUFISTTEMP = hash("RUECKLAUFISTTEMP");
 constexpr uint32_t HASH_VERDICHTER = hash("VERDICHTER");
 constexpr uint32_t HASH_PUMPENSTATUS = hash("PUMPENSTATUS");
-constexpr uint32_t HASH_WP_PUMPENSTATUS = hash("WP_PUMPENSTATUS");
+constexpr uint32_t HASH_BETRIEBS_STATUS = hash("BETRIEBS_STATUS");
 constexpr uint32_t HASH_EINSTELL_SPEICHERSOLLTEMP = hash("EINSTELL_SPEICHERSOLLTEMP");
 constexpr uint32_t HASH_RAUMSOLLTEMP_I = hash("RAUMSOLLTEMP_I");
 constexpr uint32_t HASH_ZEITDAUER_LETZTE_ABTAUUNG = hash("ZEITDAUER_LETZTE_ABTAUUNG");
@@ -163,16 +163,6 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
     // CAN: 1 = lock inactive (off), 0 = lock active (on)
     // MQTT: "off" = lock inactive, "on" = lock active
     const char* publishValue = value.c_str();
-    // TTL 33 (compressorFromKessel): compressor state from KESSEL BETRIEBS_STATUS, bit 0x0001 / 0x0002 =
-    // one compressor each. WP_PUMPENSTATUS is not a plain bool on this unit (0x0200 / 0x0300 while running,
-    // other bits at rest), see the WP_PUMPENSTATUS case below.
-    if (kModel.compressorFromKessel && strcmp(signalName, "BETRIEBS_STATUS") == 0
-        && strcmp(cm.Name, "KESSEL") == 0) {
-        char* endRaw;
-        const long raw = strtol(value.c_str(), &endRaw, 10);
-        if (endRaw != value.c_str() && *endRaw == '\0' && raw >= 0)
-            lastVerdichterValue = (raw & 0x3) ? COMPRESSOR_ON_VALUE : 0.0f;
-    }
     if (signalHash == HASH_EVU_SPERRE_AKTIV && strcmp(signalName, "EVU_SPERRE_AKTIV") == 0) {
         if (value == "on") {
             publishValue = "off";
@@ -360,15 +350,20 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
             if (strcmp(cm.Name, "KESSEL") == 0 && value != "-255") lastPumpenstatus = atoi(value.c_str());
             break;
 
-        case HASH_WP_PUMPENSTATUS:
-            if (kModel.compressorFromKessel && strcmp(cm.Name, "KESSEL") == 0) {
-                // Not used for the compressor state any more: decodes to "?" for 0x0200 / 0x0300
-                // (compressor running) and is dropped; the state comes from BETRIEBS_STATUS above.
-            }
+        case HASH_BETRIEBS_STATUS: {
+            // TTL 33 (compressorFromKessel): bit 0x0001 / 0x0002 = compressor 1 / 2 running (#131).
+            // WP_PUMPENSTATUS is no source: 0x0200 / 0x0300 while running, other bits at rest.
+            // et_default decodes as signed short, so bit 15 gives a negative number.
+            if (!kModel.compressorFromKessel || strcmp(cm.Name, "KESSEL") != 0 || value == "-255") break;
+            char* endPtr;
+            const long raw = strtol(value.c_str(), &endPtr, 10);
+            if (endPtr == value.c_str() || *endPtr != '\0' || raw < -32768 || raw > 0xFFFF) break;
+            lastVerdichterValue = (static_cast<unsigned long>(raw) & 0x3UL) ? COMPRESSOR_ON_VALUE : 0.0f;
             break;
+        }
 
         case HASH_VERDICHTER: {
-            if (kModel.compressorFromKessel) break;   // placeholders, see WP_PUMPENSTATUS
+            if (kModel.compressorFromKessel) break;   // placeholders, see BETRIEBS_STATUS
             char* endPtr;
             float floatValue = strtof(value.c_str(), &endPtr);
             if (endPtr != value.c_str() && *endPtr == '\0') {
