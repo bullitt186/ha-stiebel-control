@@ -9,16 +9,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Upgrade notes
 
+- `SOLAR_GESAMTERTRAG_KWH`, `SOLAR_WOCHENERTRAG_KWH` and `SOLAR_JAHRESERTRAG_KWH` lose their
+  `state_class` (they are the kWh part of the matching `*_MWH` register, see Fixed). HA reports that
+  their long-term statistics have no state class any more; delete those statistics under Developer
+  tools → Statistics. Use the `*_MWH` registers for statistics instead.
 - WPL13E/WPL18E/TTL 33: some existing sensors get new display names; entity IDs stay. `STILLSTANDZEIT`
   now has the unit min, so HA asks once to update the unit of its statistics (Developer tools →
   Statistics).
 
 ### Fixed
 
-- Raw energy counters decoded as plain integers (`*_TAG_WH`, `*_SUM_KWH`, `WAERMEERTRAG_RUECKGE_*`,
-  solar yields; 24 signals with metadata) had no `state_class` in their discovery although their
-  metadata says `total_increasing`/`measurement`, so Home Assistant kept no long-term statistics
-  for them. They now carry it, and HA starts recording statistics for them after the update.
+- Values decoded as plain integers (`et_default`, e.g. `SOLAR_AKT_LEISTUNG_W`) were announced
+  without the `state_class` of their metadata row; they now carry it.
+- Remainder registers of split energy counters (`*_TAG_WH` = Wh part of `*_TAG_KWH`, `*_SUM_KWH` =
+  kWh part of `*_SUM_MWH`, the solar and recovery equivalents; 21 registers) no longer claim
+  `total_increasing`. They fall at every carry, which Home Assistant reads as a meter reset, so a
+  statistic of them lost the remainder. The coarse registers and the combined totals stay the
+  counters for the energy dashboard.
 - A `total_increasing` signal (energy counters, runtime hours) that answers "not available"
   (`0x8000`) now keeps its last state instead of publishing `-255`: HA reads a drop as a new
   meter cycle and would add the next real value to the statistics sum again.
