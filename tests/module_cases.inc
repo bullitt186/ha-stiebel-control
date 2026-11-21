@@ -824,37 +824,76 @@ TEST_CASE("discovery: calculated sensor payload from its calculatedSensors row",
     resetDiscoveryState();
 }
 
-TEST_CASE("discovery: et_default counters keep the state_class of their metadata row", "[mqtt][discovery]") {
-    // et_default decodes to a plain integer (%d, KElsterTable.cpp), so it is numeric. ElsterMetaTable:
-    // { 0x091e, "EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH", ..., "energy", "Wh", "total_increasing" }
-    // { 0x0930, "WAERMEERTRAG_HEIZ_SUM_KWH", ..., "energy", "kWh", "total_increasing" }
+TEST_CASE("discovery: et_default values keep the state_class of their metadata row", "[mqtt][discovery]") {
+    // et_default decodes to a plain integer (%d, KElsterTable.cpp), so it is numeric (#127).
+    // { 0x0084, "SOLAR_AKT_LEISTUNG_W", ..., "power", "W", "measurement" }
+    resetDiscoveryState();
+    const ElsterIndex* ei = GetElsterIndex("SOLAR_AKT_LEISTUNG_W");
+    REQUIRE(ei != nullptr);
+    REQUIRE(ei->Type == et_default);
+    publishMqttDiscovery(CanMembers[cm_manager], ei);
+    REQUIRE(mqtt_client_instance().messages.size() == 1);
+    CHECK(mmField(mqtt_client_instance().messages[0].payload, "state_class") == "measurement");
+}
+
+TEST_CASE("discovery: remainder registers of split counters have no state_class", "[mqtt][discovery]") {
+    // Split counters: total = MWh*1000 + kWh, day = kWh + Wh/1000 (energy.h). The fine register is
+    // a remainder (0..999) that falls at every carry; as total_increasing HA would read each carry
+    // as a meter reset and lose the remainder (seen 19./20.11.: 4.05 of 7.74 kWh counted).
     for (const char* sig : {"EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH", "WAERMEERTRAG_HEIZ_SUM_KWH"}) {
         INFO(sig);
         resetDiscoveryState();
         const ElsterIndex* ei = GetElsterIndex(sig);
         REQUIRE(ei != nullptr);
-        REQUIRE(ei->Type == et_default);
         publishMqttDiscovery(CanMembers[cm_heizmodul], ei);
         REQUIRE(mqtt_client_instance().messages.size() == 1);
-        CHECK(mmField(mqtt_client_instance().messages[0].payload, "state_class") == "total_increasing");
+        const std::string& cfg = mqtt_client_instance().messages[0].payload;
+        CHECK(mmField(cfg, "state_class") == "<absent>");
+        CHECK(mmField(cfg, "device_class") == "energy");   // still an energy value with a unit
+    }
+    // The coarse register is the counter and keeps total_increasing
+    resetDiscoveryState();
+    publishMqttDiscovery(CanMembers[cm_heizmodul], GetElsterIndex("EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH"));
+    REQUIRE(mqtt_client_instance().messages.size() == 1);
+    CHECK(mmField(mqtt_client_instance().messages[0].payload, "state_class") == "total_increasing");
+}
+
+TEST_CASE("ElsterMetaTable: no total_increasing row has a coarser register of the same counter", "[elster][discovery]") {
+    // Rule from the split-counter layout: X_WH is the remainder of X_KWH, X_KWH of X_MWH.
+    auto exists = [](const std::string& name) {
+        const ElsterIndex* ei = GetElsterIndex(name.c_str());
+        return ei != nullptr && ei != &ElsterTable[0] && name == ei->Name;
+    };
+    for (unsigned j = 0; j < ElsterMetaCount; j++) {
+        const ElsterMeta& m = ElsterMetaTable[j];
+        if (!m.stateClass || std::strcmp(m.stateClass, "total_increasing") != 0) continue;
+        const std::string n = m.Name;
+        INFO(n);
+        auto endsWith = [&](const char* suf) {
+            const size_t l = std::strlen(suf);
+            return n.size() > l && n.compare(n.size() - l, l, suf) == 0;
+        };
+        if (endsWith("_WH")) CHECK_FALSE(exists(n.substr(0, n.size() - 3) + "_KWH"));
+        if (endsWith("_KWH")) CHECK_FALSE(exists(n.substr(0, n.size() - 4) + "_MWH"));
     }
 }
 
 TEST_CASE("updateSensor: a total_increasing counter keeps its last state on -255", "[mqtt][discovery]") {
     // HA reads a drop of a total_increasing sensor as a meter reset and adds the next real
     // value to the sum again, so "not available" (0x8000 -> -255) must not reach the state.
+    // { 0x091f, "EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", ..., "energy", "kWh", "total_increasing" }
     resetDiscoveryState();
     resetStateCache();
-    const ElsterIndex* ei = GetElsterIndex("EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH");
+    const ElsterIndex* ei = GetElsterIndex("EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH");
     REQUIRE(ei != nullptr);
-    const std::string topic = kRoot + "/HEIZMODUL/EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH/state";
-    updateSensor(CanMembers[cm_heizmodul], ei, "412");
-    REQUIRE(mmPayload(topic) == "412");
+    const std::string topic = kRoot + "/HEIZMODUL/EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH/state";
+    updateSensor(CanMembers[cm_heizmodul], ei, "12");
+    REQUIRE(mmPayload(topic) == "12");
     updateSensor(CanMembers[cm_heizmodul], ei, "-255");
-    CHECK(mmPayload(topic) == "412");
+    CHECK(mmPayload(topic) == "12");
     CHECK(mmCount(topic) == 1);
-    updateSensor(CanMembers[cm_heizmodul], ei, "415");   // a real value goes through again
-    CHECK(mmPayload(topic) == "415");
+    updateSensor(CanMembers[cm_heizmodul], ei, "13");   // a real value goes through again
+    CHECK(mmPayload(topic) == "13");
     resetDiscoveryState();
     resetStateCache();
 }

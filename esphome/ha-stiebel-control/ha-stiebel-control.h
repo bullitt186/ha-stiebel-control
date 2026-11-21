@@ -77,6 +77,7 @@ constexpr uint32_t HASH_WPVORLAUFIST = hash("WPVORLAUFIST");
 constexpr uint32_t HASH_RUECKLAUFISTTEMP = hash("RUECKLAUFISTTEMP");
 constexpr uint32_t HASH_VERDICHTER = hash("VERDICHTER");
 constexpr uint32_t HASH_PUMPENSTATUS = hash("PUMPENSTATUS");
+constexpr uint32_t HASH_BETRIEBS_STATUS = hash("BETRIEBS_STATUS");
 constexpr uint32_t HASH_EINSTELL_SPEICHERSOLLTEMP = hash("EINSTELL_SPEICHERSOLLTEMP");
 constexpr uint32_t HASH_RAUMSOLLTEMP_I = hash("RAUMSOLLTEMP_I");
 constexpr uint32_t HASH_ZEITDAUER_LETZTE_ABTAUUNG = hash("ZEITDAUER_LETZTE_ABTAUUNG");
@@ -115,6 +116,11 @@ static bool isIgnoredOnWpl13e(const char* name) {
     if (!kModel.ignoreUnusedIwsRuntime) return false;
     return strncmp(name, "LZ_VERD_", 8) == 0 && (strstr(name, "VERD_1") || strstr(name, "KUEHL"));
 }
+
+// Synthetic VERDICHTER value for a running compressor (TTL 33, kModel.compressorFromKessel):
+// above the > 2 (compressor_active) and > 1.5 (betriebsstatus) thresholds that the
+// VERDICHTER-based models use (#83).
+static constexpr float COMPRESSOR_ON_VALUE = 3.0f;
 
 void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string &value)
 {
@@ -344,7 +350,20 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
             if (strcmp(cm.Name, "KESSEL") == 0 && value != "-255") lastPumpenstatus = atoi(value.c_str());
             break;
 
+        case HASH_BETRIEBS_STATUS: {
+            // TTL 33 (compressorFromKessel): bit 0x0001 / 0x0002 = compressor 1 / 2 running (#131).
+            // WP_PUMPENSTATUS is no source: 0x0200 / 0x0300 while running, other bits at rest.
+            // et_default decodes as signed short, so bit 15 gives a negative number.
+            if (!kModel.compressorFromKessel || strcmp(cm.Name, "KESSEL") != 0 || value == "-255") break;
+            char* endPtr;
+            const long raw = strtol(value.c_str(), &endPtr, 10);
+            if (endPtr == value.c_str() || *endPtr != '\0' || raw < -32768 || raw > 0xFFFF) break;
+            lastVerdichterValue = (static_cast<unsigned long>(raw) & 0x3UL) ? COMPRESSOR_ON_VALUE : 0.0f;
+            break;
+        }
+
         case HASH_VERDICHTER: {
+            if (kModel.compressorFromKessel) break;   // placeholders, see BETRIEBS_STATUS
             char* endPtr;
             float floatValue = strtof(value.c_str(), &endPtr);
             if (endPtr != value.c_str() && *endPtr == '\0') {
