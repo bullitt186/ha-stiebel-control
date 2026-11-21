@@ -339,6 +339,7 @@ TEST_CASE("storeCOPEnergyValue: negative value accepted", "[can]") {
 
 TEST_CASE("updateCOPCalculations: publishes cop_ww when all WW values present", "[can]") {
     mqtt_client_instance().clear();
+    resetStateCache();
 
     storeCOPEnergyValue("WAERMEERTRAG_WW_SUM_MWH",      "3.0");
     storeCOPEnergyValue("WAERMEERTRAG_2WE_WW_SUM_MWH",  "1.0");
@@ -352,6 +353,7 @@ TEST_CASE("updateCOPCalculations: publishes cop_ww when all WW values present", 
 }
 TEST_CASE("updateCOPCalculations: cop_ww value = (3+1)/2 = 2.00", "[can]") {
     mqtt_client_instance().clear();
+    resetStateCache();
     storeCOPEnergyValue("WAERMEERTRAG_WW_SUM_MWH",       "3.0");
     storeCOPEnergyValue("WAERMEERTRAG_2WE_WW_SUM_MWH",   "1.0");
     storeCOPEnergyValue("EL_AUFNAHMELEISTUNG_WW_SUM_MWH", "2.0");
@@ -359,10 +361,11 @@ TEST_CASE("updateCOPCalculations: cop_ww value = (3+1)/2 = 2.00", "[can]") {
 
     for (auto& m : mqtt_client_instance().messages)
         if (m.topic.find("cop_ww") != std::string::npos)
-            CHECK(m.payload == "2.00");
+            CHECK(m.payload == (kModel.wpmDisplayCounters ? "unknown" : "2.00"));
 }
 TEST_CASE("updateCOPCalculations: cop_ww includes SUM_KWH remainder (WPL13E)", "[can]") {
     mqtt_client_instance().clear();
+    resetStateCache();
     storeCOPEnergyValue("WAERMEERTRAG_WW_SUM_MWH",        "42");
     storeCOPEnergyValue("WAERMEERTRAG_WW_SUM_KWH",        "629");
     storeCOPEnergyValue("WAERMEERTRAG_2WE_WW_SUM_MWH",    "0");
@@ -373,7 +376,7 @@ TEST_CASE("updateCOPCalculations: cop_ww includes SUM_KWH remainder (WPL13E)", "
     updateCOPCalculations();
     bool found = false;
     for (auto& m : mqtt_client_instance().messages)
-        if (m.topic.find("cop_ww") != std::string::npos) { CHECK(m.payload == "3.03"); found = true; }  // 42.629/14.075
+        if (m.topic.find("cop_ww") != std::string::npos) { CHECK(m.payload == (kModel.wpmDisplayCounters ? "unknown" : "3.03")); found = true; }  // 42.629/14.075
     CHECK(found);
     for (const char* k : {"WAERMEERTRAG_WW_SUM_KWH", "EL_AUFNAHMELEISTUNG_WW_SUM_KWH",
                           "WAERMEERTRAG_HEIZ_SUM_KWH", "EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH"})
@@ -381,27 +384,36 @@ TEST_CASE("updateCOPCalculations: cop_ww includes SUM_KWH remainder (WPL13E)", "
 }
 TEST_CASE("updateCOPCalculations: waits for all SUM_KWH remainders", "[can]") {
     mqtt_client_instance().clear();
+    resetStateCache();
     storeCOPEnergyValue("WAERMEERTRAG_WW_SUM_MWH",        "42");
     storeCOPEnergyValue("WAERMEERTRAG_2WE_WW_SUM_MWH",    "0");
     storeCOPEnergyValue("EL_AUFNAHMELEISTUNG_WW_SUM_MWH", "14");
     storeCOPEnergyValue("EL_AUFNAHMELEISTUNG_WW_SUM_KWH", "75");   // only 1 of 4
     updateCOPCalculations();
-    for (auto& m : mqtt_client_instance().messages)
-        CHECK(m.topic.find("cop_ww/state") == std::string::npos);
+    for (auto& m : mqtt_client_instance().messages) {
+        if (kModel.wpmDisplayCounters) {
+            if (m.topic == "heatingpump/calculated/cop_ww/state") CHECK(m.payload == "unknown");
+        } else CHECK(m.topic.find("cop_ww/state") == std::string::npos);
+    }
     copEnergyValues.erase("EL_AUFNAHMELEISTUNG_WW_SUM_KWH");
 }
 TEST_CASE("updateCOPCalculations: skips cop_ww when el divisor is 0", "[can]") {
     mqtt_client_instance().clear();
+    resetStateCache();
     storeCOPEnergyValue("WAERMEERTRAG_WW_SUM_MWH",       "3.0");
     storeCOPEnergyValue("WAERMEERTRAG_2WE_WW_SUM_MWH",   "1.0");
     storeCOPEnergyValue("EL_AUFNAHMELEISTUNG_WW_SUM_MWH", "0.0");
     updateCOPCalculations();
 
-    for (auto& m : mqtt_client_instance().messages)
-        CHECK(m.topic.find("cop_ww") == std::string::npos);
+    for (auto& m : mqtt_client_instance().messages) {
+        if (kModel.wpmDisplayCounters) {
+            if (m.topic == "heatingpump/calculated/cop_ww/state") CHECK(m.payload == "unknown");
+        } else CHECK(m.topic.find("cop_ww") == std::string::npos);
+    }
 }
 TEST_CASE("updateCOPCalculations: publishes cop_heiz when all Heiz values present", "[can]") {
     mqtt_client_instance().clear();
+    resetStateCache();
     storeCOPEnergyValue("WAERMEERTRAG_HEIZ_SUM_MWH",       "6.0");
     storeCOPEnergyValue("WAERMEERTRAG_2WE_HEIZ_SUM_MWH",   "0.0");
     storeCOPEnergyValue("EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", "2.0");
@@ -414,6 +426,7 @@ TEST_CASE("updateCOPCalculations: publishes cop_heiz when all Heiz values presen
 }
 TEST_CASE("updateCOPCalculations: publishes cop_gesamt when all values present", "[can]") {
     mqtt_client_instance().clear();
+    resetStateCache();
     storeCOPEnergyValue("WAERMEERTRAG_WW_SUM_MWH",          "3.0");
     storeCOPEnergyValue("WAERMEERTRAG_2WE_WW_SUM_MWH",      "1.0");
     storeCOPEnergyValue("EL_AUFNAHMELEISTUNG_WW_SUM_MWH",   "2.0");
@@ -634,7 +647,7 @@ TEST_CASE("VD CAN feedback publishes whole hours with existing MQTT identity", "
     CHECK(discovery.find("\"unit_of_measurement\":\"h\"") != std::string::npos);
     CHECK(discovery.find("\"state_class\":\"total_increasing\"") != std::string::npos);
     processAndUpdate(0x500, {0xd2, 0x00, 0xfa, 0x07, 0xff, 0x0a, 0xf3});
-    CHECK(mqttFindPayload("heatingpump/HEIZMODUL/LZ_VERD_1_KUEHLBETRIEB/state") == "2803");
+    CHECK(mqttFindPayload("heatingpump/HEIZMODUL/LZ_VERD_1_KUEHLBETRIEB/state") == (kModel.wpmDisplayCounters ? "" : "2803"));
     mqtt_client_instance().clear();
     // 0x8000 (-255, not available): a total_increasing counter keeps its last state, because
     // HA reads a drop as a new meter cycle and would add the next real value to the sum again.
@@ -1679,7 +1692,11 @@ TEST_CASE("writableNumbers: WPMW II values encode like the bus scan read them", 
 
 TEST_CASE("i18n: including lang_en.h does not override a German build", "[i18n]") {
     // ESPHome includes every listed file from main.cpp, so lang_en.h is always included.
+#ifdef HA_LANGUAGE_EN
+    CHECK(std::string(LNAME_ABTAUUNGAKTIV) == "Defrost Active");
+#else
     CHECK(std::string(LNAME_ABTAUUNGAKTIV) == "Abtauung Aktiv");
+#endif
 }
 
 TEST_CASE("i18n: all writableNumbers friendlyNames are non-empty", "[i18n]") {
@@ -1762,7 +1779,7 @@ TEST_CASE("climate: heating and hot water discoveries reuse the number /set topi
                     LNAME_OPT_ABSENKBETRIEB + "\",\"" + LNAME_OPT_WARMWASSER + "\"]") != std::string::npos);
     CHECK(dhw.find("EINSTELL_SPEICHERSOLLTEMP/set") != std::string::npos);
     const bool wpl17 = std::strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0;
-    const bool canbSetpoint = wpl17 || std::strcmp(HA_DEVICE_MODEL_STR, "wpl9") == 0;
+    const bool canbSetpoint = wpl17 || kModel.wpmDisplayCounters;
     const std::string current = std::string("heatingpump/") +
         (wpl17 ? "KESSEL_CANB" : "KESSEL") + "/SPEICHERISTTEMP/state";
     const std::string command = std::string("heatingpump/") +
@@ -2314,7 +2331,7 @@ TEST_CASE("SG Ready IO: writes are queued and sent one at a time (#85)", "[sgrea
 TEST_CASE("paced writes: a newer value replaces a waiting write of the same signal", "[sgready]") {
     resetDiscoveryState();
     fake_can().sent.clear();
-    sgReadyIO.writeCanSignal("PROGRAMMSCHALTER", "Automatik");
+    sgReadyIO.writeCanSignal("PROGRAMMSCHALTER", SG_READY_AUTO_MODE);
     sgReadyIO.writeCanSignal("RAUMSOLLTEMP_I", "21.0");
     sgReadyIO.writeCanSignal("RAUMSOLLTEMP_I", "20.0");
     REQUIRE(pacedWriteCount == 2);
@@ -2332,13 +2349,13 @@ TEST_CASE("paced writes: values compare as encoded on the bus", "[sgready]") {
     CHECK(pacedValueMatches(prog, "", "not used time domain"));
     CHECK_FALSE(pacedValueMatches(prog, "11:00-17:00", "06:30-23:00"));
     const ElsterIndex* ps = GetElsterIndex("PROGRAMMSCHALTER");
-    CHECK(pacedValueMatches(ps, "Automatik", "Automatik"));
-    CHECK_FALSE(pacedValueMatches(ps, "Automatik", "Tagbetrieb"));
+    CHECK(pacedValueMatches(ps, SG_READY_AUTO_MODE, SG_READY_AUTO_MODE));
+    CHECK_FALSE(pacedValueMatches(ps, SG_READY_AUTO_MODE, SG_READY_NORMAL_MODE));
 }
 
 TEST_CASE("SG Ready boost baseline is the setpoint read from the manager (#85)", "[sgready]") {
     resetDiscoveryState();
-    if (std::strcmp(HA_DEVICE_MODEL_STR, "wpl9") == 0) return;   // WPL9 reads the setpoints on CAN-B
+    if (kModel.wpmDisplayCounters) return;   // WPL9 reads the setpoints on CAN-B
     applySgReadyState(2);                          // no boost active from an earlier test
     pacedWriteCount = 0;
     updateSensor(CanMembers[cm_manager], GetElsterIndex("EINSTELL_SPEICHERSOLLTEMP"), "50.0");
@@ -2371,7 +2388,7 @@ TEST_CASE("SG Ready boost baseline is the setpoint read from the manager (#85)",
 TEST_CASE("discovery: one device block, COP from calculatedSensors, named rows (#95)", "[mqtt][discovery]") {
     // rows by name
     CHECK(std::string(calculatedSensors[CALC_IDX_DATE].uniqueId) == "stiebel_calculated_date");
-    CHECK(std::string(calculatedSensors[CALC_IDX_ENERGIE_HEIZ_TOTAL_KWH].uniqueId) == "stiebel_calculated_energie_heiz_total_kwh");
+    CHECK(std::string(calculatedSensors[CALC_IDX_ENERGIE_HEIZ_TOTAL_KWH].uniqueId) == ENERGY_CALC_ID("energie_heiz_total_kwh"));
     CHECK(std::string(calculatedSensors[CALC_IDX_ABTAUUNG_LAEUFT].uniqueId) == "stiebel_calculated_abtauung_laeuft");
     CHECK(std::string(calculatedSensors[CALC_IDX_COP_GESAMT].uniqueId) == "stiebel_cop_gesamt");
     CHECK_FALSE(calculatedSensors[CALC_IDX_COMPRESSOR_ACTIVE].onDemand);
@@ -3264,3 +3281,9 @@ TEST_CASE("climate: mode follows the ESP availability instead of staying off", "
     const std::string hk2 = mqttFindPayload("climate/heatingpump/stiebel_climate_heizung_hk2/config");
     if (kModel.wpmw2WritesVerified) CHECK(hk2.find(expected) != std::string::npos);
 }
+#include "wpl9_counter_cases.inc"
+
+#include "wpl9_wpm3_labels.inc"
+
+#include "wpm_boot_cases.inc"
+#include "wpm_energy_restart_cases.inc"

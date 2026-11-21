@@ -42,6 +42,10 @@ def allowed_suffixes() -> set:
             base = f"{m}_{s}".lower()
             out.update({base, base + "_set"})
     out.update(u[len("stiebel_"):] for u in re.findall(r'"(stiebel_(?:calculated|cop)_\w+)"', header))
+    # Corrected WPL9 energy sensors have new identities; other models retain
+    # the original suffix. Both branches are valid in a shared dashboard.
+    for suffix in re.findall(r'ENERGY_CALC_ID\("(\w+)"\)', header):
+        out.update({f"calculated_{suffix}", f"calculated_wpl9_{suffix}"})
     out.update({"climate_heizung", "climate_heizung_hk2", "climate_warmwasser"})
     for d in DAYS:
         out.update({f"ww_programm_{d}", f"heiz_programm_{d}", f"heiz_programm_hk2_{d}"})

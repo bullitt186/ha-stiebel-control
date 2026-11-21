@@ -11,6 +11,8 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <map>
+#include <cstring>
 
 // ── Device model default (normally injected via platformio build_flags) ──────
 // Unquoted on purpose — config.h stringifies it (see HA_DEVICE_MODEL_STR).
@@ -72,14 +74,43 @@ inline FakeMqttClient& mqtt_client_instance() { static FakeMqttClient c; return 
 // ── NVS / Preferences stub ───────────────────────────────────────────────────
 // ESPPreferenceObject is only needed by EspHomeSgReadyIO which we don't test here.
 // Defined as a no-op struct so the header compiles.
+struct FakePreferenceStore {
+    bool enabled = false, failSave = false, failSync = false;
+    unsigned saves = 0, syncs = 0;
+    std::map<uint32_t, std::vector<uint8_t>> committed, pending;
+};
+inline FakePreferenceStore& fake_preferences() { static FakePreferenceStore s; return s; }
 struct ESPPreferenceObject {
-    template<typename T> bool save(T*) { return true; }
-    template<typename T> bool load(T*) { return false; }
+    uint32_t key = 0;
+    template<typename T> bool save(T* value) {
+        auto& s=fake_preferences();
+        if (!s.enabled) return true;
+        ++s.saves;
+        if (s.failSave) return false;
+        const auto* data=reinterpret_cast<const uint8_t*>(value);
+        s.pending[key]=std::vector<uint8_t>(data,data+sizeof(T));
+        return true;
+    }
+    template<typename T> bool load(T* value) {
+        auto& s=fake_preferences();
+        if (!s.enabled) return false;
+        auto it=s.committed.find(key);
+        if (it==s.committed.end() || it->second.size()!=sizeof(T)) return false;
+        std::memcpy(value,it->second.data(),sizeof(T));return true;
+    }
 };
 struct ESPPreferences {
     template<typename T>
-    ESPPreferenceObject make_preference(uint32_t /*key*/, bool /*flash*/) {
-        return {};
+    ESPPreferenceObject make_preference(uint32_t key, bool /*flash*/) {
+        return {key};
+    }
+    bool sync() {
+        auto& s=fake_preferences();
+        if (!s.enabled) return true;
+        ++s.syncs;
+        if (s.failSync) return false;
+        for (auto& p:s.pending) s.committed[p.first]=p.second;
+        s.pending.clear();return true;
     }
 };
 inline ESPPreferences* global_preferences_instance() {

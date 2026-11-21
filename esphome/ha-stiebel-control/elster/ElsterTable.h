@@ -4000,7 +4000,7 @@ const ElsterIndex ElsterTable[] =
   // on a WPL13E next to SOMMERBETRIEB (0xfdb4) and GEBAEUDEART (0xfdb3); raw 2560 = 10 degC.
   { "SOMMERBETRIEB_TEMP"                          , 0xfdb5, et_little_endian, false, false },
   // kr0ner/OneESP32ToRuleThemAll index facts (WPM3 generation)
-#ifdef HA_ELSTER_WPL_FAMILY
+#if defined(HA_ELSTER_WPL_FAMILY) || defined(HA_HAS_WPM_DISPLAY_COUNTERS)
   { "UNTERK_COND"                                 , 0x0aff, et_dec_val      , false, false },
   { "REGLERDYNAMIK_HEIZEN"                        , 0x4e8a, 0               , false, false },
   { "SILENT_LEISTUNG"                             , 0x4e9f, 0               , false, false },
@@ -4030,14 +4030,26 @@ const ElsterIndex ElsterTable[] =
   { "INBETRIEBNAHME_NOTBETRIEB"                   , 0x4ef5, 0               , false, false },
   { "WW_SOLLTEMPERATUR"                           , 0x4ef9, et_dec_val      , false, false },
   { "EINGESCHALTETE_STUFEN"                       , 0x4efa, 0               , false, false },
-  { "LAUFZEIT_VD_HEIZEN"                          , 0x4efb, 0               , false, false },
+#ifdef HA_HAS_WPM_DISPLAY_COUNTERS
+  { "LAUFZEIT_VD_HEIZEN"                          , 0x4efb, et_hours, false, true },
+#else
+  { "LAUFZEIT_VD_HEIZEN"                          , 0x4efb, et_default, false, false },
+#endif
   { "LAUFZEIT_VD_KUEHLEN"                         , 0x4efc, 0               , false, false },
-  { "LAUFZEIT_VD_WW"                              , 0x4efd, 0               , false, false },
+#ifdef HA_HAS_WPM_DISPLAY_COUNTERS
+  { "LAUFZEIT_VD_WW"                              , 0x4efd, et_hours, false, true },
+#else
+  { "LAUFZEIT_VD_WW"                              , 0x4efd, et_default, false, false },
+#endif
   { "HYSTERESE_VORLAUFTEMP_KUEHLEN"               , 0x4f00, et_dec_val      , false, false },
   { "VORLAUFSOLLTEMPERATUR_KUEHLEN"               , 0x4f03, et_dec_val      , false, false },
   { "RAUMSOLLTEMP_KUEHLEN"                        , 0x4f04, et_dec_val      , false, false },
   { "KUEHLART"                                    , 0x4f05, 0               , false, false },
-  { "LAUFZEIT_VD_ABTAUEN"                         , 0x4f06, 0               , false, false },
+#ifdef HA_HAS_WPM_DISPLAY_COUNTERS
+  { "LAUFZEIT_VD_ABTAUEN"                         , 0x4f06, et_hours, false, true },
+#else
+  { "LAUFZEIT_VD_ABTAUEN"                         , 0x4f06, et_default, false, false },
+#endif
   { "KUEHLEN"                                     , 0x4f07, 0               , false, false },
   { "KUEHLKREIS"                                  , 0x4f08, 0               , false, false },
   { "ISTTEMPERATUR_KK_2"                          , 0x4f09, et_dec_val      , false, false },
@@ -4297,6 +4309,11 @@ const ElsterMeta ElsterMetaTable[] =
 #else
 #endif
   { 0x0805, "LZ_DHC12", "Laufzeit Nacherwärmung Stufe 1+2", "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL },
+#ifdef HA_HAS_WPM_DISPLAY_COUNTERS
+  { 0x4efb, "LAUFZEIT_VD_HEIZEN", LNAME_WPL9_RUNTIME_HEAT, "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL },
+  { 0x4efd, "LAUFZEIT_VD_WW", LNAME_WPL9_RUNTIME_DHW, "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL },
+  { 0x4f06, "LAUFZEIT_VD_ABTAUEN", LNAME_WPL9_RUNTIME_DEFROST, "sensor", "duration", "h", "total_increasing", "mdi:timer", NULL, NULL },
+#endif
   { 0x0806, "STARTS_ABTAUUNG", "Abtauungen gesamt", "sensor", "", "", "total_increasing", "mdi:snowflake-melt", NULL, NULL },
   { 0x0807, "ZEITDAUER_LETZTE_ABTAUUNG", "Dauer letzte Abtauung", "sensor", "duration", "s", "measurement", "mdi:timer-snowflake", NULL, NULL },
 #ifdef HA_CONTROLLER_WPMW2
@@ -4406,7 +4423,18 @@ static const ErrorIndex ErrorList[] =
   { 0x1fcd, "INV FEHLERGRENZE"}
 };
 
-#ifdef HA_CONTROLLER_WPM3
+#ifdef HA_HAS_WPM_PROGRAM_LABELS
+// WPL9 / WPM3 display labels; protocol values remain unchanged.
+const ErrorIndex BetriebsartList[] =
+{
+  { 0x0000, "Notbetrieb" },
+  { 0x0100, "Bereitschaftsbetrieb" },
+  { 0x0200, "Programmbetrieb" },
+  { 0x0300, "Komfortbetrieb" },
+  { 0x0400, "ECO-Betrieb" },
+  { 0x0500, "Warmwasserbetrieb" }
+};
+#elif defined(HA_CONTROLLER_WPM3)
 // WPL 10 AC + WPM3 operating mode names
 const ErrorIndex BetriebsartList[] =
 {

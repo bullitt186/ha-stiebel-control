@@ -7,6 +7,42 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Fixed
+
+- WPL9: pair fresh display counter replies from HEIZMODUL_WPL (0x514),
+  including boot-time MWh carries, high-load thermal yield and daily resets
+  after a missed midnight read. Include NHZ heat on both sides of cumulative
+  COP, approximating the resistance heater's electrical energy by its heat.
+- WPL9: preserve accepted combined totals and SUM/TAG folding state in NVS
+  before publishing changes, preventing a reboot from discarding a held
+  fractional total. Unchanged counter data does not write flash repeatedly.
+- WPL9: expose display runtime counters and the fresh paired hardware lifetime
+  start count; use separate model capabilities for counters and mode vocabulary.
+
+### Upgrade notes — WPL9 counter correction
+
+- Eight energy total/day sensors get new `stiebel_calculated_wpl9_*` unique IDs
+  and `<device_name>/calculated/wpl9_*` topics: re-point Energy dashboard and
+  `utility_meter` sources explicitly. Old retained discovery configs can leave
+  orphaned entities; remove their exact config topics with empty retained MQTT
+  payloads, then remove the unused old entities after checking consumers.
+  Raw `EL_*`/`WAERMEERTRAG_*` inputs move from HEIZMODUL (0x500) to
+  HEIZMODUL_WPL (0x514); `LZ_VERD_1_HEIZBETRIEB` is removed and
+  `LZ_VERD_1_KUEHLBETRIEB` changes member. COP keeps its IDs but changes meaning
+  (NHZ on both sides and the corrected source), so existing COP statistics
+  cross an accounting boundary. No history is rewritten automatically.
+- WPL9 mode values 0x0200/0x0300/0x0400 are unchanged; the announced labels are
+  `Programmbetrieb` / `Komfortbetrieb` / `ECO-Betrieb`. Update HA select options
+  and state conditions. Legacy MQTT command labels `Automatik`, `Tagbetrieb`
+  and `Absenkbetrieb` remain accepted for one migration release. The exact
+  display vocabulary was transcribed by the owner on 2026-11-21, including
+  `Bereitschaftsbetrieb` and `Warmwasserbetrieb`; their former short MQTT
+  commands `Bereitschaft` and `Warmwasser` are accepted as migration aliases.
+- The new continuity record initializes from fresh inputs on first install;
+  it cannot reconstruct an already lost historical fraction. See
+  [WPL9 counter migration](docs/WPL9_COUNTER_MIGRATION.md) for source mappings,
+  retained-config cleanup, reboot evidence and remaining hardware checks.
+
 ## [2.8.0] — 2026-11-21
 
 Firmware split into modules, writable numbers take their range from the heat pump, energy counters

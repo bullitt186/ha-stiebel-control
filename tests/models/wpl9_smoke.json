@@ -1,7 +1,11 @@
 {
-  "description": "WPL9 read-feedback baseline verified on 2026-10-29. MANAGER/WW_ECO is intentionally disabled after repeated invalid responses. Topic presence alone does not prove freshness, register semantics or write acceptance.",
+  "description": "WPL9 WPM counter preparation: electricity, thermal energy and NHZ at 0x514. Thermal routing still requires a contemporaneous post-install display comparison. COP is the compressor lifetime heat/electricity ratio.",
   "excluded_common_topics": [
-    "{root}/MANAGER/WW_ECO/state"
+    "{root}/MANAGER/WW_ECO/state",
+    "{root}/HEIZMODUL/EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH/state",
+    "{root}/HEIZMODUL/EL_AUFNAHMELEISTUNG_WW_SUM_MWH/state",
+    "{root}/HEIZMODUL/WAERMEERTRAG_HEIZ_SUM_MWH/state",
+    "{root}/HEIZMODUL/WAERMEERTRAG_WW_SUM_MWH/state"
   ],
   "required_topics": [
     "{root}/KESSEL/SPEICHERISTTEMP/state",
@@ -18,7 +22,24 @@
     "{root}/KESSEL/SPEICHERSOLLTEMP/state",
     "{root}/KESSEL/WPVORLAUFIST/state",
     "{root}/KESSEL/PUFFERTEMP_UNTEN1/state",
-    "{root}/HEIZMODUL/LZ_VERD_1_HEIZBETRIEB/state",
-    "{root}/HEIZMODUL/LZ_VERD_1_KUEHLBETRIEB/state"
+    "{root}/HEIZMODUL_WPL/LAUFZEIT_VD_HEIZEN/state",
+    "{root}/HEIZMODUL_WPL/LAUFZEIT_VD_WW/state",
+    "{root}/HEIZMODUL_WPL/LAUFZEIT_VD_ABTAUEN/state",
+    "{root}/HEIZMODUL_WPL/LZ_VERD_1_KUEHLBETRIEB/state",
+    "{root}/HEIZMODUL_WPL/EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH/state",
+    "{root}/HEIZMODUL_WPL/EL_AUFNAHMELEISTUNG_WW_SUM_MWH/state",
+    "{root}/calculated/wpl9_energie_heiz_total_kwh/state",
+    "{root}/calculated/wpl9_energie_ww_total_kwh/state",
+    "{root}/calculated/wpl9_energie_heiz_tag_kwh/state",
+    "{root}/calculated/wpl9_energie_ww_tag_kwh/state",
+    "{root}/calculated/wpl9_verdichter_starts_gesamt/state",
+    "{root}/HEIZMODUL_WPL/WAERMEERTRAG_HEIZ_SUM_MWH/state",
+    "{root}/HEIZMODUL_WPL/WAERMEERTRAG_WW_SUM_MWH/state",
+    "{root}/calculated/wpl9_waerme_heiz_total_kwh/state",
+    "{root}/calculated/wpl9_waerme_ww_total_kwh/state",
+    "{root}/calculated/wpl9_waerme_heiz_tag_kwh/state",
+    "{root}/calculated/wpl9_waerme_ww_tag_kwh/state",
+    "{root}/calculated/wpl9_nhz_heiz_total_kwh/state",
+    "{root}/calculated/wpl9_nhz_ww_total_kwh/state"
   ]
 }

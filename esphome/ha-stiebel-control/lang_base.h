@@ -244,7 +244,14 @@
 // Select option strings (programmschalterOptions[], sgReadyOptions[])
 // ============================================================================
 #define LNAME_OPT_NOTBETRIEB                   "Notbetrieb"
-#ifdef HA_CONTROLLER_WPM3
+#ifdef HA_HAS_WPM_PROGRAM_LABELS
+// Protocol option labels must match BetriebsartList (including English UI).
+#define LNAME_OPT_BEREITSCHAFT                 "Bereitschaftsbetrieb"
+#define LNAME_OPT_AUTOMATIK                    "Programmbetrieb"
+#define LNAME_OPT_TAGBETRIEB                   "Komfortbetrieb"
+#define LNAME_OPT_ABSENKBETRIEB                "ECO-Betrieb"
+#define LNAME_OPT_WARMWASSER                   "Warmwasserbetrieb"
+#elif defined(HA_CONTROLLER_WPM3)
 // WPL 10 AC + WPM3 operating mode names (differ from the old WPM2 naming)
 #define LNAME_OPT_BEREITSCHAFT                 "Bereitschaftsbetrieb"
 #define LNAME_OPT_AUTOMATIK                    "Programmierbetrieb"
@@ -256,7 +263,9 @@
 #define LNAME_OPT_TAGBETRIEB                   "Tagbetrieb"
 #define LNAME_OPT_ABSENKBETRIEB                "Absenkbetrieb"
 #endif
+#ifndef LNAME_OPT_WARMWASSER
 #define LNAME_OPT_WARMWASSER                   "Warmwasser"
+#endif
 #define LNAME_OPT_SG_EVU_SPERRE               "1 - EVU Sperre"
 #define LNAME_OPT_SG_NORMAL                    "2 - Normal"
 #define LNAME_OPT_SG_EMPFOHLEN                 "3 - Empfohlen"
@@ -270,3 +279,14 @@
 #define LNAME_COP_WW                           "COP Warmwasser"
 #define LNAME_COP_HEIZ                         "COP Heizung"
 #define LNAME_COP_GESAMT                       "COP Gesamt"
+
+#define LNAME_WPL9_RUNTIME_HEAT "Verdichter Laufzeit Heizen (WPM)"
+
+#define LNAME_WPL9_RUNTIME_DHW "Verdichter Laufzeit Warmwasser (WPM)"
+
+#define LNAME_WPL9_RUNTIME_DEFROST "Verdichter Laufzeit Abtauen (WPM)"
+
+#define LNAME_WPL9_STARTS "Verdichterstarts gesamt (WPM)"
+
+#define LNAME_CALC_NHZ_HEAT "NHZ Heizen gesamt (WPM)"
+#define LNAME_CALC_NHZ_DHW "NHZ Warmwasser gesamt (WPM)"

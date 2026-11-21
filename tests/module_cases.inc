@@ -210,6 +210,9 @@ TEST_CASE("time program command: range check, only changed periods are written",
 // ============================================================================
 
 static void mmResetEnergy() {
+    stableValue.clear(); pendingValue.clear(); pendingSince.clear();
+    wpmEnergyCheckpoint = {}; wpmEnergyCheckpointLoaded = true;
+    wpl9EnergyPairs.clear();
     resetDiscoveryState();
     copEnergyValues.clear();
     copEnergyByMember.clear();
@@ -260,6 +263,20 @@ TEST_CASE("storeCOPEnergyValue: only numbers are stored", "[calc][energy]") {
     mmResetEnergy();
 }
 
+static void mmWpmInputs() {
+    if (!kModel.wpmDisplayCounters) return;
+    for (const char* b : {"EL_AUFNAHMELEISTUNG_HEIZ","EL_AUFNAHMELEISTUNG_WW","WAERMEERTRAG_HEIZ","WAERMEERTRAG_WW",
+                          "WAERMEERTRAG_2WE_HEIZ","WAERMEERTRAG_2WE_WW"}) {
+        const std::string base(b);
+        if (!copEnergyValues.count(base+"_SUM_MWH")) continue;
+        if (!copEnergyValues.count(base+"_SUM_KWH")) copEnergyValues[base+"_SUM_KWH"]=0;
+        if (base.find("2WE")==std::string::npos) {
+            copEnergyValues[base+"_TAG_KWH"]=0; copEnergyValues[base+"_TAG_WH"]=0;
+            for (const char* suffix : {"_SUM_MWH","_SUM_KWH","_TAG_KWH","_TAG_WH"})
+                copEnergyByMember[std::string(energyMemberName())+"|"+base+suffix]=copEnergyValues[base+suffix];
+        }
+    }
+}
 TEST_CASE("COP: (heat + booster heat) / electrical energy for DHW, heating and total", "[calc][energy]") {
     mmResetEnergy();
     storeCOPEnergyValue("WAERMEERTRAG_WW_SUM_MWH", "3");
@@ -268,19 +285,19 @@ TEST_CASE("COP: (heat + booster heat) / electrical energy for DHW, heating and t
     storeCOPEnergyValue("WAERMEERTRAG_HEIZ_SUM_MWH", "9");
     storeCOPEnergyValue("WAERMEERTRAG_2WE_HEIZ_SUM_MWH", "1");
     storeCOPEnergyValue("EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", "4");
-    updateCOPCalculations();
-    CHECK(mmPayload(kRoot + "/calculated/cop_ww/state") == "2.00");       // (3+1)/2
-    CHECK(mmPayload(kRoot + "/calculated/cop_heiz/state") == "2.50");     // (9+1)/4
-    CHECK(mmPayload(kRoot + "/calculated/cop_gesamt/state") == "2.33");   // (3+1+9+1)/(2+4)
+    mmWpmInputs(); updateCOPCalculations();
+    CHECK(mmPayload(kRoot + "/calculated/cop_ww/state") == (kModel.wpmDisplayCounters ? "1.33" : "2.00"));       // (3+1)/2
+    CHECK(mmPayload(kRoot + "/calculated/cop_heiz/state") == (kModel.wpmDisplayCounters ? "2.00" : "2.50"));     // (9+1)/4
+    CHECK(mmPayload(kRoot + "/calculated/cop_gesamt/state") == (kModel.wpmDisplayCounters ? "1.75" : "2.33"));   // (3+1+9+1)/(2+4)
     // configs on their kept discovery topics (calculated.h objectId), once
     for (const char* id : {"cop_ww", "cop_heiz", "cop_gesamt"})
         CHECK(mmCount("homeassistant/sensor/" + kRoot + "/" + id + "/config") == 1);
-    updateCOPCalculations();
+    mmWpmInputs(); updateCOPCalculations();
     CHECK(mmCount("homeassistant/sensor/" + kRoot + "/cop_ww/config") == 1);
     // a discovery republish sends them again
     copDiscoveryRepublish();
     discoveredCalculatedSensors.clear();
-    updateCOPCalculations();
+    mmWpmInputs(); updateCOPCalculations();
     CHECK(mmCount("homeassistant/sensor/" + kRoot + "/cop_ww/config") == 2);
     mmResetEnergy();
 }
@@ -293,10 +310,10 @@ TEST_CASE("COP: no value without electrical energy or a missing register", "[cal
     storeCOPEnergyValue("WAERMEERTRAG_HEIZ_SUM_MWH", "9");
     storeCOPEnergyValue("WAERMEERTRAG_2WE_HEIZ_SUM_MWH", "1");
     storeCOPEnergyValue("EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", "4");
-    updateCOPCalculations();
-    CHECK(mmCount(kRoot + "/calculated/cop_ww/state") == 0);              // division by 0
-    CHECK(mmPayload(kRoot + "/calculated/cop_heiz/state") == "2.50");
-    CHECK(mmPayload(kRoot + "/calculated/cop_gesamt/state") == "3.50");   // 14 / (0+4)
+    mmWpmInputs(); updateCOPCalculations();
+    CHECK(mmPayload(kRoot + "/calculated/cop_ww/state") == (kModel.wpmDisplayCounters ? "4.00" : "<none>"));
+    CHECK(mmPayload(kRoot + "/calculated/cop_heiz/state") == (kModel.wpmDisplayCounters ? "2.00" : "2.50"));
+    CHECK(mmPayload(kRoot + "/calculated/cop_gesamt/state") == (kModel.wpmDisplayCounters ? "2.33" : "3.50"));   // 14 / (0+4)
 
     mmResetEnergy();
     storeCOPEnergyValue("WAERMEERTRAG_WW_SUM_MWH", "3");                  // 2WE_WW missing
@@ -304,10 +321,10 @@ TEST_CASE("COP: no value without electrical energy or a missing register", "[cal
     storeCOPEnergyValue("WAERMEERTRAG_HEIZ_SUM_MWH", "9");
     storeCOPEnergyValue("WAERMEERTRAG_2WE_HEIZ_SUM_MWH", "1");
     storeCOPEnergyValue("EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", "0");
-    updateCOPCalculations();
-    CHECK(mmCount(kRoot + "/calculated/cop_ww/state") == 0);
-    CHECK(mmCount(kRoot + "/calculated/cop_heiz/state") == 0);
-    CHECK(mmCount(kRoot + "/calculated/cop_gesamt/state") == 0);
+    mmWpmInputs(); updateCOPCalculations();
+    CHECK(mmPayload(kRoot + "/calculated/cop_ww/state") == (kModel.wpmDisplayCounters ? "unknown" : "<none>"));
+    CHECK(mmPayload(kRoot + "/calculated/cop_heiz/state") == (kModel.wpmDisplayCounters ? "10.00" : "<none>"));
+    CHECK(mmPayload(kRoot + "/calculated/cop_gesamt/state") == (kModel.wpmDisplayCounters ? "unknown" : "<none>"));
     mmResetEnergy();
 }
 
@@ -324,15 +341,17 @@ TEST_CASE("COP: the kWh remainder (0..999) is added to the whole MWh", "[calc][e
     storeCOPEnergyValue("WAERMEERTRAG_2WE_HEIZ_SUM_MWH", "0");
     storeCOPEnergyValue("EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", "5");
     storeCOPEnergyValue("EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH", "125");
-    updateCOPCalculations();
+    mmWpmInputs(); updateCOPCalculations();
     CHECK(mmPayload(kRoot + "/calculated/cop_ww/state") == "3.03");     // 42.629 / 14.075
     CHECK(mmPayload(kRoot + "/calculated/cop_heiz/state") == "4.00");   // 20.5 / 5.125
     // out-of-range remainders (0x8000 marker, 1000) do not count
     for (const char* bad : {"32768", "1000", "-255"}) {
         INFO(bad);
         storeCOPEnergyValue("EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH", bad);
+        mmWpmInputs();
+        if (kModel.wpmDisplayCounters) copEnergyValues.erase("EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH");
         updateCOPCalculations();
-        CHECK(mmPayload(kRoot + "/calculated/cop_heiz/state") == "4.10");   // 20.5 / 5
+        CHECK(mmPayload(kRoot + "/calculated/cop_heiz/state") == (kModel.wpmDisplayCounters ? "unknown" : "4.10"));   // 20.5 / 5
     }
     mmResetEnergy();
 }
@@ -427,20 +446,26 @@ TEST_CASE("combined total: MWh*1000 + kWh on models without day counters", "[cal
     mmPrimeTotal("combined_energie_heiz", 24730.0f, t);
     storeCOPEnergyValue("EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", "24");
     storeCOPEnergyValue("EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH", "738");
+    if (kModel.wpmDisplayCounters) {
+        publishCombinedEnergySensors();
+        CHECK(mmPayload(ENERGY_CALC_TOPIC("energie_heiz_total_kwh")) == "<none>");
+        mmWpmInputs();
+    }
     publishCombinedEnergySensors();
-    CHECK(mmPayload(kRoot + "/calculated/energie_heiz_total_kwh/state") == "24738.000");
-    const std::string cfg = mmPayload("homeassistant/sensor/" + kRoot + "/stiebel_calculated_energie_heiz_total_kwh/config");
+    CHECK(mmPayload(std::string(ENERGY_CALC_TOPIC("energie_heiz_total_kwh"))) == "24738.000");
+    const std::string cfg = mmPayload("homeassistant/sensor/" + kRoot + "/" + ENERGY_CALC_ID("energie_heiz_total_kwh") + "/config");
     CHECK(mmField(cfg, "device_class") == "energy");
     CHECK(mmField(cfg, "unit_of_measurement") == "kWh");
     CHECK(mmField(cfg, "state_class") == "total_increasing");
-    CHECK(mmCount(kRoot + "/calculated/energie_ww_total_kwh/state") == 0);   // WW registers unknown
+    CHECK(mmCount(std::string(ENERGY_CALC_TOPIC("energie_ww_total_kwh"))) == 0);   // WW registers unknown
 
     // once a day counter base exists, the device SUM alone is not used
     mqtt_client_instance().clear();
     resetStateCache();
     energyBase.v[0] = 24000.0f;
+    if (kModel.wpmDisplayCounters) copEnergyByMember.clear(); // no current-boot day parts
     publishCombinedEnergySensors();
-    CHECK(mmCount(kRoot + "/calculated/energie_heiz_total_kwh/state") == 0);
+    CHECK(mmCount(std::string(ENERGY_CALC_TOPIC("energie_heiz_total_kwh"))) == 0);
     mmResetEnergy();
 }
 
@@ -455,11 +480,11 @@ TEST_CASE("combined total: SUM base plus today's day counter from the energy mem
     storeCOPEnergyValueMember(m, "WAERMEERTRAG_HEIZ_TAG_WH", "500");
     publishCombinedEnergySensors();
     // SUM_MWH*1000 + SUM_KWH + TAG_KWH + TAG_WH/1000
-    CHECK(mmPayload(kRoot + "/calculated/waerme_heiz_total_kwh/state") == "24741.500");
+    CHECK(mmPayload(std::string(ENERGY_CALC_TOPIC("waerme_heiz_total_kwh"))) == "24741.500");
     // the same registers of another member are ignored
     storeCOPEnergyValueMember("MANAGER", "WAERMEERTRAG_HEIZ_TAG_KWH", "9");
     publishCombinedEnergySensors();
-    CHECK(mmPayload(kRoot + "/calculated/waerme_heiz_total_kwh/state") == "24741.500");
+    CHECK(mmPayload(std::string(ENERGY_CALC_TOPIC("waerme_heiz_total_kwh"))) == "24741.500");
     mmResetEnergy();
 }
 
@@ -530,11 +555,11 @@ TEST_CASE("day values: kWh part + Wh/1000, only with both registers", "[calc][en
     storeCOPEnergyValue("WAERMEERTRAG_HEIZ_TAG_WH", "999");
     storeCOPEnergyValue("WAERMEERTRAG_WW_TAG_KWH", "4");    // TAG_WH missing
     publishCombinedEnergySensors();
-    CHECK(mmPayload(kRoot + "/calculated/energie_heiz_tag_kwh/state") == "12.345");
-    CHECK(mmPayload(kRoot + "/calculated/energie_ww_tag_kwh/state") == "1.005");
-    CHECK(mmPayload(kRoot + "/calculated/waerme_heiz_tag_kwh/state") == "30.999");
-    CHECK(mmCount(kRoot + "/calculated/waerme_ww_tag_kwh/state") == 0);
-    const std::string cfg = mmPayload("homeassistant/sensor/" + kRoot + "/stiebel_calculated_energie_heiz_tag_kwh/config");
+    CHECK(mmPayload(std::string(ENERGY_CALC_TOPIC("energie_heiz_tag_kwh"))) == "12.345");
+    CHECK(mmPayload(std::string(ENERGY_CALC_TOPIC("energie_ww_tag_kwh"))) == "1.005");
+    CHECK(mmPayload(std::string(ENERGY_CALC_TOPIC("waerme_heiz_tag_kwh"))) == "30.999");
+    CHECK(mmCount(std::string(ENERGY_CALC_TOPIC("waerme_ww_tag_kwh"))) == 0);
+    const std::string cfg = mmPayload("homeassistant/sensor/" + kRoot + "/" + ENERGY_CALC_ID("energie_heiz_tag_kwh") + "/config");
     CHECK(mmField(cfg, "state_class") == "total_increasing");
     mmResetEnergy();
     fake_millis() = 0;
@@ -886,13 +911,14 @@ TEST_CASE("updateSensor: a total_increasing counter keeps its last state on -255
     resetStateCache();
     const ElsterIndex* ei = GetElsterIndex("EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH");
     REQUIRE(ei != nullptr);
-    const std::string topic = kRoot + "/HEIZMODUL/EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH/state";
-    updateSensor(CanMembers[cm_heizmodul], ei, "12");
+    const auto& energyCm=CanMembers[kModel.wpmDisplayCounters ? cm_heizmodul_wpl : cm_heizmodul];
+    const std::string topic = kRoot + "/" + energyCm.Name + "/EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH/state";
+    updateSensor(energyCm, ei, "12");
     REQUIRE(mmPayload(topic) == "12");
-    updateSensor(CanMembers[cm_heizmodul], ei, "-255");
+    updateSensor(energyCm, ei, "-255");
     CHECK(mmPayload(topic) == "12");
     CHECK(mmCount(topic) == 1);
-    updateSensor(CanMembers[cm_heizmodul], ei, "13");   // a real value goes through again
+    updateSensor(energyCm, ei, "13");   // a real value goes through again
     CHECK(mmPayload(topic) == "13");
     resetDiscoveryState();
     resetStateCache();
