@@ -26,6 +26,16 @@
 #ifndef SIGNAL_REQUESTS_BASE_H
 #define SIGNAL_REQUESTS_BASE_H
 
+#include "model_profile.h"
+
+#if defined(HA_HAS_WPM_DISPLAY_COUNTERS)
+#define ELECTRIC_ENERGY_MEMBER cm_heizmodul_wpl
+#define THERMAL_ENERGY_MEMBER cm_heizmodul_wpl
+#else
+#define ELECTRIC_ENERGY_MEMBER cm_heizmodul
+#define THERMAL_ENERGY_MEMBER cm_heizmodul
+#endif
+
 #define SIGNAL_REQUESTS_BASE \
     \
     /* -------------------------------------------------------------------- */ \
@@ -49,27 +59,27 @@
     /* -------------------------------------------------------------------- */ \
     /* ENERGY COUNTERS — required for COP calculations                      */ \
     /* -------------------------------------------------------------------- */ \
-    {"EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", FREQ_10MIN, cm_heizmodul}, \
-    {"EL_AUFNAHMELEISTUNG_WW_SUM_MWH",   FREQ_10MIN, cm_heizmodul}, \
-    {"WAERMEERTRAG_WW_SUM_MWH",          FREQ_10MIN, cm_heizmodul}, \
-    {"WAERMEERTRAG_HEIZ_SUM_MWH",        FREQ_10MIN, cm_heizmodul}, \
-    {"WAERMEERTRAG_2WE_WW_SUM_MWH",      FREQ_10MIN, cm_heizmodul}, \
-    {"WAERMEERTRAG_2WE_HEIZ_SUM_MWH",    FREQ_10MIN, cm_heizmodul},
+    {"EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", FREQ_10MIN, ELECTRIC_ENERGY_MEMBER}, \
+    {"EL_AUFNAHMELEISTUNG_WW_SUM_MWH",   FREQ_10MIN, ELECTRIC_ENERGY_MEMBER}, \
+    {"WAERMEERTRAG_WW_SUM_MWH",          FREQ_10MIN, THERMAL_ENERGY_MEMBER}, \
+    {"WAERMEERTRAG_HEIZ_SUM_MWH",        FREQ_10MIN, THERMAL_ENERGY_MEMBER}, \
+    {"WAERMEERTRAG_2WE_WW_SUM_MWH",      FREQ_10MIN, THERMAL_ENERGY_MEMBER}, \
+    {"WAERMEERTRAG_2WE_HEIZ_SUM_MWH",    FREQ_10MIN, THERMAL_ENERGY_MEMBER},
 
 // Daily and total energy counters of the heat pump module (IWS), in kWh and Wh. Used by models
 // whose HEIZMODUL answers them (wpl9, wpl10ac, wpl13e/wpl18e); one definition for all (#101).
 #define SIGNAL_REQUESTS_ENERGY_IWS \
-    {"EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH", FREQ_10MIN, cm_heizmodul}, \
-    {"EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH",  FREQ_10MIN, cm_heizmodul}, \
-    {"EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", FREQ_10MIN, cm_heizmodul}, \
-    {"EL_AUFNAHMELEISTUNG_WW_SUM_KWH",   FREQ_10MIN, cm_heizmodul}, \
-    {"EL_AUFNAHMELEISTUNG_WW_TAG_WH",    FREQ_10MIN, cm_heizmodul}, \
-    {"EL_AUFNAHMELEISTUNG_WW_TAG_KWH",   FREQ_10MIN, cm_heizmodul}, \
-    {"WAERMEERTRAG_HEIZ_SUM_KWH",        FREQ_10MIN, cm_heizmodul}, \
-    {"WAERMEERTRAG_HEIZ_TAG_WH",         FREQ_10MIN, cm_heizmodul}, \
-    {"WAERMEERTRAG_HEIZ_TAG_KWH",        FREQ_10MIN, cm_heizmodul}, \
-    {"WAERMEERTRAG_WW_SUM_KWH",          FREQ_10MIN, cm_heizmodul}, \
-    {"WAERMEERTRAG_WW_TAG_WH",           FREQ_10MIN, cm_heizmodul}, \
-    {"WAERMEERTRAG_WW_TAG_KWH",          FREQ_10MIN, cm_heizmodul},
+    {"EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH", FREQ_10MIN, ELECTRIC_ENERGY_MEMBER}, \
+    {"EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH",  FREQ_10MIN, ELECTRIC_ENERGY_MEMBER}, \
+    {"EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", FREQ_10MIN, ELECTRIC_ENERGY_MEMBER}, \
+    {"EL_AUFNAHMELEISTUNG_WW_SUM_KWH",   FREQ_10MIN, ELECTRIC_ENERGY_MEMBER}, \
+    {"EL_AUFNAHMELEISTUNG_WW_TAG_WH",    FREQ_10MIN, ELECTRIC_ENERGY_MEMBER}, \
+    {"EL_AUFNAHMELEISTUNG_WW_TAG_KWH",   FREQ_10MIN, ELECTRIC_ENERGY_MEMBER}, \
+    {"WAERMEERTRAG_HEIZ_SUM_KWH",        FREQ_10MIN, THERMAL_ENERGY_MEMBER}, \
+    {"WAERMEERTRAG_HEIZ_TAG_WH",         FREQ_10MIN, THERMAL_ENERGY_MEMBER}, \
+    {"WAERMEERTRAG_HEIZ_TAG_KWH",        FREQ_10MIN, THERMAL_ENERGY_MEMBER}, \
+    {"WAERMEERTRAG_WW_SUM_KWH",          FREQ_10MIN, THERMAL_ENERGY_MEMBER}, \
+    {"WAERMEERTRAG_WW_TAG_WH",           FREQ_10MIN, THERMAL_ENERGY_MEMBER}, \
+    {"WAERMEERTRAG_WW_TAG_KWH",          FREQ_10MIN, THERMAL_ENERGY_MEMBER},
 
 #endif // SIGNAL_REQUESTS_BASE_H

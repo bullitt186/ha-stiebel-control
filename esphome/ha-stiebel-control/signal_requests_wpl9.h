@@ -57,15 +57,21 @@ extern const SignalRequest signalRequests[] = {
     // KESSEL returned fresh -255; valid MANAGER feedback was confirmed live.
     {"RUECKLAUFISTTEMP",           FREQ_30S,   cm_manager},
 
-    // Existing nonzero compressor-1 counters from the previous polling profile.
-    // MANAGER returned -255 for these counters; preserve HEIZMODUL ownership.
-    {"LZ_VERD_1_HEIZBETRIEB",       FREQ_10MIN, cm_heizmodul},
-    {"LZ_VERD_1_KUEHLBETRIEB",      FREQ_10MIN, cm_heizmodul},
+    // Matched to WPM display photos and targeted CAN reads, 2026-11-15.
+    {"LAUFZEIT_VD_HEIZEN",           FREQ_10MIN, cm_heizmodul_wpl},
+    {"LAUFZEIT_VD_WW",               FREQ_10MIN, cm_heizmodul_wpl},
+    {"LZ_VERD_1_KUEHLBETRIEB",        FREQ_10MIN, cm_heizmodul_wpl},
+    {"LAUFZEIT_VD_ABTAUEN",           FREQ_10MIN, cm_heizmodul_wpl},
+    // Poll thousands; its reply requests the remainder immediately (fresh pair).
+    {"VERDICHTER_STARTS_K_4EF0",      FREQ_1MIN, cm_heizmodul_wpl},
 
     // ========================================================================
-    // ENERGY COUNTERS (HEIZMODUL 0x500) — valid read responses confirmed live
+    // ENERGY: WPM electricity and heat counters on 0x514 (see migration notes)
     // ========================================================================
     SIGNAL_REQUESTS_ENERGY_IWS   // daily and total energy counters (signal_requests_base.h)
+    // NHZ totals also need their kWh remainder (the photographed totals are <1 MWh).
+    {"WAERMEERTRAG_2WE_HEIZ_SUM_KWH", FREQ_10MIN, cm_heizmodul_wpl},
+    {"WAERMEERTRAG_2WE_WW_SUM_KWH",   FREQ_10MIN, cm_heizmodul_wpl},
 };
 
 extern const size_t SIGNAL_REQUEST_COUNT_VALUE = sizeof(signalRequests) / sizeof(SignalRequest);

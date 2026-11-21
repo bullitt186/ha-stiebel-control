@@ -88,6 +88,13 @@ inline bool handleSelectCommand(const WritableSelectConfig& c, const std::string
         return ok;
     }
     const char* v = payload.c_str();
+    if (kModel.wpmProgramLabels && strcmp(c.signalName, "PROGRAMMSCHALTER") == 0) {
+        if (payload == "Automatik") v = "Programmbetrieb";
+        else if (payload == "Tagbetrieb") v = "Komfortbetrieb";
+        else if (payload == "Absenkbetrieb") v = "ECO-Betrieb";
+        else if (payload == "Bereitschaft") v = "Bereitschaftsbetrieb";
+        else if (payload == "Warmwasser") v = "Warmwasserbetrieb";
+    }
     writeSignal(&CanMembers[c.member], GetElsterIndex(c.signalName), v);
     readSignal(&CanMembers[c.member], c.signalName);
     return true;

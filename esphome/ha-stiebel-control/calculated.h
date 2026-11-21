@@ -27,6 +27,11 @@
 #include "mqtt_publish.h"
 #include "discovery.h"
 #include "request_manager.h"
+#include "wpl9_observed_counters.h"
+
+// Separate corrected energy identities: old histories have a different baseline.
+#define ENERGY_CALC_ID(suffix) (kModel.wpmDisplayCounters ? "stiebel_calculated_wpl9_" suffix : "stiebel_calculated_" suffix)
+#define ENERGY_CALC_TOPIC(suffix) (kModel.wpmDisplayCounters ? HA_TOPIC_ROOT "/calculated/wpl9_" suffix "/state" : HA_TOPIC_ROOT "/calculated/" suffix "/state")
 
 static const CalculatedSensorConfig calculatedSensors[] = {
     // Date sensor
@@ -60,13 +65,13 @@ static const CalculatedSensorConfig calculatedSensors[] = {
      "sensor", "", "", "", "mdi:can", "", "", "diagnostic", false},
 
     // Kombinierte Energie-Gesamtwerte (MWh*1000 + kWh), zusaetzlich zu den Einzelwerten
-    {"stiebel_calculated_energie_heiz_total_kwh", LNAME_CALC_ENERGIE_HEIZ_TOTAL_KWH, HA_TOPIC_ROOT "/calculated/energie_heiz_total_kwh/state",
+    {ENERGY_CALC_ID("energie_heiz_total_kwh"), LNAME_CALC_ENERGIE_HEIZ_TOTAL_KWH, ENERGY_CALC_TOPIC("energie_heiz_total_kwh"),
      "sensor", "energy", "kWh", "total_increasing", "mdi:flash", "", "", "", true, true},
-    {"stiebel_calculated_energie_ww_total_kwh", LNAME_CALC_ENERGIE_WW_TOTAL_KWH, HA_TOPIC_ROOT "/calculated/energie_ww_total_kwh/state",
+    {ENERGY_CALC_ID("energie_ww_total_kwh"), LNAME_CALC_ENERGIE_WW_TOTAL_KWH, ENERGY_CALC_TOPIC("energie_ww_total_kwh"),
      "sensor", "energy", "kWh", "total_increasing", "mdi:flash", "", "", "", true, true},
-    {"stiebel_calculated_waerme_heiz_total_kwh", LNAME_CALC_WAERME_HEIZ_TOTAL_KWH, HA_TOPIC_ROOT "/calculated/waerme_heiz_total_kwh/state",
+    {ENERGY_CALC_ID("waerme_heiz_total_kwh"), LNAME_CALC_WAERME_HEIZ_TOTAL_KWH, ENERGY_CALC_TOPIC("waerme_heiz_total_kwh"),
      "sensor", "energy", "kWh", "total_increasing", "mdi:fire", "", "", "", true, true},
-    {"stiebel_calculated_waerme_ww_total_kwh", LNAME_CALC_WAERME_WW_TOTAL_KWH, HA_TOPIC_ROOT "/calculated/waerme_ww_total_kwh/state",
+    {ENERGY_CALC_ID("waerme_ww_total_kwh"), LNAME_CALC_WAERME_WW_TOTAL_KWH, ENERGY_CALC_TOPIC("waerme_ww_total_kwh"),
      "sensor", "energy", "kWh", "total_increasing", "mdi:fire", "", "", "", true, true},
 
     // Aktuelle elektrische Leistung (W) — aus den feinen Tageszaehlern (EL_*_TAG_WH)
@@ -86,13 +91,13 @@ static const CalculatedSensorConfig calculatedSensors[] = {
     // zurueck; der Geraete-Gesamtzahler springt nur einmal pro Nacht. In HA ist
     // state_class total_increasing korrekt (Reset wird als Zaehlerneustart
     // behandelt) und als Basis fuer utility_meter (Tag/Monat/Jahr) geeignet.
-    {"stiebel_calculated_energie_heiz_tag_kwh", LNAME_CALC_ENERGIE_HEIZ_TAG_KWH, HA_TOPIC_ROOT "/calculated/energie_heiz_tag_kwh/state",
+    {ENERGY_CALC_ID("energie_heiz_tag_kwh"), LNAME_CALC_ENERGIE_HEIZ_TAG_KWH, ENERGY_CALC_TOPIC("energie_heiz_tag_kwh"),
      "sensor", "energy", "kWh", "total_increasing", "mdi:flash", "", "", "", true, true},
-    {"stiebel_calculated_energie_ww_tag_kwh", LNAME_CALC_ENERGIE_WW_TAG_KWH, HA_TOPIC_ROOT "/calculated/energie_ww_tag_kwh/state",
+    {ENERGY_CALC_ID("energie_ww_tag_kwh"), LNAME_CALC_ENERGIE_WW_TAG_KWH, ENERGY_CALC_TOPIC("energie_ww_tag_kwh"),
      "sensor", "energy", "kWh", "total_increasing", "mdi:flash", "", "", "", true, true},
-    {"stiebel_calculated_waerme_heiz_tag_kwh", LNAME_CALC_WAERME_HEIZ_TAG_KWH, HA_TOPIC_ROOT "/calculated/waerme_heiz_tag_kwh/state",
+    {ENERGY_CALC_ID("waerme_heiz_tag_kwh"), LNAME_CALC_WAERME_HEIZ_TAG_KWH, ENERGY_CALC_TOPIC("waerme_heiz_tag_kwh"),
      "sensor", "energy", "kWh", "total_increasing", "mdi:fire", "", "", "", true, true},
-    {"stiebel_calculated_waerme_ww_tag_kwh", LNAME_CALC_WAERME_WW_TAG_KWH, HA_TOPIC_ROOT "/calculated/waerme_ww_tag_kwh/state",
+    {ENERGY_CALC_ID("waerme_ww_tag_kwh"), LNAME_CALC_WAERME_WW_TAG_KWH, ENERGY_CALC_TOPIC("waerme_ww_tag_kwh"),
      "sensor", "energy", "kWh", "total_increasing", "mdi:fire", "", "", "", true, true},
 
     // Getrennte elektrische Leistung (W) aus den jeweiligen TAG_WH-Zaehlern.
@@ -146,7 +151,14 @@ static const CalculatedSensorConfig calculatedSensors[] = {
     {"stiebel_cop_heiz", LNAME_COP_HEIZ, HA_TOPIC_ROOT "/calculated/cop_heiz/state",
      "sensor", "", "", "measurement", "mdi:radiator", "", "", "", true, true, "cop_heiz"},
     {"stiebel_cop_gesamt", LNAME_COP_GESAMT, HA_TOPIC_ROOT "/calculated/cop_gesamt/state",
-     "sensor", "", "", "measurement", "mdi:chart-line", "", "", "", true, true, "cop_gesamt"}
+     "sensor", "", "", "measurement", "mdi:chart-line", "", "", "", true, true, "cop_gesamt"},
+    {"stiebel_calculated_wpl9_verdichter_starts_gesamt", LNAME_WPL9_STARTS,
+      HA_TOPIC_ROOT "/calculated/wpl9_verdichter_starts_gesamt/state",
+      "sensor", "", "", "total_increasing", "mdi:counter", "", "", "", true, true},
+    {ENERGY_CALC_ID("nhz_heiz_total_kwh"), LNAME_CALC_NHZ_HEAT, ENERGY_CALC_TOPIC("nhz_heiz_total_kwh"),
+      "sensor", "energy", "kWh", "total_increasing", "mdi:heating-coil", "", "", "", true, true},
+    {ENERGY_CALC_ID("nhz_ww_total_kwh"), LNAME_CALC_NHZ_DHW, ENERGY_CALC_TOPIC("nhz_ww_total_kwh"),
+      "sensor", "energy", "kWh", "total_increasing", "mdi:heating-coil", "", "", "", true, true},
 };
 
 static const size_t CALCULATED_SENSOR_COUNT = sizeof(calculatedSensors) / sizeof(CalculatedSensorConfig);
@@ -188,9 +200,15 @@ enum CalcIdx : size_t {
     CALC_IDX_COP_WW,
     CALC_IDX_COP_HEIZ,
     CALC_IDX_COP_GESAMT,
+    CALC_IDX_WPL9_LIFETIME_STARTS,
+    CALC_IDX_WPL9_NHZ_HEIZ,
+    CALC_IDX_WPL9_NHZ_WW,
     CALC_IDX_COUNT
 };
 static_assert(CALCULATED_SENSOR_COUNT == CALC_IDX_COUNT, "calculatedSensors and CalcIdx must have the same rows");
+static const CalculatedSensorConfig& wpl9LifetimeStartsSensor = calculatedSensors[CALC_IDX_WPL9_LIFETIME_STARTS];
+static Wpl9StartCounter wpl9StartCounter;
+
 
 // Publish all calculated sensor discoveries (used during startup and republish).
 // Rows marked onDemand need model-specific registers; they announce themselves on their
@@ -394,6 +412,7 @@ void publishDeltaTRunning()
     const char* stateTopic = HA_TOPIC_ROOT "/calculated/delta_t_running/state";
     publishCalculatedState(stateTopic, value);
 }
+
 
 // Compressor starts and runtime per day (#49). An off phase shorter than
 // COMPRESSOR_MIN_OFF_MS does not end a run, so a short gap is not a new start.

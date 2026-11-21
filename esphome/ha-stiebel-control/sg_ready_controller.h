@@ -15,7 +15,10 @@
 
 // Operating mode written by SG Ready when boosting back to normal operation.
 // The WPM3 (WPL 10 AC) calls this mode "Komfortbetrieb", older WPM2 "Tagbetrieb".
-#ifdef HA_CONTROLLER_WPM3
+#ifdef HA_HAS_WPM_PROGRAM_LABELS
+#define SG_READY_NORMAL_MODE "Komfortbetrieb"
+#define SG_READY_AUTO_MODE   "Programmbetrieb"
+#elif defined(HA_CONTROLLER_WPM3)
 #define SG_READY_NORMAL_MODE "Komfortbetrieb"
 #define SG_READY_AUTO_MODE   "Programmierbetrieb"
 #else
@@ -247,7 +250,7 @@ private:
         restoreRoom();
         state_.active = true;
         persistState();
-        io_.writeCanSignal("PROGRAMMSCHALTER", "Bereitschaft");
+        io_.writeCanSignal("PROGRAMMSCHALTER", kModel.wpmProgramLabels ? "Bereitschaftsbetrieb" : "Bereitschaft");
     }
 
     void applyNormal() {

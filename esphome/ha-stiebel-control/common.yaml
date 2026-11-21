@@ -69,6 +69,7 @@ esphome:
     - dhw_program.h
     # Firmware modules (#109), in include order; each header includes what it needs,
     # ha-stiebel-control.h includes all of them. Listed so ESPHome copies them.
+    - wpl9_observed_counters.h
     - signal_route.h
     - mqtt_publish.h
     - can_io.h
@@ -84,6 +85,7 @@ esphome:
     - set_commands.h
     - fault_list.h
     - republish.h
+    - wpm_display_counters.h
     - ha-stiebel-control.h
     - signal_requests_base.h
     # model-specific signal_requests_*.h is declared by each model yaml package

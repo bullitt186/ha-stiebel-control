@@ -72,6 +72,12 @@ test: $(TEST_BIN)
 test-all: $(TEST_BIN)
 	./$(TEST_BIN) --reporter console --success
 
+# Compile the actual WPL9 request table, independently of the unit-test stub.
+.PHONY: test-wpl9-polling
+test-wpl9-polling:
+	$(CXX) $(CXXFLAGS) -DHA_DEVICE_MODEL=wpl9 tests/wpl9_polling_test.cpp $(ELSTER_SRCS) -o tests/run_wpl9_polling
+	./tests/run_wpl9_polling
+
 TEST_EXTRA_OBJS = $(patsubst tests/%.cpp,tests/%.o,$(TEST_EXTRA))
 # Every object includes these headers (ElsterTable.h is compiled into KElsterTable.o)
 TEST_HDRS = $(wildcard esphome/ha-stiebel-control/*.h esphome/ha-stiebel-control/elster/*.h tests/*.h tests/*.inc tools/*.h)
@@ -96,7 +102,7 @@ $(TEST_BIN): $(TEST_SRCS) $(TEST_EXTRA_OBJS) $(ELSTER_OBJS) $(TEST_HDRS) $(TEST_
 	$(CXX) $(CXXFLAGS) $(TEST_SRCS) $(TEST_EXTRA_OBJS) $(ELSTER_OBJS) -o $(TEST_BIN)
 
 clean-tests:
-	rm -f $(TEST_BIN) $(TEST_EXTRA_OBJS) $(ELSTER_OBJS) $(TEST_FLAGS_STAMP)
+	rm -f $(TEST_BIN) tests/run_wpl9_polling $(TEST_EXTRA_OBJS) $(ELSTER_OBJS) $(TEST_FLAGS_STAMP)
 
 # ── Mutation testing (Mull) ──────────────────────────────────────────────────
 

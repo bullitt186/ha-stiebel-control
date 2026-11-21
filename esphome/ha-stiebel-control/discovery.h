@@ -182,6 +182,9 @@ void publishCalculatedSensorDiscovery(const CalculatedSensorConfig& config, bool
             << defaultEntityIdJson(config.component, config.uniqueId)
             << "\"state_topic\":\"" << config.stateTopic << "\"";
     
+    // Incomplete WPM counter inputs yield a numeric unknown, not a conversion error.
+    if (kModel.wpmDisplayCounters && strncmp(config.uniqueId, "stiebel_cop_", 12) == 0)
+        payload << ",\"value_template\":\"{{ value | float(none) }}\"";
     // Add device class if specified
     if (config.deviceClass[0] != '\0') {
         payload << ",\"device_class\":\"" << config.deviceClass << "\"";

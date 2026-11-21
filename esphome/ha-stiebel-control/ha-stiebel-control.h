@@ -36,6 +36,7 @@
 #include "model_profile.h"
 #include "language_select.h"
 #include "can_members.h"   // CanMember, CanMembers[], CanMemberType, SignalRequest
+#include "wpl9_observed_counters.h"
 #include "signal_route.h"
 #include "mqtt_publish.h"
 #include "can_io.h"
@@ -51,6 +52,7 @@
 #include "set_commands.h"
 #include "fault_list.h"
 #include "republish.h"
+#include "wpm_display_counters.h"
 
 // ============================================================================
 // COMPILE-TIME STRING HASHING FOR FAST SIGNAL DISPATCH
@@ -146,6 +148,7 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
     // -255 = the device does not provide this value: count it for the poll
     // back-off and create no HA entity until a real value has been seen.
     if (value == "-255") {
+        if (kModel.wpmDisplayCounters) handleWpmDisplayCounter(cm, ei, value);
         uint8_t& streak = invalidStreak[key];
         if (streak < 255) streak++;
         if (streak >= 3) {
@@ -158,6 +161,8 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
     } else if (!invalidStreak.empty()) {
         invalidStreak.erase(key);
     }
+
+    if (kModel.wpmDisplayCounters && !handleWpmDisplayCounter(cm, ei, value)) return;
 
     // Invert boolean logic for EVU_SPERRE_AKTIV signal
     // CAN: 1 = lock inactive (off), 0 = lock active (on)
@@ -375,6 +380,10 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
             break;
         }
         
+        case hash("WAERMEERTRAG_2WE_WW_SUM_KWH"):
+        case hash("WAERMEERTRAG_2WE_HEIZ_SUM_KWH"):
+            if (kModel.wpmDisplayCounters) storeWpmDisplayEnergy(cm, signalName, value);
+            break;
         case HASH_EL_AUFNAHMELEISTUNG_HEIZ:
         case HASH_EL_AUFNAHMELEISTUNG_WW:
         case HASH_WAERMEERTRAG_2WE_WW:
@@ -393,6 +402,10 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
         case HASH_WAERMEERTRAG_HEIZ_TAG_KWH:
         case HASH_WAERMEERTRAG_WW_TAG_WH:
         case HASH_WAERMEERTRAG_WW_TAG_KWH:
+            if (kModel.wpmDisplayCounters) {
+                storeWpmDisplayEnergy(cm, signalName, value);
+                break;
+            }
             storeCOPEnergyValue(signalName, value);
             storeCOPEnergyValueMember(cm.Name, signalName, value);
             updateCOPCalculations();

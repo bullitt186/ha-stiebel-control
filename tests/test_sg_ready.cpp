@@ -141,7 +141,7 @@ TEST_CASE("state 1 (EVU Lock): sets Bereitschaft, does not restore if not active
 
     CHECK(ctrl.currentState() == 1);
     CHECK(ctrl.isActive() == true);
-    CHECK(io.hadCan("PROGRAMMSCHALTER", "Bereitschaft"));
+    CHECK(io.hadCan("PROGRAMMSCHALTER", kModel.wpmProgramLabels ? "Bereitschaftsbetrieb" : "Bereitschaft"));
     // No restore calls because sgReadyActive was false and originalDhw/Room are 0
     CHECK(io.countCan("EINSTELL_SPEICHERSOLLTEMP") == 0);
     CHECK(io.countCan("RAUMSOLLTEMP_I") == 0);
