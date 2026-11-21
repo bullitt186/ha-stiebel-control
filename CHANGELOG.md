@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+## [2.8.0] — 2026-11-21
+
+Firmware split into modules, writable numbers take their range from the heat pump, energy counters
+get correct statistics, and WPMW II heating circuit 2 and the FE 7 remote control appear in Home
+Assistant. TTL 33 compressor state from SolderAndSyntax's bus analysis.
+
 ### Upgrade notes
 
 - `SOLAR_GESAMTERTRAG_KWH`, `SOLAR_WOCHENERTRAG_KWH` and `SOLAR_JAHRESERTRAG_KWH` lose their
