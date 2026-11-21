@@ -33,7 +33,7 @@ esphome:
   friendly_name: ${friendly_name}
   project:
     name: "bullitt186.ha-stiebel-control"
-    version: "2.7.0"
+    version: "2.8.0"
   on_boot:
     priority: 600
     then:
