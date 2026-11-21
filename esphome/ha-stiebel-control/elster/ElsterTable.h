@@ -4069,9 +4069,14 @@ const ElsterIndex ElsterTable[] =
   { "PUMPENLEISTUNG_STANDBY_4F8A"                 , 0x4f8a, 0               , false, false },
   { "PUMPENLEISTUNG_HEIZEN"                       , 0x4f8c, 0               , false, false },
   { "PUMPENLEISTUNG_WW_4F8F"                      , 0x4f8f, 0               , false, false },
+  { "SPREIZUNG"                                   , 0x4f91, et_dec_val      , false, true  }, // WPL-A 07, checked on the device
   { "PUMPENLEISTUNG_KUEHLEN"                      , 0x4f92, 0               , false, false },
+  { "MINIMALE_PUMPLEISTUNG"                       , 0x4f98, et_default      , false, true  }, // WPL-A 07, checked on the device
+  { "MAXIMALE_PUMPLEISTUNG"                       , 0x4f99, et_default      , false, true  }, // WPL-A 07, checked on the device
   { "LAUFZEIT_PASSIVKUEHLUNG"                     , 0x4f9a, et_dec_val      , false, false },
   { "ADAPTION_UEBERHITZUNG"                       , 0x4f9e, et_dec_val      , false, false },
+  { "UNTERKUEHLUNG_EXVENTIL_EIN"                  , 0x4f9f, et_dec_val      , false, true  }, // WPL-A 07, checked on the device
+  { "BETRIEBSART_KAELTEKREISREGLER"               , 0x4fa0, et_default      , false, false }, // WPL-A 07, checked on the device
   { "SOLL_UEBERHITZUNG_SAUGGAS_VERDICHTER"        , 0x4fa1, et_dec_val      , false, false },
   { "IST_UEBERHITZUNG_SAUGGAS_VERDICHTER"         , 0x4fa2, et_dec_val      , false, false },
   { "RUECKLAUFTEMP_QUELLE"                        , 0x4fa6, et_dec_val      , false, false },
@@ -4351,6 +4356,10 @@ const ElsterMeta ElsterMetaTable[] =
   { 0xfdf5, "ANTILEGIONELLEN_ZEITPUNKT", LNAME_ANTILEGIONELLEN_ZEITPUNKT, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
   { 0x0075, "RAUMFEUCHTE", "Raumfeuchte", "sensor", "humidity", "%", "measurement", "mdi:water-percent", NULL, NULL },
 #ifdef HA_ELSTER_WPL_FAMILY
+  { 0x4f91, "SPREIZUNG", "Spreizung", "sensor", "", "K", "measurement", "mdi:arrow-expand-vertical", NULL, NULL },
+  { 0x4f98, "MINIMALE_PUMPLEISTUNG", "Minimale Pumpleistung", "sensor", "", "%", "measurement", "mdi:pump", NULL, NULL },
+  { 0x4f99, "MAXIMALE_PUMPLEISTUNG", "Maximale Pumpleistung", "sensor", "", "%", "measurement", "mdi:pump", NULL, NULL },
+  { 0x4f9f, "UNTERKUEHLUNG_EXVENTIL_EIN", "Unterkühlung Exventil Ein", "sensor", "", "K", "measurement", "mdi:thermometer-lines", NULL, NULL },
 #endif
 };
 const unsigned ElsterMetaCount = sizeof(ElsterMetaTable) / sizeof(ElsterMetaTable[0]);

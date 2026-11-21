@@ -40,7 +40,7 @@ The key must match what HA's ESPHome integration has stored for this device. If 
 | `can_mosi_pin` | SPI MOSI (MCP2515 only) | board-specific — see note below |
 | `can_miso_pin` | SPI MISO (MCP2515 only) | board-specific — see note below |
 | `can_cs_pin` | SPI CS (MCP2515 only) | board-specific — see note below |
-| `can_bit_rate` | CAN bus speed: `20kbps` (CAN-A: WPL13E/WPF10/WPC7) or `50kbps` (CAN-B: WPL17/WPL23/WPL10AC) | `20kbps` |
+| `can_bit_rate` | CAN bus speed: `20kbps` (CAN-A: WPL13E/WPF10/WPC7) or `50kbps` (CAN-B: WPL17/WPL23/WPL10AC/WPLA7) | `20kbps` |
 | `disable_sg_ready` | `"true"` hides all SG Ready entities (models without SG Ready input) | `"false"` |
 | `read_only` | `"true"`: never write to the heat pump — no setpoint/mode/climate entities, clock buttons hidden; reading and bus scan keep working | `"false"` |
 | `network_package` | Network package from `ha-stiebel-control/`: `network_wifi.yaml` (WiFi + captive portal) or `network_ethernet_w5500.yaml` (W5500 Ethernet) | `"network_wifi.yaml"` |
