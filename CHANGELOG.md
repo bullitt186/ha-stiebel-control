@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Added
+
+- Optional observer `canTxObserver` in `can_io.h`: called with the sender id and the bytes of
+  every frame that `readSignalRaw()` and `writeSignal()` send. `nullptr` by default (no change).
+  Lets an external debug package stream the full bus traffic; received frames it can already
+  take with its own `on_frame` (`canbus: - id: !extend my_can`).
+
 ## [2.8.0] — 2026-11-21
 
 Firmware split into modules, writable numbers take their range from the heat pump, energy counters

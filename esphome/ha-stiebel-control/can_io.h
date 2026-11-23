@@ -28,6 +28,16 @@ static constexpr size_t ELSTER_VALUE_BUF_SIZE = 32;
 // damit die Scan-Firmware rein passiv auf dem Bus lauscht.
 static bool disableCanRequests = false;
 
+// Observer for every frame this node sends (e.g. an external debug package that streams the
+// bus). Set at static initialisation by the module that needs it, like requestManagerExtraStep
+// (#79); nullptr = none. Received frames need no hook: a package can add its own on_frame.
+using CanTxObserver = void (*)(uint32_t canId, const std::vector<uint8_t>& data);
+static CanTxObserver canTxObserver = nullptr;
+
+inline void notifyCanTx(uint32_t canId, const std::vector<uint8_t>& data) {
+    if (canTxObserver) canTxObserver(canId, data);
+}
+
 /**
  * Simple struct for CAN ID bytes (avoids heap allocation)
  */
@@ -221,6 +231,7 @@ void readSignalRaw(const CanMember *cm, uint16_t index, [[maybe_unused]] const c
              data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
 
     id(my_can).send_data(CanMembers[cm_pc].CanId, use_extended_id, data);
+    notifyCanTx(CanMembers[cm_pc].CanId, data);
 }
 
 void readSignal(const CanMember *cm, const ElsterIndex *ei)
@@ -293,6 +304,7 @@ void writeSignal(const CanMember *cm, const ElsterIndex *ei, const char *&strIn)
     ESP_LOGI("writeSignal()", "%s", logmsg);
 
     id(my_can).send_data(CanMembers[cm_pc].CanId, use_extended_id, data);
+    notifyCanTx(CanMembers[cm_pc].CanId, data);
     // Command echo: publish the read-back even if the value did not change
     forceNextStatePublish(*cm, ei);
     // The immediate read-back may still return the old value; read again once settled

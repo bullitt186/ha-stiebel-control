@@ -1524,6 +1524,55 @@ TEST_CASE("writeSignal: et_betriebsart with valid German string is sent", "[can]
     CHECK(fake_can().sent.size() == 1);
 }
 
+// TX observer: every sent frame is reported with the sender id (PC 0x680) and the frame bytes.
+// Expected bytes from the Elster frame layout: read request to MANAGER 0x480 = {0x91, 0x00, ...}
+// (see generate_read_id tests), short form for index <= 0xff, long form 0xFA <hi> <lo> above.
+namespace {
+struct TxRecord { uint32_t id; std::vector<uint8_t> data; };
+std::vector<TxRecord>& txRecords() { static std::vector<TxRecord> r; return r; }
+void recordTx(uint32_t canId, const std::vector<uint8_t>& data) { txRecords().push_back({canId, data}); }
+}  // namespace
+
+TEST_CASE("canTxObserver: reports read requests with sender id and frame bytes", "[can]") {
+    txRecords().clear();
+    fake_can().sent.clear();
+    canTxObserver = recordTx;
+    readSignalRaw(&CanMembers[cm_manager], 0x0005, "T");
+    readSignalRaw(&CanMembers[cm_manager], 0x0a20, "T");
+    canTxObserver = nullptr;
+    REQUIRE(txRecords().size() == 2);
+    CHECK(txRecords()[0].id == 0x680);
+    CHECK(txRecords()[0].data == std::vector<uint8_t>{0x91, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00});
+    CHECK(txRecords()[1].id == 0x680);
+    CHECK(txRecords()[1].data == std::vector<uint8_t>{0x91, 0x00, 0xFA, 0x0A, 0x20, 0x00, 0x00});
+    REQUIRE(fake_can().sent.size() == 2);
+    CHECK(fake_can().sent[1] == txRecords()[1].data);
+}
+
+TEST_CASE("canTxObserver: reports writes, MANAGER write id 0x90 0x00", "[can]") {
+    txRecords().clear();
+    fake_can().sent.clear();
+    canTxObserver = recordTx;
+    const char* value = LNAME_OPT_AUTOMATIK;
+    writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", value);
+    canTxObserver = nullptr;
+    REQUIRE(fake_can().sent.size() == 1);
+    REQUIRE(txRecords().size() == 1);
+    CHECK(txRecords()[0].id == 0x680);
+    CHECK(txRecords()[0].data[0] == 0x90);
+    CHECK(txRecords()[0].data[1] == 0x00);
+    CHECK(txRecords()[0].data == fake_can().sent[0]);
+}
+
+TEST_CASE("canTxObserver: nullptr reports nothing, frame is still sent", "[can]") {
+    txRecords().clear();
+    fake_can().sent.clear();
+    canTxObserver = nullptr;
+    readSignalRaw(&CanMembers[cm_manager], 0x0005, "T");
+    CHECK(fake_can().sent.size() == 1);
+    CHECK(txRecords().empty());
+}
+
 TEST_CASE("i18n: sgReadyOptions contains 4 non-empty entries", "[i18n]") {
     for (size_t i = 0; i < 4; ++i)
         CHECK(std::string(sgReadyOptions[i]).length() > 0);
