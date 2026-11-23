@@ -29,6 +29,10 @@ jobs:
           COUNT=$(./tests/run_tests --reporter compact 2>&1 | grep -c "passed")
           echo "Test assertions passing: $COUNT"
 
+      - name: Build and run tests without the CAN frame stream (default firmware)
+        if: matrix.model == 'test_model'
+        run: make test CAN_DEBUG_TEST_FLAGS=
+
       - name: Topic root follows device_name (#102)
         run: |
           make clean-tests
