@@ -212,7 +212,7 @@ Only after stage 1 has been installed, update to the later release whose
 CHANGELOG explicitly requires encrypted OTA. It will replace `password:` with
 `encryption: {}` while keeping the same `api_encryption_key`. Install it and
 confirm `Encryption: required`; only then remove `ota_password` from the local
-secrets file. The shared package in this PR intentionally still ships stage 1.
+secrets file. Until that release, the shared package ships stage 1.
 
 ESPHome **2027.3.0 removes the plaintext upload fallback**. Complete stage 1
 before upgrading the build tool to that version. Do not skip directly from

@@ -17,6 +17,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   plaintext upload fallback. Complete stage 1 before upgrading the build tool.
   See [the release-based migration guide](docs/INSTALLATION.md#ota-encryption-migration).
 
+### Fixed
+
+- `FESTWERT` (manager `0x01c0`, fixed-value setpoint) was decoded byte-swapped, so 40.5 °C showed
+  as 38145. It is a tenths value like the other setpoints (checked on a WPMW II by SolderAndSyntax).
+
+### Changed
+
+- MQTT keepalive 15 s → 60 s. With 15 s the ESP dropped its MQTT connection about twice a day for
+  10–15 s (`mqtt_client: No PING_RESP, disconnected`) after a short receive stall on WiFi, while the
+  broker and other clients on the same access point stayed connected. A real outage of the ESP now
+  shows as `offline` in Home Assistant after about 90 s instead of about 22 s.
+
 ## [2.8.0] — 2026-11-21
 
 Firmware split into modules, writable numbers take their range from the heat pump, energy counters
