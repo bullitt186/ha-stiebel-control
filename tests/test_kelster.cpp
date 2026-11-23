@@ -411,6 +411,10 @@ TEST_CASE("WPL-A 07: corrected types decode the displayed values", "[kelster][wp
         {0x4f2b, "STEIGUNG_HEIZKURVE", 40, "0.40"},                        // display 0.40, raw 40
         {0x4fac, "VERDICHTERDREHZAHLGRENZE", 1028, "1028"},                // display 1028, plain integer
         {0x4f28, "ANTILEGIONELLENBEHANDLUNG", 0x0001, "on"},               // display EIN
+        {0x02e2, "WP_WASSERVOLUMENSTROM", 100, "10.0"},                    // display 10.0 l/min
+        {0x0a36, "FROSTSCHUTZTEMPERATUR", 583, "58.3"},                    // scan 58.3 C
+        {0x0a37, "VERFLUESSIGER_TEMP_WPLA", 474, "47.4"},                  // display 47.4 C
+        {0x0a39, "OELSUMPFTEMP", 792, "79.2"},                             // display 79.2 C
     };
     for (const TypeCase& c : cases) {
         INFO("index " << std::hex << c.index << " " << c.name);
@@ -430,6 +434,7 @@ TEST_CASE("WPL-A 07: corrected rows carry the units of the display", "[kelster][
     struct MetaCase { unsigned short index; const char* unit; };
     const MetaCase cases[] = {
         {0x07a6, "bar"}, {0x07a7, "bar"}, {0x07a9, "\xC2\xB0" "C"}, {0x07ca, "%"}, {0x07f6, "%"}, {0x07f4, "K"},
+        {0x02e2, "l/min"}, {0x0a36, "\xC2\xB0" "C"}, {0x0a37, "\xC2\xB0" "C"}, {0x0a39, "\xC2\xB0" "C"},
     };
     for (const MetaCase& c : cases) {
         INFO("index " << std::hex << c.index);
@@ -457,6 +462,7 @@ TEST_CASE("other models keep the upstream types of the rows corrected for the WP
         {0x033d, et_default}, {0x07ca, et_default}, {0x07f6, et_default}, {0x07f7, et_default},
         {0x07f8, et_default}, {0x07f9, et_default}, {0x4f28, et_default},
         {0x4f2b, et_dec_val}, {0x4fac, et_dec_val},
+        {0x02e2, et_default}, {0x0a36, et_default}, {0x0a37, et_default}, {0x0a39, et_default},
         {0x07a6, t07a6}, {0x07a7, t07a6}, {0x07a9, t07a9}, {0x07f4, t07a9},
     };
     for (const Keep& k : keep) {

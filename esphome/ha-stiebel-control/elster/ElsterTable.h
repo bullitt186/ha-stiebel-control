@@ -807,7 +807,11 @@ const ElsterIndex ElsterTable[] =
   { "WE_KONFIG_OK"                                , 0x02df, 0               , false, false },
   { "BUS_SCAN"                                    , 0x02e0, 0               , false, false },
   { "WE2_ISTTEMP"                                 , 0x02e1, 0               , false, false },
+#if defined(HA_CONTROLLER_WPLA)
+  { "WP_WASSERVOLUMENSTROM"                       , 0x02e2, et_dec_val      , false, true  }, // WPL-A 07: display 10.0 l/min; was WE_KONFIGURATION
+#else
   { "WE_KONFIGURATION"                            , 0x02e2, 0               , false, false },
+#endif
   { "VOLUMENSTROM_PUMPE_HZK"                      , 0x02e3, 0               , false, false },
   { "VOLUMENSTROM_PUMPE_SPL"                      , 0x02e4, 0               , false, false },
   { "VOLUMENSTROM_PUMPE_WW_PRI"                   , 0x02e5, 0               , false, false },
@@ -2589,10 +2593,22 @@ const ElsterIndex ElsterTable[] =
   { "EINGANG11"                                   , 0x0a33, 0               , false, false },
   { "EINGANG12"                                   , 0x0a34, 0               , false, false },
   { "EINGANG13"                                   , 0x0a35, 0               , false, false },
+#if defined(HA_CONTROLLER_WPLA)
+  { "FROSTSCHUTZTEMPERATUR"                       , 0x0a36, et_dec_val      , false, true  }, // WPL-A 07: display name "Frostschutztemperatur"; was EINGANG14
+#else
   { "EINGANG14"                                   , 0x0a36, 0               , false, false },
+#endif
+#if defined(HA_CONTROLLER_WPLA)
+  { "VERFLUESSIGER_TEMP_WPLA"                     , 0x0a37, et_dec_val      , false, true  }, // WPL-A 07: display "Verfluessigertemperatur"; was EINGANG15 (suffix: VERFLUESSIGERTEMP exists)
+#else
   { "EINGANG15"                                   , 0x0a37, 0               , false, false },
+#endif
   { "EINGANG16"                                   , 0x0a38, 0               , false, false },
+#if defined(HA_CONTROLLER_WPLA)
+  { "OELSUMPFTEMP"                                , 0x0a39, et_dec_val      , false, true  }, // WPL-A 07: display "Oelsumpftemperatur"; was EINGANG17
+#else
   { "EINGANG17"                                   , 0x0a39, 0               , false, false },
+#endif
   { "EINGANG18"                                   , 0x0a3a, 0               , false, false },
   { "EINGANG19"                                   , 0x0a3b, 0               , false, false },
   { "EINGANG20"                                   , 0x0a3c, 0               , false, false },
@@ -4407,6 +4423,10 @@ const ElsterMeta ElsterMetaTable[] =
   { 0x07f9, "D_ANTEIL_EXV", "D-Anteil EXV", "sensor", "", "", "measurement", "mdi:tune-variant", NULL, NULL },
   { 0x4f28, "ANTILEGIONELLENBEHANDLUNG", "Antilegionellenbehandlung", "binary_sensor", "", "", "", "mdi:bacteria-outline", "on", "off" },
   { 0x4f2b, "STEIGUNG_HEIZKURVE", "HK1 Steigung Heizkurve", "sensor", "", "", "", "mdi:chart-line", NULL, NULL },
+  { 0x02e2, "WP_WASSERVOLUMENSTROM", "WP Wasservolumenstrom", "sensor", "", "l/min", "measurement", "mdi:water-pump", NULL, NULL },
+  { 0x0a36, "FROSTSCHUTZTEMPERATUR", "Frostschutztemperatur", "sensor", "temperature", "°C", "measurement", "mdi:snowflake-thermometer", NULL, NULL },
+  { 0x0a37, "VERFLUESSIGER_TEMP_WPLA", "Verflüssigertemperatur", "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL },
+  { 0x0a39, "OELSUMPFTEMP", "Ölsumpftemperatur", "sensor", "temperature", "°C", "measurement", "mdi:thermometer", NULL, NULL },
 #endif
 };
 const unsigned ElsterMetaCount = sizeof(ElsterMetaTable) / sizeof(ElsterMetaTable[0]);

@@ -131,6 +131,10 @@ extern const SignalRequest signalRequests[] = {
     {"P_ANTEIL_EXV",                          FREQ_1MIN,  cm_heizmodul_wpl},   // 0x07f7
     {"I_ANTEIL_EXV",                          FREQ_1MIN,  cm_heizmodul_wpl},   // 0x07f8
     {"UNTERK_COND",                           FREQ_1MIN,  cm_heizmodul_wpl},   // 0x0aff condenser subcooling
+    {"WP_WASSERVOLUMENSTROM",                 FREQ_1MIN,  cm_heizmodul_wpl},   // 0x02e2 l/min
+    {"FROSTSCHUTZTEMPERATUR",                 FREQ_1MIN,  cm_heizmodul_wpl},   // 0x0a36 °C, meaning of the value open
+    {"VERFLUESSIGER_TEMP_WPLA",               FREQ_1MIN,  cm_heizmodul_wpl},   // 0x0a37 °C
+    {"OELSUMPFTEMP",                          FREQ_1MIN,  cm_heizmodul_wpl},   // 0x0a39 °C
 
     // ========================================================================
     // MISCHERMODUL_2 (0x601) - heating circuit 1
