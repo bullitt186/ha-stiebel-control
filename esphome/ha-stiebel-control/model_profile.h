@@ -74,19 +74,21 @@ struct ModelProfile {
     bool dhwActualOnKesselCanb;   // DHW actual temperature SPEICHERISTTEMP read from KESSEL_CANB (0x201)
     bool compressorFromKessel;    // HEIZMODUL answers VERDICHTER with placeholders; the compressor
                                   // state comes from KESSEL BETRIEBS_STATUS (TTL 33, #68, #83, #131)
+    bool defrostFromKessel;       // HEIZMODUL answers ZEITDAUER_LETZTE_ABTAUUNG with a placeholder;
+                                  // "defrost running" is KESSEL BETRIEBS_STATUS bit 0x0040 (TTL 33, #136)
 
     constexpr bool heatingCurveWritable() const { return canBRoutes || wpmw2WritesVerified; }
 };
 
-//                                       wpmw2  verified single canB   canBDhw perMember ignoreIws dhwActualCanb kesselVd
-inline constexpr ModelProfile kProfileGeneric{false, false,   false, false, false,  false,    false,    false,        false};
-inline constexpr ModelProfile kProfileWpl9   {false, false,   false, false, true,   false,    false,    false,        false};
-inline constexpr ModelProfile kProfileWpl13e {true,  true,    false, false, false,  false,    true,     false,        false};
-inline constexpr ModelProfile kProfileWpl17  {false, false,   true,  true,  false,  true,     false,    false,        false};
+//                                       wpmw2  verified single canB   canBDhw perMember ignoreIws dhwActualCanb kesselVd kesselDefrost
+inline constexpr ModelProfile kProfileGeneric{false, false,   false, false, false,  false,    false,    false,        false,   false};
+inline constexpr ModelProfile kProfileWpl9   {false, false,   false, false, true,   false,    false,    false,        false,   false};
+inline constexpr ModelProfile kProfileWpl13e {true,  true,    false, false, false,  false,    true,     false,        false,   false};
+inline constexpr ModelProfile kProfileWpl17  {false, false,   true,  true,  false,  true,     false,    false,        false,   false};
 // WPL18E polls the wpl13e table; WPMW II writes are not checked on its display yet
-inline constexpr ModelProfile kProfileWpl18e {true,  false,   false, false, false,  false,    false,    false,        false};
-inline constexpr ModelProfile kProfileTtl33  {true,  true,    false, false, false,  false,    false,    false,        true};
-inline constexpr ModelProfile kProfileWpla7  {false, false,   true,  false, true,   false,    false,    true,         false};
+inline constexpr ModelProfile kProfileWpl18e {true,  false,   false, false, false,  false,    false,    false,        false,   false};
+inline constexpr ModelProfile kProfileTtl33  {true,  true,    false, false, false,  false,    false,    false,        true,    true};
+inline constexpr ModelProfile kProfileWpla7  {false, false,   true,  false, true,   false,    false,    true,         false,   false};
 
 #if HA_MODEL_ID == HA_MODEL_ID_wpl9
 inline constexpr const ModelProfile& kModel = kProfileWpl9;
