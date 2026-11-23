@@ -1950,15 +1950,14 @@ TEST_CASE("scan: answers of the scanned member are published, 0x8000 is not", "[
     startScan("HEIZMODUL");
     REQUIRE(scanState.table);
     mqtt_client_instance().clear();
-    const ElsterIndex* ei = GetElsterIndex("VERDICHTER");
     std::vector<uint8_t> hit = {0xD2, 0x00, 0xFA, 0x07, 0xA8, 0x00, 0x08};
-    CHECK(handleScanFrame(CanMembers[cm_heizmodul], ei, hit, "0.8"));
+    CHECK(handleScanFrame(0x500, hit));
     CHECK(mqttFindPayload("scan/HEIZMODUL/0x07a8") == "{\"name\":\"VERDICHTER\",\"raw\":8,\"value\":\"0.8\"}");
     mqtt_client_instance().clear();
     std::vector<uint8_t> none = {0xD2, 0x00, 0xFA, 0x07, 0xA8, 0x80, 0x00};
-    CHECK(handleScanFrame(CanMembers[cm_heizmodul], ei, none, "-255"));
+    CHECK(handleScanFrame(0x500, none));
     CHECK(mqtt_client_instance().messages.empty());
-    CHECK_FALSE(handleScanFrame(CanMembers[cm_manager], ei, hit, "0.8"));   // other member: normal path
+    CHECK_FALSE(handleScanFrame(0x480, hit));   // other member: normal path
     CHECK(scanState.hits == 1);
     scanState = ScanState{};
 }
