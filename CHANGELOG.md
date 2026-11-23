@@ -9,6 +9,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Fixed
 
+- TTL 33: "Abtauung läuft" never turned on, because the heat pump module answers
+  `ZEITDAUER_LETZTE_ABTAUUNG` with the placeholder 255. On `ttl33` it now comes from KESSEL
+  `BETRIEBS_STATUS` bit `0x0040`, which SolderAndSyntax saw set during two defrosts and not
+  otherwise (#136).
 - `FESTWERT` (manager `0x01c0`, fixed-value setpoint) was decoded byte-swapped, so 40.5 °C showed
   as 38145. It is a tenths value like the other setpoints (checked on a WPMW II by SolderAndSyntax).
 
