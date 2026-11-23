@@ -17,6 +17,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   plaintext upload fallback. Complete stage 1 before upgrading the build tool.
   See [the release-based migration guide](docs/INSTALLATION.md#ota-encryption-migration).
 
+### Added
+
+- New model `wpla7` (WPL-A 07, 1 heating circuit, CAN 50 kbps), contributed by bastard-GIT:
+  `wpla7.yaml`, the signal request table `signal_requests_wpla7.h`, and the CI compile target
+  `ci_heatingpump_wpla7.yaml`. Verified on a WPL-A 07 230 Premium. Types and units of 13 existing
+  rows and names of four former placeholder rows (0x02e2, 0x0a36, 0x0a37, 0x0a39) follow the display
+  check; they only apply to this model (#129). Operating mode names as on its display (the WPM3 set:
+  Programmierbetrieb, Komfortbetrieb, Eco-Modus, …). Model profile flag `dhwActualOnKesselCanb` for
+  the DHW actual temperature on `KESSEL_CANB` (#119).
+
+- Raw CAN frame stream for bus analysis (`can_debug.h`): `<root>/can_debug/set` `on`/`off` streams
+  every received and sent frame as JSON to `<root>/can_debug/frames`, state on
+  `<root>/can_debug/state`. Opt-in: built in only with substitution `can_debug: "true"` (default
+  `"false"`). When built in, off by default and after a restart. Works with TWAI and MCP2515; RAM is
+  allocated only while on, size via substitution `can_debug_queue_size` (default 256 frames). See
+  docs/CONFIGURATION.md "CAN frame stream".
+- Frame observers `canRxObserver`/`canTxObserver` in `can_io.h`: raw frames before any filter of
+  `processAndUpdate()` and after every `send_data()`. Used by `can_debug.h`; compiled in only with
+  `can_debug: "true"`, otherwise empty inline hooks.
+
 ### Fixed
 
 - `FESTWERT` (manager `0x01c0`, fixed-value setpoint) was decoded byte-swapped, so 40.5 °C showed
