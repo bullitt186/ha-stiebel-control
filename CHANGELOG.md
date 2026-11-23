@@ -17,6 +17,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   Programmierbetrieb, Komfortbetrieb, Eco-Modus, …). Model profile flag `dhwActualOnKesselCanb` for
   the DHW actual temperature on `KESSEL_CANB` (#119).
 
+- Raw CAN frame stream for bus analysis (`can_debug.h`): `<root>/can_debug/set` `on`/`off` streams
+  every received and sent frame as JSON to `<root>/can_debug/frames`, state on
+  `<root>/can_debug/state`. Opt-in: built in only with substitution `can_debug: "true"` (default
+  `"false"`). When built in, off by default and after a restart. Works with TWAI and MCP2515; RAM is
+  allocated only while on, size via substitution `can_debug_queue_size` (default 256 frames). See
+  docs/CONFIGURATION.md "CAN frame stream".
+- Frame observers `canRxObserver`/`canTxObserver` in `can_io.h`: raw frames before any filter of
+  `processAndUpdate()` and after every `send_data()`. Used by `can_debug.h`; compiled in only with
+  `can_debug: "true"`, otherwise empty inline hooks.
+
+### Fixed
+
+- `FESTWERT` (manager `0x01c0`, fixed-value setpoint) was decoded byte-swapped, so 40.5 °C showed
+  as 38145. It is a tenths value like the other setpoints (checked on a WPMW II by SolderAndSyntax).
+
 ### Changed
 
 - MQTT keepalive 15 s → 60 s. With 15 s the ESP dropped its MQTT connection about twice a day for

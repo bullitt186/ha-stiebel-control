@@ -34,6 +34,7 @@ ha-stiebel-control/
 │       ├── signal_route.h                  # Signal key and model route (pure C++)
 │       ├── mqtt_publish.h                  # MQTT publish, publish-on-change state cache
 │       ├── can_io.h                        # Frame decode, read/write requests, read-back
+│       ├── can_debug.h                     # Raw CAN frame stream over MQTT (opt-in: can_debug "true")
 │       ├── paced_writes.h                  # Paced write queue (SG Ready, time programs)
 │       ├── discovery.h                     # HA device blocks and discovery payloads
 │       ├── bus_scan.h                      # Bus scan of one member
@@ -140,7 +141,8 @@ modules and not listed.
 |---|---|---|
 | `signal_route.h` | Signal key (`signalKey()`) and model route (`resolveSignalRoute()`), pure C++ | — |
 | `mqtt_publish.h` | `mqttPublish()` with failure counter, publish-on-change state cache | signal_route |
-| `can_io.h` | Frame decode, read/write requests, read-back after a write, clock/date writes | signal_route, mqtt_publish |
+| `can_io.h` | Frame decode, read/write requests, read-back after a write, clock/date writes, RX/TX frame observers | signal_route, mqtt_publish |
+| `can_debug.h` | Raw CAN frame stream over MQTT (`<root>/can_debug/…`) | can_io, mqtt_publish |
 | `paced_writes.h` | Paced write queue for SG Ready and the time programs | can_io |
 | `discovery.h` | HA device blocks, default entity IDs, discovery of raw signals and calculated sensors | signal_route, mqtt_publish |
 | `bus_scan.h` | Bus scan of one CAN member | can_io, mqtt_publish |

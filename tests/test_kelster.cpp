@@ -473,3 +473,14 @@ TEST_CASE("other models keep the upstream types of the rows corrected for the WP
     }
 }
 #endif
+
+TEST_CASE("FESTWERT (0x01c0) decodes as a tenths setpoint (#135)", "[kelster]") {
+    // WPMW II (TTL 33) answers raw 0x0195 after 40.5 °C was set on the display.
+    const ElsterIndex* ei = GetElsterIndex((unsigned short)0x01c0);
+    REQUIRE(std::string(ei->Name) == "FESTWERT");
+    char val[32];
+    SetValueType(val, ei->Type, 0x0195);
+    CHECK(std::string(val) == "40.5");
+    SetValueType(val, ei->Type, 0x0000);  // fixed-value mode off
+    CHECK(std::string(val) == "0.0");
+}

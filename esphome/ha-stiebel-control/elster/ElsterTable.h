@@ -493,7 +493,7 @@ const ElsterIndex ElsterTable[] =
   // Zirkulationspumpe: 0x0080
   { "SOLARDIFFERENZ"                              , 0x01b8, et_dec_val      , false, false },
   // Regelung / Festwertregelung
-  { "FESTWERT"                                    , 0x01c0, et_little_endian, false, false },
+  { "FESTWERT"                                    , 0x01c0, et_dec_val      , false, false },
   { "UNTERE_GRENZE_MINKESSELTEMP"                 , 0x018b, 0               , false, false },
   { "SERVICE_MINUTEN"                             , 0x018c, 0               , false, false },
   { "KONFIG_KONTAKT_OHNE_SPF"                     , 0x018d, 0               , false, false },

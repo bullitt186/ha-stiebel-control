@@ -28,6 +28,27 @@ static constexpr size_t ELSTER_VALUE_BUF_SIZE = 32;
 // damit die Scan-Firmware rein passiv auf dem Bus lauscht.
 static bool disableCanRequests = false;
 
+// Observers for the raw frames on the bus: every received frame (processAndUpdate(), before
+// any filter) and every frame this node sends (after send_data()). can_debug.h installs them
+// at static initialisation, like the device limit hooks of writables.h (#79); nullptr = none.
+// Opt-in: only with substitution can_debug: "true" (-DHA_CAN_DEBUG_true); otherwise both are no-ops.
+#ifdef HA_CAN_DEBUG_true
+using CanFrameObserver = void (*)(uint32_t canId, const std::vector<uint8_t>& data);
+static CanFrameObserver canRxObserver = nullptr;
+static CanFrameObserver canTxObserver = nullptr;
+
+inline void notifyCanRx(uint32_t canId, const std::vector<uint8_t>& data) {
+    if (canRxObserver) canRxObserver(canId, data);
+}
+
+inline void notifyCanTx(uint32_t canId, const std::vector<uint8_t>& data) {
+    if (canTxObserver) canTxObserver(canId, data);
+}
+#else
+inline void notifyCanRx(uint32_t, const std::vector<uint8_t>&) {}
+inline void notifyCanTx(uint32_t, const std::vector<uint8_t>&) {}
+#endif
+
 /**
  * Simple struct for CAN ID bytes (avoids heap allocation)
  */
@@ -221,6 +242,7 @@ void readSignalRaw(const CanMember *cm, uint16_t index, [[maybe_unused]] const c
              data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
 
     id(my_can).send_data(CanMembers[cm_pc].CanId, use_extended_id, data);
+    notifyCanTx(CanMembers[cm_pc].CanId, data);
 }
 
 void readSignal(const CanMember *cm, const ElsterIndex *ei)
@@ -293,6 +315,7 @@ void writeSignal(const CanMember *cm, const ElsterIndex *ei, const char *&strIn)
     ESP_LOGI("writeSignal()", "%s", logmsg);
 
     id(my_can).send_data(CanMembers[cm_pc].CanId, use_extended_id, data);
+    notifyCanTx(CanMembers[cm_pc].CanId, data);
     // Command echo: publish the read-back even if the value did not change
     forceNextStatePublish(*cm, ei);
     // The immediate read-back may still return the old value; read again once settled
