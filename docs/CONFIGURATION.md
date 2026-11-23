@@ -43,6 +43,7 @@ The key must match what HA's ESPHome integration has stored for this device. If 
 | `can_bit_rate` | CAN bus speed: `20kbps` (CAN-A: WPL13E/WPF10/WPC7) or `50kbps` (CAN-B: WPL17/WPL23/WPL10AC) | `20kbps` |
 | `disable_sg_ready` | `"true"` hides all SG Ready entities (models without SG Ready input) | `"false"` |
 | `read_only` | `"true"`: never write to the heat pump — no setpoint/mode/climate entities, clock buttons hidden; reading and bus scan keep working | `"false"` |
+| `can_debug_queue_size` | Frames the CAN frame stream buffers (16 bytes each, plus a 2 KB JSON buffer); RAM is used only while the stream is on. Lower it (minimum 8) on boards with little free RAM | `"256"` |
 | `network_package` | Network package from `ha-stiebel-control/`: `network_wifi.yaml` (WiFi + captive portal) or `network_ethernet_w5500.yaml` (W5500 Ethernet) | `"network_wifi.yaml"` |
 | `eth_clk_pin` … `eth_rst_pin` | W5500 SPI pins (`eth_clk_pin`, `eth_mosi_pin`, `eth_miso_pin`, `eth_cs_pin`, `eth_int_pin`, `eth_rst_pin`), only with `network_ethernet_w5500.yaml` | Waveshare ESP32-S3-POE-ETH: GPIO13/11/12/14/10/9 |
 
@@ -531,8 +532,13 @@ frames the firmware ignores) and every frame this node sends. Off by default and
 
 `t` = milliseconds since boot, `id` = CAN id of the sender (`0x680` = this node), `d` = data bytes in hex,
 `tx` = sent by this node. The frames are not decoded; decode them offline (Elster telegram type in the low
-nibble of byte 0, index in byte 2 or bytes 3–4 after `0xfa`). Up to 256 frames are buffered while MQTT is
-busy; further frames are dropped and counted in a warning on the log.
+nibble of byte 0, index in byte 2 or bytes 3–4 after `0xfa`). Up to `can_debug_queue_size` frames (default
+256) are buffered while MQTT is busy; further frames are dropped and counted in a warning on the log.
+
+Works with both CAN controllers (built-in TWAI and MCP2515 over SPI): received frames are taken in
+`processAndUpdate()`, sent frames after `send_data()`. RAM: none while off; `on` allocates the buffer
+(default 256 × 16 bytes + 2 KB) and `off` frees it. If the allocation fails, the stream stays off and
+the log shows a warning; lower `can_debug_queue_size` then.
 
 ```bash
 mosquitto_pub -h BROKER -u USER -P PASS -t heatingpump/can_debug/set -m on

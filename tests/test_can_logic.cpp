@@ -1670,13 +1670,33 @@ TEST_CASE("can_debug: unknown command changes nothing", "[can_debug]") {
 TEST_CASE("can_debug: at most CAN_DEBUG_BATCH frames per message", "[can_debug]") {
     canDebugReset();
     canDebugCommand("on");
-    for (int i = 0; i < 40; i++) processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    // A full queue goes out in ceil(QUEUE / BATCH) messages, the first one exactly BATCH frames
+    for (size_t i = 0; i < CAN_DEBUG_QUEUE; i++)
+        processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
     canDebugStep();
     REQUIRE(canDebugBatches().size() == 1);
     CHECK(countFrames(canDebugBatches()) == CAN_DEBUG_BATCH);
-    canDebugStep();
-    CHECK(canDebugBatches().size() == 2);
-    CHECK(countFrames(canDebugBatches()) == 40);
+    const size_t messages = (CAN_DEBUG_QUEUE + CAN_DEBUG_BATCH - 1) / CAN_DEBUG_BATCH;
+    for (size_t i = 1; i < messages + 2; i++) canDebugStep();
+    CHECK(canDebugBatches().size() == messages);
+    CHECK(countFrames(canDebugBatches()) == CAN_DEBUG_QUEUE);
+    canDebugReset();
+}
+
+TEST_CASE("can_debug: memory only while on", "[can_debug]") {
+    canDebugReset();
+    CHECK(canDebugQueue == nullptr);
+    CHECK(canDebugBuf == nullptr);
+    canDebugCommand("on");
+    REQUIRE(canDebugQueue != nullptr);
+    const CanDebugFrame* first = canDebugQueue;
+    processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    canDebugCommand("on");   // again: same memory, empty queue
+    CHECK(canDebugQueue == first);
+    CHECK(canDebugCount == 0);
+    canDebugCommand("off");
+    CHECK(canDebugQueue == nullptr);
+    CHECK(canDebugBuf == nullptr);
     canDebugReset();
 }
 

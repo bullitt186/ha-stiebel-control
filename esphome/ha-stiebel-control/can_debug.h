@@ -9,9 +9,14 @@
  *   <root>/can_debug/frames  JSON array, not retained, at most CAN_DEBUG_BATCH frames per message:
  *                            [{"t":<ms since boot>,"id":"0x180","d":"<data bytes hex>","tx":false},...]
  *
- * The frames are raw: tools decode them offline (sender id, Elster telegram type, index, value).
+ * Independent of the CAN controller: RX comes from processAndUpdate() (on_frame of both
+ * can_esp32.yaml and can_mcp2515.yaml), TX from the canbus send_data() calls in can_io.h.
  * Hooks into can_io.h via canRxObserver/canTxObserver, installed at static initialisation like
  * the device limit hooks of writables.h (#79).
+ *
+ * RAM: nothing while off. "on" allocates the queue (CAN_DEBUG_QUEUE_SIZE frames x 16 bytes,
+ * substitution can_debug_queue_size) and the JSON buffer (CAN_DEBUG_BATCH x 64 bytes) on the
+ * heap; "off" frees both. If the allocation fails the stream stays off.
  */
 
 #ifndef CAN_DEBUG_H
@@ -19,14 +24,23 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
+#include <new>
 #include <string>
 #include <vector>
 #include "config.h"
 #include "mqtt_publish.h"
 #include "can_io.h"
 
-static constexpr size_t CAN_DEBUG_QUEUE = 256;   // frames buffered between two publishes
-static constexpr size_t CAN_DEBUG_BATCH = 32;    // frames per MQTT message
+// Frames buffered between two publishes (build flag from substitution can_debug_queue_size)
+#ifndef CAN_DEBUG_QUEUE_SIZE
+#define CAN_DEBUG_QUEUE_SIZE 256
+#endif
+static constexpr size_t CAN_DEBUG_QUEUE = CAN_DEBUG_QUEUE_SIZE;
+static_assert(CAN_DEBUG_QUEUE >= 8, "can_debug_queue_size must be at least 8");
+// Frames per MQTT message
+static constexpr size_t CAN_DEBUG_BATCH = CAN_DEBUG_QUEUE < 32 ? CAN_DEBUG_QUEUE : 32;
+static constexpr size_t CAN_DEBUG_BUF_SIZE = CAN_DEBUG_BATCH * 64 + 4;   // one frame <= 63 chars
 
 struct CanDebugFrame {
     uint32_t t;        // millis() when queued
@@ -36,19 +50,27 @@ struct CanDebugFrame {
     bool tx;           // true = sent by this node
 };
 
-static CanDebugFrame canDebugQueue[CAN_DEBUG_QUEUE];
-static size_t canDebugHead = 0;            // oldest queued frame
+static CanDebugFrame* canDebugQueue = nullptr;   // heap, only while on
+static char* canDebugBuf = nullptr;              // heap, only while on
+static size_t canDebugHead = 0;                  // oldest queued frame
 static size_t canDebugCount = 0;
-static uint32_t canDebugDropped = 0;       // frames lost because the queue was full (since "on")
+static uint32_t canDebugDropped = 0;             // frames lost because the queue was full (since "on")
 static uint32_t canDebugDroppedLogged = 0;
 static bool canDebugEnabled = false;
-static bool canDebugStatePending = true;   // publish <root>/can_debug/state (boot, command)
+static bool canDebugStatePending = true;         // publish <root>/can_debug/state (boot, command)
 
 inline void canDebugClear() {
     canDebugHead = 0;
     canDebugCount = 0;
     canDebugDropped = 0;
     canDebugDroppedLogged = 0;
+}
+
+inline void canDebugFree() {
+    delete[] canDebugQueue;
+    delete[] canDebugBuf;
+    canDebugQueue = nullptr;
+    canDebugBuf = nullptr;
 }
 
 inline void canDebugPush(uint32_t canId, const std::vector<uint8_t>& data, bool tx) {
@@ -69,14 +91,25 @@ inline void canDebugPush(uint32_t canId, const std::vector<uint8_t>& data, bool 
 inline void canDebugOnRx(uint32_t canId, const std::vector<uint8_t>& data) { canDebugPush(canId, data, false); }
 inline void canDebugOnTx(uint32_t canId, const std::vector<uint8_t>& data) { canDebugPush(canId, data, true); }
 
-// <root>/can_debug/set: "on" starts with an empty queue, "off" stops and discards the queue.
+// <root>/can_debug/set: "on" starts with an empty queue, "off" stops and frees the memory.
 inline void canDebugCommand(const std::string& payload) {
     if (payload == "on") {
+        if (canDebugQueue == nullptr) {
+            canDebugQueue = new (std::nothrow) CanDebugFrame[CAN_DEBUG_QUEUE];
+            canDebugBuf = new (std::nothrow) char[CAN_DEBUG_BUF_SIZE];
+            if (canDebugQueue == nullptr || canDebugBuf == nullptr) {
+                canDebugFree();
+                ESP_LOGW("can_debug", "Not enough memory for %u frames, stream stays off "
+                         "(lower can_debug_queue_size)", static_cast<unsigned>(CAN_DEBUG_QUEUE));
+                return;
+            }
+        }
         canDebugClear();
         canDebugEnabled = true;
     } else if (payload == "off") {
         canDebugEnabled = false;
         canDebugClear();
+        canDebugFree();
     } else {
         ESP_LOGW("can_debug", "Unknown command '%s' (expected on/off)", payload.c_str());
         return;
@@ -90,7 +123,7 @@ inline void canDebugCommand(const std::string& payload) {
 inline size_t canDebugFormatBatch(char* out, size_t cap, size_t maxFrames) {
     size_t pos = 0;
     size_t n = 0;
-    if (cap < 3) return 0;
+    if (out == nullptr || cap < 3) return 0;
     out[pos++] = '[';
     while (n < maxFrames && n < canDebugCount) {
         const CanDebugFrame& f = canDebugQueue[(canDebugHead + n) % CAN_DEBUG_QUEUE];
@@ -120,11 +153,10 @@ inline void canDebugStep() {
         canDebugDroppedLogged = canDebugDropped;
     }
     if (!canDebugEnabled || canDebugCount == 0) return;
-    static char buf[CAN_DEBUG_BATCH * 64 + 4];
-    const size_t n = canDebugFormatBatch(buf, sizeof(buf), CAN_DEBUG_BATCH);
+    const size_t n = canDebugFormatBatch(canDebugBuf, CAN_DEBUG_BUF_SIZE, CAN_DEBUG_BATCH);
     if (n == 0) return;
     // Not retained; on failure (e.g. not connected) the frames stay queued for the next call
-    if (!mqttPublish(HA_TOPIC_ROOT "/can_debug/frames", buf, strlen(buf), false)) return;
+    if (!mqttPublish(HA_TOPIC_ROOT "/can_debug/frames", canDebugBuf, strlen(canDebugBuf), false)) return;
     canDebugHead = (canDebugHead + n) % CAN_DEBUG_QUEUE;
     canDebugCount -= n;
 }
