@@ -1,8 +1,8 @@
 /*
- * Signal Request Table - WPL-A Heat Pump (Air-Source) with HSBC 300 cool (integrated WPM3)
+ * Signal Request Table - WPL-A Heat Pump (Air-Source) with HSBC 300 cool (integrated manager, shown as WPM4 on the display)
  *
  * Verified on real hardware: WPL-A 07 HK 230 Premium + integral cylinder HSBC 300 cool
- * (integrated manager WPM3), built-in CAN at 50 kbit/s, sender 0x680.
+ * (integrated manager, shown as WPM4 on the display), built-in CAN at 50 kbit/s, sender 0x680.
  *
  * Member layout on the WPL-A 07:
  *   KESSEL         0x180 - outside temp, buffer, flow, operating status 0x0176, DHW params 0x4fxx

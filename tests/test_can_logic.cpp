@@ -2484,7 +2484,7 @@ TEST_CASE("model profile: one place decides the model's capabilities (#94)", "[m
     CHECK(kModel.ignoreUnusedIwsRuntime == (m == "wpl13e"));
     CHECK(kModel.dhwActualOnKesselCanb == (m == "wpla7"));
 #ifdef HA_CONTROLLER_WPM3
-    CHECK(m == "wpl10ac");
+    CHECK((m == "wpl10ac" || m == "wpla7"));
     CHECK(std::string(SG_READY_NORMAL_MODE) == "Komfortbetrieb");
 #endif
 }
@@ -2496,6 +2496,18 @@ TEST_CASE("model profile: WPL-A 07 selects its own profile (wpla7)", "[model][wp
     CHECK(kModel.singleHeatingCircuit);
     CHECK(kModel.canBDhwRoutes);
     CHECK(kModel.dhwActualOnKesselCanb);
+}
+
+TEST_CASE("WPL-A 07: operating mode names as shown on its display (#119)", "[model][wpla7]") {
+    // Display list from #119 (2026-11-23): Bereitschaftsbetrieb, Programmierbetrieb,
+    // Komfortbetrieb, Eco-Modus, Notbetrieb
+    CHECK(std::string(LNAME_OPT_BEREITSCHAFT) == "Bereitschaftsbetrieb");
+    CHECK(std::string(LNAME_OPT_AUTOMATIK) == "Programmierbetrieb");
+    CHECK(std::string(LNAME_OPT_TAGBETRIEB) == "Komfortbetrieb");
+    CHECK(std::string(LNAME_OPT_ABSENKBETRIEB) == "Eco-Modus");
+    char val[32];
+    SetValueType(val, GetElsterIndex("PROGRAMMSCHALTER")->Type, 0x0200);
+    CHECK(std::string(val) == "Programmierbetrieb");
 }
 #endif
 

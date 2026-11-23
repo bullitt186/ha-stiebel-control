@@ -41,8 +41,8 @@
 #if HA_MODEL_ID == HA_MODEL_ID_wpl13e || HA_MODEL_ID == HA_MODEL_ID_wpl18e || HA_MODEL_ID == HA_MODEL_ID_ttl33
   #define HA_CONTROLLER_WPMW2
 #endif
-// WPM3 manager (WPL 10 AC): its own operating mode names
-#if HA_MODEL_ID == HA_MODEL_ID_wpl10ac
+// WPM3 operating mode names (WPL 10 AC; WPL-A 07, whose display shows the same five names, #119)
+#if HA_MODEL_ID == HA_MODEL_ID_wpl10ac || HA_MODEL_ID == HA_MODEL_ID_wpla7
   #define HA_CONTROLLER_WPM3
 #endif
 // WPL-A manager (WPL-A 07): WPL-A status, pump and tuning registers in the signal table
