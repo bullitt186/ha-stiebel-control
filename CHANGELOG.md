@@ -7,6 +7,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Upgrade notes — OTA migration, stage 1
+
+- Requires ESPHome 2026.9.0 or newer; existing installations retain
+  `ota.password: !secret ota_password` and the same API encryption key. Build
+  and install this password-compatible stepping-stone with ESPHome
+  2026.9.x–2027.2.x and verify `Encryption: offered, plaintext accepted`.
+  A later release will require encrypted OTA; ESPHome 2027.3.0 removes the
+  plaintext upload fallback. Complete stage 1 before upgrading the build tool.
+  See [the release-based migration guide](docs/INSTALLATION.md#ota-encryption-migration).
+
 ### Added
 
 - New model `wpla7` (WPL-A 07, 1 heating circuit, CAN 50 kbps), contributed by bastard-GIT:

@@ -13,15 +13,23 @@ All keys are required unless marked optional.
 | `mqtt_broker` | MQTT broker IP or hostname | `192.168.1.10` |
 | `mqtt_username` | MQTT username | `"mqtt_user"` |
 | `mqtt_password` | MQTT password | `"secret"` |
-| `api_encryption_key` | 32-byte base64 key for ESPHome native API | `"abc...=="` |
-| `ota_password` | OTA update password | `"change_me"` |
+| `ota_password` | Existing OTA password; keep it through the stepping-stone release | `"secret"` |
+| `api_encryption_key` | 32-byte base64 key shared by the native API and encrypted OTA | `"abc...=="` |
 
-Generate `api_encryption_key`:
+For a new device, generate `api_encryption_key`:
 ```bash
 python3 -c "import base64, os; print(base64.b64encode(os.urandom(32)).decode())"
 ```
 
-The key must match what HA's ESPHome integration has stored for this device. If you change it, you need to re-adopt the device in HA (Settings → Devices & Services → ESPHome → delete entry, then re-add).
+For an installed device, preserve both its existing API key and OTA password.
+This stepping-stone release keeps `password: !secret ota_password`; firmware
+built with ESPHome 2026.9.0 or newer offers encrypted OTA using the API key while
+still accepting plaintext uploads. The following release will require
+`encryption: {}` and remove the OTA password. API encryption alone does not
+require encrypted OTA. Install the stepping-stone firmware before upgrading
+the build tool to ESPHome 2027.3.0, which removes plaintext upload fallback.
+See the [migration instructions](INSTALLATION.md#ota-encryption-migration) and
+[official OTA documentation](https://esphome.io/components/ota/esphome/#encryption).
 
 ---
 
