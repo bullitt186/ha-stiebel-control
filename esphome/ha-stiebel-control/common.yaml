@@ -21,6 +21,8 @@ substitutions:
   friendly_name: "Heating Pump CAN Interface"   # ESPHome device name in Home Assistant
   disable_sg_ready: "false"   # "true" hides all SG Ready entities (e.g. WPC7, which has no SG Ready input)
   read_only: "false"          # "true": never write to the heat pump (no setpoints/modes/clock; reading and bus scan only)
+  can_debug: "false"          # "true": build in the raw CAN frame stream (can_debug.h) and its RX/TX observers
+  can_debug_queue_size: "256" # frames buffered by the CAN frame stream (can_debug.h, RAM only while on: 16 bytes each); lower it on boards with little free RAM
   # Network package from this folder: network_wifi.yaml (default) or network_ethernet_w5500.yaml
   network_package: "network_wifi.yaml"
 
@@ -28,7 +30,7 @@ packages:
   network: !include ${network_package}
 
 esphome:
-  min_version: 2026.7.0
+  min_version: 2026.9.0
   name: ${device_name}
   friendly_name: ${friendly_name}
   project:
@@ -72,6 +74,7 @@ esphome:
     - signal_route.h
     - mqtt_publish.h
     - can_io.h
+    - can_debug.h
     - paced_writes.h
     - discovery.h
     - bus_scan.h
@@ -93,6 +96,8 @@ esphome:
     - "-DHA_LANGUAGE_${language}"
     - "-DHA_DISABLE_SG_READY_${disable_sg_ready}"
     - "-DHA_READ_ONLY_${read_only}"
+    - "-DHA_CAN_DEBUG_${can_debug}"
+    - "-DCAN_DEBUG_QUEUE_SIZE=${can_debug_queue_size}"
 
 #########################################
 #                                       #
@@ -213,6 +218,11 @@ mqtt:
       then:
         - lambda: stopScan();
 
+    # Raw CAN frame stream for bus analysis (can_debug.h): payload "on" or "off"
+    - topic: ${device_name}/can_debug/set
+      then:
+        - lambda: canDebugCommand(x);
+
     # Force republish all discoveries (including writable entities)
     - topic: ${device_name}/republish_discoveries
       then:
@@ -243,6 +253,11 @@ interval:
   - interval: 150ms
     then:
       - lambda: scanStep();
+
+  # Raw CAN frame stream (idle unless switched on via <device_name>/can_debug/set)
+  - interval: 50ms
+    then:
+      - lambda: canDebugStep();
 
   # Process calculated sensor updates (runs every second)
   - interval: 1s

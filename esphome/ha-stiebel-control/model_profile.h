@@ -31,6 +31,7 @@
 #define HA_MODEL_ID_wpc7       7
 #define HA_MODEL_ID_wpf10      8
 #define HA_MODEL_ID_ttl33      9
+#define HA_MODEL_ID_wpla7      10
 
 #define HA_PP_CAT_(a, b) a##b
 #define HA_PP_CAT(a, b) HA_PP_CAT_(a, b)
@@ -40,13 +41,18 @@
 #if HA_MODEL_ID == HA_MODEL_ID_wpl13e || HA_MODEL_ID == HA_MODEL_ID_wpl18e || HA_MODEL_ID == HA_MODEL_ID_ttl33
   #define HA_CONTROLLER_WPMW2
 #endif
-// WPM3 manager (WPL 10 AC): its own operating mode names
-#if HA_MODEL_ID == HA_MODEL_ID_wpl10ac
+// WPM3 operating mode names (WPL 10 AC; WPL-A 07, whose display shows the same five names, #119)
+#if HA_MODEL_ID == HA_MODEL_ID_wpl10ac || HA_MODEL_ID == HA_MODEL_ID_wpla7
   #define HA_CONTROLLER_WPM3
+#endif
+// WPL-A manager (WPL-A 07): WPL-A status, pump and tuning registers in the signal table
+#if HA_MODEL_ID == HA_MODEL_ID_wpla7
+  #define HA_CONTROLLER_WPLA
 #endif
 // WPL family registers (CAN-B models and WPM3) in the signal table
 #if HA_MODEL_ID == HA_MODEL_ID_wpl17 || HA_MODEL_ID == HA_MODEL_ID_wpl23 || \
-    HA_MODEL_ID == HA_MODEL_ID_wpl10ac || HA_MODEL_ID == HA_MODEL_ID_wpc7
+    HA_MODEL_ID == HA_MODEL_ID_wpl10ac || HA_MODEL_ID == HA_MODEL_ID_wpc7 || \
+    HA_MODEL_ID == HA_MODEL_ID_wpla7
   #define HA_ELSTER_WPL_FAMILY
 #endif
 
@@ -65,6 +71,7 @@ struct ModelProfile {
     bool perMemberEnergy;         // energy totals from the HEIZMODUL_WPL counters (WPL17)
     bool ignoreUnusedIwsRuntime;  // drop VERD_1/KUEHL runtime answers the manager polls itself
                                   // (WPL13E: one compressor, no cooling)
+    bool dhwActualOnKesselCanb;   // DHW actual temperature SPEICHERISTTEMP read from KESSEL_CANB (0x201)
     bool compressorFromKessel;    // HEIZMODUL answers VERDICHTER with placeholders; the compressor
                                   // state comes from KESSEL BETRIEBS_STATUS (TTL 33, #68, #83, #131)
     bool defrostFromKessel;       // HEIZMODUL answers ZEITDAUER_LETZTE_ABTAUUNG with a placeholder;
@@ -73,14 +80,15 @@ struct ModelProfile {
     constexpr bool heatingCurveWritable() const { return canBRoutes || wpmw2WritesVerified; }
 };
 
-//                                       wpmw2  verified single canB   canBDhw perMember ignoreIws kesselVd kesselDefrost
-inline constexpr ModelProfile kProfileGeneric{false, false,   false, false, false,  false,    false,    false,   false};
-inline constexpr ModelProfile kProfileWpl9   {false, false,   false, false, true,   false,    false,    false,   false};
-inline constexpr ModelProfile kProfileWpl13e {true,  true,    false, false, false,  false,    true,     false,   false};
-inline constexpr ModelProfile kProfileWpl17  {false, false,   true,  true,  false,  true,     false,    false,   false};
+//                                       wpmw2  verified single canB   canBDhw perMember ignoreIws dhwActualCanb kesselVd kesselDefrost
+inline constexpr ModelProfile kProfileGeneric{false, false,   false, false, false,  false,    false,    false,        false,   false};
+inline constexpr ModelProfile kProfileWpl9   {false, false,   false, false, true,   false,    false,    false,        false,   false};
+inline constexpr ModelProfile kProfileWpl13e {true,  true,    false, false, false,  false,    true,     false,        false,   false};
+inline constexpr ModelProfile kProfileWpl17  {false, false,   true,  true,  false,  true,     false,    false,        false,   false};
 // WPL18E polls the wpl13e table; WPMW II writes are not checked on its display yet
-inline constexpr ModelProfile kProfileWpl18e {true,  false,   false, false, false,  false,    false,    false,   false};
-inline constexpr ModelProfile kProfileTtl33  {true,  true,    false, false, false,  false,    false,    true,    true};
+inline constexpr ModelProfile kProfileWpl18e {true,  false,   false, false, false,  false,    false,    false,        false,   false};
+inline constexpr ModelProfile kProfileTtl33  {true,  true,    false, false, false,  false,    false,    false,        true,    true};
+inline constexpr ModelProfile kProfileWpla7  {false, false,   true,  false, true,   false,    false,    true,         false,   false};
 
 #if HA_MODEL_ID == HA_MODEL_ID_wpl9
 inline constexpr const ModelProfile& kModel = kProfileWpl9;
@@ -92,6 +100,8 @@ inline constexpr const ModelProfile& kModel = kProfileWpl17;
 inline constexpr const ModelProfile& kModel = kProfileWpl18e;
 #elif HA_MODEL_ID == HA_MODEL_ID_ttl33
 inline constexpr const ModelProfile& kModel = kProfileTtl33;
+#elif HA_MODEL_ID == HA_MODEL_ID_wpla7
+inline constexpr const ModelProfile& kModel = kProfileWpla7;
 #else
 inline constexpr const ModelProfile& kModel = kProfileGeneric;
 #endif

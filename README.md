@@ -1,6 +1,9 @@
 # ha-stiebel-control
 
-Requires ESPHome 2026.7.0 or newer. CI uses ESPHome 2026.10.1.
+Requires ESPHome 2026.9.0 or newer. CI uses ESPHome 2026.10.1.
+OTA migration uses a password-compatible stepping-stone before encryption is required.
+For installed devices, follow the [release-based migration instructions](docs/INSTALLATION.md#ota-encryption-migration)
+before moving to an encryption-required release.
 
 ESPHome firmware for monitoring and controlling Stiebel Eltron heat pumps via CAN bus.
 Connects an ESP32 to the heat pump's internal Elster CAN bus and automatically publishes
@@ -28,7 +31,7 @@ community work by [roberreiters](https://community.home-assistant.io/t/configure
 
 ## Quick Start
 
-Requires ESPHome 2026.7.0 or newer (check with `esphome version`; dashboard add-on users
+Requires ESPHome 2026.9.0 or newer (check with `esphome version`; dashboard add-on users
 update the add-on).
 
 ```bash
@@ -98,6 +101,7 @@ pump provides its own termination).
 | `ttl33.yaml` | Tecalor TTL 33 with WPMW II (air-source, 2 heating circuits, no IWS values) | ✅ Verified read-only — circuit 2 on `MISCHERMODUL_3` (0x602) |
 | `wpf10.yaml` | WPF 10 / WPF 10M (ground-source) | ⚠️ Community — signals may need adjustment |
 | `wpl17.yaml` | WPL 17 ICS classic (air-source, 1 heating circuit) | ✅ Verified on CAN-B (X1.2, 50 kbps) |
+| `wpla7.yaml` | WPL-A 07 (air-source, 1 heating circuit; the display shows a WPM4) | ✅ Verified on WPL-A 07 230 Premium (50 kbps) |
 
 **WPL17 note:** the WPL17 has two CAN buses. The comfort level (Speicher-Ist-Temp,
 Raum-Soll-Temp, Heizkurve, Energien, Betriebsmodus) is only readable on **CAN-B

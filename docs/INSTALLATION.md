@@ -2,8 +2,8 @@
 
 Two installation paths are supported. Choose the one that fits your workflow.
 
-**Requirements:** ESPHome 2026.7.0 or newer (`esphome version`; the config declares
-`min_version: 2026.7.0` and older versions refuse it). CI builds with ESPHome 2026.10.1.
+**Requirements:** ESPHome 2026.9.0 or newer (`esphome version`; the config declares
+`min_version: 2026.9.0` and older versions refuse it). CI builds with ESPHome 2026.10.1.
 
 ---
 
@@ -38,9 +38,8 @@ mqtt_password: "your_mqtt_password"
 
 # Generate with: python3 -c "import base64,os; print(base64.b64encode(os.urandom(32)).decode())"
 # Must match the key stored in HA's ESPHome integration for this device.
-api_encryption_key: "your-32-byte-base64-key=="
-
-ota_password: "change_me"
+ota_password: "your-existing-ota-password"  # Keep through the stepping-stone release
+api_encryption_key: "your-32-byte-base64-key=="  # Also used by encrypted OTA
 ```
 
 > **Important:** `secrets.yaml` is gitignored. Never commit it.
@@ -173,6 +172,60 @@ homeassistant:
 Restart Home Assistant.
 
 ---
+
+## OTA Encryption Migration
+
+OTA migration is delivered in two releases. This first stage keeps password
+authentication and requires ESPHome 2026.9.0 or newer. A later release will
+require encrypted OTA. Keep the existing API encryption key and OTA password
+for installed devices; do not generate replacements during this migration.
+
+### Stage 1: install a password-compatible stepping-stone
+
+Choose the first published release whose CHANGELOG lists **OTA migration,
+stage 1**. The release tag is assigned when that release is published; this
+guide does not depend on a contributor's fork or a review branch.
+
+For git-clone installations, fetch upstream release tags (`git fetch --tags
+origin`), check out that stage-1 release and build/install it with ESPHome
+**2026.9.x–2027.2.x**. For remote packages, pin every package reference to that
+same release tag before building. Both paths keep this configuration:
+
+```yaml
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  platform: esphome
+  password: !secret ota_password
+```
+
+After installation, confirm the device log says
+`Encryption: offered, plaintext accepted`. A device already showing that
+message has completed stage 1. The password authenticates uploads in this
+stage; it does not itself encrypt firmware in transit.
+
+### Stage 2: require encryption in the later release
+
+Only after stage 1 has been installed, update to the later release whose
+CHANGELOG explicitly requires encrypted OTA. It will replace `password:` with
+`encryption: {}` while keeping the same `api_encryption_key`. Install it and
+confirm `Encryption: required`; only then remove `ota_password` from the local
+secrets file. Until that release, the shared package ships stage 1.
+
+ESPHome **2027.3.0 removes the plaintext upload fallback**. Complete stage 1
+before upgrading the build tool to that version. Do not skip directly from
+older device firmware to an encryption-required package. Removing the password
+too early can fail with `ESP requests password, but no password given!`;
+requiring encryption too early refuses a device that cannot yet offer it.
+
+An installation already requiring encrypted OTA need not return to stage 1.
+For recovery alternatives, consult the official migration guide instead of
+leaving a plaintext exception permanently enabled.
+
+References: [ESPHome OTA encryption and migration](https://esphome.io/components/ota/esphome/#encryption),
+[native API encryption key](https://esphome.io/components/api/#configuration-variables).
 
 ## Verifying Operation
 
