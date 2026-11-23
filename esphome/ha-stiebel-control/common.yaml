@@ -21,6 +21,7 @@ substitutions:
   friendly_name: "Heating Pump CAN Interface"   # ESPHome device name in Home Assistant
   disable_sg_ready: "false"   # "true" hides all SG Ready entities (e.g. WPC7, which has no SG Ready input)
   read_only: "false"          # "true": never write to the heat pump (no setpoints/modes/clock; reading and bus scan only)
+  can_debug: "false"          # "true": build in the raw CAN frame stream (can_debug.h) and its RX/TX observers
   can_debug_queue_size: "256" # frames buffered by the CAN frame stream (can_debug.h, RAM only while on: 16 bytes each); lower it on boards with little free RAM
   # Network package from this folder: network_wifi.yaml (default) or network_ethernet_w5500.yaml
   network_package: "network_wifi.yaml"
@@ -95,6 +96,7 @@ esphome:
     - "-DHA_LANGUAGE_${language}"
     - "-DHA_DISABLE_SG_READY_${disable_sg_ready}"
     - "-DHA_READ_ONLY_${read_only}"
+    - "-DHA_CAN_DEBUG_${can_debug}"
     - "-DCAN_DEBUG_QUEUE_SIZE=${can_debug_queue_size}"
 
 #########################################

@@ -1524,6 +1524,7 @@ TEST_CASE("writeSignal: et_betriebsart with valid German string is sent", "[can]
     CHECK(fake_can().sent.size() == 1);
 }
 
+#ifdef HA_CAN_DEBUG_true
 // Frame observers (can_io.h) and the raw frame stream (can_debug.h).
 // Expected bytes from the Elster frame layout: read request to MANAGER 0x480 = {0x91, 0x00, ...}
 // (see generate_read_id tests), short form for index <= 0xff, long form 0xFA <hi> <lo> above;
@@ -1725,6 +1726,18 @@ TEST_CASE("can_debug: frames stay queued while MQTT is disconnected", "[can_debu
     CHECK(canDebugCount == 0);
     canDebugReset();
 }
+#else  // HA_CAN_DEBUG_true not set (default): stream and observers are not built in
+TEST_CASE("can_debug: built without the stream, command and step do nothing", "[can_debug]") {
+    mqtt_client_instance().messages.clear();
+    fake_can().sent.clear();
+    canDebugCommand("on");
+    processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    readSignalRaw(&CanMembers[cm_manager], 0x0005, "T");
+    canDebugStep();
+    CHECK(fake_can().sent.size() == 1);   // sending is unaffected
+    CHECK(mqttFindPayload("can_debug/").empty());
+}
+#endif  // HA_CAN_DEBUG_true
 
 TEST_CASE("i18n: sgReadyOptions contains 4 non-empty entries", "[i18n]") {
     for (size_t i = 0; i < 4; ++i)

@@ -31,6 +31,8 @@ static bool disableCanRequests = false;
 // Observers for the raw frames on the bus: every received frame (processAndUpdate(), before
 // any filter) and every frame this node sends (after send_data()). can_debug.h installs them
 // at static initialisation, like the device limit hooks of writables.h (#79); nullptr = none.
+// Opt-in: only with substitution can_debug: "true" (-DHA_CAN_DEBUG_true); otherwise both are no-ops.
+#ifdef HA_CAN_DEBUG_true
 using CanFrameObserver = void (*)(uint32_t canId, const std::vector<uint8_t>& data);
 static CanFrameObserver canRxObserver = nullptr;
 static CanFrameObserver canTxObserver = nullptr;
@@ -42,6 +44,10 @@ inline void notifyCanRx(uint32_t canId, const std::vector<uint8_t>& data) {
 inline void notifyCanTx(uint32_t canId, const std::vector<uint8_t>& data) {
     if (canTxObserver) canTxObserver(canId, data);
 }
+#else
+inline void notifyCanRx(uint32_t, const std::vector<uint8_t>&) {}
+inline void notifyCanTx(uint32_t, const std::vector<uint8_t>&) {}
+#endif
 
 /**
  * Simple struct for CAN ID bytes (avoids heap allocation)

@@ -34,7 +34,7 @@ ha-stiebel-control/
 │       ├── signal_route.h                  # Signal key and model route (pure C++)
 │       ├── mqtt_publish.h                  # MQTT publish, publish-on-change state cache
 │       ├── can_io.h                        # Frame decode, read/write requests, read-back
-│       ├── can_debug.h                     # Raw CAN frame stream over MQTT (off by default)
+│       ├── can_debug.h                     # Raw CAN frame stream over MQTT (opt-in: can_debug "true")
 │       ├── paced_writes.h                  # Paced write queue (SG Ready, time programs)
 │       ├── discovery.h                     # HA device blocks and discovery payloads
 │       ├── bus_scan.h                      # Bus scan of one member

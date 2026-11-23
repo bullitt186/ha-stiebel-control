@@ -43,6 +43,7 @@ The key must match what HA's ESPHome integration has stored for this device. If 
 | `can_bit_rate` | CAN bus speed: `20kbps` (CAN-A: WPL13E/WPF10/WPC7) or `50kbps` (CAN-B: WPL17/WPL23/WPL10AC) | `20kbps` |
 | `disable_sg_ready` | `"true"` hides all SG Ready entities (models without SG Ready input) | `"false"` |
 | `read_only` | `"true"`: never write to the heat pump — no setpoint/mode/climate entities, clock buttons hidden; reading and bus scan keep working | `"false"` |
+| `can_debug` | `"true"` builds in the raw CAN frame stream and its RX/TX observers (see [CAN frame stream](#can-frame-stream-bus-analysis)); `"false"` leaves them out of the firmware | `"false"` |
 | `can_debug_queue_size` | Frames the CAN frame stream buffers (16 bytes each, plus a 2 KB JSON buffer); RAM is used only while the stream is on. Lower it (minimum 8) on boards with little free RAM | `"256"` |
 | `network_package` | Network package from `ha-stiebel-control/`: `network_wifi.yaml` (WiFi + captive portal) or `network_ethernet_w5500.yaml` (W5500 Ethernet) | `"network_wifi.yaml"` |
 | `eth_clk_pin` … `eth_rst_pin` | W5500 SPI pins (`eth_clk_pin`, `eth_mosi_pin`, `eth_miso_pin`, `eth_cs_pin`, `eth_int_pin`, `eth_rst_pin`), only with `network_ethernet_w5500.yaml` | Waveshare ESP32-S3-POE-ETH: GPIO13/11/12/14/10/9 |
@@ -522,7 +523,15 @@ python3 helperscripts/scan_report.py scan.txt
 ## CAN frame stream (bus analysis)
 
 Streams every raw frame on the bus over MQTT: all received frames (also requests of other nodes and
-frames the firmware ignores) and every frame this node sends. Off by default and after every restart.
+frames the firmware ignores) and every frame this node sends. Opt-in: built in only with
+substitution `can_debug: "true"` (default `"false"`, no stream and no observers in the firmware).
+When built in, it is off by default and after every restart.
+
+```yaml
+substitutions:
+  can_debug: "true"
+  can_debug_queue_size: "256"   # optional
+```
 
 | Topic | Payload |
 |---|---|

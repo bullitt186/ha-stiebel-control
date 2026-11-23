@@ -1,5 +1,5 @@
 /*
- * can_debug.h - raw CAN frame stream over MQTT for bus analysis (off by default).
+ * can_debug.h - raw CAN frame stream over MQTT for bus analysis (opt-in, see below).
  *
  * Every received frame (before any filter of processAndUpdate()) and every frame this node
  * sends (after send_data()) is queued while the stream is on and published in batches:
@@ -17,6 +17,10 @@
  * RAM: nothing while off. "on" allocates the queue (CAN_DEBUG_QUEUE_SIZE frames x 16 bytes,
  * substitution can_debug_queue_size) and the JSON buffer (CAN_DEBUG_BATCH x 64 bytes) on the
  * heap; "off" frees both. If the allocation fails the stream stays off.
+ *
+ * Opt-in: the stream and the observers are built in only with substitution can_debug: "true"
+ * (-DHA_CAN_DEBUG_true). Default "false": canDebugCommand() only logs that it is not built in,
+ * canDebugStep() is empty, and can_io.h compiles the observers out.
  */
 
 #ifndef CAN_DEBUG_H
@@ -31,6 +35,8 @@
 #include "config.h"
 #include "mqtt_publish.h"
 #include "can_io.h"
+
+#ifdef HA_CAN_DEBUG_true
 
 // Frames buffered between two publishes (build flag from substitution can_debug_queue_size)
 #ifndef CAN_DEBUG_QUEUE_SIZE
@@ -167,4 +173,10 @@ inline void canDebugStep() {
     return true;
 }();
 
+#else
+inline void canDebugCommand(const std::string&) {
+    ESP_LOGW("can_debug", "CAN frame stream not built in (substitution can_debug: \"true\" builds it in)");
+}
+inline void canDebugStep() {}
+#endif  // HA_CAN_DEBUG_true
 #endif  // CAN_DEBUG_H
