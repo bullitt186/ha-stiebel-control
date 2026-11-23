@@ -19,6 +19,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   `processAndUpdate()` and after every `send_data()`. Used by `can_debug.h`; compiled in only with
   `can_debug: "true"`, otherwise empty inline hooks.
 
+### Fixed
+
+- `FESTWERT` (manager `0x01c0`, fixed-value setpoint) was decoded byte-swapped, so 40.5 °C showed
+  as 38145. It is a tenths value like the other setpoints (checked on a WPMW II by SolderAndSyntax).
+
 ### Changed
 
 - MQTT keepalive 15 s → 60 s. With 15 s the ESP dropped its MQTT connection about twice a day for
