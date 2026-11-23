@@ -1,7 +1,8 @@
 {
-  "description": "Required topics for WPL-A 07 230 Premium with HSBC 300 cool (CAN B, 50 kbps, integrated WPM4). UNVERIFIED on hardware: derived from signal_requests_wpla7.h, only signals polled every 30 s or every minute so they appear inside the 120 s smoke window. The WPL-A does not answer the MWh energy counters of the base table, so the energy sums, the COP values and MANAGER/WW_ECO are excluded from the common baseline. Populate/correct with make capture-baseline once the device runs this branch.",
+  "description": "Required topics for WPL-A 07 230 Premium with HSBC 300 cool (CAN B, 50 kbps, integrated WPM4). Verified on hardware 2026-11-23 (read-only, 120 s smoke window and 300 s baseline on firmware built from this branch). Derived from signal_requests_wpla7.h: only signals polled every 30 s or every minute, so they appear inside the 120 s smoke window. The WPL-A does not answer the MWh energy counters of the base table, so the energy sums, the COP values and MANAGER/WW_ECO are excluded from the common baseline. MANAGER/PROGRAMMSCHALTER appeared only after the first 120 s of the 300 s baseline and is excluded for the same reason.",
   "excluded_common_topics": [
     "{root}/MANAGER/WW_ECO/state",
+    "{root}/MANAGER/PROGRAMMSCHALTER/state",
     "{root}/calculated/cop_gesamt/state",
     "{root}/calculated/cop_heiz/state",
     "{root}/calculated/cop_ww/state",
