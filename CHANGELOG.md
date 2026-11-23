@@ -19,6 +19,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   `processAndUpdate()` and after every `send_data()`. Used by `can_debug.h`; compiled in only with
   `can_debug: "true"`, otherwise empty inline hooks.
 
+### Changed
+
+- MQTT keepalive 15 s → 60 s. With 15 s the ESP dropped its MQTT connection about twice a day for
+  10–15 s (`mqtt_client: No PING_RESP, disconnected`) after a short receive stall on WiFi, while the
+  broker and other clients on the same access point stayed connected. A real outage of the ESP now
+  shows as `offline` in Home Assistant after about 90 s instead of about 22 s.
+
 ## [2.8.0] — 2026-11-21
 
 Firmware split into modules, writable numbers take their range from the heat pump, energy counters
