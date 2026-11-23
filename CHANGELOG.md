@@ -64,9 +64,9 @@ Assistant. TTL 33 compressor state from SolderAndSyntax's bus analysis.
 
 ### Added
 
-- New model `wpla7` (WPL-A 07, WPM3, 1 heating circuit, CAN 50 kbps): `wpla7.yaml`, the signal
+- New model `wpla7` (WPL-A 07, 1 heating circuit, CAN 50 kbps; **beta** until the type corrections of #129 are merged): `wpla7.yaml`, the signal
   request table `signal_requests_wpla7.h`, and the CI compile target `ci_heatingpump_wpla7.yaml`.
-  Verified on a WPL-A 07 230 Premium. Model profile flag `dhwActualOnKesselCanb` for the DHW actual
+  Tested on a WPL-A 07 230 Premium. Model profile flag `dhwActualOnKesselCanb` for the DHW actual
   temperature on `KESSEL_CANB`.
 - WPL13E/WPL18E/TTL 33 (WPMW II): names, units and scaling for IWS values and parameters checked on a
   WPL 18 E display: evaporator outlet, compressor inlet and vapour injection temperature, the pressure
