@@ -28,11 +28,16 @@ static constexpr size_t ELSTER_VALUE_BUF_SIZE = 32;
 // damit die Scan-Firmware rein passiv auf dem Bus lauscht.
 static bool disableCanRequests = false;
 
-// Observer for every frame this node sends (e.g. an external debug package that streams the
-// bus). Set at static initialisation by the module that needs it, like requestManagerExtraStep
-// (#79); nullptr = none. Received frames need no hook: a package can add its own on_frame.
-using CanTxObserver = void (*)(uint32_t canId, const std::vector<uint8_t>& data);
-static CanTxObserver canTxObserver = nullptr;
+// Observers for the raw frames on the bus: every received frame (processAndUpdate(), before
+// any filter) and every frame this node sends (after send_data()). can_debug.h installs them
+// at static initialisation, like the device limit hooks of writables.h (#79); nullptr = none.
+using CanFrameObserver = void (*)(uint32_t canId, const std::vector<uint8_t>& data);
+static CanFrameObserver canRxObserver = nullptr;
+static CanFrameObserver canTxObserver = nullptr;
+
+inline void notifyCanRx(uint32_t canId, const std::vector<uint8_t>& data) {
+    if (canRxObserver) canRxObserver(canId, data);
+}
 
 inline void notifyCanTx(uint32_t canId, const std::vector<uint8_t>& data) {
     if (canTxObserver) canTxObserver(canId, data);

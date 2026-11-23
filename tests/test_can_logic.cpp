@@ -1524,22 +1524,54 @@ TEST_CASE("writeSignal: et_betriebsart with valid German string is sent", "[can]
     CHECK(fake_can().sent.size() == 1);
 }
 
-// TX observer: every sent frame is reported with the sender id (PC 0x680) and the frame bytes.
+// Frame observers (can_io.h) and the raw frame stream (can_debug.h).
 // Expected bytes from the Elster frame layout: read request to MANAGER 0x480 = {0x91, 0x00, ...}
-// (see generate_read_id tests), short form for index <= 0xff, long form 0xFA <hi> <lo> above.
+// (see generate_read_id tests), short form for index <= 0xff, long form 0xFA <hi> <lo> above;
+// a write to MANAGER starts with 0x90 0x00 (generate_write_id). Sender of our frames: PC 0x680.
 namespace {
 struct TxRecord { uint32_t id; std::vector<uint8_t> data; };
 std::vector<TxRecord>& txRecords() { static std::vector<TxRecord> r; return r; }
 void recordTx(uint32_t canId, const std::vector<uint8_t>& data) { txRecords().push_back({canId, data}); }
+
+// Swaps an observer for the test and restores it (can_debug.h installs its own at startup)
+struct ObserverSwap {
+    CanFrameObserver& slot;
+    CanFrameObserver saved;
+    ObserverSwap(CanFrameObserver& s, CanFrameObserver o) : slot(s), saved(s) { slot = o; }
+    ~ObserverSwap() { slot = saved; }
+};
+
+std::vector<std::string> canDebugBatches() {
+    std::vector<std::string> out;
+    for (const auto& m : mqtt_client_instance().messages)
+        if (m.topic == HA_TOPIC_ROOT "/can_debug/frames") out.push_back(m.payload);
+    return out;
+}
+
+size_t countFrames(const std::vector<std::string>& batches) {
+    size_t n = 0;
+    for (const auto& b : batches)
+        for (size_t p = b.find("\"id\""); p != std::string::npos; p = b.find("\"id\"", p + 1)) n++;
+    return n;
+}
+
+void canDebugReset() {
+    canDebugCommand("off");
+    canDebugStatePending = false;
+    mqtt_client_instance().messages.clear();
+    mqtt_client_instance().connected = true;
+    fake_can().sent.clear();
+}
 }  // namespace
 
 TEST_CASE("canTxObserver: reports read requests with sender id and frame bytes", "[can]") {
     txRecords().clear();
     fake_can().sent.clear();
-    canTxObserver = recordTx;
-    readSignalRaw(&CanMembers[cm_manager], 0x0005, "T");
-    readSignalRaw(&CanMembers[cm_manager], 0x0a20, "T");
-    canTxObserver = nullptr;
+    {
+        ObserverSwap swap(canTxObserver, recordTx);
+        readSignalRaw(&CanMembers[cm_manager], 0x0005, "T");
+        readSignalRaw(&CanMembers[cm_manager], 0x0a20, "T");
+    }
     REQUIRE(txRecords().size() == 2);
     CHECK(txRecords()[0].id == 0x680);
     CHECK(txRecords()[0].data == std::vector<uint8_t>{0x91, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00});
@@ -1552,10 +1584,11 @@ TEST_CASE("canTxObserver: reports read requests with sender id and frame bytes",
 TEST_CASE("canTxObserver: reports writes, MANAGER write id 0x90 0x00", "[can]") {
     txRecords().clear();
     fake_can().sent.clear();
-    canTxObserver = recordTx;
-    const char* value = LNAME_OPT_AUTOMATIK;
-    writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", value);
-    canTxObserver = nullptr;
+    {
+        ObserverSwap swap(canTxObserver, recordTx);
+        const char* value = LNAME_OPT_AUTOMATIK;
+        writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", value);
+    }
     REQUIRE(fake_can().sent.size() == 1);
     REQUIRE(txRecords().size() == 1);
     CHECK(txRecords()[0].id == 0x680);
@@ -1564,13 +1597,113 @@ TEST_CASE("canTxObserver: reports writes, MANAGER write id 0x90 0x00", "[can]") 
     CHECK(txRecords()[0].data == fake_can().sent[0]);
 }
 
-TEST_CASE("canTxObserver: nullptr reports nothing, frame is still sent", "[can]") {
+TEST_CASE("canRxObserver: sees every received frame, also those processAndUpdate() drops", "[can]") {
+    txRecords().clear();
+    ObserverSwap swap(canRxObserver, recordTx);
+    // Read request of another node (type 1) and a short frame: both filtered out after the hook
+    processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    processAndUpdate(0x180, {0x32, 0x00});
+    REQUIRE(txRecords().size() == 2);
+    CHECK(txRecords()[0].id == 0x180);
+    CHECK(txRecords()[0].data == std::vector<uint8_t>{0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    CHECK(txRecords()[1].data == std::vector<uint8_t>{0x32, 0x00});
+}
+
+TEST_CASE("frame observers: nullptr reports nothing, frame is still sent", "[can]") {
     txRecords().clear();
     fake_can().sent.clear();
-    canTxObserver = nullptr;
+    ObserverSwap tx(canTxObserver, nullptr);
+    ObserverSwap rx(canRxObserver, nullptr);
     readSignalRaw(&CanMembers[cm_manager], 0x0005, "T");
+    processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
     CHECK(fake_can().sent.size() == 1);
     CHECK(txRecords().empty());
+}
+
+TEST_CASE("can_debug: off by default, nothing queued or published", "[can_debug]") {
+    canDebugReset();
+    processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    readSignalRaw(&CanMembers[cm_manager], 0x0005, "T");
+    canDebugStep();
+    CHECK(canDebugCount == 0);
+    CHECK(canDebugBatches().empty());
+}
+
+TEST_CASE("can_debug: on streams RX and TX frames as JSON, oldest first", "[can_debug]") {
+    canDebugReset();
+    canDebugCommand("on");
+    fake_millis() = 5;
+    processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    fake_millis() = 7;
+    readSignalRaw(&CanMembers[cm_manager], 0x0005, "T");
+    canDebugStep();
+    CHECK(mqttFindPayload("can_debug/state") == "on");
+    const auto batches = canDebugBatches();
+    REQUIRE(batches.size() == 1);
+    CHECK(batches[0] ==
+          "[{\"t\":5,\"id\":\"0x180\",\"d\":\"3100fa000c0000\",\"tx\":false},"
+          "{\"t\":7,\"id\":\"0x680\",\"d\":\"91000500000000\",\"tx\":true}]");
+    CHECK(canDebugCount == 0);
+    fake_millis() = 0;
+    canDebugReset();
+}
+
+TEST_CASE("can_debug: off stops the stream and discards queued frames", "[can_debug]") {
+    canDebugReset();
+    canDebugCommand("on");
+    processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    canDebugCommand("off");
+    processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    canDebugStep();
+    CHECK(canDebugBatches().empty());
+    CHECK(mqttFindPayload("can_debug/state") == "off");
+}
+
+TEST_CASE("can_debug: unknown command changes nothing", "[can_debug]") {
+    canDebugReset();
+    canDebugCommand("ON!");
+    canDebugStep();
+    CHECK_FALSE(canDebugEnabled);
+    CHECK(mqttFindPayload("can_debug/state").empty());
+}
+
+TEST_CASE("can_debug: at most CAN_DEBUG_BATCH frames per message", "[can_debug]") {
+    canDebugReset();
+    canDebugCommand("on");
+    for (int i = 0; i < 40; i++) processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    canDebugStep();
+    REQUIRE(canDebugBatches().size() == 1);
+    CHECK(countFrames(canDebugBatches()) == CAN_DEBUG_BATCH);
+    canDebugStep();
+    CHECK(canDebugBatches().size() == 2);
+    CHECK(countFrames(canDebugBatches()) == 40);
+    canDebugReset();
+}
+
+TEST_CASE("can_debug: full queue drops new frames and counts them", "[can_debug]") {
+    canDebugReset();
+    canDebugCommand("on");
+    for (size_t i = 0; i < CAN_DEBUG_QUEUE + 10; i++)
+        processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    CHECK(canDebugCount == CAN_DEBUG_QUEUE);
+    CHECK(canDebugDropped == 10);
+    for (int i = 0; i < 20; i++) canDebugStep();
+    CHECK(countFrames(canDebugBatches()) == CAN_DEBUG_QUEUE);
+    canDebugReset();
+}
+
+TEST_CASE("can_debug: frames stay queued while MQTT is disconnected", "[can_debug]") {
+    canDebugReset();
+    canDebugCommand("on");
+    processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    mqtt_client_instance().connected = false;
+    canDebugStep();
+    CHECK(canDebugCount == 1);
+    mqtt_client_instance().connected = true;
+    canDebugStep();
+    CHECK(countFrames(canDebugBatches()) == 1);
+    CHECK(canDebugCount == 0);
+    canDebugReset();
 }
 
 TEST_CASE("i18n: sgReadyOptions contains 4 non-empty entries", "[i18n]") {

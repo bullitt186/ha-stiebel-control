@@ -518,6 +518,28 @@ mosquitto_sub -h BROKER -u USER -P PASS -t 'heatingpump/scan/#' -v -W 5 > scan.t
 python3 helperscripts/scan_report.py scan.txt
 ```
 
+## CAN frame stream (bus analysis)
+
+Streams every raw frame on the bus over MQTT: all received frames (also requests of other nodes and
+frames the firmware ignores) and every frame this node sends. Off by default and after every restart.
+
+| Topic | Payload |
+|---|---|
+| `heatingpump/can_debug/set` | `on` or `off` |
+| `heatingpump/can_debug/state` | `on` / `off` (retained) |
+| `heatingpump/can_debug/frames` | JSON array, up to 32 frames per message, at most every 50 ms: `[{"t":123456,"id":"0x180","d":"9200fa000c0123","tx":false},…]` |
+
+`t` = milliseconds since boot, `id` = CAN id of the sender (`0x680` = this node), `d` = data bytes in hex,
+`tx` = sent by this node. The frames are not decoded; decode them offline (Elster telegram type in the low
+nibble of byte 0, index in byte 2 or bytes 3–4 after `0xfa`). Up to 256 frames are buffered while MQTT is
+busy; further frames are dropped and counted in a warning on the log.
+
+```bash
+mosquitto_pub -h BROKER -u USER -P PASS -t heatingpump/can_debug/set -m on
+mosquitto_sub -h BROKER -u USER -P PASS -t heatingpump/can_debug/frames > frames.txt
+mosquitto_pub -h BROKER -u USER -P PASS -t heatingpump/can_debug/set -m off
+```
+
 ## Polling back-off
 
 A signal answering `-255` (not available on this model) creates no HA entity until it has

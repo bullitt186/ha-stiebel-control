@@ -72,6 +72,7 @@ esphome:
     - signal_route.h
     - mqtt_publish.h
     - can_io.h
+    - can_debug.h
     - paced_writes.h
     - discovery.h
     - bus_scan.h
@@ -210,6 +211,11 @@ mqtt:
       then:
         - lambda: stopScan();
 
+    # Raw CAN frame stream for bus analysis (can_debug.h): payload "on" or "off"
+    - topic: ${device_name}/can_debug/set
+      then:
+        - lambda: canDebugCommand(x);
+
     # Force republish all discoveries (including writable entities)
     - topic: ${device_name}/republish_discoveries
       then:
@@ -240,6 +246,11 @@ interval:
   - interval: 150ms
     then:
       - lambda: scanStep();
+
+  # Raw CAN frame stream (idle unless switched on via <device_name>/can_debug/set)
+  - interval: 50ms
+    then:
+      - lambda: canDebugStep();
 
   # Process calculated sensor updates (runs every second)
   - interval: 1s

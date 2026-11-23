@@ -9,10 +9,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Added
 
-- Optional observer `canTxObserver` in `can_io.h`: called with the sender id and the bytes of
-  every frame that `readSignalRaw()` and `writeSignal()` send. `nullptr` by default (no change).
-  Lets an external debug package stream the full bus traffic; received frames it can already
-  take with its own `on_frame` (`canbus: - id: !extend my_can`).
+- Raw CAN frame stream for bus analysis (`can_debug.h`): `<root>/can_debug/set` `on`/`off` streams
+  every received and sent frame as JSON to `<root>/can_debug/frames`, state on
+  `<root>/can_debug/state`. Off by default and after a restart. See docs/CONFIGURATION.md
+  "CAN frame stream".
+- Frame observers `canRxObserver`/`canTxObserver` in `can_io.h`: raw frames before any filter of
+  `processAndUpdate()` and after every `send_data()`. Used by `can_debug.h`.
 
 ## [2.8.0] — 2026-11-21
 
