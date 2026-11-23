@@ -384,3 +384,86 @@ TEST_CASE("TranslateString: leading spaces are skipped", "[kelster]") {
     const char* s = "   42";
     CHECK(TranslateString(s, et_default) == 42);
 }
+
+// ============================================================================
+// WPL-A 07 (PR 2, #129): types of existing rows, checked on the display.
+// Expected texts come from the display check of 2026-11-20/22 (plan/display-check.csv,
+// docs/display-menue.md in the control repo): raw scan value or display value x scale.
+// Other models keep the upstream rows.
+// ============================================================================
+namespace {
+struct TypeCase { unsigned short index; const char* name; unsigned short raw; const char* text; };
+}
+
+#if defined(HA_CONTROLLER_WPLA)
+TEST_CASE("WPL-A 07: corrected types decode the displayed values", "[kelster][wpla7]") {
+    const TypeCase cases[] = {
+        {0x07a6, "ANZEIGE_HOCHDRUCK", 2166, "21.66"},                      // scan raw 2166, display 21.44 bar
+        {0x07a7, "ANZEIGE_NIEDERDRUCK", 569, "5.69"},                      // scan raw 569, display 5.72 bar
+        {0x07a9, "VERDAMPFERISTTEMP_KOMPENSIERT", 56, "5.6"},              // scan raw 56, display 5.6 C
+        {0x033d, "INTEGRAL_REGELABWEICHUNG", 9, "0.9"},                    // display 0.9 K
+        {0x07ca, "EXV_OEFFNUNGSGRAD", 277, "27.7"},                        // display 27.7 %
+        {0x07f4, "ISTWERT_UEBERHITZUNG_VERDAMPFER", (unsigned short)(short)-20, "-2.0"},  // display -2.0 K
+        {0x07f6, "VORSTEUER_OEFFNUNGSGRAD", 288, "28.8"},                  // display 28.8 %
+        {0x07f7, "P_ANTEIL_EXV", 100, "1.00"},                             // display P-Faktor 1.00
+        {0x07f8, "I_ANTEIL_EXV", 94, "0.94"},                              // display I-Faktor 0.94
+        {0x07f9, "D_ANTEIL_EXV", 100, "1.00"},                             // display D-Faktor 1.00
+        {0x4f2b, "STEIGUNG_HEIZKURVE", 40, "0.40"},                        // display 0.40, raw 40
+        {0x4fac, "VERDICHTERDREHZAHLGRENZE", 1028, "1028"},                // display 1028, plain integer
+        {0x4f28, "ANTILEGIONELLENBEHANDLUNG", 0x0001, "on"},               // display EIN
+    };
+    for (const TypeCase& c : cases) {
+        INFO("index " << std::hex << c.index << " " << c.name);
+        const ElsterIndex* ei = GetElsterIndex(c.index);
+        REQUIRE(ei != nullptr);
+        CHECK(std::string(ei->Name) == c.name);
+        char val[32];
+        SetValueType(val, ei->Type, c.raw);
+        CHECK(std::string(val) == c.text);
+    }
+    char off[32];
+    SetValueType(off, GetElsterIndex(0x4f28)->Type, 0);
+    CHECK(std::string(off) == "off");
+}
+
+TEST_CASE("WPL-A 07: corrected rows carry the units of the display", "[kelster][wpla7]") {
+    struct MetaCase { unsigned short index; const char* unit; };
+    const MetaCase cases[] = {
+        {0x07a6, "bar"}, {0x07a7, "bar"}, {0x07a9, "\xC2\xB0" "C"}, {0x07ca, "%"}, {0x07f6, "%"}, {0x07f4, "K"},
+    };
+    for (const MetaCase& c : cases) {
+        INFO("index " << std::hex << c.index);
+        const ElsterMeta* m = GetElsterMeta(GetElsterIndex(c.index));
+        REQUIRE(m != nullptr);
+        CHECK(std::string(m->unit) == c.unit);
+    }
+    CHECK(std::string(GetElsterMeta(GetElsterIndex(0x07a6))->haDeviceClass) == "pressure");
+    CHECK(std::string(GetElsterMeta(GetElsterIndex(0x07a7))->haDeviceClass) == "pressure");
+    const ElsterMeta* leg = GetElsterMeta(GetElsterIndex(0x4f28));
+    REQUIRE(leg != nullptr);
+    CHECK(std::string(leg->haComponent) == "binary_sensor");
+}
+#else
+TEST_CASE("other models keep the upstream types of the rows corrected for the WPL-A 07", "[kelster][wpla7]") {
+    // Upstream main (4b18bc1): type 0 = et_default without metadata
+    // A row that a model does not have (the WPL family rows are not in every table) has nothing to keep.
+    struct Keep { unsigned short index; unsigned type; };
+#if defined(HA_CONTROLLER_WPMW2)
+    const unsigned t07a6 = et_cent_val, t07a9 = et_dec_val;   // WPMW II rows
+#else
+    const unsigned t07a6 = et_dec_val, t07a9 = et_default;
+#endif
+    const Keep keep[] = {
+        {0x033d, et_default}, {0x07ca, et_default}, {0x07f6, et_default}, {0x07f7, et_default},
+        {0x07f8, et_default}, {0x07f9, et_default}, {0x4f28, et_default},
+        {0x4f2b, et_dec_val}, {0x4fac, et_dec_val},
+        {0x07a6, t07a6}, {0x07a7, t07a6}, {0x07a9, t07a9}, {0x07f4, t07a9},
+    };
+    for (const Keep& k : keep) {
+        INFO("index " << std::hex << k.index);
+        const ElsterIndex* ei = GetElsterIndex(k.index);
+        if (ei->Index != k.index) continue;   // not in this model's table
+        CHECK(ei->Type == k.type);
+    }
+}
+#endif

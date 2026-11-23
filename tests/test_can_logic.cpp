@@ -1574,6 +1574,10 @@ TEST_CASE("WPMW II: IWS values and parameters carry read-only metadata (#52)", "
         REQUIRE(std::string(ei->Name) == r.name);   // unknown names return INDEX_NOT_FOUND
         const ElsterMeta* meta = GetElsterMeta(ei);
         if (!isWpmw2Model()) {
+#if defined(HA_CONTROLLER_WPLA)
+            // WPL-A 07: corrected after the display check (display 5.6 C at raw 56), see test_kelster.cpp
+            if (std::string(r.name) == "VERDAMPFERISTTEMP_KOMPENSIERT") continue;
+#endif
             CHECK(ei->Type == r.typeOther);
             CHECK(meta == nullptr);
             continue;
