@@ -33,8 +33,9 @@ TEST_CASE("WPL9 DHW writes and feedback use CAN-B", "[routes]") {
 TEST_CASE("configured DHW commands send short and extended register frames", "[routes][can]") {
     const bool wpl9 = std::strcmp(HA_DEVICE_MODEL_STR, "wpl9") == 0;
     const bool wpl17 = std::strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0;
-    const uint8_t writeFirst = (wpl9 || wpl17) ? 0x40 : 0x90;
-    const uint8_t writeSecond = (wpl9 || wpl17) ? 0x01 : 0x00;
+    const bool wpla7 = std::strcmp(HA_DEVICE_MODEL_STR, "wpla7") == 0;
+    const uint8_t writeFirst = (wpl9 || wpl17 || wpla7) ? 0x40 : 0x90;
+    const uint8_t writeSecond = (wpl9 || wpl17 || wpla7) ? 0x01 : 0x00;
     fake_can().sent.clear();
     writeConfiguredSignal(cm_manager, "EINSTELL_SPEICHERSOLLTEMP", "49");
     REQUIRE(fake_can().sent.size() == 2);

@@ -24,7 +24,7 @@ ha-stiebel-control/
 │       ├── no_captive_portal.yaml          # Optional: removes captive portal + fallback hotspot
 │       ├── can_esp32.yaml                  # Built-in TWAI CAN (256 RX / 64 TX queue)
 │       ├── can_mcp2515.yaml                # MCP2515 SPI CAN (legacy)
-│       ├── <model>.yaml                    # Model package (wpl9, wpl10ac, wpl13e, wpl17, wpl18e, wpf10, wpc7, ttl33):
+│       ├── <model>.yaml                    # Model package (wpl9, wpl10ac, wpl13e, wpl17, wpl18e, wpf10, wpc7, ttl33, wpla7):
 │       │                                   #   only selects its signal_requests_<model>.h
 │       ├── signal_requests_base.h          # Universal signals macro (all models) + shared row macros
 │       ├── signal_requests_<model>.h       # Request table of one model (e.g. signal_requests_wpl13e.h)

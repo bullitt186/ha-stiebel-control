@@ -17,7 +17,7 @@ built-in TWAI controller (recommended) and a classic ESP32 (`esp32dev`) with an 
   - `common.yaml` — board-agnostic core: MQTT, API, OTA, build flags, `includes:`, MQTT command
     handlers (`on_message`), intervals, template sensors/buttons
   - `<model>.yaml` — model package (`wpl9`, `wpl10ac`, `wpl13e`, `wpl17`, `wpl18e`, `wpf10`, `wpc7`,
-    `ttl33`). It only adds the model's request table to `esphome: includes:`; it holds no sensors.
+    `ttl33`, `wpla7`). It only adds the model's request table to `esphome: includes:`; it holds no sensors.
   - `signal_requests_base.h` — `SIGNAL_REQUESTS_BASE` (universal signals) and shared row macros
     such as `SIGNAL_REQUESTS_ENERGY_IWS`
   - `signal_requests_<model>.h` — what the model polls: `{"SIGNAL", FREQ_xx, cm_member}` rows

@@ -40,7 +40,7 @@ The key must match what HA's ESPHome integration has stored for this device. If 
 | `can_mosi_pin` | SPI MOSI (MCP2515 only) | board-specific — see note below |
 | `can_miso_pin` | SPI MISO (MCP2515 only) | board-specific — see note below |
 | `can_cs_pin` | SPI CS (MCP2515 only) | board-specific — see note below |
-| `can_bit_rate` | CAN bus speed: `20kbps` (CAN-A: WPL13E/WPF10/WPC7) or `50kbps` (CAN-B: WPL17/WPL23/WPL10AC) | `20kbps` |
+| `can_bit_rate` | CAN bus speed: `20kbps` (CAN-A: WPL13E/WPF10/WPC7) or `50kbps` (CAN-B: WPL17/WPL23/WPL10AC/WPLA7) | `20kbps` |
 | `disable_sg_ready` | `"true"` hides all SG Ready entities (models without SG Ready input) | `"false"` |
 | `read_only` | `"true"`: never write to the heat pump — no setpoint/mode/climate entities, clock buttons hidden; reading and bus scan keep working | `"false"` |
 | `can_debug` | `"true"` builds in the raw CAN frame stream and its RX/TX observers (see [CAN frame stream](#can-frame-stream-bus-analysis)); `"false"` leaves them out of the firmware | `"false"` |
