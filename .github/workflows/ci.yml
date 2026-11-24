@@ -19,7 +19,7 @@ jobs:
         model: [test_model, wpl9, wpl10ac, wpl13e, wpl17, wpf10, ttl33, wpl18e, wpla7]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Build and run tests
         run: make test MODEL_TEST_FLAGS=-DHA_DEVICE_MODEL=${{ matrix.model }}
@@ -43,9 +43,9 @@ jobs:
     name: Compile ESP32-S3
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -53,7 +53,7 @@ jobs:
         run: pip install esphome==2026.10.1
 
       - name: Cache ESP-IDF toolchain and framework
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/esphome
           key: esphome-idf-esphome-2026.10.1
@@ -86,13 +86,13 @@ jobs:
     name: Compile WPL9 (ESP32-S3)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pip install esphome==2026.10.1
       - name: Cache ESP-IDF toolchain and framework
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/esphome
           key: esphome-idf-esphome-2026.10.1
@@ -104,13 +104,13 @@ jobs:
     name: Compile WPL-A 07 (ESP32-S3)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pip install esphome==2026.10.1
       - name: Cache ESP-IDF toolchain and framework
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/esphome
           key: esphome-idf-esphome-2026.10.1
@@ -122,13 +122,13 @@ jobs:
     name: Compile diagnostic scan firmware (tools/)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pip install esphome==2026.10.1
       - name: Cache ESP-IDF toolchain and framework
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/esphome
           key: esphome-idf-esphome-2026.10.1
@@ -145,9 +145,9 @@ jobs:
     name: Compile ESP32 (MCP2515)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -155,7 +155,7 @@ jobs:
         run: pip install esphome==2026.10.1
 
       - name: Cache ESP-IDF toolchain and framework
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/esphome
           key: esphome-idf-esphome-2026.10.1
@@ -178,9 +178,9 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -223,9 +223,9 @@ jobs:
     name: Validate YAML
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
