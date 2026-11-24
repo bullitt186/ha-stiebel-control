@@ -112,7 +112,8 @@ discoverability:
 3. **Never commit `esphome/secrets.yaml`** — it is gitignored and contains real credentials
 4. **`api_encryption_key` must be in `secrets.yaml`** and match what HA's ESPHome integration stores — if it changes, the HA integration entry must be re-adopted
 5. **Edit the repository part of `AGENTS.md`**, not `CLAUDE.md`, for persistent agent guidance
-6. **Bump `version:` in `common.yaml`** before tagging a release
+6. **Releases follow the [release standard](https://github.com/bullitt186/repo-kit/blob/main/docs/RELEASING.md)**:
+   a release pull request bumps `version:` in `common.yaml`; the maintainer tags after acceptance
 
 ---
 
@@ -147,7 +148,8 @@ Every push/PR to `main` runs:
 | `compile-esp32` | Full classic ESP32 (esp32dev)/MCP2515 firmware compile + config check of the deprecated `board_esp32s2.yaml` alias |
 | `compile-scan` | Diagnostic scan firmware in `tools/` |
 | `validate-yaml` | YAML lint, MQTT manifests, doc paths, dashboard IDs, module includes |
-| `hygiene / PR hygiene` | repo-kit check on pull requests: tests and changelog travel with code, ADR format, Markdown links |
+| `hygiene / PR hygiene` | repo-kit check on pull requests: tests and changelog travel with code, ADR format, scope changes with an ADR, Markdown links, size |
+| `security` | repo-kit secret scan (gitleaks) and dependency review; weekly full-history secret scan |
 
 On `v*` tags, a `release` job additionally compiles both firmware variants and creates the
 GitHub Release from the `CHANGELOG.md` section. No firmware binaries are attached: users build
