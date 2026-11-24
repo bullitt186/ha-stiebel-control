@@ -7,6 +7,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Contributors
+
+- One setup for all coding agents and people ([repo-kit](https://github.com/bullitt186/repo-kit)):
+  `AGENTS.md` is the single instruction file (`CLAUDE.md` imports it, the Copilot file points to
+  it), `CONTRIBUTING.md` holds the Definition of Done that every pull request is reviewed
+  against, a pull request template, and architecture decision records in `docs/adr/`
+  (ADR-0002 model profiles, ADR-0003 module include order). The new `PR hygiene` check fails
+  when code changes come without a test or changelog change, or when an ADR or a Markdown link is
+  broken.
+- `tests/check_doc_paths.py` no longer cuts the leading dot of paths like `.github/...`.
+
 ### Upgrade notes — OTA migration, stage 1
 
 - Requires ESPHome 2026.9.0 or newer; existing installations retain
