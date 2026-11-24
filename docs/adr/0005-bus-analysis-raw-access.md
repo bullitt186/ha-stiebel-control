@@ -1,4 +1,4 @@
-# ADR-0004: Bus analysis with raw read/write behind build flags
+# ADR-0005: Bus analysis with raw read/write behind build flags
 
 - **Status:** Accepted
 - **Date:** 2026-11-24

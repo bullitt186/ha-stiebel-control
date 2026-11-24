@@ -17,6 +17,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   when code changes come without a test or changelog change, or when an ADR or a Markdown link is
   broken.
 - `tests/check_doc_paths.py` no longer cuts the leading dot of paths like `.github/...`.
+- repo-kit v2: `docs/SCOPE.md` says what the project is for and what it is not; feature
+  requests are built after the maintainer labels the issue `accepted`. A weekly security workflow
+  scans for secrets and reviews new dependencies, Dependabot updates the GitHub Actions weekly,
+  and releases follow the repo-kit release standard (release pull request, acceptance, then tag).
 
 ### Upgrade notes — OTA migration, stage 1
 
@@ -58,7 +62,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - Raw write (`<root>/raw/write`, opt-in): writes one index of any CAN id and reports `verified`,
   `mismatch`, `timeout`, `no_ack` or `rejected`. Needs `can_debug: "true"` and substitution
   `can_raw_write: "true"`. There is no whitelist: any MQTT client with broker access can then write any value
-  (design and rules in [ADR-0004](docs/adr/0004-bus-analysis-raw-access.md)).
+  (design and rules in [ADR-0005](docs/adr/0005-bus-analysis-raw-access.md)).
 - Substitution `can_raw_write` (default `"false"`, needs `can_debug: "true"`) for the raw write.
 
 ### Fixed

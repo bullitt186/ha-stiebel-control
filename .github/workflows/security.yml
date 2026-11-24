@@ -1,0 +1,19 @@
+# Managed by repo-kit (https://github.com/bullitt186/repo-kit). Do not edit here.
+# Secret scan on every pull request and weekly over the full history; dependency review on
+# pull requests (public repositories). CodeQL runs as GitHub default setup (kit.py github).
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "23 4 * * 1"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  security:
+    uses: bullitt186/repo-kit/.github/workflows/security-reusable.yml@stable-v2

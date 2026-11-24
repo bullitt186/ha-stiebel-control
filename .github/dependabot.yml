@@ -1,0 +1,10 @@
+# Weekly dependency update pull requests (repo-kit, docs/CI_STANDARD.md).
+# Add one entry per package ecosystem of this repository (pip, npm, gomod, docker, ...).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7   # wait a week after a release before updating

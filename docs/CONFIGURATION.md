@@ -513,7 +513,7 @@ the WPMW II manager answers 69 (`0x0045`, no fault) on this index, so it is not 
 Tools to look at the CAN bus with one ESP: scan one member for indices, read one index from any CAN id,
 write one index (opt-in), and stream every raw frame. `<root>` is the MQTT root, `heatingpump` by default
 (substitution `device_name`). The design and the safety rules for raw writes are recorded in
-[ADR-0004](adr/0004-bus-analysis-raw-access.md).
+[ADR-0005](adr/0005-bus-analysis-raw-access.md).
 
 | Tool | Needs | Topics |
 |------|-------|--------|

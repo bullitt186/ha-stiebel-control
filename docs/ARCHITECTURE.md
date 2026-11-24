@@ -79,8 +79,11 @@ ha-stiebel-control/
 └── .github/
     ├── copilot-instructions.md             # Points GitHub Copilot to AGENTS.md
     └── workflows/
-        ├── ci.yml                          # CI: compile + unit test + YAML lint
-        └── (release job in ci.yml)         # Release: compile → attach binaries → GitHub Release
+        ├── ci.yml                          # CI: compile + unit test + YAML lint; on v* tags the release job
+        │                                   #   compiles and creates the GitHub Release (no binaries attached)
+        ├── mutation.yml                    # Weekly mutation testing (Mull)
+        ├── pr-hygiene.yml                  # repo-kit PR hygiene
+        └── security.yml                    # repo-kit secret scan and dependency review
 ```
 
 ---
