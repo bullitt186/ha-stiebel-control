@@ -23,6 +23,7 @@ substitutions:
   read_only: "false"          # "true": never write to the heat pump (no setpoints/modes/clock; reading and bus scan only)
   can_debug: "false"          # "true": build in the raw CAN frame stream (can_debug.h) and its RX/TX observers
   can_debug_queue_size: "256" # frames buffered by the CAN frame stream (can_debug.h, RAM only while on: 16 bytes each); lower it on boards with little free RAM
+  can_raw_write: "false"      # "true": allow free writes via <root>/raw/write, needs can_debug "true"; any MQTT client with broker access can then write any value
   # Network package from this folder: network_wifi.yaml (default) or network_ethernet_w5500.yaml
   network_package: "network_wifi.yaml"
 
@@ -78,6 +79,7 @@ esphome:
     - paced_writes.h
     - discovery.h
     - bus_scan.h
+    - can_raw.h
     - request_manager.h
     - calculated.h
     - energy.h
@@ -98,6 +100,7 @@ esphome:
     - "-DHA_READ_ONLY_${read_only}"
     - "-DHA_CAN_DEBUG_${can_debug}"
     - "-DCAN_DEBUG_QUEUE_SIZE=${can_debug_queue_size}"
+    - "-DHA_CAN_RAW_WRITE_${can_raw_write}"
 
 #########################################
 #                                       #
@@ -210,18 +213,30 @@ mqtt:
         - lambda: |-
             if (x == "online") republishAllDiscoveries();
 
-    # Bus scan: payload "<MEMBER>" (all table indices) or "<MEMBER> 0x0000 0x0fff"
+    # Bus scan: payload "MEMBER|0xID [0xLO 0xHI] [fa|f8|f9]"
     - topic: ${device_name}/scan/start
       then:
         - lambda: startScan(x);
     - topic: ${device_name}/scan/stop
       then:
         - lambda: stopScan();
+    # Members scan, only with can_debug: "true". Payload "[0xLO 0xHI] [0xIDX]"
+    - topic: ${device_name}/scan/members
+      then:
+        - lambda: startMemberScan(x);
 
     # Raw CAN frame stream for bus analysis (can_debug.h): payload "on" or "off"
     - topic: ${device_name}/can_debug/set
       then:
         - lambda: canDebugCommand(x);
+
+    # Raw read and write of one index at any CAN id (can_raw.h, only with can_debug: "true")
+    - topic: ${device_name}/raw/read
+      then:
+        - lambda: rawReadCommand(x);
+    - topic: ${device_name}/raw/write
+      then:
+        - lambda: rawWriteCommand(x);
 
     # Force republish all discoveries (including writable entities)
     - topic: ${device_name}/republish_discoveries
@@ -254,10 +269,13 @@ interval:
     then:
       - lambda: scanStep();
 
-  # Raw CAN frame stream (idle unless switched on via <device_name>/can_debug/set)
+  # Raw CAN frame stream (idle unless switched on via <device_name>/can_debug/set) and
+  # raw read/write timeouts (can_raw.h)
   - interval: 50ms
     then:
-      - lambda: canDebugStep();
+      - lambda: |-
+          canDebugStep();
+          rawStep();
 
   # Process calculated sensor updates (runs every second)
   - interval: 1s

@@ -49,7 +49,8 @@ above it. The shared configuration is only the build flags, `config.h` (`HA_TOPI
 | `can_debug.h` | raw CAN frame stream over MQTT (`canDebugCommand()`, `canDebugStep()`), opt-in via `can_debug: "true"` (stream off by default) |
 | `paced_writes.h` | `queuePacedWrite()`/`pacedWriteStep()`: one write at a time, checked by read-back |
 | `discovery.h` | device blocks (`HA_MAIN_DEVICE_JSON`, `memberDeviceJson()`), `defaultEntityIdJson()`, discovery of raw signals and calculated sensors |
-| `bus_scan.h` | bus scan (`startScan()`, `scanStep()`, `handleScanFrame()`) |
+| `bus_scan.h` | bus scan (`startScan()`, `scanStep()`, `handleScanFrame()`), hex-id/switch-byte scan, members scan (can_debug) |
+| `can_raw.h` | raw read/write of one index (`rawReadCommand()`, `rawWriteCommand()`, `handleBusAnalysisFrame()`), opt-in via can_debug, write also needs can_raw_write |
 | `request_manager.h` | polling of `signalRequests[]` (`processSignalRequests()`), back-off |
 | `calculated.h` | `calculatedSensors[]`/`CalcIdx`, date/time, Delta T, compressor, summer mode, diagnostics, `processCalculatedSensors()` |
 | `energy.h` | COP and the combined energy values |

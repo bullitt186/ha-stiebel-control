@@ -37,7 +37,8 @@ ha-stiebel-control/
 │       ├── can_debug.h                     # Raw CAN frame stream over MQTT (opt-in: can_debug "true")
 │       ├── paced_writes.h                  # Paced write queue (SG Ready, time programs)
 │       ├── discovery.h                     # HA device blocks and discovery payloads
-│       ├── bus_scan.h                      # Bus scan of one member
+│       ├── bus_scan.h                      # Bus scan of one member: hex-id/switch-byte scan, members scan (can_debug)
+│       ├── can_raw.h                       # Raw read/write of one index at any CAN id (opt-in: can_debug "true")
 │       ├── request_manager.h               # Polling of the model's request table
 │       ├── calculated.h                    # calculatedSensors[] and derived values
 │       ├── energy.h                        # COP and combined energy values
@@ -145,7 +146,8 @@ modules and not listed.
 | `can_debug.h` | Raw CAN frame stream over MQTT (`<root>/can_debug/…`) | can_io, mqtt_publish |
 | `paced_writes.h` | Paced write queue for SG Ready and the time programs | can_io |
 | `discovery.h` | HA device blocks, default entity IDs, discovery of raw signals and calculated sensors | signal_route, mqtt_publish |
-| `bus_scan.h` | Bus scan of one CAN member | can_io, mqtt_publish |
+| `bus_scan.h` | Bus scan of one CAN member: hex-id/switch-byte scan, members scan (can_debug) | can_io, mqtt_publish |
+| `can_raw.h` | Raw read/write of one index at any CAN id (`<root>/raw/…`), opt-in via can_debug; write also needs can_raw_write | can_io, mqtt_publish, bus_scan |
 | `request_manager.h` | Polling of the model's request table, back-off | signal_route, can_io, bus_scan |
 | `calculated.h` | `calculatedSensors[]` and the derived values, their scheduler | signal_route, mqtt_publish, discovery, request_manager |
 | `energy.h` | COP and the combined energy values | calculated |

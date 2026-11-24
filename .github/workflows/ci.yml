@@ -33,6 +33,10 @@ jobs:
         if: matrix.model == 'test_model'
         run: make test CAN_DEBUG_TEST_FLAGS=
 
+      - name: Unit tests without raw write
+        if: matrix.model == 'test_model'
+        run: make test CAN_RAW_WRITE_TEST_FLAGS=
+
       - name: Topic root follows device_name (#102)
         run: |
           make clean-tests

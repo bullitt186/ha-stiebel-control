@@ -37,6 +37,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   `processAndUpdate()` and after every `send_data()`. Used by `can_debug.h`; compiled in only with
   `can_debug: "true"`, otherwise empty inline hooks.
 
+- Bus scan at any CAN id: `<root>/scan/start` with `MEMBER|0xID [0xLO 0xHI] [fa|f8|f9]` scans a table
+  member, a hex id or a hex range, with switch byte `fa`, `f8` or `f9`. Results per index and the status
+  are published under `<root>/scan/…`. See docs/CONFIGURATION.md "Bus analysis".
+- Members scan (`<root>/scan/members`, `can_debug: "true"`): asks every CAN id of a range for one index and
+  publishes the answers to `<root>/scan/members/0x<id>`.
+- Raw read (`<root>/raw/read`, `can_debug: "true"`): reads one index of one CAN id; the result goes to
+  `<root>/raw/result`.
+- Raw write (`<root>/raw/write`, opt-in): writes one index of any CAN id and reports `verified`,
+  `mismatch`, `timeout`, `no_ack` or `rejected`. Needs `can_debug: "true"` and substitution
+  `can_raw_write: "true"`. There is no whitelist: any MQTT client with broker access can then write any value.
+- Substitution `can_raw_write` (default `"false"`, needs `can_debug: "true"`) for the raw write.
+
 ### Fixed
 
 - `FESTWERT` (manager `0x01c0`, fixed-value setpoint) was decoded byte-swapped, so 40.5 °C showed

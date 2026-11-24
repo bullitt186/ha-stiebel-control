@@ -272,10 +272,18 @@ inline bool handleMemberScanFrame(uint32_t canId, const std::vector<uint8_t>& ms
 }
 #endif
 
+// True if the answer is addressed to the PC. Header bytes carry the target id (see generate_read_id()).
+// Otherwise answers from the scanned member to other bus members would be reported as scan hits.
+inline bool scanAnswerIsForPc(const std::vector<uint8_t>& msg) {
+    const CanIdBytes pc = generate_read_id(CanMembers[cm_pc].CanId);
+    return (msg[0] & 0xF0) == (pc.first & 0xF0) && msg[1] == pc.second;
+}
+
 // Returns true if the frame was a scan answer (then it is not processed further).
 // Called from processAndUpdate() for every answer frame (type 2) of the bus.
 bool handleScanFrame(uint32_t canId, const std::vector<uint8_t>& msg) {
     if (!scanState.active || msg.size() < 7 || (msg[0] & 0x0F) != 2) return false;
+    if (!scanAnswerIsForPc(msg)) return false;
 #ifdef HA_CAN_DEBUG_true
     if (scanState.members) return handleMemberScanFrame(canId, msg);
 #endif
