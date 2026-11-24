@@ -102,6 +102,9 @@ Include:
 - `tests/models/yourmodel_smoke.json`
 - ESPHome log snippet showing signals responding from your heat pump
 - Heat pump model/variant info in the PR description
+- the CI matrix entry, a profile in `model_profile.h` if needed, and a `CHANGELOG.md` entry
+
+The pull request is reviewed against the Definition of Done in [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ---
 
@@ -241,7 +244,8 @@ for line in sys.stdin:
 ### Step 4 — Submit a PR
 
 Include `lang_XX.h` and the `language_select.h` update. Mention which signals you have
-translated and which intentionally keep the German default.
+translated and which intentionally keep the German default. Review follows the Definition of
+Done in [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ---
 

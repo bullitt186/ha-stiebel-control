@@ -1,7 +1,8 @@
 # Agentic Development
 
-This project is set up for agentic development with Claude Code and GitHub Copilot.
-Both agents share a single source of truth and a fully automated quality pipeline.
+This project is set up for agentic development with any coding agent (Claude Code, GitHub
+Copilot, Codex, …). All agents share a single source of truth and a fully automated quality
+pipeline.
 
 ---
 
@@ -9,15 +10,16 @@ Both agents share a single source of truth and a fully automated quality pipelin
 
 ### Single source of truth
 
-`.github/copilot-instructions.md` is the authoritative instructions file for all AI agents.
+[`AGENTS.md`](../AGENTS.md) is the authoritative instructions file for all coding agents. Its
+first block is shared with the maintainer's other repositories
+([repo-kit](https://github.com/bullitt186/repo-kit)); the part below it is specific to this
+repository. `CLAUDE.md` imports it (`@AGENTS.md`) and adds only Claude Code specifics;
+`.github/copilot-instructions.md` points Copilot to it.
 
-`CLAUDE.md` (at repo root) imports it with a single line:
-```
-@.github/copilot-instructions.md
-```
-
-**Edit `.github/copilot-instructions.md` — never `CLAUDE.md` directly.** One edit keeps
-both Copilot and Claude Code in sync.
+**Edit the repository part of `AGENTS.md`** for persistent agent guidance, never the shared
+block. The **Definition of Done** in [`CONTRIBUTING.md`](../CONTRIBUTING.md) is the list every
+pull request is reviewed against, and the decisions behind the code are in
+[`docs/adr/`](adr/README.md).
 
 ### Pre-approved permissions
 
@@ -102,14 +104,14 @@ Claude will:
 
 ## Rules for Agents
 
-These rules are also in `.github/copilot-instructions.md`, but are repeated here for
+These rules are also in `AGENTS.md`, but are repeated here for
 discoverability:
 
 1. **Always run `make check` before committing** any change that touches firmware files
 2. **Always run `make smoke-test` after `make upload`** — do not declare a flash successful until it passes
 3. **Never commit `esphome/secrets.yaml`** — it is gitignored and contains real credentials
 4. **`api_encryption_key` must be in `secrets.yaml`** and match what HA's ESPHome integration stores — if it changes, the HA integration entry must be re-adopted
-5. **Edit `.github/copilot-instructions.md`**, not `CLAUDE.md`, for persistent agent guidance
+5. **Edit the repository part of `AGENTS.md`**, not `CLAUDE.md`, for persistent agent guidance
 6. **Bump `version:` in `common.yaml`** before tagging a release
 
 ---
@@ -140,14 +142,15 @@ Every push/PR to `main` runs:
 
 | Job | What it checks |
 |-----|---------------|
-| `unit-tests` | Native Catch2 suite (138 tests, no hardware) |
+| `unit-tests` | Native Catch2 suite for every model (no hardware) |
 | `compile-s3` | Full ESP32-S3 firmware compile |
 | `compile-esp32` | Full classic ESP32 (esp32dev)/MCP2515 firmware compile + config check of the deprecated `board_esp32s2.yaml` alias |
-| `validate-yaml` | YAML lint on all package files |
+| `compile-scan` | Diagnostic scan firmware in `tools/` |
+| `validate-yaml` | YAML lint, MQTT manifests, doc paths, dashboard IDs, module includes |
+| `hygiene / PR hygiene` | repo-kit check on pull requests: tests and changelog travel with code, ADR format, Markdown links |
 
-On `v*` tags, a `release` job additionally:
-- Compiles both firmware variants
-- Generates `manifest.json` with firmware URLs and MD5s
-- Creates a GitHub Release with attached `.bin` files
+On `v*` tags, a `release` job additionally compiles both firmware variants and creates the
+GitHub Release from the `CHANGELOG.md` section. No firmware binaries are attached: users build
+with their own `secrets.yaml`.
 
 The unit tests and YAML validation run in seconds. The firmware compile jobs take ~5 minutes each and require the full ESP-IDF toolchain to be downloaded on first run.
