@@ -7,6 +7,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Contributors
+
+- One setup for all coding agents and people ([repo-kit](https://github.com/bullitt186/repo-kit)):
+  `AGENTS.md` is the single instruction file (`CLAUDE.md` imports it, the Copilot file points to
+  it), `CONTRIBUTING.md` holds the Definition of Done that every pull request is reviewed
+  against, a pull request template, and architecture decision records in `docs/adr/`
+  (ADR-0002 model profiles, ADR-0003 module include order). The new `PR hygiene` check fails
+  when code changes come without a test or changelog change, or when an ADR or a Markdown link is
+  broken.
+- `tests/check_doc_paths.py` no longer cuts the leading dot of paths like `.github/...`.
+
 ### Upgrade notes — OTA migration, stage 1
 
 - Requires ESPHome 2026.9.0 or newer; existing installations retain
@@ -46,11 +57,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   `<root>/raw/result`.
 - Raw write (`<root>/raw/write`, opt-in): writes one index of any CAN id and reports `verified`,
   `mismatch`, `timeout`, `no_ack` or `rejected`. Needs `can_debug: "true"` and substitution
-  `can_raw_write: "true"`. There is no whitelist: any MQTT client with broker access can then write any value.
+  `can_raw_write: "true"`. There is no whitelist: any MQTT client with broker access can then write any value
+  (design and rules in [ADR-0004](docs/adr/0004-bus-analysis-raw-access.md)).
 - Substitution `can_raw_write` (default `"false"`, needs `can_debug: "true"`) for the raw write.
 
 ### Fixed
 
+- TTL 33: "Abtauung läuft" never turned on, because the heat pump module answers
+  `ZEITDAUER_LETZTE_ABTAUUNG` with the placeholder 255. On `ttl33` it now comes from KESSEL
+  `BETRIEBS_STATUS` bit `0x0040`, which SolderAndSyntax saw set during two defrosts and not
+  otherwise (#136).
 - `FESTWERT` (manager `0x01c0`, fixed-value setpoint) was decoded byte-swapped, so 40.5 °C showed
   as 38145. It is a tenths value like the other setpoints (checked on a WPMW II by SolderAndSyntax).
 

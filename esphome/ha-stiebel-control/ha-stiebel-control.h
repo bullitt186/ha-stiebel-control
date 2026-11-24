@@ -327,7 +327,8 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
             // The IWS resets the last defrost duration to 0 when a defrost starts and
             // writes the new duration when it ends, so 0 marks a running defrost (#48).
             // ABTAUUNGAKTIV stayed off through three defrosts on a WPL13E.
-            if (strcmp(cm.Name, "HEIZMODUL") == 0 && value != "-255") {
+            // TTL 33 answers a placeholder here, BETRIEBS_STATUS decides (#136).
+            if (!kModel.defrostFromKessel && strcmp(cm.Name, "HEIZMODUL") == 0 && value != "-255") {
                 publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_ABTAUUNG_LAEUFT], false);
                 publishCalculatedState(calculatedSensors[CALC_IDX_ABTAUUNG_LAEUFT].stateTopic,
                                        atoi(value.c_str()) == 0 ? "on" : "off");
@@ -355,12 +356,21 @@ void updateSensor(const CanMember &cm, const ElsterIndex *ei, const std::string 
         case HASH_BETRIEBS_STATUS: {
             // TTL 33 (compressorFromKessel): bit 0x0001 / 0x0002 = compressor 1 / 2 running (#131).
             // WP_PUMPENSTATUS is no source: 0x0200 / 0x0300 while running, other bits at rest.
+            // TTL 33 (defrostFromKessel): bit 0x0040 is set during a defrost (#136).
             // et_default decodes as signed short, so bit 15 gives a negative number.
-            if (!kModel.compressorFromKessel || strcmp(cm.Name, "KESSEL") != 0 || value == "-255") break;
+            if (!kModel.compressorFromKessel && !kModel.defrostFromKessel) break;
+            if (strcmp(cm.Name, "KESSEL") != 0 || value == "-255") break;
             char* endPtr;
             const long raw = strtol(value.c_str(), &endPtr, 10);
             if (endPtr == value.c_str() || *endPtr != '\0' || raw < -32768 || raw > 0xFFFF) break;
-            lastVerdichterValue = (static_cast<unsigned long>(raw) & 0x3UL) ? COMPRESSOR_ON_VALUE : 0.0f;
+            const unsigned long bits = static_cast<unsigned long>(raw) & 0xFFFFUL;
+            if (kModel.compressorFromKessel)
+                lastVerdichterValue = (bits & 0x3UL) ? COMPRESSOR_ON_VALUE : 0.0f;
+            if (kModel.defrostFromKessel) {
+                publishCalculatedSensorDiscovery(calculatedSensors[CALC_IDX_ABTAUUNG_LAEUFT], false);
+                publishCalculatedState(calculatedSensors[CALC_IDX_ABTAUUNG_LAEUFT].stateTopic,
+                                       (bits & 0x40UL) ? "on" : "off");
+            }
             break;
         }
 

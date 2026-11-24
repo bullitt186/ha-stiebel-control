@@ -1,5 +1,5 @@
 # Mull mutation testing config, read by the compiler plugin and mull-runner.
-# Run it with `make mutate` (changed lines) or `make mutate-all`; see CLAUDE.md.
+# Run it with `make mutate` (changed lines) or `make mutate-all`; see AGENTS.md.
 # Only the firmware's C++ logic is mutated, never the tests or Catch2.
 includePaths:
   - esphome/ha-stiebel-control/

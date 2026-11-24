@@ -239,6 +239,9 @@ jobs:
       - name: Validate MQTT model manifests
         run: python3 -m unittest discover -s tests -p 'test_mqtt_manifest.py'
 
+      - name: Unit tests of the repository checks
+        run: python3 -m unittest discover -s tests -p 'test_check_*.py'
+
       - name: Check repo paths named in the agent and architecture docs
         run: python3 tests/check_doc_paths.py
 

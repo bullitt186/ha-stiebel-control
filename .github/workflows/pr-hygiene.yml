@@ -1,0 +1,15 @@
+# Managed by repo-kit (https://github.com/bullitt186/repo-kit). Do not edit here;
+# per-repository settings go into .github/repo-kit.yml.
+name: PR hygiene
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  hygiene:
+    uses: bullitt186/repo-kit/.github/workflows/hygiene-reusable.yml@stable

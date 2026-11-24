@@ -74,9 +74,10 @@ ha-stiebel-control/
 ├── docs/                                   # Extended documentation
 ├── manuals/                                # PDF manuals for reference
 ├── Makefile                                # Developer task runner
-├── CLAUDE.md                               # Claude Code agent context
+├── AGENTS.md                               # Instructions for all coding agents (repo-kit block + repository part)
+├── CLAUDE.md                               # @AGENTS.md plus Claude Code specifics
 └── .github/
-    ├── copilot-instructions.md             # Single source of truth for AI agents
+    ├── copilot-instructions.md             # Points GitHub Copilot to AGENTS.md
     └── workflows/
         ├── ci.yml                          # CI: compile + unit test + YAML lint
         └── (release job in ci.yml)         # Release: compile → attach binaries → GitHub Release

@@ -1196,6 +1196,12 @@ TEST_CASE("defrost running: last defrost duration 0 means a defrost is running (
     resetDiscoveryState();
     const ElsterIndex* ei = GetElsterIndex("ZEITDAUER_LETZTE_ABTAUUNG");
     REQUIRE(ei != nullptr);
+    if (kModel.defrostFromKessel) {   // TTL 33: placeholder 255 here, BETRIEBS_STATUS decides (#136)
+        updateSensor(CanMembers[cm_heizmodul], ei, "255");
+        updateSensor(CanMembers[cm_heizmodul], ei, "0");
+        CHECK(mqttFindPayload("calculated/abtauung_laeuft/state").empty());
+        return;
+    }
     updateSensor(CanMembers[cm_heizmodul], ei, "708");
     CHECK(mqttFindPayload("calculated/abtauung_laeuft/state") == "off");
     mqtt_client_instance().clear();
@@ -1207,6 +1213,36 @@ TEST_CASE("defrost running: last defrost duration 0 means a defrost is running (
     mqtt_client_instance().clear();
     updateSensor(CanMembers[cm_heizmodul], ei, "-255"); // not provided: no state
     CHECK(mqttFindPayload("calculated/abtauung_laeuft/state").empty());
+}
+
+TEST_CASE("ttl33: defrost running from KESSEL BETRIEBS_STATUS bit 0x0040 (#136)", "[calc]") {
+    // Recorded on a TTL 33 / WPMW II (#136): bit 0x0040 set during two defrosts and not otherwise,
+    // 0x42 right after a DHW charge and 0x41 after 1.5 h of heating.
+    resetDiscoveryState();
+    const ElsterIndex* bs = GetElsterIndex("BETRIEBS_STATUS");
+    REQUIRE(bs != nullptr);
+    const char* topic = "calculated/abtauung_laeuft/state";
+    if (!kModel.defrostFromKessel) {
+        updateSensor(CanMembers[cm_kessel], bs, "66");       // other models: no defrost source
+        CHECK(mqttFindPayload(topic).empty());
+        return;
+    }
+    // State after one frame; states are cached, so the steps alternate on/off.
+    auto stateAfter = [&](const CanMember& cm, const char* v) {
+        mqtt_client_instance().clear();
+        updateSensor(cm, bs, v);
+        return mqttFindPayload(topic);
+    };
+    CHECK(stateAfter(CanMembers[cm_kessel], "1") == "off");        // compressor 1, no defrost
+    CHECK(stateAfter(CanMembers[cm_kessel], "65") == "on");        // 0x41: defrost while heating
+    CHECK(stateAfter(CanMembers[cm_kessel], "63") == "off");       // 0x003f: every bit below 0x0040
+    CHECK(stateAfter(CanMembers[cm_kessel], "66") == "on");        // 0x42: defrost after a DHW charge
+    CHECK(stateAfter(CanMembers[cm_kessel], "128") == "off");      // 0x0080: the bit above
+    CHECK(stateAfter(CanMembers[cm_kessel], "-32704") == "on");    // 0x8040 as signed short
+    CHECK(stateAfter(CanMembers[cm_kessel], "-32768") == "off");   // 0x8000 as signed short
+    CHECK(stateAfter(CanMembers[cm_kessel], "-255").empty());      // not available: no state
+    CHECK(stateAfter(CanMembers[cm_kessel], "abc").empty());       // unparsable: no state
+    CHECK(stateAfter(CanMembers[cm_manager], "64").empty());       // other member: no state
 }
 
 TEST_CASE("ttl33: compressor state from KESSEL BETRIEBS_STATUS bits 0x0001/0x0002 (#83, #131)", "[calc]") {
@@ -2696,6 +2732,7 @@ TEST_CASE("model profile: one place decides the model's capabilities (#94)", "[m
     CHECK(kModel.singleHeatingCircuit == (m == "wpl17" || m == "wpla7"));
     CHECK(kModel.perMemberEnergy == (m == "wpl17"));
     CHECK(kModel.ignoreUnusedIwsRuntime == (m == "wpl13e"));
+    CHECK(kModel.defrostFromKessel == (m == "ttl33"));
     CHECK(kModel.dhwActualOnKesselCanb == (m == "wpla7"));
 #ifdef HA_CONTROLLER_WPM3
     CHECK((m == "wpl10ac" || m == "wpla7"));

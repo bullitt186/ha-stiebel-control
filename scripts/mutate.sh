@@ -44,7 +44,7 @@ out=.mull
 for tool in "$cxx" "$runner"; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "mutate: '$tool' not found. Install Mull 0.38.0 and a matching clang," >&2
-        echo "or set MULL_CXX / MULL_IR_FRONTEND / MULL_RUNNER (see CLAUDE.md)." >&2
+        echo "or set MULL_CXX / MULL_IR_FRONTEND / MULL_RUNNER (see AGENTS.md)." >&2
         exit 1
     fi
 done

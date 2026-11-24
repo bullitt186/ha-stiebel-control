@@ -2,7 +2,7 @@ name: Mutation testing
 
 # Weekly full mutation run of the C++ logic with Mull. It reports the mutation
 # score per file; it is not a required check and never blocks a pull request.
-# Run `make mutate` locally for the lines a change touches (see CLAUDE.md).
+# Run `make mutate` locally for the lines a change touches (see AGENTS.md).
 
 on:
   schedule:
