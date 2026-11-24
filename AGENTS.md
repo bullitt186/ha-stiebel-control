@@ -1,26 +1,36 @@
 # AGENTS.md
 
-<!-- repo-kit:begin v1 (managed, do not edit; https://github.com/bullitt186/repo-kit) -->
+<!-- repo-kit:begin v2 (managed, do not edit; https://github.com/bullitt186/repo-kit) -->
 ## How to work in this repository (all coding agents)
 
 This block is shared by all repositories of this maintainer and kept in sync by
 [repo-kit](https://github.com/bullitt186/repo-kit). Repository-specific
-instructions follow below it and win where they are more specific.
+instructions follow below it. They add detail; where they contradict this block,
+this block wins, unless an ADR in `docs/adr/` records the exception.
 
 A pull request that follows this block passes review without rework. The
 maintainer reviews against the same rules: the **Definition of Done** in
 `CONTRIBUTING.md`.
 
-### Before you change anything
+### Build the right thing
 
-1. Read this file to the end, `CONTRIBUTING.md`, and the architecture decision
-   records in `docs/adr/` (start with `docs/adr/README.md`). An *Accepted* ADR is
-   binding: do not work against it. If your change needs a different decision,
-   write a new ADR that supersedes it, in the same pull request.
-2. Find the issue for the work. If there is none and the change is more than a
-   small fix, open one first and describe the problem, not only the solution.
-3. Keep one topic per pull request. Do not reformat, rename or refactor code
-   that your change does not need.
+1. Read this file to the end, `CONTRIBUTING.md`, `docs/SCOPE.md` and the
+   architecture decision records in `docs/adr/` (start with `docs/adr/README.md`).
+   An *Accepted* ADR and the scope are binding. If your change needs a different
+   decision, write a new ADR that supersedes the old one, in the same pull request.
+2. Work from an issue. A feature or behaviour change needs an issue the maintainer
+   has labelled `accepted`; if there is none, open one, describe the problem (not
+   only the solution) and wait. Only a **small fix** may skip the issue: it repairs
+   documented behaviour, changes fewer than about 50 lines of code, and adds no
+   dependency, interface, setting or file format.
+3. Build what the issue asks for and nothing else. Ideas you have on the way become
+   a new issue, not part of this pull request. No reformatting, renaming or
+   refactoring that the change does not need.
+4. Prefer the smallest complete change: reuse what the repository already has
+   (helpers, patterns, dependencies) before adding anything; no new dependency for
+   a few lines. Fix the root cause, not the symptom.
+5. Never guess protocol values, API fields or hardware behaviour. Take them from a
+   source and name it; mark anything unconfirmed as an assumption.
 
 ### Design first
 
@@ -35,65 +45,107 @@ Write an ADR (`docs/adr/`, see its README) when the change:
   entity or topic names, anything users or other systems rely on,
 - changes the architecture: module boundaries, data flow, persistence, threading,
 - sets a security, privacy or compatibility rule,
-- reverses or replaces an earlier ADR.
+- reverses or replaces an earlier ADR, or changes `docs/SCOPE.md`.
 
 Bug fixes and refactorings inside existing decisions need no ADR.
 
 ### Tests
 
-- A bug fix starts with a regression test that fails for the reason the bug
-  describes. Commit it with the fix.
-- New behaviour comes with tests. Expected values come from the specification,
-  documentation, a protocol table or a recorded real payload, never from running
-  the code under test and copying its output.
+Design the test cases from the specification, then implement the change together
+with them. A one-test-at-a-time red/green cycle is not required.
+
+- A bug fix starts with a regression test that reproduces the bug. Run it and
+  confirm it fails **for the reason the bug describes**, not because of a build,
+  import or signature error. Then fix the bug and commit the test with the fix.
+- Expected values come from the specification: documentation, a protocol table,
+  a manual, the issue, or a recorded real payload. Never from running the code
+  under test and copying its output; such a test only proves the code does what
+  it does.
 - Assert observable results (output, state, sent request, raised error), not only
   that something was called.
+- Tests are fast, deterministic and offline. A flaky test is a bug to fix, not to
+  re-run.
 - Changing an expected value in an existing test needs a reason in the commit
   message that names the source of the new value.
+- Coverage shows what ran, not whether a test notices a wrong result. Run mutation
+  testing on the code you changed (see Commands below); kill a surviving mutant
+  with a test, or say in the pull request why it is equivalent.
 - Do not weaken lint rules, thresholds or checks to make a change pass; fix the
-  code. A justified exception gets a comment and a note in the commit message.
+  code. A justified exception gets a comment next to it and a note in the commit
+  message. Thresholds are only ever raised.
 
 ### Documentation
 
 Documentation changes in the same pull request as the behaviour it describes:
-README, `docs/`, configuration examples, `CHANGELOG.md` (section `[Unreleased]`),
-and the ADRs. Outdated documentation counts as a bug. Relative links in Markdown
-must point to files that exist.
+README, `docs/`, configuration examples, the ADRs and `CHANGELOG.md`. Outdated
+documentation counts as a bug. Relative links in Markdown must point to files
+that exist.
+
+Changelog entries go under `[Unreleased]`, in the Keep a Changelog sections
+(Added, Changed, Fixed, Removed, Security). Write them for the user of the
+project: what changes for them and what they have to do, not which functions
+moved. A breaking change gets an entry under "Upgrade notes" with the steps.
+Name outside contributors and link their issue or pull request. Releases, tags
+and version numbers are the maintainer's
+([release standard](https://github.com/bullitt186/repo-kit/blob/main/docs/RELEASING.md)).
+
+### Commits and branches
+
+- One branch per topic from the current default branch; never commit to the
+  default branch. Agents working in parallel use their own git worktree; never
+  run checkout, switch, reset, stash or clean in a checkout someone else uses.
+- Commit each completed step with a Conventional Commits message (`feat:`,
+  `fix:`, `docs:`, `test:`, `refactor:`, `chore:`, `ci:`); the body says why.
+  Code, comments, commit messages and pull requests are in English.
+- Reference the issue: `Closes #N` on GitHub; `Refs #N` on Forgejo, which closes
+  an issue as soon as a commit with `Closes` is pushed.
+- Never commit or push on red; never use `--no-verify` or skip hooks; treat every
+  hook finding as work to do.
 
 ### Before you open the pull request
 
-- Run the repository's full check (see below) and make it pass. Never commit or
-  push on red, never use `--no-verify`.
-- Rebase on or merge the current default branch and run the check again.
-- Fill in the pull request template completely; tick only what you did.
-- No secrets, tokens, personal data, local paths or host names in code, tests,
-  logs, commits or pull request text.
+- Run the repository's **fast check** before every commit and the **full check**
+  when your change can affect what it covers (see Commands below). Both must pass.
+- Merge or rebase onto the current default branch and run the checks again.
+- Fill in the pull request template completely; tick only what you did and say
+  why anything stays unticked.
+- After pushing, watch CI yourself. A red check on your pull request is your work,
+  also when it looks unrelated.
+- No secrets, tokens, personal data, local paths, host names or IP addresses in
+  code, tests, fixtures, logs, commits or pull request text.
 
 ### Continuous integration
 
-CI runs the repository's checks and `PR hygiene` from repo-kit. PR hygiene fails
-when code changes come without a test change or without a `CHANGELOG.md` entry,
-when an ADR is malformed or missing from the index, or when a changed Markdown
-file has a broken relative link. Only the maintainer can waive a rule, with the
-labels `no-test-change` or `skip-changelog`. Do not ask for a waiver when a test
-or changelog entry is possible.
+CI follows the repo-kit [CI standard](https://github.com/bullitt186/repo-kit/blob/main/docs/CI_STANDARD.md):
+tests, lint and format, type check, build, secret scan, dependency review, static
+analysis and `PR hygiene`. PR hygiene fails when code changes come without a test
+change or a `CHANGELOG.md` entry, when `docs/SCOPE.md` changes without an ADR,
+when an ADR is malformed or missing from the index, when a changed Markdown file
+has a broken relative link, when code from an outside contributor links no issue,
+or when a pull request changes more than about 800 lines of code and tests. Only
+the maintainer can waive a rule (labels `no-test-change`, `skip-changelog`,
+`large-change`). Do not ask for a waiver when a test, entry or split is possible.
 
 ### Respect
 
 Do not change CI configuration, branch protection, release workflows, licence,
-or this block unless the issue asks for it. Maintainer decisions recorded in
-issues and ADRs are not up for silent change.
+`docs/SCOPE.md` or this block unless the issue asks for it. Maintainer decisions
+recorded in issues and ADRs are not up for silent change.
 <!-- repo-kit:end -->
 
 ## This repository
 
-### Project Overview
+### Purpose
+
+Scope and non-goals: [docs/SCOPE.md](docs/SCOPE.md).
+
 ESPHome firmware plus Home Assistant integration for Stiebel Eltron / Tecalor heat pumps on the
 CAN bus (Elster protocol). The ESP32 acts as bus member `PC` (0x680), polls signals, publishes them
 via MQTT discovery and writes settings. Two hardware variants, both on ESP-IDF: ESP32-S3 with the
 built-in TWAI controller (recommended) and a classic ESP32 (`esp32dev`) with an MCP2515.
 
-### Repository layout (`esphome/`)
+### Layout
+
 - `heatingpump.yaml` — user entry point: substitutions (`device_model`, pins, `language`, …) and the
   package list (board, can, network, base, model). Never add sensors or logic here.
 - `ha-stiebel-control/` — the packages and the C++ code:
@@ -122,7 +174,8 @@ built-in TWAI controller (recommended) and a classic ESP32 (`esp32dev`) with an 
 - `packages/ha_stiebel_control.yaml` — HA helpers (clock/date sync). Docs: `docs/`, `SG_READY.md`.
 - `manuals/` — Stiebel PDFs; consult them for signal meaning.
 
-### Firmware modules (`esphome/ha-stiebel-control/`, #109)
+#### Firmware modules (`esphome/ha-stiebel-control/`, #109)
+
 One header per responsibility. Each module owns its global state and includes the modules it
 uses; the includes form no cycle. The table is in include order: a module includes only modules
 above it. The shared configuration is only the build flags, `config.h` (`HA_TOPIC_ROOT`) and
@@ -153,7 +206,8 @@ it. A new header goes into `common.yaml` `includes:` (ESPHome copies only listed
 this table and `docs/ARCHITECTURE.md`. `python3 tests/check_modules.py` checks cycles, the size
 of `ha-stiebel-control.h` and the `includes:` list (CI).
 
-### How a signal reaches Home Assistant
+#### How a signal reaches Home Assistant
+
 1. A row in `signal_requests_<model>.h` makes the request manager poll it
    (`processSignalRequests()` in `request_manager.h`, round-robin, one request per second).
 2. The answer is decoded in `processCanMessage()` (`can_io.h`) with the type from `ElsterTable.h`
@@ -177,7 +231,8 @@ model table(s) with the right member (`cm_manager`, `cm_kessel`, `cm_heizmodul`,
 For HA metadata (unit, device class, binary payloads) set `hasMetadata = true` and add an
 `ElsterMetaTable` row plus an `LNAME_*` macro. Binary sensors need `payloadOn`/`payloadOff`.
 
-### Models (`model_profile.h`)
+#### Models (`model_profile.h`)
+
 The build flag `-DHA_DEVICE_MODEL=<model>` (from `device_model`) is evaluated **only** in
 `model_profile.h`. It defines the preprocessor switches for the signal table and language files
 (`HA_CONTROLLER_WPMW2`, `HA_CONTROLLER_WPM3`, `HA_ELSTER_WPL_FAMILY`) and `kModel`, a constexpr
@@ -193,43 +248,22 @@ add the model to the CI test matrix, and give it a profile in `model_profile.h` 
 WPMW II specifics: heating circuit 2 lives on the virtual member `MISCHERMODUL_3` (0x602),
 including its room setpoints, heating curve and program (`HEIZPROG_1_*`).
 
-### File rules
-- `heatingpump.yaml`: board/model selection only.
-- Board files: hardware only (flash, PSRAM, framework). CAN files: CAN only, keep `id: my_can`.
-- `common.yaml`: board-agnostic; no pins, no model names (use `kModel`).
-- Model YAML: only the `includes:` entry of its request table.
-- Signal protocol names and option values written to the bus stay German in every language
-  (`"Tagbetrieb"`, `LNAME_OPT_*`); only display names are translated.
+#### i18n
 
-### i18n
 `language` substitution → `-DHA_LANGUAGE_${language}` → `language_select.h` picks `lang_en.h` or
 `lang_base.h`. `lang_base.h` is the single source of German strings; `lang_en.h` overrides with
 `#undef`/`#define`. `common.yaml` lists all three headers in `includes:` so ESPHome copies them.
 
-### Testing
-- `make test` — native Catch2 tests; `make test MODEL_TEST_FLAGS=-DHA_DEVICE_MODEL=wpl13e` builds the
-  tests with that model's tables and profile (CI runs every model).
-- `make check` — compile both board variants; keep flash and RAM below 50 %.
-- After every OTA flash: `make smoke-test` must pass (`tests/models/_common_smoke.json` +
-  `<device_model>_smoke.json`).
-- `python3 tests/check_doc_paths.py` — every repo path named in these docs must exist (CI).
-- `python3 tests/check_modules.py` — no include cycle between the firmware headers,
-  `ha-stiebel-control.h` below 800 lines, every included module listed in `common.yaml` (CI).
+### Commands
 
-### Pitfalls
-- Template sensor lambdas that only trigger reads return `{}`; the C++ side publishes values.
-- Do not change `on_frame` in the CAN files; every frame goes through `processAndUpdate()`.
-- Check `unknown`/`unavailable` in HA templates.
-- The `archive/` folder is reference only.
+| Task | Command |
+|---|---|
+| Install / set up | a C++17 compiler (`g++`) and `make` for the tests; Python 3 with `pip install esphome==2026.10.1` (the version CI uses) for `make check`; `pip install yamllint paho-mqtt` for the YAML and manifest checks |
+| Fast check (before every commit, also the stop hook) | `make test` (Catch2, default model; the stop hook `scripts/agent-stop-check.sh` adds the MQTT manifest tests, `git diff --check`, yamllint and `esphome config` of changed firmware) |
+| Full check | `make check` (unit tests and compile of both board variants; keep flash and RAM below 50 %), plus `python3 tests/check_doc_paths.py` and `python3 tests/check_modules.py`; CI also runs `make test MODEL_TEST_FLAGS=-DHA_DEVICE_MODEL=<model>` for every model |
+| Mutation testing of changed code | `make mutate` (Mull, the C++ lines changed against `origin/main`; set-up below) |
 
-### Releasing
-1. Bump `esphome: project: version:` in `common.yaml`.
-2. Move `[Unreleased]` in `CHANGELOG.md` to the new version (with upgrade notes if needed).
-3. Commit `release: vX.Y.Z`, tag `vX.Y.Z`; CI builds and creates the GitHub release.
-
-### Development commands
-
-Run these `make` targets from the repo root:
+More `make` targets, run from the repository root:
 
 | Target | What it does |
 |--------|-------------|
@@ -246,41 +280,16 @@ Run these `make` targets from the repo root:
 | `make mutate` | Mutation testing (Mull) of the C++ lines changed against `origin/main` |
 | `make mutate-all` | Mutation testing of all C++ logic (slow; the weekly CI workflow runs it) |
 
-**Before uploading**: always run `make check` first. Verify flash usage stays <50% in the compile output.
+- `make test MODEL_TEST_FLAGS=-DHA_DEVICE_MODEL=wpl13e` builds the tests with that model's tables
+  and profile (CI runs every model).
+- `python3 tests/check_doc_paths.py`: every repository path named in these docs must exist (CI).
+- `python3 tests/check_modules.py`: no include cycle between the firmware headers,
+  `ha-stiebel-control.h` below 800 lines, every included module listed in `common.yaml` (CI).
 
-### Design-first changes and tests
+#### Mutation testing set-up
 
-For every change to the C++ logic (`esphome/ha-stiebel-control/*.h`, `elster/`) or to `tests/`:
-
-1. Write down the design before writing code: the behavior that changes, the signals, CAN
-   members and functions involved. Put it in the issue or pull request description; for a small
-   change, the commit message is enough.
-2. Derive the test cases from the specification: the Elster signal definitions in `ElsterTable.h`,
-   the protocol rules (frame layout, index encoding, value types), the manuals in `manuals/`, the
-   issue or a recorded CAN frame. Cover the boundaries the specification names.
-3. Implement the change together with those tests. A one-test-at-a-time red/green cycle is not
-   required.
-4. Run `make test`, and `make check` before a firmware change is merged or flashed.
-
-A bug fix starts with a regression test that reproduces the bug, wherever the logic is
-unit-testable. Run it and confirm it fails for the reason the bug describes, not because of a
-build error. Then fix the bug and commit the test with the fix.
-
-Write tests that can fail:
-
-- Take expected values from the specification (protocol tables, manuals, a recorded frame),
-  never from running the implementation and copying its output. A test whose expected value came
-  from the code under test only proves that the code does what it does.
-- Assert on observable results: the decoded value, the CAN frame sent, the published state.
-- Changing an expected value in an existing test requires a reason in the commit message: name the
-  specification, manual page or recorded frame that makes the new value correct.
-- Compiler warnings and lint rules (`-Wall -Wextra`, yamllint, pre-commit) are relaxed only as a
-  justified exception, with the reason in the commit message. Otherwise refactor.
-
-Line coverage shows which code ran, not whether a test notices a wrong result. Check test strength
-with mutation testing: `make mutate` mutates the C++ lines changed against `origin/main`
-(`MUTATE_BASE=<ref>` for another base) and lists surviving mutants in `.mull/mutation.txt`. A
-survivor in changed code points to a missing or weak assertion. Mull mutates the C++ code under
+`make mutate` mutates the C++ lines changed against `origin/main` (`MUTATE_BASE=<ref>` for
+another base) and lists surviving mutants in `.mull/mutation.txt`. Mull mutates the C++ code under
 `esphome/ha-stiebel-control/`, never `tests/` (scope in `mull.yml`). YAML is not mutated.
 `.github/workflows/mutation.yml` runs `make mutate-all` weekly and reports the score; it does not
 block pull requests.
@@ -292,9 +301,42 @@ match. On macOS unpack `Mull-0.38.0-macOS-*.zip` and the `Mull-<N>-...-macOS-*.z
 major version `<N>` matches Homebrew `llvm`, then set `MULL_CXX=$(brew --prefix llvm)/bin/clang++`,
 `MULL_IR_FRONTEND=<unpacked>/lib/mull-ir-frontend-<N>` and `MULL_RUNNER=<unpacked>/bin/mull-runner`.
 
-### After OTA flash — mandatory checklist
+### Rules specific to this repository
 
-After every `make upload`, run these steps in order:
+#### File rules
+
+- `heatingpump.yaml`: board/model selection only.
+- Board files: hardware only (flash, PSRAM, framework). CAN files: CAN only, keep `id: my_can`.
+- `common.yaml`: board-agnostic; no pins, no model names (use `kModel`).
+- Model YAML: only the `includes:` entry of its request table.
+- Signal protocol names and option values written to the bus stay German in every language
+  (`"Tagbetrieb"`, `LNAME_OPT_*`); only display names are translated.
+
+#### Specifications for tests
+
+The specification for expected values is: the Elster signal definitions in `ElsterTable.h`, the
+protocol rules (frame layout, index encoding, value types), the manuals in `manuals/`, the issue
+or a recorded CAN frame. Cover the boundaries the specification names. Regression tests apply
+wherever the logic is unit-testable; YAML and hardware behaviour are checked by `make check` and
+`make smoke-test`. Compiler warnings and lint rules (`-Wall -Wextra`, yamllint, pre-commit) are
+relaxed only as a justified exception, with the reason in the commit message.
+
+#### CI standard exceptions
+
+- Type check: C++ has no separate type checker; the compiler (`-Wall -Wextra` in the tests, the
+  ESPHome compile in CI) is the type check.
+
+#### Pitfalls
+
+- Template sensor lambdas that only trigger reads return `{}`; the C++ side publishes values.
+- Do not change `on_frame` in the CAN files; every frame goes through `processAndUpdate()`.
+- Check `unknown`/`unavailable` in HA templates.
+- The `archive/` folder is reference only.
+
+#### After OTA flash — mandatory checklist
+
+Before `make upload`, run `make check` and verify that flash usage stays below 50 % in the
+compile output. After every `make upload`, run these steps in order:
 
 1. Watch `heatingpump/status` go `offline` → `online` (within ~60s):
    ```bash
@@ -310,6 +352,20 @@ After every `make upload`, run these steps in order:
 
 If `make smoke-test` fails, check `heatingpump/debug` for errors and investigate before declaring success.
 
-### Secrets
+#### Secrets
 
 `esphome/secrets.yaml` contains real WiFi/MQTT credentials — it is gitignored and must **never** be committed. For CI, a credential-free stub lives at `esphome/ci_secrets.yaml`.
+
+#### Releasing
+
+Releases follow the repo-kit [release standard](https://github.com/bullitt186/repo-kit/blob/main/docs/RELEASING.md);
+the version and the tag are the maintainer's. Repository specifics:
+
+1. The release pull request bumps `esphome: project: version:` in `common.yaml` and moves
+   `[Unreleased]` in `CHANGELOG.md` to the new version (with upgrade notes if needed). Write that
+   section in the release-notes structure of the standard (summary, thank you, what's new, fixes,
+   under the hood, upgrade notes): the release job publishes it verbatim as the release body.
+2. After the maintainer's acceptance, the merge commit is tagged `vX.Y.Z`. CI compiles both
+   variants and creates the GitHub release from the `CHANGELOG.md` section. No firmware binaries
+   are attached: they would carry placeholder credentials, so users build with their own
+   `secrets.yaml`.

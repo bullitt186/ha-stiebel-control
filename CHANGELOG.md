@@ -17,6 +17,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   when code changes come without a test or changelog change, or when an ADR or a Markdown link is
   broken.
 - `tests/check_doc_paths.py` no longer cuts the leading dot of paths like `.github/...`.
+- repo-kit v2: `docs/SCOPE.md` says what the project is for and what it is not; feature
+  requests are built after the maintainer labels the issue `accepted`. A weekly security workflow
+  scans for secrets and reviews new dependencies, Dependabot updates the GitHub Actions weekly,
+  and releases follow the repo-kit release standard (release pull request, acceptance, then tag).
 
 ### Upgrade notes — OTA migration, stage 1
 
