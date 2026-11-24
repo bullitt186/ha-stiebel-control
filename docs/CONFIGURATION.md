@@ -13,15 +13,23 @@ All keys are required unless marked optional.
 | `mqtt_broker` | MQTT broker IP or hostname | `192.168.1.10` |
 | `mqtt_username` | MQTT username | `"mqtt_user"` |
 | `mqtt_password` | MQTT password | `"secret"` |
-| `api_encryption_key` | 32-byte base64 key for ESPHome native API | `"abc...=="` |
-| `ota_password` | OTA update password | `"change_me"` |
+| `ota_password` | Existing OTA password; keep it through the stepping-stone release | `"secret"` |
+| `api_encryption_key` | 32-byte base64 key shared by the native API and encrypted OTA | `"abc...=="` |
 
-Generate `api_encryption_key`:
+For a new device, generate `api_encryption_key`:
 ```bash
 python3 -c "import base64, os; print(base64.b64encode(os.urandom(32)).decode())"
 ```
 
-The key must match what HA's ESPHome integration has stored for this device. If you change it, you need to re-adopt the device in HA (Settings → Devices & Services → ESPHome → delete entry, then re-add).
+For an installed device, preserve both its existing API key and OTA password.
+This stepping-stone release keeps `password: !secret ota_password`; firmware
+built with ESPHome 2026.9.0 or newer offers encrypted OTA using the API key while
+still accepting plaintext uploads. The following release will require
+`encryption: {}` and remove the OTA password. API encryption alone does not
+require encrypted OTA. Install the stepping-stone firmware before upgrading
+the build tool to ESPHome 2027.3.0, which removes plaintext upload fallback.
+See the [migration instructions](INSTALLATION.md#ota-encryption-migration) and
+[official OTA documentation](https://esphome.io/components/ota/esphome/#encryption).
 
 ---
 
@@ -40,9 +48,11 @@ The key must match what HA's ESPHome integration has stored for this device. If 
 | `can_mosi_pin` | SPI MOSI (MCP2515 only) | board-specific — see note below |
 | `can_miso_pin` | SPI MISO (MCP2515 only) | board-specific — see note below |
 | `can_cs_pin` | SPI CS (MCP2515 only) | board-specific — see note below |
-| `can_bit_rate` | CAN bus speed: `20kbps` (CAN-A: WPL13E/WPF10/WPC7) or `50kbps` (CAN-B: WPL17/WPL23/WPL10AC) | `20kbps` |
+| `can_bit_rate` | CAN bus speed: `20kbps` (CAN-A: WPL13E/WPF10/WPC7) or `50kbps` (CAN-B: WPL17/WPL23/WPL10AC/WPLA7) | `20kbps` |
 | `disable_sg_ready` | `"true"` hides all SG Ready entities (models without SG Ready input) | `"false"` |
 | `read_only` | `"true"`: never write to the heat pump — no setpoint/mode/climate entities, clock buttons hidden; reading and bus scan keep working | `"false"` |
+| `can_debug` | `"true"` builds in the raw CAN frame stream and its RX/TX observers (see [CAN frame stream](#can-frame-stream-bus-analysis)); `"false"` leaves them out of the firmware | `"false"` |
+| `can_debug_queue_size` | Frames the CAN frame stream buffers (16 bytes each, plus a 2 KB JSON buffer); RAM is used only while the stream is on. Lower it (minimum 8) on boards with little free RAM | `"256"` |
 | `network_package` | Network package from `ha-stiebel-control/`: `network_wifi.yaml` (WiFi + captive portal) or `network_ethernet_w5500.yaml` (W5500 Ethernet) | `"network_wifi.yaml"` |
 | `eth_clk_pin` … `eth_rst_pin` | W5500 SPI pins (`eth_clk_pin`, `eth_mosi_pin`, `eth_miso_pin`, `eth_cs_pin`, `eth_int_pin`, `eth_rst_pin`), only with `network_ethernet_w5500.yaml` | Waveshare ESP32-S3-POE-ETH: GPIO13/11/12/14/10/9 |
 
@@ -516,6 +526,41 @@ scan. Turn the results into a request block and a Markdown table:
 ```bash
 mosquitto_sub -h BROKER -u USER -P PASS -t 'heatingpump/scan/#' -v -W 5 > scan.txt
 python3 helperscripts/scan_report.py scan.txt
+```
+
+## CAN frame stream (bus analysis)
+
+Streams every raw frame on the bus over MQTT: all received frames (also requests of other nodes and
+frames the firmware ignores) and every frame this node sends. Opt-in: built in only with
+substitution `can_debug: "true"` (default `"false"`, no stream and no observers in the firmware).
+When built in, it is off by default and after every restart.
+
+```yaml
+substitutions:
+  can_debug: "true"
+  can_debug_queue_size: "256"   # optional
+```
+
+| Topic | Payload |
+|---|---|
+| `heatingpump/can_debug/set` | `on` or `off` |
+| `heatingpump/can_debug/state` | `on` / `off` (retained) |
+| `heatingpump/can_debug/frames` | JSON array, up to 32 frames per message, at most every 50 ms: `[{"t":123456,"id":"0x180","d":"9200fa000c0123","tx":false},…]` |
+
+`t` = milliseconds since boot, `id` = CAN id of the sender (`0x680` = this node), `d` = data bytes in hex,
+`tx` = sent by this node. The frames are not decoded; decode them offline (Elster telegram type in the low
+nibble of byte 0, index in byte 2 or bytes 3–4 after `0xfa`). Up to `can_debug_queue_size` frames (default
+256) are buffered while MQTT is busy; further frames are dropped and counted in a warning on the log.
+
+Works with both CAN controllers (built-in TWAI and MCP2515 over SPI): received frames are taken in
+`processAndUpdate()`, sent frames after `send_data()`. RAM: none while off; `on` allocates the buffer
+(default 256 × 16 bytes + 2 KB) and `off` frees it. If the allocation fails, the stream stays off and
+the log shows a warning; lower `can_debug_queue_size` then.
+
+```bash
+mosquitto_pub -h BROKER -u USER -P PASS -t heatingpump/can_debug/set -m on
+mosquitto_sub -h BROKER -u USER -P PASS -t heatingpump/can_debug/frames > frames.txt
+mosquitto_pub -h BROKER -u USER -P PASS -t heatingpump/can_debug/set -m off
 ```
 
 ## Polling back-off

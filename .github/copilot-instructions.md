@@ -17,7 +17,7 @@ built-in TWAI controller (recommended) and a classic ESP32 (`esp32dev`) with an 
   - `common.yaml` — board-agnostic core: MQTT, API, OTA, build flags, `includes:`, MQTT command
     handlers (`on_message`), intervals, template sensors/buttons
   - `<model>.yaml` — model package (`wpl9`, `wpl10ac`, `wpl13e`, `wpl17`, `wpl18e`, `wpf10`, `wpc7`,
-    `ttl33`). It only adds the model's request table to `esphome: includes:`; it holds no sensors.
+    `ttl33`, `wpla7`). It only adds the model's request table to `esphome: includes:`; it holds no sensors.
   - `signal_requests_base.h` — `SIGNAL_REQUESTS_BASE` (universal signals) and shared row macros
     such as `SIGNAL_REQUESTS_ENERGY_IWS`
   - `signal_requests_<model>.h` — what the model polls: `{"SIGNAL", FREQ_xx, cm_member}` rows
@@ -46,7 +46,8 @@ above it. The shared configuration is only the build flags, `config.h` (`HA_TOPI
 | `wpl9_observed_counters.h` | Pure split-counter pairing and register constants |
 | `signal_route.h` | `SignalRoute`/`resolveSignalRoute()`, `isWpmw2Model()`, `elsterNameHash()`, `signalKey()` (pure C++) |
 | `mqtt_publish.h` | `mqttPublish()`, failure counter, publish-on-change state cache, `publishMqttState()` |
-| `can_io.h` | frame decode (`processCanMessage()`), `readSignal()`/`writeSignal()`, read-back queue, `disableCanRequests`, clock/date writes |
+| `can_io.h` | frame decode (`processCanMessage()`), `readSignal()`/`writeSignal()`, read-back queue, `disableCanRequests`, frame observers `canRxObserver`/`canTxObserver`, clock/date writes |
+| `can_debug.h` | raw CAN frame stream over MQTT (`canDebugCommand()`, `canDebugStep()`), opt-in via `can_debug: "true"` (stream off by default) |
 | `paced_writes.h` | `queuePacedWrite()`/`pacedWriteStep()`: one write at a time, checked by read-back |
 | `discovery.h` | device blocks (`HA_MAIN_DEVICE_JSON`, `memberDeviceJson()`), `defaultEntityIdJson()`, discovery of raw signals and calculated sensors |
 | `bus_scan.h` | bus scan (`startScan()`, `scanStep()`, `handleScanFrame()`) |

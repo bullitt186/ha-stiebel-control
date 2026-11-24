@@ -43,6 +43,52 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   [WPL9 counter migration](docs/WPL9_COUNTER_MIGRATION.md) for source mappings,
   retained-config cleanup, reboot evidence and remaining hardware checks.
 
+### Upgrade notes — OTA migration, stage 1
+
+- Requires ESPHome 2026.9.0 or newer; existing installations retain
+  `ota.password: !secret ota_password` and the same API encryption key. Build
+  and install this password-compatible stepping-stone with ESPHome
+  2026.9.x–2027.2.x and verify `Encryption: offered, plaintext accepted`.
+  A later release will require encrypted OTA; ESPHome 2027.3.0 removes the
+  plaintext upload fallback. Complete stage 1 before upgrading the build tool.
+  See [the release-based migration guide](docs/INSTALLATION.md#ota-encryption-migration).
+
+### Added
+
+- New model `wpla7` (WPL-A 07, 1 heating circuit, CAN 50 kbps), contributed by bastard-GIT:
+  `wpla7.yaml`, the signal request table `signal_requests_wpla7.h`, and the CI compile target
+  `ci_heatingpump_wpla7.yaml`. Verified on a WPL-A 07 230 Premium. Types and units of 13 existing
+  rows and names of four former placeholder rows (0x02e2, 0x0a36, 0x0a37, 0x0a39) follow the display
+  check; they only apply to this model (#129). Operating mode names as on its display (the WPM3 set:
+  Programmierbetrieb, Komfortbetrieb, Eco-Modus, …). Model profile flag `dhwActualOnKesselCanb` for
+  the DHW actual temperature on `KESSEL_CANB` (#119).
+
+- Raw CAN frame stream for bus analysis (`can_debug.h`): `<root>/can_debug/set` `on`/`off` streams
+  every received and sent frame as JSON to `<root>/can_debug/frames`, state on
+  `<root>/can_debug/state`. Opt-in: built in only with substitution `can_debug: "true"` (default
+  `"false"`). When built in, off by default and after a restart. Works with TWAI and MCP2515; RAM is
+  allocated only while on, size via substitution `can_debug_queue_size` (default 256 frames). See
+  docs/CONFIGURATION.md "CAN frame stream".
+- Frame observers `canRxObserver`/`canTxObserver` in `can_io.h`: raw frames before any filter of
+  `processAndUpdate()` and after every `send_data()`. Used by `can_debug.h`; compiled in only with
+  `can_debug: "true"`, otherwise empty inline hooks.
+
+### Fixed
+
+- TTL 33: "Abtauung läuft" never turned on, because the heat pump module answers
+  `ZEITDAUER_LETZTE_ABTAUUNG` with the placeholder 255. On `ttl33` it now comes from KESSEL
+  `BETRIEBS_STATUS` bit `0x0040`, which SolderAndSyntax saw set during two defrosts and not
+  otherwise (#136).
+- `FESTWERT` (manager `0x01c0`, fixed-value setpoint) was decoded byte-swapped, so 40.5 °C showed
+  as 38145. It is a tenths value like the other setpoints (checked on a WPMW II by SolderAndSyntax).
+
+### Changed
+
+- MQTT keepalive 15 s → 60 s. With 15 s the ESP dropped its MQTT connection about twice a day for
+  10–15 s (`mqtt_client: No PING_RESP, disconnected`) after a short receive stall on WiFi, while the
+  broker and other clients on the same access point stayed connected. A real outage of the ESP now
+  shows as `offline` in Home Assistant after about 90 s instead of about 22 s.
+
 ## [2.8.0] — 2026-11-21
 
 Firmware split into modules, writable numbers take their range from the heat pump, energy counters

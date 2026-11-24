@@ -24,7 +24,7 @@ ha-stiebel-control/
 │       ├── no_captive_portal.yaml          # Optional: removes captive portal + fallback hotspot
 │       ├── can_esp32.yaml                  # Built-in TWAI CAN (256 RX / 64 TX queue)
 │       ├── can_mcp2515.yaml                # MCP2515 SPI CAN (legacy)
-│       ├── <model>.yaml                    # Model package (wpl9, wpl10ac, wpl13e, wpl17, wpl18e, wpf10, wpc7, ttl33):
+│       ├── <model>.yaml                    # Model package (wpl9, wpl10ac, wpl13e, wpl17, wpl18e, wpf10, wpc7, ttl33, wpla7):
 │       │                                   #   only selects its signal_requests_<model>.h
 │       ├── signal_requests_base.h          # Universal signals macro (all models) + shared row macros
 │       ├── signal_requests_<model>.h       # Request table of one model (e.g. signal_requests_wpl13e.h)
@@ -34,6 +34,7 @@ ha-stiebel-control/
 │       ├── signal_route.h                  # Signal key and model route (pure C++)
 │       ├── mqtt_publish.h                  # MQTT publish, publish-on-change state cache
 │       ├── can_io.h                        # Frame decode, read/write requests, read-back
+│       ├── can_debug.h                     # Raw CAN frame stream over MQTT (opt-in: can_debug "true")
 │       ├── paced_writes.h                  # Paced write queue (SG Ready, time programs)
 │       ├── discovery.h                     # HA device blocks and discovery payloads
 │       ├── bus_scan.h                      # Bus scan of one member
@@ -141,7 +142,8 @@ modules and not listed.
 | `wpl9_observed_counters.h` | Pure split-counter pairing and register constants |
 | `signal_route.h` | Signal key (`signalKey()`) and model route (`resolveSignalRoute()`), pure C++ | — |
 | `mqtt_publish.h` | `mqttPublish()` with failure counter, publish-on-change state cache | signal_route |
-| `can_io.h` | Frame decode, read/write requests, read-back after a write, clock/date writes | signal_route, mqtt_publish |
+| `can_io.h` | Frame decode, read/write requests, read-back after a write, clock/date writes, RX/TX frame observers | signal_route, mqtt_publish |
+| `can_debug.h` | Raw CAN frame stream over MQTT (`<root>/can_debug/…`) | can_io, mqtt_publish |
 | `paced_writes.h` | Paced write queue for SG Ready and the time programs | can_io |
 | `discovery.h` | HA device blocks, default entity IDs, discovery of raw signals and calculated sensors | signal_route, mqtt_publish |
 | `bus_scan.h` | Bus scan of one CAN member | can_io, mqtt_publish |

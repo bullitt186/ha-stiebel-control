@@ -1209,6 +1209,12 @@ TEST_CASE("defrost running: last defrost duration 0 means a defrost is running (
     resetDiscoveryState();
     const ElsterIndex* ei = GetElsterIndex("ZEITDAUER_LETZTE_ABTAUUNG");
     REQUIRE(ei != nullptr);
+    if (kModel.defrostFromKessel) {   // TTL 33: placeholder 255 here, BETRIEBS_STATUS decides (#136)
+        updateSensor(CanMembers[cm_heizmodul], ei, "255");
+        updateSensor(CanMembers[cm_heizmodul], ei, "0");
+        CHECK(mqttFindPayload("calculated/abtauung_laeuft/state").empty());
+        return;
+    }
     updateSensor(CanMembers[cm_heizmodul], ei, "708");
     CHECK(mqttFindPayload("calculated/abtauung_laeuft/state") == "off");
     mqtt_client_instance().clear();
@@ -1220,6 +1226,36 @@ TEST_CASE("defrost running: last defrost duration 0 means a defrost is running (
     mqtt_client_instance().clear();
     updateSensor(CanMembers[cm_heizmodul], ei, "-255"); // not provided: no state
     CHECK(mqttFindPayload("calculated/abtauung_laeuft/state").empty());
+}
+
+TEST_CASE("ttl33: defrost running from KESSEL BETRIEBS_STATUS bit 0x0040 (#136)", "[calc]") {
+    // Recorded on a TTL 33 / WPMW II (#136): bit 0x0040 set during two defrosts and not otherwise,
+    // 0x42 right after a DHW charge and 0x41 after 1.5 h of heating.
+    resetDiscoveryState();
+    const ElsterIndex* bs = GetElsterIndex("BETRIEBS_STATUS");
+    REQUIRE(bs != nullptr);
+    const char* topic = "calculated/abtauung_laeuft/state";
+    if (!kModel.defrostFromKessel) {
+        updateSensor(CanMembers[cm_kessel], bs, "66");       // other models: no defrost source
+        CHECK(mqttFindPayload(topic).empty());
+        return;
+    }
+    // State after one frame; states are cached, so the steps alternate on/off.
+    auto stateAfter = [&](const CanMember& cm, const char* v) {
+        mqtt_client_instance().clear();
+        updateSensor(cm, bs, v);
+        return mqttFindPayload(topic);
+    };
+    CHECK(stateAfter(CanMembers[cm_kessel], "1") == "off");        // compressor 1, no defrost
+    CHECK(stateAfter(CanMembers[cm_kessel], "65") == "on");        // 0x41: defrost while heating
+    CHECK(stateAfter(CanMembers[cm_kessel], "63") == "off");       // 0x003f: every bit below 0x0040
+    CHECK(stateAfter(CanMembers[cm_kessel], "66") == "on");        // 0x42: defrost after a DHW charge
+    CHECK(stateAfter(CanMembers[cm_kessel], "128") == "off");      // 0x0080: the bit above
+    CHECK(stateAfter(CanMembers[cm_kessel], "-32704") == "on");    // 0x8040 as signed short
+    CHECK(stateAfter(CanMembers[cm_kessel], "-32768") == "off");   // 0x8000 as signed short
+    CHECK(stateAfter(CanMembers[cm_kessel], "-255").empty());      // not available: no state
+    CHECK(stateAfter(CanMembers[cm_kessel], "abc").empty());       // unparsable: no state
+    CHECK(stateAfter(CanMembers[cm_manager], "64").empty());       // other member: no state
 }
 
 TEST_CASE("ttl33: compressor state from KESSEL BETRIEBS_STATUS bits 0x0001/0x0002 (#83, #131)", "[calc]") {
@@ -1537,6 +1573,221 @@ TEST_CASE("writeSignal: et_betriebsart with valid German string is sent", "[can]
     CHECK(fake_can().sent.size() == 1);
 }
 
+#ifdef HA_CAN_DEBUG_true
+// Frame observers (can_io.h) and the raw frame stream (can_debug.h).
+// Expected bytes from the Elster frame layout: read request to MANAGER 0x480 = {0x91, 0x00, ...}
+// (see generate_read_id tests), short form for index <= 0xff, long form 0xFA <hi> <lo> above;
+// a write to MANAGER starts with 0x90 0x00 (generate_write_id). Sender of our frames: PC 0x680.
+namespace {
+struct TxRecord { uint32_t id; std::vector<uint8_t> data; };
+std::vector<TxRecord>& txRecords() { static std::vector<TxRecord> r; return r; }
+void recordTx(uint32_t canId, const std::vector<uint8_t>& data) { txRecords().push_back({canId, data}); }
+
+// Swaps an observer for the test and restores it (can_debug.h installs its own at startup)
+struct ObserverSwap {
+    CanFrameObserver& slot;
+    CanFrameObserver saved;
+    ObserverSwap(CanFrameObserver& s, CanFrameObserver o) : slot(s), saved(s) { slot = o; }
+    ~ObserverSwap() { slot = saved; }
+};
+
+std::vector<std::string> canDebugBatches() {
+    std::vector<std::string> out;
+    for (const auto& m : mqtt_client_instance().messages)
+        if (m.topic == HA_TOPIC_ROOT "/can_debug/frames") out.push_back(m.payload);
+    return out;
+}
+
+size_t countFrames(const std::vector<std::string>& batches) {
+    size_t n = 0;
+    for (const auto& b : batches)
+        for (size_t p = b.find("\"id\""); p != std::string::npos; p = b.find("\"id\"", p + 1)) n++;
+    return n;
+}
+
+void canDebugReset() {
+    canDebugCommand("off");
+    canDebugStatePending = false;
+    mqtt_client_instance().messages.clear();
+    mqtt_client_instance().connected = true;
+    fake_can().sent.clear();
+}
+}  // namespace
+
+TEST_CASE("canTxObserver: reports read requests with sender id and frame bytes", "[can]") {
+    txRecords().clear();
+    fake_can().sent.clear();
+    {
+        ObserverSwap swap(canTxObserver, recordTx);
+        readSignalRaw(&CanMembers[cm_manager], 0x0005, "T");
+        readSignalRaw(&CanMembers[cm_manager], 0x0a20, "T");
+    }
+    REQUIRE(txRecords().size() == 2);
+    CHECK(txRecords()[0].id == 0x680);
+    CHECK(txRecords()[0].data == std::vector<uint8_t>{0x91, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00});
+    CHECK(txRecords()[1].id == 0x680);
+    CHECK(txRecords()[1].data == std::vector<uint8_t>{0x91, 0x00, 0xFA, 0x0A, 0x20, 0x00, 0x00});
+    REQUIRE(fake_can().sent.size() == 2);
+    CHECK(fake_can().sent[1] == txRecords()[1].data);
+}
+
+TEST_CASE("canTxObserver: reports writes, MANAGER write id 0x90 0x00", "[can]") {
+    txRecords().clear();
+    fake_can().sent.clear();
+    {
+        ObserverSwap swap(canTxObserver, recordTx);
+        const char* value = LNAME_OPT_AUTOMATIK;
+        writeSignal(&CanMembers[cm_manager], "PROGRAMMSCHALTER", value);
+    }
+    REQUIRE(fake_can().sent.size() == 1);
+    REQUIRE(txRecords().size() == 1);
+    CHECK(txRecords()[0].id == 0x680);
+    CHECK(txRecords()[0].data[0] == 0x90);
+    CHECK(txRecords()[0].data[1] == 0x00);
+    CHECK(txRecords()[0].data == fake_can().sent[0]);
+}
+
+TEST_CASE("canRxObserver: sees every received frame, also those processAndUpdate() drops", "[can]") {
+    txRecords().clear();
+    ObserverSwap swap(canRxObserver, recordTx);
+    // Read request of another node (type 1) and a short frame: both filtered out after the hook
+    processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    processAndUpdate(0x180, {0x32, 0x00});
+    REQUIRE(txRecords().size() == 2);
+    CHECK(txRecords()[0].id == 0x180);
+    CHECK(txRecords()[0].data == std::vector<uint8_t>{0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    CHECK(txRecords()[1].data == std::vector<uint8_t>{0x32, 0x00});
+}
+
+TEST_CASE("frame observers: nullptr reports nothing, frame is still sent", "[can]") {
+    txRecords().clear();
+    fake_can().sent.clear();
+    ObserverSwap tx(canTxObserver, nullptr);
+    ObserverSwap rx(canRxObserver, nullptr);
+    readSignalRaw(&CanMembers[cm_manager], 0x0005, "T");
+    processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    CHECK(fake_can().sent.size() == 1);
+    CHECK(txRecords().empty());
+}
+
+TEST_CASE("can_debug: off by default, nothing queued or published", "[can_debug]") {
+    canDebugReset();
+    processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    readSignalRaw(&CanMembers[cm_manager], 0x0005, "T");
+    canDebugStep();
+    CHECK(canDebugCount == 0);
+    CHECK(canDebugBatches().empty());
+}
+
+TEST_CASE("can_debug: on streams RX and TX frames as JSON, oldest first", "[can_debug]") {
+    canDebugReset();
+    canDebugCommand("on");
+    fake_millis() = 5;
+    processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    fake_millis() = 7;
+    readSignalRaw(&CanMembers[cm_manager], 0x0005, "T");
+    canDebugStep();
+    CHECK(mqttFindPayload("can_debug/state") == "on");
+    const auto batches = canDebugBatches();
+    REQUIRE(batches.size() == 1);
+    CHECK(batches[0] ==
+          "[{\"t\":5,\"id\":\"0x180\",\"d\":\"3100fa000c0000\",\"tx\":false},"
+          "{\"t\":7,\"id\":\"0x680\",\"d\":\"91000500000000\",\"tx\":true}]");
+    CHECK(canDebugCount == 0);
+    fake_millis() = 0;
+    canDebugReset();
+}
+
+TEST_CASE("can_debug: off stops the stream and discards queued frames", "[can_debug]") {
+    canDebugReset();
+    canDebugCommand("on");
+    processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    canDebugCommand("off");
+    processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    canDebugStep();
+    CHECK(canDebugBatches().empty());
+    CHECK(mqttFindPayload("can_debug/state") == "off");
+}
+
+TEST_CASE("can_debug: unknown command changes nothing", "[can_debug]") {
+    canDebugReset();
+    canDebugCommand("ON!");
+    canDebugStep();
+    CHECK_FALSE(canDebugEnabled);
+    CHECK(mqttFindPayload("can_debug/state").empty());
+}
+
+TEST_CASE("can_debug: at most CAN_DEBUG_BATCH frames per message", "[can_debug]") {
+    canDebugReset();
+    canDebugCommand("on");
+    // A full queue goes out in ceil(QUEUE / BATCH) messages, the first one exactly BATCH frames
+    for (size_t i = 0; i < CAN_DEBUG_QUEUE; i++)
+        processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    canDebugStep();
+    REQUIRE(canDebugBatches().size() == 1);
+    CHECK(countFrames(canDebugBatches()) == CAN_DEBUG_BATCH);
+    const size_t messages = (CAN_DEBUG_QUEUE + CAN_DEBUG_BATCH - 1) / CAN_DEBUG_BATCH;
+    for (size_t i = 1; i < messages + 2; i++) canDebugStep();
+    CHECK(canDebugBatches().size() == messages);
+    CHECK(countFrames(canDebugBatches()) == CAN_DEBUG_QUEUE);
+    canDebugReset();
+}
+
+TEST_CASE("can_debug: memory only while on", "[can_debug]") {
+    canDebugReset();
+    CHECK(canDebugQueue == nullptr);
+    CHECK(canDebugBuf == nullptr);
+    canDebugCommand("on");
+    REQUIRE(canDebugQueue != nullptr);
+    const CanDebugFrame* first = canDebugQueue;
+    processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    canDebugCommand("on");   // again: same memory, empty queue
+    CHECK(canDebugQueue == first);
+    CHECK(canDebugCount == 0);
+    canDebugCommand("off");
+    CHECK(canDebugQueue == nullptr);
+    CHECK(canDebugBuf == nullptr);
+    canDebugReset();
+}
+
+TEST_CASE("can_debug: full queue drops new frames and counts them", "[can_debug]") {
+    canDebugReset();
+    canDebugCommand("on");
+    for (size_t i = 0; i < CAN_DEBUG_QUEUE + 10; i++)
+        processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    CHECK(canDebugCount == CAN_DEBUG_QUEUE);
+    CHECK(canDebugDropped == 10);
+    for (int i = 0; i < 20; i++) canDebugStep();
+    CHECK(countFrames(canDebugBatches()) == CAN_DEBUG_QUEUE);
+    canDebugReset();
+}
+
+TEST_CASE("can_debug: frames stay queued while MQTT is disconnected", "[can_debug]") {
+    canDebugReset();
+    canDebugCommand("on");
+    processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    mqtt_client_instance().connected = false;
+    canDebugStep();
+    CHECK(canDebugCount == 1);
+    mqtt_client_instance().connected = true;
+    canDebugStep();
+    CHECK(countFrames(canDebugBatches()) == 1);
+    CHECK(canDebugCount == 0);
+    canDebugReset();
+}
+#else  // HA_CAN_DEBUG_true not set (default): stream and observers are not built in
+TEST_CASE("can_debug: built without the stream, command and step do nothing", "[can_debug]") {
+    mqtt_client_instance().messages.clear();
+    fake_can().sent.clear();
+    canDebugCommand("on");
+    processAndUpdate(0x180, {0x31, 0x00, 0xFA, 0x00, 0x0C, 0x00, 0x00});
+    readSignalRaw(&CanMembers[cm_manager], 0x0005, "T");
+    canDebugStep();
+    CHECK(fake_can().sent.size() == 1);   // sending is unaffected
+    CHECK(mqttFindPayload("can_debug/").empty());
+}
+#endif  // HA_CAN_DEBUG_true
+
 TEST_CASE("i18n: sgReadyOptions contains 4 non-empty entries", "[i18n]") {
     for (size_t i = 0; i < 4; ++i)
         CHECK(std::string(sgReadyOptions[i]).length() > 0);
@@ -1587,6 +1838,10 @@ TEST_CASE("WPMW II: IWS values and parameters carry read-only metadata (#52)", "
         REQUIRE(std::string(ei->Name) == r.name);   // unknown names return INDEX_NOT_FOUND
         const ElsterMeta* meta = GetElsterMeta(ei);
         if (!isWpmw2Model()) {
+#if defined(HA_CONTROLLER_WPLA)
+            // WPL-A 07: corrected after the display check (display 5.6 C at raw 56), see test_kelster.cpp
+            if (std::string(r.name) == "VERDAMPFERISTTEMP_KOMPENSIERT") continue;
+#endif
             CHECK(ei->Type == r.typeOther);
             CHECK(meta == nullptr);
             continue;
@@ -1779,9 +2034,9 @@ TEST_CASE("climate: heating and hot water discoveries reuse the number /set topi
                     LNAME_OPT_ABSENKBETRIEB + "\",\"" + LNAME_OPT_WARMWASSER + "\"]") != std::string::npos);
     CHECK(dhw.find("EINSTELL_SPEICHERSOLLTEMP/set") != std::string::npos);
     const bool wpl17 = std::strcmp(HA_DEVICE_MODEL_STR, "wpl17") == 0;
-    const bool canbSetpoint = wpl17 || kModel.wpmDisplayCounters;
+    const bool canbSetpoint = wpl17 || kModel.canBDhwRoutes;
     const std::string current = std::string("heatingpump/") +
-        (wpl17 ? "KESSEL_CANB" : "KESSEL") + "/SPEICHERISTTEMP/state";
+        ((wpl17 || std::strcmp(HA_DEVICE_MODEL_STR, "wpla7") == 0) ? "KESSEL_CANB" : "KESSEL") + "/SPEICHERISTTEMP/state";
     const std::string command = std::string("heatingpump/") +
         (canbSetpoint ? "KESSEL_CANB" : "MANAGER") + "/EINSTELL_SPEICHERSOLLTEMP/set";
     CHECK(dhw.find(current) != std::string::npos);
@@ -2355,7 +2610,7 @@ TEST_CASE("paced writes: values compare as encoded on the bus", "[sgready]") {
 
 TEST_CASE("SG Ready boost baseline is the setpoint read from the manager (#85)", "[sgready]") {
     resetDiscoveryState();
-    if (kModel.wpmDisplayCounters) return;   // WPL9 reads the setpoints on CAN-B
+    if (kModel.canBDhwRoutes) return;   // WPL9 and WPL-A 07 read the setpoints on CAN-B
     applySgReadyState(2);                          // no boost active from an earlier test
     pacedWriteCount = 0;
     updateSensor(CanMembers[cm_manager], GetElsterIndex("EINSTELL_SPEICHERSOLLTEMP"), "50.0");
@@ -2488,16 +2743,40 @@ TEST_CASE("model profile: one place decides the model's capabilities (#94)", "[m
     CHECK(kModel.wpmw2 == wpmw2Switch);
     CHECK(kModel.wpmw2 == (m == "wpl13e" || m == "wpl18e" || m == "ttl33"));
     CHECK(kModel.wpmw2WritesVerified == (m == "wpl13e" || m == "ttl33"));
-    CHECK(kModel.canBDhwRoutes == (m == "wpl9"));
+    CHECK(kModel.canBDhwRoutes == (m == "wpl9" || m == "wpla7"));
     CHECK(kModel.canBRoutes == (m == "wpl17"));
-    CHECK(kModel.singleHeatingCircuit == (m == "wpl17"));
+    CHECK(kModel.singleHeatingCircuit == (m == "wpl17" || m == "wpla7"));
     CHECK(kModel.perMemberEnergy == (m == "wpl17"));
     CHECK(kModel.ignoreUnusedIwsRuntime == (m == "wpl13e"));
+    CHECK(kModel.defrostFromKessel == (m == "ttl33"));
+    CHECK(kModel.dhwActualOnKesselCanb == (m == "wpla7"));
 #ifdef HA_CONTROLLER_WPM3
-    CHECK(m == "wpl10ac");
+    CHECK((m == "wpl10ac" || m == "wpla7"));
     CHECK(std::string(SG_READY_NORMAL_MODE) == "Komfortbetrieb");
 #endif
 }
+
+#if HA_MODEL_ID == HA_MODEL_ID_wpla7
+TEST_CASE("model profile: WPL-A 07 selects its own profile (wpla7)", "[model][wpla7]") {
+    CHECK(&kModel == &kProfileWpla7);
+    CHECK_FALSE(kModel.wpmw2);
+    CHECK(kModel.singleHeatingCircuit);
+    CHECK(kModel.canBDhwRoutes);
+    CHECK(kModel.dhwActualOnKesselCanb);
+}
+
+TEST_CASE("WPL-A 07: operating mode names as shown on its display (#119)", "[model][wpla7]") {
+    // Display list from #119 (2026-11-23): Bereitschaftsbetrieb, Programmierbetrieb,
+    // Komfortbetrieb, Eco-Modus, Notbetrieb
+    CHECK(std::string(LNAME_OPT_BEREITSCHAFT) == "Bereitschaftsbetrieb");
+    CHECK(std::string(LNAME_OPT_AUTOMATIK) == "Programmierbetrieb");
+    CHECK(std::string(LNAME_OPT_TAGBETRIEB) == "Komfortbetrieb");
+    CHECK(std::string(LNAME_OPT_ABSENKBETRIEB) == "Eco-Modus");
+    char val[32];
+    SetValueType(val, GetElsterIndex("PROGRAMMSCHALTER")->Type, 0x0200);
+    CHECK(std::string(val) == "Programmierbetrieb");
+}
+#endif
 
 TEST_CASE("SG Ready labels: one set, the select options, for every publish (#93)", "[sgready]") {
     for (int st = 1; st <= 4; st++) {
