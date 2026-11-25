@@ -258,7 +258,7 @@ including its room setpoints, heating curve and program (`HEIZPROG_1_*`).
 
 | Task | Command |
 |---|---|
-| Install / set up | a C++17 compiler (`g++`) and `make` for the tests; Python 3 with `pip install -r requirements-ci.txt` (ESPHome, yamllint, paho-mqtt and clang-format in the versions CI uses) for `make check` and the checks below; `shellcheck` from the system package manager |
+| Install / set up | a C++17 compiler (`g++`) and `make` for the tests; Python 3 with `pip install -r requirements-ci.txt` (ESPHome with its paho-mqtt, yamllint and clang-format in the versions CI uses) for `make check` and the checks below; `shellcheck` from the system package manager |
 | Fast check (before every commit, also the stop hook) | `make test` (Catch2, default model; the stop hook `scripts/agent-stop-check.sh` adds the MQTT manifest tests, `git diff --check`, yamllint, `python3 tests/check_format.py` (shellcheck and clang-format) and `esphome config` of changed firmware) |
 | Full check | `make check` (unit tests and compile of both board variants; keep flash and RAM below 50 %), plus `python3 tests/check_doc_paths.py` and `python3 tests/check_modules.py`; CI also runs `make test MODEL_TEST_FLAGS=-DHA_DEVICE_MODEL=<model>` for every model |
 | Mutation testing of changed code | `make mutate` (Mull, the C++ lines changed against `origin/main`; set-up below) |
