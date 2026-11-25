@@ -336,7 +336,8 @@ relaxed only as a justified exception, with the reason in the commit message.
 - Template sensor lambdas that only trigger reads return `{}`; the C++ side publishes values.
 - Do not change `on_frame` in the CAN files; every frame goes through `processAndUpdate()`.
 - Check `unknown`/`unavailable` in HA templates.
-- The `archive/` folder is reference only.
+- The old Rust/Cargo reference material that lived in `archive/` was removed; it is in git
+  history, tag `v2.8.0`.
 
 #### After OTA flash — mandatory checklist
 
