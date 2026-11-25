@@ -8,3 +8,10 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7   # wait a week after a release before updating
+
+  - package-ecosystem: pip
+    directory: /   # requirements-ci.txt, the tools CI installs
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7

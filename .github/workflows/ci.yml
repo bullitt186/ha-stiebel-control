@@ -53,13 +53,13 @@ jobs:
           python-version: "3.12"
 
       - name: Install ESPHome
-        run: pip install esphome==2026.10.1
+        run: pip install -r requirements-ci.txt
 
       - name: Cache ESP-IDF toolchain and framework
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/esphome
-          key: esphome-idf-esphome-2026.10.1
+          key: esphome-idf-${{ hashFiles('requirements-ci.txt') }}
           restore-keys: esphome-idf-
 
       - name: Use CI secrets
@@ -93,12 +93,12 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
-      - run: pip install esphome==2026.10.1
+      - run: pip install -r requirements-ci.txt
       - name: Cache ESP-IDF toolchain and framework
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/esphome
-          key: esphome-idf-esphome-2026.10.1
+          key: esphome-idf-${{ hashFiles('requirements-ci.txt') }}
           restore-keys: esphome-idf-
       - run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
       - run: esphome compile esphome/ci_heatingpump_wpl9.yaml
@@ -111,12 +111,12 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
-      - run: pip install esphome==2026.10.1
+      - run: pip install -r requirements-ci.txt
       - name: Cache ESP-IDF toolchain and framework
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/esphome
-          key: esphome-idf-esphome-2026.10.1
+          key: esphome-idf-${{ hashFiles('requirements-ci.txt') }}
           restore-keys: esphome-idf-
       - run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
       - run: esphome compile esphome/ci_heatingpump_wpla7.yaml
@@ -129,12 +129,12 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
-      - run: pip install esphome==2026.10.1
+      - run: pip install -r requirements-ci.txt
       - name: Cache ESP-IDF toolchain and framework
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/esphome
-          key: esphome-idf-esphome-2026.10.1
+          key: esphome-idf-${{ hashFiles('requirements-ci.txt') }}
           restore-keys: esphome-idf-
       - name: Set up the layout from tools/README.md (scan files next to ha-stiebel-control/)
         run: |
@@ -155,13 +155,13 @@ jobs:
           python-version: "3.12"
 
       - name: Install ESPHome
-        run: pip install esphome==2026.10.1
+        run: pip install -r requirements-ci.txt
 
       - name: Cache ESP-IDF toolchain and framework
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/esphome
-          key: esphome-idf-esphome-2026.10.1
+          key: esphome-idf-${{ hashFiles('requirements-ci.txt') }}
           restore-keys: esphome-idf-
 
       - name: Use CI secrets
@@ -188,7 +188,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install ESPHome
-        run: pip install esphome==2026.10.1
+        run: pip install -r requirements-ci.txt
 
       - name: Use CI secrets
         run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
@@ -222,6 +222,30 @@ jobs:
           # and would be unusable and potentially dangerous for end users.
           # Users must compile their own firmware with their own secrets.yaml.
 
+  lint:
+    name: Lint and format (C++, shell)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install clang-format
+        run: pip install "$(grep '^clang-format==' requirements-ci.txt)"
+
+      # shellcheck is preinstalled on the runner. A pull request is checked against its
+      # base branch, a push against the commit before it (a tag push has none: HEAD~1).
+      - name: shellcheck and clang-format (changed C++ lines)
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+        run: |
+          if [ -z "${BASE//0/}" ]; then BASE=HEAD~1; fi
+          python3 tests/check_format.py "$BASE"
+
   validate-yaml:
     name: Validate YAML
     runs-on: ubuntu-latest
@@ -233,7 +257,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install validation dependencies
-        run: pip install yamllint paho-mqtt
+        run: pip install -r requirements-ci.txt
 
       - name: Validate MQTT model manifests
         run: python3 -m unittest discover -s tests -p 'test_mqtt_manifest.py'

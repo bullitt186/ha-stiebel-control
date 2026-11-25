@@ -64,6 +64,13 @@ else
     notes+=("yamllint skipped (not installed)")
 fi
 
+# Shell lint (shellcheck) and clang-format on the changed C++ lines, as in CI.
+if command -v shellcheck >/dev/null 2>&1 && git clang-format -h >/dev/null 2>&1; then
+    run_check "format check (tests/check_format.py)" python3 tests/check_format.py
+else
+    notes+=("format check skipped (shellcheck or clang-format not installed)")
+fi
+
 # ESPHome config validation (no compile) of the CI configs, only when the
 # firmware files changed. Runs on a copy with the credential-free CI secrets,
 # so the real esphome/secrets.yaml is never read.

@@ -20,7 +20,7 @@ H=(-h "$BROKER" -u "$USER_" --pw "$PW")
 mosquitto_sub "${H[@]}" -t "$ROOT/scan/#" -R -F '%I %t %p' >> "$OUT" &
 SUB=$!
 trap 'kill $SUB' EXIT
-for i in $(seq 1 "$N"); do
+for _ in $(seq 1 "$N"); do
   t0=$(date +%s)
   mosquitto_pub "${H[@]}" -t "$ROOT/scan/start" -m 'KESSEL 0x0050 0x0066'; sleep 6
   mosquitto_pub "${H[@]}" -t "$ROOT/scan/start" -m 'KESSEL 0x01d2 0x01dd'; sleep 4

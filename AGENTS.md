@@ -258,8 +258,8 @@ including its room setpoints, heating curve and program (`HEIZPROG_1_*`).
 
 | Task | Command |
 |---|---|
-| Install / set up | a C++17 compiler (`g++`) and `make` for the tests; Python 3 with `pip install esphome==2026.10.1` (the version CI uses) for `make check`; `pip install yamllint paho-mqtt` for the YAML and manifest checks |
-| Fast check (before every commit, also the stop hook) | `make test` (Catch2, default model; the stop hook `scripts/agent-stop-check.sh` adds the MQTT manifest tests, `git diff --check`, yamllint and `esphome config` of changed firmware) |
+| Install / set up | a C++17 compiler (`g++`) and `make` for the tests; Python 3 with `pip install -r requirements-ci.txt` (ESPHome with its paho-mqtt, yamllint and clang-format in the versions CI uses) for `make check` and the checks below; `shellcheck` from the system package manager |
+| Fast check (before every commit, also the stop hook) | `make test` (Catch2, default model; the stop hook `scripts/agent-stop-check.sh` adds the MQTT manifest tests, `git diff --check`, yamllint, `python3 tests/check_format.py` (shellcheck and clang-format) and `esphome config` of changed firmware) |
 | Full check | `make check` (unit tests and compile of both board variants; keep flash and RAM below 50 %), plus `python3 tests/check_doc_paths.py` and `python3 tests/check_modules.py`; CI also runs `make test MODEL_TEST_FLAGS=-DHA_DEVICE_MODEL=<model>` for every model |
 | Mutation testing of changed code | `make mutate` (Mull, the C++ lines changed against `origin/main`; set-up below) |
 
@@ -325,6 +325,11 @@ relaxed only as a justified exception, with the reason in the commit message.
 
 - Type check: C++ has no separate type checker; the compiler (`-Wall -Wextra` in the tests, the
   ESPHome compile in CI) is the type check.
+- Format: clang-format (`.clang-format`) checks only the C++ lines a change touches
+  (`python3 tests/check_format.py`, in CI against the base branch). The existing code keeps its
+  hand-aligned signal tables and macros and is not reformatted in bulk; vendored code
+  (`tests/catch2/`, `esphome/ha-stiebel-control/elster/`) is not checked. Format new lines with
+  `git clang-format origin/main`.
 
 #### Pitfalls
 

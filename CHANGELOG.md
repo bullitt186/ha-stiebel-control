@@ -21,6 +21,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   requests are built after the maintainer labels the issue `accepted`. A weekly security workflow
   scans for secrets and reviews new dependencies, Dependabot updates the GitHub Actions weekly,
   and releases follow the repo-kit release standard (release pull request, acceptance, then tag).
+- CI lints the shell scripts with shellcheck and checks the format of changed C++ lines with
+  clang-format (`.clang-format`, `tests/check_format.py`, also in the agent stop hook). The Python
+  tools CI uses are pinned in `requirements-ci.txt`; Dependabot updates them and a weekly
+  osv-scanner run checks them and their dependencies for known vulnerabilities.
 
 ### Upgrade notes — OTA migration, stage 1
 
