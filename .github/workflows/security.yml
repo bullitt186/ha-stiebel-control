@@ -16,4 +16,4 @@ permissions:
 
 jobs:
   security:
-    uses: bullitt186/repo-kit/.github/workflows/security-reusable.yml@673452c89f61af072f2c9916d845120d58071fa7 # stable-v2
+    uses: bullitt186/repo-kit/.github/workflows/security-reusable.yml@aa504d2c3d73f1e21564395048ca95b35a62b384 # stable-v2
