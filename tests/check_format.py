@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Lint and format check for C++ and shell scripts (repo-kit CI standard, category 2).
 
-- shellcheck on every tracked shell script outside archive/;
+- shellcheck on every tracked shell script;
 - clang-format (style in .clang-format) on the C++ lines changed against a base, by default
   the merge base with origin/main. The existing code keeps its hand-aligned tables and is not
   reformatted in bulk; new and changed lines follow the style. Vendored code (tests/catch2/,
@@ -18,7 +18,6 @@ ROOT = Path(__file__).resolve().parent.parent
 CPP_EXTENSIONS = ("h", "cpp", "inc")
 CPP_DIRS = ("esphome", "tests", "tools")
 VENDORED = ("tests/catch2/", "esphome/ha-stiebel-control/elster/")
-SHELL_EXCLUDED = ("archive/",)
 
 
 def git(*args: str) -> str:
@@ -27,7 +26,7 @@ def git(*args: str) -> str:
 
 def shell_scripts(tracked: list) -> list:
     """Tracked shell scripts that shellcheck covers."""
-    return sorted(p for p in tracked if p.endswith(".sh") and not p.startswith(SHELL_EXCLUDED))
+    return sorted(p for p in tracked if p.endswith(".sh"))
 
 
 def clang_format_pathspec() -> list:

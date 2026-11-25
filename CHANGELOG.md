@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Removed
+
+- The old Rust/Cargo reference material in `archive/` is deleted, so its outdated dependencies no
+  longer raise security alerts. It was not part of the ESPHome firmware or the Home Assistant
+  configuration; nothing changes for users. The last version is in tag `v2.8.0`.
+
 ### Contributors
 
 - One setup for all coding agents and people ([repo-kit](https://github.com/bullitt186/repo-kit)):

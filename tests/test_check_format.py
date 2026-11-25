@@ -8,8 +8,8 @@ from check_format import clang_format_clean, clang_format_pathspec, shell_script
 
 
 class ShellScriptsTest(unittest.TestCase):
-    def test_all_tracked_scripts_outside_archive(self) -> None:
-        tracked = ["scripts/mutate.sh", "helperscripts/register_probe.sh", "archive/build.sh", "Makefile"]
+    def test_all_tracked_shell_scripts_sorted(self) -> None:
+        tracked = ["scripts/mutate.sh", "helperscripts/register_probe.sh", "Makefile"]
         self.assertEqual(shell_scripts(tracked), ["helperscripts/register_probe.sh", "scripts/mutate.sh"])
 
 
