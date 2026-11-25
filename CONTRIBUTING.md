@@ -67,4 +67,5 @@ releases or repository settings. Say so in the pull request.
 | `breaking` | changes behaviour users rely on |
 | `adr` | adds or changes an architecture decision record |
 | `no-test-change`, `skip-changelog`, `large-change` | maintainer waiver for a PR hygiene rule |
+| `dependencies` | dependency update (Dependabot, Renovate); PR hygiene accepts it without test or changelog when it only touches manifests and lockfiles |
 <!-- repo-kit:end -->

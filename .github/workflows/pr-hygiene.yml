@@ -12,4 +12,4 @@ permissions:
 
 jobs:
   hygiene:
-    uses: bullitt186/repo-kit/.github/workflows/hygiene-reusable.yml@aa504d2c3d73f1e21564395048ca95b35a62b384 # stable-v2
+    uses: bullitt186/repo-kit/.github/workflows/hygiene-reusable.yml@0d27befbe8bdb77c000bc2f77fad8fcd5b2fd699 # stable-v2
