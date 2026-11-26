@@ -7,6 +7,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -19,7 +22,7 @@ jobs:
         model: [test_model, wpl9, wpl10ac, wpl13e, wpl17, wpf10, ttl33, wpl18e, wpla7]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Build and run tests
         run: make test MODEL_TEST_FLAGS=-DHA_DEVICE_MODEL=${{ matrix.model }}
@@ -47,20 +50,20 @@ jobs:
     name: Compile ESP32-S3
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
 
       - name: Install ESPHome
-        run: pip install esphome==2026.10.1
+        run: pip install -r requirements-ci.txt
 
       - name: Cache ESP-IDF toolchain and framework
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/esphome
-          key: esphome-idf-esphome-2026.10.1
+          key: esphome-idf-${{ hashFiles('requirements-ci.txt') }}
           restore-keys: esphome-idf-
 
       - name: Use CI secrets
@@ -90,16 +93,16 @@ jobs:
     name: Compile WPL9 (ESP32-S3)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
-      - run: pip install esphome==2026.10.1
+      - run: pip install -r requirements-ci.txt
       - name: Cache ESP-IDF toolchain and framework
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/esphome
-          key: esphome-idf-esphome-2026.10.1
+          key: esphome-idf-${{ hashFiles('requirements-ci.txt') }}
           restore-keys: esphome-idf-
       - run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
       - run: esphome compile esphome/ci_heatingpump_wpl9.yaml
@@ -108,16 +111,16 @@ jobs:
     name: Compile WPL-A 07 (ESP32-S3)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
-      - run: pip install esphome==2026.10.1
+      - run: pip install -r requirements-ci.txt
       - name: Cache ESP-IDF toolchain and framework
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/esphome
-          key: esphome-idf-esphome-2026.10.1
+          key: esphome-idf-${{ hashFiles('requirements-ci.txt') }}
           restore-keys: esphome-idf-
       - run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
       - run: esphome compile esphome/ci_heatingpump_wpla7.yaml
@@ -126,16 +129,16 @@ jobs:
     name: Compile diagnostic scan firmware (tools/)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
-      - run: pip install esphome==2026.10.1
+      - run: pip install -r requirements-ci.txt
       - name: Cache ESP-IDF toolchain and framework
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/esphome
-          key: esphome-idf-esphome-2026.10.1
+          key: esphome-idf-${{ hashFiles('requirements-ci.txt') }}
           restore-keys: esphome-idf-
       - name: Set up the layout from tools/README.md (scan files next to ha-stiebel-control/)
         run: |
@@ -149,20 +152,20 @@ jobs:
     name: Compile ESP32 (MCP2515)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
 
       - name: Install ESPHome
-        run: pip install esphome==2026.10.1
+        run: pip install -r requirements-ci.txt
 
       - name: Cache ESP-IDF toolchain and framework
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/esphome
-          key: esphome-idf-esphome-2026.10.1
+          key: esphome-idf-${{ hashFiles('requirements-ci.txt') }}
           restore-keys: esphome-idf-
 
       - name: Use CI secrets
@@ -182,14 +185,14 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
 
       - name: Install ESPHome
-        run: pip install esphome==2026.10.1
+        run: pip install -r requirements-ci.txt
 
       - name: Use CI secrets
         run: cp esphome/ci_secrets.yaml esphome/secrets.yaml
@@ -216,25 +219,49 @@ jobs:
           EOF
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           body_path: release_notes.md
           # No firmware binaries attached — they are compiled with placeholder credentials
           # and would be unusable and potentially dangerous for end users.
           # Users must compile their own firmware with their own secrets.yaml.
 
+  lint:
+    name: Lint and format (C++, shell)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install clang-format
+        run: pip install "$(grep '^clang-format==' requirements-ci.txt)"
+
+      # shellcheck is preinstalled on the runner. A pull request is checked against its
+      # base branch, a push against the commit before it (a tag push has none: HEAD~1).
+      - name: shellcheck and clang-format (changed C++ lines)
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+        run: |
+          if [ -z "${BASE//0/}" ]; then BASE=HEAD~1; fi
+          python3 tests/check_format.py "$BASE"
+
   validate-yaml:
     name: Validate YAML
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
 
       - name: Install validation dependencies
-        run: pip install yamllint paho-mqtt
+        run: pip install -r requirements-ci.txt
 
       - name: Validate MQTT model manifests
         run: python3 -m unittest discover -s tests -p 'test_mqtt_manifest.py'

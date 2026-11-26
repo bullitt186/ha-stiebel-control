@@ -1,8 +1,7 @@
 # repo-kit settings for PR hygiene. See https://github.com/bullitt186/repo-kit
 test_paths:
   - tests/**
-exempt_paths:          # not code: reference material, dashboards and example HA packages
-  - archive/**
+exempt_paths:          # not code: manuals, dashboards and example HA packages
   - manuals/**
   - dashboards/**
   - packages/**

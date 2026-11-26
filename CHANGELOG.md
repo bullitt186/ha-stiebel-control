@@ -7,31 +7,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
-### Contributors
-
-- One setup for all coding agents and people ([repo-kit](https://github.com/bullitt186/repo-kit)):
-  `AGENTS.md` is the single instruction file (`CLAUDE.md` imports it, the Copilot file points to
-  it), `CONTRIBUTING.md` holds the Definition of Done that every pull request is reviewed
-  against, a pull request template, and architecture decision records in `docs/adr/`
-  (ADR-0002 model profiles, ADR-0003 module include order). The new `PR hygiene` check fails
-  when code changes come without a test or changelog change, or when an ADR or a Markdown link is
-  broken.
-- `tests/check_doc_paths.py` no longer cuts the leading dot of paths like `.github/...`.
-- repo-kit v2: `docs/SCOPE.md` says what the project is for and what it is not; feature
-  requests are built after the maintainer labels the issue `accepted`. A weekly security workflow
-  scans for secrets and reviews new dependencies, Dependabot updates the GitHub Actions weekly,
-  and releases follow the repo-kit release standard (release pull request, acceptance, then tag).
-
-### Upgrade notes — OTA migration, stage 1
-
-- Requires ESPHome 2026.9.0 or newer; existing installations retain
-  `ota.password: !secret ota_password` and the same API encryption key. Build
-  and install this password-compatible stepping-stone with ESPHome
-  2026.9.x–2027.2.x and verify `Encryption: offered, plaintext accepted`.
-  A later release will require encrypted OTA; ESPHome 2027.3.0 removes the
-  plaintext upload fallback. Complete stage 1 before upgrading the build tool.
-  See [the release-based migration guide](docs/INSTALLATION.md#ota-encryption-migration).
-
 ### Added
 
 - New model `wpla7` (WPL-A 07, 1 heating circuit, CAN 50 kbps), contributed by bastard-GIT:
@@ -65,6 +40,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
   (design and rules in [ADR-0005](docs/adr/0005-bus-analysis-raw-access.md)).
 - Substitution `can_raw_write` (default `"false"`, needs `can_debug: "true"`) for the raw write.
 
+### Changed
+
+- MQTT keepalive 15 s → 60 s. With 15 s the ESP dropped its MQTT connection about twice a day for
+  10–15 s (`mqtt_client: No PING_RESP, disconnected`) after a short receive stall on WiFi, while the
+  broker and other clients on the same access point stayed connected. A real outage of the ESP now
+  shows as `offline` in Home Assistant after about 90 s instead of about 22 s.
+
+### Removed
+
+- The old Rust/Cargo reference material in `archive/` is deleted, so its outdated dependencies no
+  longer raise security alerts. It was not part of the ESPHome firmware or the Home Assistant
+  configuration; nothing changes for users. The last version is in tag `v2.8.0`.
+
 ### Fixed
 
 - TTL 33: "Abtauung läuft" never turned on, because the heat pump module answers
@@ -74,12 +62,34 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - `FESTWERT` (manager `0x01c0`, fixed-value setpoint) was decoded byte-swapped, so 40.5 °C showed
   as 38145. It is a tenths value like the other setpoints (checked on a WPMW II by SolderAndSyntax).
 
-### Changed
+### Contributors
 
-- MQTT keepalive 15 s → 60 s. With 15 s the ESP dropped its MQTT connection about twice a day for
-  10–15 s (`mqtt_client: No PING_RESP, disconnected`) after a short receive stall on WiFi, while the
-  broker and other clients on the same access point stayed connected. A real outage of the ESP now
-  shows as `offline` in Home Assistant after about 90 s instead of about 22 s.
+- One setup for all coding agents and people ([repo-kit](https://github.com/bullitt186/repo-kit)):
+  `AGENTS.md` is the single instruction file (`CLAUDE.md` imports it, the Copilot file points to
+  it), `CONTRIBUTING.md` holds the Definition of Done that every pull request is reviewed
+  against, a pull request template, and architecture decision records in `docs/adr/`
+  (ADR-0002 model profiles, ADR-0003 module include order). The new `PR hygiene` check fails
+  when code changes come without a test or changelog change, or when an ADR or a Markdown link is
+  broken.
+- `tests/check_doc_paths.py` no longer cuts the leading dot of paths like `.github/...`.
+- repo-kit v2: `docs/SCOPE.md` says what the project is for and what it is not; feature
+  requests are built after the maintainer labels the issue `accepted`. A weekly security workflow
+  scans for secrets and reviews new dependencies, Dependabot updates the GitHub Actions weekly,
+  and releases follow the repo-kit release standard (release pull request, acceptance, then tag).
+- CI lints the shell scripts with shellcheck and checks the format of changed C++ lines with
+  clang-format (`.clang-format`, `tests/check_format.py`, also in the agent stop hook). The Python
+  tools CI uses are pinned in `requirements-ci.txt`; Dependabot updates them and a weekly
+  osv-scanner run checks them and their dependencies for known vulnerabilities.
+
+### Upgrade notes — OTA migration, stage 1
+
+- Requires ESPHome 2026.9.0 or newer; existing installations retain
+  `ota.password: !secret ota_password` and the same API encryption key. Build
+  and install this password-compatible stepping-stone with ESPHome
+  2026.9.x–2027.2.x and verify `Encryption: offered, plaintext accepted`.
+  A later release will require encrypted OTA; ESPHome 2027.3.0 removes the
+  plaintext upload fallback. Complete stage 1 before upgrading the build tool.
+  See [the release-based migration guide](docs/INSTALLATION.md#ota-encryption-migration).
 
 ## [2.8.0] — 2026-11-21
 

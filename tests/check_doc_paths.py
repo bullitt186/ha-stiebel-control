@@ -4,7 +4,7 @@
 Checks AGENTS.md, docs/ARCHITECTURE.md and README.md:
 - file names in backticks or links (`ha-stiebel-control.h`, [x](docs/CONFIGURATION.md)) must
   exist in the repo, as a path from the root or from esphome/ha-stiebel-control, or as a file
-  name anywhere outside archive/;
+  name anywhere;
 - the retired canbus id `my_mcp2515` and the removed dispatcher `signal_requests_model.h` must
   not appear.
 
@@ -30,7 +30,7 @@ def doc_path(found: str) -> str:
 
 
 def all_files():
-    return {p.name for p in ROOT.rglob("*") if p.is_file() and "archive" not in p.parts and ".git" not in p.parts}
+    return {p.name for p in ROOT.rglob("*") if p.is_file() and ".git" not in p.parts}
 
 
 def exists(path: str, names: set) -> bool:
