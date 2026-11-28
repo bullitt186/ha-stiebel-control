@@ -2,6 +2,6 @@
 # (pip) proposes updates weekly and the weekly vulnerability scan checks them with all their
 # dependencies. Update the ESPHome version named in README.md and docs/INSTALLATION.md with it.
 # ESPHome pins its own paho-mqtt, which the MQTT manifest and smoke tests use.
-esphome==2026.10.1
+esphome==2026.11.0
 yamllint==1.38.0
 clang-format==23.1.5

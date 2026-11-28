@@ -3,7 +3,7 @@
 Two installation paths are supported. Choose the one that fits your workflow.
 
 **Requirements:** ESPHome 2026.9.0 or newer (`esphome version`; the config declares
-`min_version: 2026.9.0` and older versions refuse it). CI builds with ESPHome 2026.10.1.
+`min_version: 2026.9.0` and older versions refuse it). CI builds with ESPHome 2026.11.0.
 
 ---
 
