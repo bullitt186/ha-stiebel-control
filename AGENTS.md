@@ -68,8 +68,13 @@ with them. A one-test-at-a-time red/green cycle is not required.
 - Changing an expected value in an existing test needs a reason in the commit
   message that names the source of the new value.
 - Coverage shows what ran, not whether a test notices a wrong result. Run mutation
-  testing on the code you changed (see Commands below); kill a surviving mutant
-  with a test, or say in the pull request why it is equivalent.
+  testing on every line your change touches, including the callers you edited,
+  not only new functions (see Commands below); kill a surviving mutant
+  with a test, or say in the pull request why it is equivalent. Without a
+  mutation tool, mutate by hand: for each changed branch or condition, break it
+  (invert, drop, return a constant), run the tests, revert, and list each mutant
+  with its result in the pull request. Reasoning about mutants without running
+  them does not count.
 - Do not weaken lint rules, thresholds or checks to make a change pass; fix the
   code. A justified exception gets a comment next to it and a note in the commit
   message. Thresholds are only ever raised.
@@ -81,11 +86,14 @@ README, `docs/`, configuration examples, the ADRs and `CHANGELOG.md`. Outdated
 documentation counts as a bug. Relative links in Markdown must point to files
 that exist.
 
-Changelog entries go under `[Unreleased]`, in the Keep a Changelog sections
-(Added, Changed, Fixed, Removed, Security). Write them for the user of the
+Changelog entries go under `[Unreleased]`, in the Keep a Changelog sections in
+this order: Added, Changed, Deprecated, Removed, Fixed, Security. Write them for the user of the
 project: what changes for them and what they have to do, not which functions
 moved. A breaking change gets an entry under "Upgrade notes" with the steps.
-Name outside contributors and link their issue or pull request. Releases, tags
+Name outside contributors and link their issue or pull request: write the issue
+reference with your entry (on GitHub a link; on Forgejo the bare `#N`, because a
+link would put the forge's host name into the repository), and add your handle and the pull request link to it as soon
+as the pull request exists. Releases, tags
 and version numbers are the maintainer's
 ([release standard](https://github.com/bullitt186/repo-kit/blob/main/docs/RELEASING.md)).
 
