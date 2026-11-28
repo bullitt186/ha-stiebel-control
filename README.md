@@ -1,6 +1,6 @@
 # ha-stiebel-control
 
-Requires ESPHome 2026.9.0 or newer. CI uses ESPHome 2026.10.1.
+Requires ESPHome 2026.9.0 or newer. CI uses ESPHome 2026.11.0.
 OTA migration uses a password-compatible stepping-stone before encryption is required.
 For installed devices, follow the [release-based migration instructions](docs/INSTALLATION.md#ota-encryption-migration)
 before moving to an encryption-required release.
