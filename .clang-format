@@ -1,0 +1,22 @@
+# C++ style of the firmware and the host tests (repo-kit CI standard, lint and format).
+# It follows the existing code: 4-space indent, attached braces, short ifs and functions on
+# one line, no column limit (long lines and hand-aligned tables are kept), includes in the
+# order written (the firmware modules depend on it, ADR-0003).
+# CI checks only changed lines (tests/check_format.py); the existing code is not reformatted.
+Language: Cpp
+BasedOnStyle: Google
+Standard: c++17
+IndentWidth: 4
+AccessModifierOffset: -4
+ColumnLimit: 0
+DerivePointerAlignment: true
+AlignConsecutiveMacros: AcrossComments
+AlignTrailingComments: true
+AlignArrayOfStructures: Left
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: All
+AllowShortBlocksOnASingleLine: Always
+AllowShortCaseLabelsOnASingleLine: true
+SortIncludes: Never
+IncludeBlocks: Preserve

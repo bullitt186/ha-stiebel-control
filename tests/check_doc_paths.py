@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Every repo path named in the agent instructions and architecture docs must exist (#100).
 
-Checks .github/copilot-instructions.md, docs/ARCHITECTURE.md and README.md:
+Checks AGENTS.md, docs/ARCHITECTURE.md and README.md:
 - file names in backticks or links (`ha-stiebel-control.h`, [x](docs/CONFIGURATION.md)) must
   exist in the repo, as a path from the root or from esphome/ha-stiebel-control, or as a file
-  name anywhere outside archive/;
+  name anywhere;
 - the retired canbus id `my_mcp2515` and the removed dispatcher `signal_requests_model.h` must
   not appear.
 
@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DOCS = [".github/copilot-instructions.md", "docs/ARCHITECTURE.md", "README.md"]
+DOCS = ["AGENTS.md", "docs/ARCHITECTURE.md", "README.md"]
 SEARCH_DIRS = [ROOT, ROOT / "esphome", ROOT / "esphome" / "ha-stiebel-control"]
 FORBIDDEN = ["my_mcp2515", "signal_requests_model.h"]
 LOCAL_ONLY = {"secrets.yaml", "esphome/secrets.yaml"}   # gitignored, created by the user
@@ -24,8 +24,13 @@ PATH_RE = re.compile(r"(?<![\w/.<>-])((?:[\w.-]+/)*[\w.-]+\.(?:h|cpp|yaml|yml|md
 PLACEHOLDER = re.compile(r"<|>|your|XX|\*|example\.com")
 
 
+def doc_path(found: str) -> str:
+    """Path as written in a doc, without a leading "./" (a leading dot of ".github" stays)."""
+    return found.removeprefix("./")
+
+
 def all_files():
-    return {p.name for p in ROOT.rglob("*") if p.is_file() and "archive" not in p.parts and ".git" not in p.parts}
+    return {p.name for p in ROOT.rglob("*") if p.is_file() and ".git" not in p.parts}
 
 
 def exists(path: str, names: set) -> bool:
@@ -48,7 +53,7 @@ def main() -> int:
                     problems.append(f"{doc}:{n}: mentions retired '{word}'")
         for n, line in enumerate(text.splitlines(), 1):
             for m in PATH_RE.finditer(line):
-                path = m.group(1).lstrip("./")
+                path = doc_path(m.group(1))
                 if PLACEHOLDER.search(path) or path.startswith(("http", "www.")):
                     continue
                 if not exists(path, names):
