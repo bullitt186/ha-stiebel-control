@@ -15,3 +15,4 @@ numbered in order, written from `template.md`. When to write one: `AGENTS.md`.
 | [0002](0002-model-differences-in-one-compile-time-profile.md) | Model differences live in one compile-time profile | Accepted |
 | [0003](0003-firmware-modules-in-a-strict-include-order.md) | Firmware modules in a strict include order | Accepted |
 | [0004](0004-project-scope-in-docs-scope.md) | Project scope in docs/SCOPE.md | Accepted |
+| [0005](0005-bus-analysis-raw-access.md) | Bus analysis with raw read/write behind build flags | Accepted |

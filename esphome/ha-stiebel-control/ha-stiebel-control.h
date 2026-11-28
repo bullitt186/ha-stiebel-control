@@ -43,6 +43,7 @@
 #include "paced_writes.h"
 #include "discovery.h"
 #include "bus_scan.h"
+#include "can_raw.h"
 #include "request_manager.h"
 #include "calculated.h"
 #include "energy.h"
@@ -425,6 +426,8 @@ void processAndUpdate(uint32_t can_id, const std::vector<uint8_t> &msg)
     // A read request carries no value: decoding it attributed a fake 0 to the
     // requesting node (e.g. the WPMW II polling the IWS -> "MANAGER VERDICHTER 0.0").
     if ((msg[0] & 0x0F) == 1) return;
+    // Bus analysis answers (can_raw.h: raw read/write, then bus_scan.h) are consumed before the normal decoding
+    if (handleBusAnalysisFrame(can_id, msg)) return;
     // Limit answers (switch byte 0xF8/0xF9) carry no current value and use the long layout,
     // so they must not go through the short-form decoding below (#79)
     if (handleLimitAnswer(can_id, msg)) return;
@@ -441,7 +444,6 @@ void processAndUpdate(uint32_t can_id, const std::vector<uint8_t> &msg)
         return;
     }
 
-    if (handleScanFrame(*cm, ei, msg, value)) return;
     if (handleFaultListFrame(*cm, msg)) return;
 
     // Skip permanently blacklisted signals (flag of the decoded row, no name lookup)

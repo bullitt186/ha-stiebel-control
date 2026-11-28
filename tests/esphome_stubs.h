@@ -49,13 +49,13 @@ inline FakeCanBus& fake_can() { static FakeCanBus b; return b; }
 
 // ── MQTT stub ────────────────────────────────────────────────────────────────
 struct FakeMqttClient {
-    struct Published { std::string topic; std::string payload; };
+    struct Published { std::string topic; std::string payload; bool retained = false; };
     std::vector<Published> messages;
     // Overloads for const char* and std::string topics (ha-stiebel-control.h uses both)
     // Like the real client: refused (false) while disconnected or when failing
-    bool publish(const char* topic, const char* payload, size_t /*len*/, int /*qos*/, bool /*retain*/) {
+    bool publish(const char* topic, const char* payload, size_t /*len*/, int /*qos*/, bool retain) {
         if (!connected || fail_publish) return false;
-        messages.push_back({topic, payload ? payload : ""});
+        messages.push_back({topic, payload ? payload : "", retain});
         return true;
     }
     bool publish(const std::string& topic, const char* payload, size_t len, int qos, bool retain) {

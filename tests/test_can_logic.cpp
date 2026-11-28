@@ -1986,15 +1986,14 @@ TEST_CASE("scan: answers of the scanned member are published, 0x8000 is not", "[
     startScan("HEIZMODUL");
     REQUIRE(scanState.table);
     mqtt_client_instance().clear();
-    const ElsterIndex* ei = GetElsterIndex("VERDICHTER");
     std::vector<uint8_t> hit = {0xD2, 0x00, 0xFA, 0x07, 0xA8, 0x00, 0x08};
-    CHECK(handleScanFrame(CanMembers[cm_heizmodul], ei, hit, "0.8"));
+    CHECK(handleScanFrame(0x500, hit));
     CHECK(mqttFindPayload("scan/HEIZMODUL/0x07a8") == "{\"name\":\"VERDICHTER\",\"raw\":8,\"value\":\"0.8\"}");
     mqtt_client_instance().clear();
     std::vector<uint8_t> none = {0xD2, 0x00, 0xFA, 0x07, 0xA8, 0x80, 0x00};
-    CHECK(handleScanFrame(CanMembers[cm_heizmodul], ei, none, "-255"));
+    CHECK(handleScanFrame(0x500, none));
     CHECK(mqtt_client_instance().messages.empty());
-    CHECK_FALSE(handleScanFrame(CanMembers[cm_manager], ei, hit, "0.8"));   // other member: normal path
+    CHECK_FALSE(handleScanFrame(0x480, hit));   // other member: normal path
     CHECK(scanState.hits == 1);
     scanState = ScanState{};
 }
@@ -3545,3 +3544,555 @@ TEST_CASE("climate: mode follows the ESP availability instead of staying off", "
     const std::string hk2 = mqttFindPayload("climate/heatingpump/stiebel_climate_heizung_hk2/config");
     if (kModel.wpmw2WritesVerified) CHECK(hk2.find(expected) != std::string::npos);
 }
+
+// ============================================================================
+// Bus analysis (#109): bus scan at any CAN id, members scan, raw read and write
+// ============================================================================
+// Expected frame bytes are derived from the Elster frame layout (can_io.h), not copied from the code:
+//   address       = (id & 0x780) / 8
+//   read request  = {(address & 0xF0) + 0x01, id & 0x7F}   (generate_read_id)
+//   write request = {(address & 0xF0),        id & 0x7F}   (generate_write_id)
+//   answer / ack  = the header of the member's request with the message type in the low nibble
+//                   of byte 0 (2 = answer, 3..5 = ack). PC 0x680 has address 0xD0, so the
+//                   answer of any member to PC starts with 0xD2 and the second byte is 0x00.
+//   short form    = {header, idx_lo, 0, 0, 0, 0} for an index <= 0xFF, not 0xF7..0xFA, fa only;
+//   long form     = {header, switch, idx_hi, idx_lo, 0, 0} (fa with 0xFA in byte 2 for writes).
+//   Examples: KESSEL 0x180 (address 0x30): read {0x31,0x00}, write {0x30,0x00};
+//             HEIZMODUL 0x500 (address 0xA0): read {0xA1,0x00};
+//             0x7F0 (address 0xF0): read {0xF1,0x70}; 0x67F: read {0xC1,0x7F}; 0x681: read {0xD1,0x01};
+//             0x100 (address 0x20): read {0x21,0x00}, 0x101: read {0x21,0x01}.
+
+static void baReset() {
+    scanState = ScanState{};
+    disableCanRequests = false;
+    fake_can().sent.clear();
+    mqtt_client_instance().clear();
+    fake_millis() = 1000;
+}
+
+// Last published message whose topic contains sub (nullptr if none)
+static const FakeMqttClient::Published* baLastTopic(const std::string& sub) {
+    const auto& msgs = mqtt_client_instance().messages;
+    for (auto it = msgs.rbegin(); it != msgs.rend(); ++it)
+        if (it->topic.find(sub) != std::string::npos) return &*it;
+    return nullptr;
+}
+
+static std::string baPayload(const std::string& sub) {
+    const FakeMqttClient::Published* m = baLastTopic(sub);
+    return m ? m->payload : std::string("<none>");
+}
+
+TEST_CASE("bus analysis scan: 0x180 with one index sends one short-form request", "[bus_analysis][scan]") {
+    baReset();
+    startScan("0x180 0x0013 0x0013");
+    REQUIRE(scanState.active);
+    CHECK(std::string(scanState.cm->Name) == "KESSEL");
+    scanStep();
+    REQUIRE(fake_can().sent.size() == 1);
+    // KESSEL 0x180: read header {0x31, 0x00}; index 0x13 is below 0xF7 and uses the short form, switch fa
+    CHECK(fake_can().sent[0] == std::vector<uint8_t>{0x31, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00});
+    fake_millis() = 1200;
+    scanStep();   // range is done, the tail wait is not over yet
+    CHECK(fake_can().sent.size() == 1);
+    CHECK(scanState.active);
+    scanState = ScanState{};
+}
+
+TEST_CASE("bus analysis scan: 0x500 with f8 sends the long F8 request, answer goes to scan/HEIZMODUL/0x07a8/f8", "[bus_analysis][scan]") {
+    baReset();
+    startScan("0x500 0x07a8 0x07a8 f8");
+    REQUIRE(scanState.active);
+    scanStep();
+    REQUIRE(fake_can().sent.size() == 1);
+    // HEIZMODUL 0x500: read header {0xA1, 0x00}; switch byte F8 always uses the long layout
+    CHECK(fake_can().sent[0] == std::vector<uint8_t>{0xA1, 0x00, 0xF8, 0x07, 0xA8, 0x00, 0x00});
+    // Answer to PC: header {0xD2, 0x00} (type 2), long layout with the same switch byte
+    CHECK(handleScanFrame(0x500, {0xD2, 0x00, 0xF8, 0x07, 0xA8, 0x00, 0x08}));
+    CHECK(baPayload("scan/HEIZMODUL/0x07a8/f8") == "{\"name\":\"VERDICHTER\",\"raw\":8,\"value\":\"0.8\"}");
+    scanState = ScanState{};
+}
+
+TEST_CASE("bus analysis scan: hex id without table member is published as 0x%03x", "[bus_analysis][scan]") {
+    baReset();
+    startScan("0x7f0 0x07a8 0x07a8");
+    REQUIRE(scanState.active);
+    CHECK(std::string(scanState.cm->Name) == "0x7f0");
+    scanStep();
+    REQUIRE(fake_can().sent.size() == 1);
+    // 0x7F0 (address 0xF0): read header {0xF1, 0x70}, index 0x07A8 long form
+    CHECK(fake_can().sent[0] == std::vector<uint8_t>{0xF1, 0x70, 0xFA, 0x07, 0xA8, 0x00, 0x00});
+    CHECK(handleScanFrame(0x7F0, {0xD2, 0x00, 0xFA, 0x07, 0xA8, 0x00, 0x08}));
+    CHECK(baLastTopic("scan/0x7f0/0x07a8") != nullptr);
+    scanState = ScanState{};
+}
+
+TEST_CASE("bus analysis scan: hex id of a table member uses the member name", "[bus_analysis][scan]") {
+    baReset();
+    startScan("0x500 0x07a8 0x07a8");
+    REQUIRE(scanState.active);
+    CHECK(scanState.cm == &CanMembers[cm_heizmodul]);
+    CHECK(handleScanFrame(0x500, {0xD2, 0x00, 0xFA, 0x07, 0xA8, 0x00, 0x08}));
+    CHECK(baLastTopic("scan/HEIZMODUL/0x07a8") != nullptr);
+    CHECK(baLastTopic("scan/0x500/") == nullptr);
+    scanState = ScanState{};
+}
+
+TEST_CASE("bus analysis scan: the PC id and unknown names are refused", "[bus_analysis][scan]") {
+    baReset();
+    startScan("0x680 0x0013 0x0013");   // own id
+    CHECK_FALSE(scanState.active);
+    startScan("PC 0x0013 0x0013");      // PC is not a scan target by name either
+    CHECK_FALSE(scanState.active);
+    startScan("0x800 0x0013 0x0013");   // above 0x7FF
+    CHECK_FALSE(scanState.active);
+    CHECK(fake_can().sent.empty());
+    scanState = ScanState{};
+}
+
+TEST_CASE("bus analysis scan: fa scan does not take f8/f9 answers, limit answers still work (#79)", "[bus_analysis][scan][limits]") {
+    unsigned long t;
+    const CanMember* m = startLimitReads(t);   // f8 limit read of writableNumbers[0] is open
+    const uint16_t idx = GetElsterIndex(writableNumbers[0].signalName)->Index;
+    char spec[64];
+    snprintf(spec, sizeof(spec), "%s 0x%04x 0x%04x", m->Name, static_cast<unsigned>(idx), static_cast<unsigned>(idx));
+    startScan(spec);
+    REQUIRE(scanState.active);
+    REQUIRE(scanState.sw == ELSTER_SWITCH_VALUE);
+    const std::vector<uint8_t> minAnswer = limitAnswer(ELSTER_SWITCH_MIN, idx, 0x012C);
+    CHECK_FALSE(handleScanFrame(m->CanId, minAnswer));   // the scan leaves it alone
+    CHECK(scanState.hits == 0);
+    processAndUpdate(m->CanId, minAnswer);               // the limit read takes it
+    CHECK(numberLimits[0].state == NumberLimitState::WaitMax);
+    CHECK(baLastTopic(std::string("scan/") + m->Name + "/") == nullptr);
+    scanState = ScanState{};
+    resetNumberLimits();
+}
+
+TEST_CASE("bus analysis scan: answers not addressed to PC or from another id are ignored", "[bus_analysis][scan]") {
+    baReset();
+    startScan("0x500 0x07a8 0x07a8");
+    REQUIRE(scanState.active);
+    // answer of HEIZMODUL to MANAGER 0x480 (address 0x90, answer header {0x92, 0x00}), and an answer
+    // to PC with the second header byte of 0x681 (0x01) instead of 0x00
+    CHECK_FALSE(handleScanFrame(0x500, {0x92, 0x00, 0xFA, 0x07, 0xA8, 0x00, 0x08}));
+    CHECK_FALSE(handleScanFrame(0x500, {0xD2, 0x01, 0xFA, 0x07, 0xA8, 0x00, 0x08}));
+    // PC-addressed answer of another member
+    CHECK_FALSE(handleScanFrame(0x480, {0xD2, 0x00, 0xFA, 0x07, 0xA8, 0x00, 0x08}));
+    CHECK(scanState.hits == 0);
+    CHECK(fake_can().sent.empty());
+    scanState = ScanState{};
+}
+
+TEST_CASE("bus analysis scan: status names the mode table or range", "[bus_analysis][scan]") {
+    baReset();
+    startScan("HEIZMODUL");
+    CHECK(baPayload("scan/status").find("\"mode\":\"table\"") != std::string::npos);
+    mqtt_client_instance().clear();
+    startScan("0x500 0x07a8 0x07a8");
+    CHECK(baPayload("scan/status").find("\"mode\":\"range\"") != std::string::npos);
+    scanState = ScanState{};
+}
+
+#ifdef HA_CAN_DEBUG_true
+// ----------------------------------------------------------------------------
+// Members scan (can_debug only): every CAN id of a range, one index
+// ----------------------------------------------------------------------------
+
+TEST_CASE("bus analysis members: ids are asked at SCAN_GAP_MS pace, answer index 0x000b published per id", "[bus_analysis][members]") {
+    baReset();
+    startMemberScan("0x100 0x102 0x000b");
+    REQUIRE(scanState.active);
+    REQUIRE(scanState.members);
+    scanStep();
+    REQUIRE(fake_can().sent.size() == 1);
+    // 0x100 (address 0x20): read header {0x21, 0x00}, index 0x0B short form
+    CHECK(fake_can().sent[0] == std::vector<uint8_t>{0x21, 0x00, 0x0B, 0x00, 0x00, 0x00, 0x00});
+    fake_millis() = 1000 + SCAN_GAP_MS - 1;
+    scanStep();
+    CHECK(fake_can().sent.size() == 1);   // gap not over yet
+    fake_millis() = 1000 + SCAN_GAP_MS;
+    scanStep();
+    REQUIRE(fake_can().sent.size() == 2);
+    CHECK(fake_can().sent[1] == std::vector<uint8_t>{0x21, 0x01, 0x0B, 0x00, 0x00, 0x00, 0x00});   // 0x101
+    // Answer of 0x101 to PC, index 0x000B, value 0x002A = 42
+    CHECK(handleScanFrame(0x101, {0xD2, 0x00, 0x0B, 0x00, 0x2A, 0x00, 0x00}));
+    CHECK(baPayload("scan/members/0x101") == "{\"index\":\"0x000b\",\"raw\":42}");
+    // 0x8000 answer counts as a hit too
+    CHECK(handleScanFrame(0x102, {0xD2, 0x00, 0x0B, 0x80, 0x00, 0x00, 0x00}));
+    CHECK(scanState.hits == 2);
+    stopScan();
+    CHECK_FALSE(scanState.active);
+    CHECK(baPayload("scan/status").find("\"state\":\"stopped\"") != std::string::npos);
+    scanState = ScanState{};
+}
+
+TEST_CASE("bus analysis members: own id 0x680 is skipped without a request", "[bus_analysis][members]") {
+    baReset();
+    startMemberScan("0x67f 0x681 0x000b");
+    REQUIRE(scanState.active);
+    scanStep();
+    REQUIRE(fake_can().sent.size() == 1);
+    CHECK(fake_can().sent[0] == std::vector<uint8_t>{0xC1, 0x7F, 0x0B, 0x00, 0x00, 0x00, 0x00});   // 0x67F
+    fake_millis() = 1000 + SCAN_GAP_MS;
+    scanStep();   // 0x680 is skipped in this step, the request goes to 0x681
+    REQUIRE(fake_can().sent.size() == 2);
+    CHECK(fake_can().sent[1] == std::vector<uint8_t>{0xD1, 0x01, 0x0B, 0x00, 0x00, 0x00, 0x00});   // 0x681
+    fake_millis() = 1000 + 2 * SCAN_GAP_MS;
+    scanStep();   // range done
+    CHECK(fake_can().sent.size() == 2);
+    scanState = ScanState{};
+}
+
+TEST_CASE("bus analysis members: a new scan replaces a running one, status mode is members", "[bus_analysis][members]") {
+    baReset();
+    startMemberScan("0x100 0x102 0x000b");
+    CHECK(baPayload("scan/status").find("\"mode\":\"members\"") != std::string::npos);
+    startScan("HEIZMODUL 0x07a8 0x07a8");
+    CHECK_FALSE(scanState.members);
+    CHECK(scanState.cm == &CanMembers[cm_heizmodul]);
+    startMemberScan("0x100 0x102 0x000b");
+    CHECK(scanState.members);
+    CHECK(scanState.cm == nullptr);
+    startMemberScan("0x102 0x100");   // invalid: nothing changes
+    CHECK(scanState.members);
+    scanState = ScanState{};
+}
+
+// ----------------------------------------------------------------------------
+// Raw read / raw write (can_raw.h)
+// ----------------------------------------------------------------------------
+
+static void baRawReset() {
+    rawOp = RawOp{};
+}
+
+// Last raw/result message (nullptr if none)
+static const FakeMqttClient::Published* baRawResult() {
+    return baLastTopic("raw/result");
+}
+
+TEST_CASE("raw read: 0x180 index 0x13 fa sends a short request, answer gives ok and is not retained", "[bus_analysis][raw]") {
+    baReset();
+    baRawReset();
+    fake_millis() = 1000;
+    rawReadCommand("0x180 0x0013");
+    REQUIRE(fake_can().sent.size() == 1);
+    CHECK(fake_can().sent[0] == std::vector<uint8_t>{0x31, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00});
+    CHECK(rawOpActive());
+    // Answer of KESSEL to PC: {0xD2, 0x00}, short layout {idx, val_hi, val_lo}
+    CHECK(handleBusAnalysisFrame(0x180, {0xD2, 0x00, 0x13, 0x02, 0x08, 0x00, 0x00}));
+    CHECK_FALSE(rawOpActive());
+    const FakeMqttClient::Published* m = baRawResult();
+    REQUIRE(m != nullptr);
+    CHECK(m->payload == "{\"op\":\"read\",\"id\":\"0x180\",\"index\":\"0x0013\",\"switch\":\"fa\",\"raw\":\"0x0208\",\"status\":\"ok\"}");
+    CHECK_FALSE(m->retained);
+    baRawReset();
+}
+
+TEST_CASE("raw read: f8 and f9 use the long layout, answer in raw/result", "[bus_analysis][raw]") {
+    baReset();
+    baRawReset();
+    fake_millis() = 1000;
+    rawReadCommand("0x180 0x0013 f8");
+    REQUIRE(fake_can().sent.size() == 1);
+    CHECK(fake_can().sent[0] == std::vector<uint8_t>{0x31, 0x00, 0xF8, 0x00, 0x13, 0x00, 0x00});
+    CHECK(handleBusAnalysisFrame(0x180, {0xD2, 0x00, 0xF8, 0x00, 0x13, 0x02, 0x08}));
+    CHECK(baRawResult()->payload == "{\"op\":\"read\",\"id\":\"0x180\",\"index\":\"0x0013\",\"switch\":\"f8\",\"raw\":\"0x0208\",\"status\":\"ok\"}");
+    rawReadCommand("0x180 0x0013 f9");
+    REQUIRE(fake_can().sent.size() == 2);
+    CHECK(fake_can().sent[1] == std::vector<uint8_t>{0x31, 0x00, 0xF9, 0x00, 0x13, 0x00, 0x00});
+    CHECK(handleBusAnalysisFrame(0x180, {0xD2, 0x00, 0xF9, 0x00, 0x13, 0x00, 0x64}));
+    CHECK(baRawResult()->payload == "{\"op\":\"read\",\"id\":\"0x180\",\"index\":\"0x0013\",\"switch\":\"f9\",\"raw\":\"0x0064\",\"status\":\"ok\"}");
+    baRawReset();
+}
+
+TEST_CASE("raw read: 0x8000 answer is unsupported, the raw value stays in the result", "[bus_analysis][raw]") {
+    baReset();
+    baRawReset();
+    rawReadCommand("0x180 0x0013");
+    CHECK(handleBusAnalysisFrame(0x180, {0xD2, 0x00, 0x13, 0x80, 0x00, 0x00, 0x00}));
+    CHECK(baRawResult()->payload == "{\"op\":\"read\",\"id\":\"0x180\",\"index\":\"0x0013\",\"switch\":\"fa\",\"raw\":\"0x8000\",\"status\":\"unsupported\"}");
+    baRawReset();
+}
+
+TEST_CASE("raw read: no answer within RAW_TIMEOUT_MS is a timeout, a later answer is not used", "[bus_analysis][raw]") {
+    baReset();
+    baRawReset();
+    fake_millis() = 1000;
+    rawReadCommand("0x180 0x0013");
+    fake_millis() = 1000 + RAW_TIMEOUT_MS - 1;
+    rawStep();
+    CHECK(rawOpActive());
+    CHECK(baRawResult() == nullptr);
+    fake_millis() = 1000 + RAW_TIMEOUT_MS + 1;
+    rawStep();
+    CHECK_FALSE(rawOpActive());
+    CHECK(baRawResult()->payload == "{\"op\":\"read\",\"id\":\"0x180\",\"index\":\"0x0013\",\"switch\":\"fa\",\"status\":\"timeout\"}");
+    CHECK_FALSE(handleBusAnalysisFrame(0x180, {0xD2, 0x00, 0x13, 0x02, 0x08, 0x00, 0x00}));
+    baRawReset();
+}
+
+TEST_CASE("raw read: answers with another index, id or header are not consumed", "[bus_analysis][raw]") {
+    baReset();
+    baRawReset();
+    rawReadCommand("0x180 0x0013");
+    CHECK_FALSE(handleBusAnalysisFrame(0x180, {0xD2, 0x00, 0x14, 0x02, 0x08, 0x00, 0x00}));   // index 0x14
+    CHECK_FALSE(handleBusAnalysisFrame(0x500, {0xD2, 0x00, 0x13, 0x02, 0x08, 0x00, 0x00}));   // other id
+    CHECK_FALSE(handleBusAnalysisFrame(0x180, {0x92, 0x00, 0x13, 0x02, 0x08, 0x00, 0x00}));   // not to PC
+    CHECK(rawOpActive());
+    CHECK(baRawResult() == nullptr);
+    CHECK(handleBusAnalysisFrame(0x180, {0xD2, 0x00, 0x13, 0x02, 0x08, 0x00, 0x00}));
+    CHECK(baRawResult()->payload.find("\"status\":\"ok\"") != std::string::npos);
+    baRawReset();
+}
+
+TEST_CASE("raw read: invalid payload and PC id give no result and send nothing", "[bus_analysis][raw]") {
+    baReset();
+    baRawReset();
+    rawReadCommand("0x180");
+    rawReadCommand("0x180 0x0013 fb");
+    rawReadCommand("0x800 0x0013");
+    rawReadCommand("0x180 0x10000");
+    rawReadCommand("0x680 0x0013");   // PC
+    CHECK(fake_can().sent.empty());
+    CHECK(baRawResult() == nullptr);
+    CHECK_FALSE(rawOpActive());
+}
+
+TEST_CASE("raw read: busy while a scan, another raw operation or passive mode runs", "[bus_analysis][raw]") {
+    baReset();
+    baRawReset();
+    const std::string busy = "{\"op\":\"read\",\"id\":\"0x180\",\"index\":\"0x0013\",\"switch\":\"fa\",\"status\":\"busy\"}";
+    startScan("HEIZMODUL 0x07a8 0x07a8");
+    rawReadCommand("0x180 0x0013");
+    CHECK(baRawResult()->payload == busy);
+    CHECK(fake_can().sent.empty());
+    CHECK_FALSE(rawOpActive());
+    scanState = ScanState{};
+
+    rawReadCommand("0x180 0x0013");
+    REQUIRE(fake_can().sent.size() == 1);
+    rawReadCommand("0x180 0x0014");   // second request while the first is open
+    CHECK(baRawResult()->payload == "{\"op\":\"read\",\"id\":\"0x180\",\"index\":\"0x0014\",\"switch\":\"fa\",\"status\":\"busy\"}");
+    CHECK(fake_can().sent.size() == 1);
+    CHECK(rawOpActive());
+    baRawReset();
+
+    disableCanRequests = true;
+    rawReadCommand("0x180 0x0013");
+    CHECK(baRawResult()->payload == busy);
+    CHECK(fake_can().sent.size() == 1);
+    disableCanRequests = false;
+}
+
+#ifdef HA_CAN_RAW_WRITE_true
+// Ack of a write: header of PC-addressed type 4 (0xD0 + 4), no value
+static const std::vector<uint8_t> baAck4 = {0xD4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+// Write 0x0208 to index 0x13 of KESSEL at t = 1000 ms; write frame header {0x30, 0x00}
+static void baWriteStart() {
+    baReset();
+    baRawReset();
+    rawWriteCommand("0x180 0x0013 0x0208");
+    REQUIRE(fake_can().sent.size() == 1);
+    CHECK(fake_can().sent[0] == std::vector<uint8_t>{0x30, 0x00, 0x13, 0x02, 0x08, 0x00, 0x00});
+}
+
+TEST_CASE("raw write: frame is short form up to index 0xFF, long form for 0xF7..0xFA", "[bus_analysis][raw_write]") {
+    struct Case { const char* payload; std::vector<uint8_t> frame; };
+    const Case cases[] = {
+        {"0x180 0x0013 0x0208", {0x30, 0x00, 0x13, 0x02, 0x08, 0x00, 0x00}},
+        {"0x180 0x00f6 0x0001", {0x30, 0x00, 0xF6, 0x00, 0x01, 0x00, 0x00}},   // below 0xF7: short
+        {"0x180 0x00f7 0x0001", {0x30, 0x00, 0xFA, 0x00, 0xF7, 0x00, 0x01}},   // 0xF7: long
+        {"0x180 0x00f8 0x0001", {0x30, 0x00, 0xFA, 0x00, 0xF8, 0x00, 0x01}},
+        {"0x180 0x00fa 0x0001", {0x30, 0x00, 0xFA, 0x00, 0xFA, 0x00, 0x01}},   // 0xFA: long
+        {"0x180 0x00fb 0x0001", {0x30, 0x00, 0xFB, 0x00, 0x01, 0x00, 0x00}},   // above 0xFA: short
+        {"0x180 0x0100 0x0001", {0x30, 0x00, 0xFA, 0x01, 0x00, 0x00, 0x01}},   // index above 0xFF: long
+    };
+    for (const Case& c : cases) {
+        INFO(c.payload);
+        baReset();
+        baRawReset();
+        rawWriteCommand(c.payload);
+        REQUIRE(fake_can().sent.size() == 1);
+        CHECK(fake_can().sent[0] == c.frame);
+        baRawReset();
+    }
+}
+
+TEST_CASE("raw write: 0x8000 on index 0xF7..0xFA is rejected, nothing sent", "[bus_analysis][raw_write]") {
+    baReset();
+    baRawReset();
+    rawWriteCommand("0x180 0x00f7 0x8000");
+    rawWriteCommand("0x180 0x00fa 0x8000");
+    rawWriteCommand("0x180 0x01fa 0x8000");   // low byte 0xFA
+    CHECK(fake_can().sent.empty());
+    CHECK(baRawResult()->payload == "{\"op\":\"write\",\"id\":\"0x180\",\"index\":\"0x01fa\",\"value\":\"0x8000\",\"status\":\"rejected\"}");
+    CHECK_FALSE(rawOpActive());
+    // just outside the range: sent (one write at a time, so reset between them)
+    baRawReset();
+    rawWriteCommand("0x180 0x00f6 0x8000");
+    baRawReset();
+    rawWriteCommand("0x180 0x00fb 0x8000");
+    CHECK(fake_can().sent.size() == 2);
+    baRawReset();
+}
+
+TEST_CASE("raw write: read-back equal to the value is verified with ack 4", "[bus_analysis][raw_write]") {
+    baWriteStart();
+    CHECK_FALSE(handleBusAnalysisFrame(0x180, baAck4));   // ack is recorded, not consumed
+    CHECK(rawOp.ackType == 4);
+    fake_millis() = 1500;
+    rawStep();
+    CHECK(fake_can().sent.size() == 1);   // ack window still open
+    fake_millis() = 2000;
+    rawStep();
+    REQUIRE(fake_can().sent.size() == 2);
+    CHECK(fake_can().sent[1] == std::vector<uint8_t>{0x31, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00});   // read-back
+    CHECK(handleBusAnalysisFrame(0x180, {0xD2, 0x00, 0x13, 0x02, 0x08, 0x00, 0x00}));
+    CHECK(baRawResult()->payload == "{\"op\":\"write\",\"id\":\"0x180\",\"index\":\"0x0013\",\"value\":\"0x0208\",\"status\":\"verified\",\"ack\":4,\"readback\":\"0x0208\"}");
+    CHECK_FALSE(baRawResult()->retained);
+    CHECK_FALSE(rawOpActive());
+    baRawReset();
+}
+
+TEST_CASE("raw write: read-back different from the value is a mismatch", "[bus_analysis][raw_write]") {
+    baWriteStart();
+    handleBusAnalysisFrame(0x180, baAck4);
+    fake_millis() = 2000;
+    rawStep();
+    CHECK(handleBusAnalysisFrame(0x180, {0xD2, 0x00, 0x13, 0x02, 0x09, 0x00, 0x00}));
+    CHECK(baRawResult()->payload == "{\"op\":\"write\",\"id\":\"0x180\",\"index\":\"0x0013\",\"value\":\"0x0208\",\"status\":\"mismatch\",\"ack\":4,\"readback\":\"0x0209\"}");
+    baRawReset();
+}
+
+TEST_CASE("raw write: ack types 3, 4 and 5 are reported as ack N", "[bus_analysis][raw_write]") {
+    for (uint8_t type : {3, 4, 5}) {
+        INFO("ack type " << static_cast<int>(type));
+        baWriteStart();
+        const std::vector<uint8_t> ack = {static_cast<uint8_t>(0xD0 + type), 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        handleBusAnalysisFrame(0x180, ack);
+        fake_millis() = 2000;
+        rawStep();
+        handleBusAnalysisFrame(0x180, {0xD2, 0x00, 0x13, 0x02, 0x08, 0x00, 0x00});
+        const std::string want = std::string("\"ack\":") + static_cast<char>('0' + type);
+        CHECK(baRawResult()->payload.find(want) != std::string::npos);
+        CHECK(baRawResult()->payload.find("\"verified\"") != std::string::npos);
+        baRawReset();
+    }
+}
+
+TEST_CASE("raw write: type 2 answer with the same index counts as ack 2, another index does not", "[bus_analysis][raw_write]") {
+    baWriteStart();
+    CHECK_FALSE(handleBusAnalysisFrame(0x180, {0xD2, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00}));
+    CHECK(rawOp.ackType == 2);
+    fake_millis() = 2000;
+    rawStep();
+    handleBusAnalysisFrame(0x180, {0xD2, 0x00, 0x13, 0x02, 0x08, 0x00, 0x00});
+    CHECK(baRawResult()->payload == "{\"op\":\"write\",\"id\":\"0x180\",\"index\":\"0x0013\",\"value\":\"0x0208\",\"status\":\"verified\",\"ack\":2,\"readback\":\"0x0208\"}");
+    baRawReset();
+
+    baWriteStart();
+    handleBusAnalysisFrame(0x180, {0xD2, 0x00, 0x14, 0x00, 0x00, 0x00, 0x00});   // index 0x14: no ack
+    CHECK(rawOp.ackType == -1);
+    fake_millis() = 2000;
+    rawStep();
+    fake_millis() = 3000;
+    rawStep();
+    CHECK(baRawResult()->payload == "{\"op\":\"write\",\"id\":\"0x180\",\"index\":\"0x0013\",\"value\":\"0x0208\",\"status\":\"no_ack\"}");
+    baRawReset();
+}
+
+TEST_CASE("raw write: ack but no read-back value is a timeout, no ack is no_ack", "[bus_analysis][raw_write]") {
+    baWriteStart();
+    handleBusAnalysisFrame(0x180, baAck4);
+    fake_millis() = 2000;
+    rawStep();
+    CHECK(fake_can().sent.size() == 2);
+    fake_millis() = 2999;
+    rawStep();
+    CHECK(rawOpActive());   // read-back window still open
+    fake_millis() = 3000;
+    rawStep();
+    CHECK_FALSE(rawOpActive());
+    CHECK(baRawResult()->payload == "{\"op\":\"write\",\"id\":\"0x180\",\"index\":\"0x0013\",\"value\":\"0x0208\",\"status\":\"timeout\",\"ack\":4}");
+    baRawReset();
+
+    baWriteStart();
+    fake_millis() = 2000;
+    rawStep();   // no ack at all: read-back still sent
+    fake_millis() = 3000;
+    rawStep();
+    CHECK(baRawResult()->payload == "{\"op\":\"write\",\"id\":\"0x180\",\"index\":\"0x0013\",\"value\":\"0x0208\",\"status\":\"no_ack\"}");
+    baRawReset();
+}
+
+TEST_CASE("raw write: read-back 0x8000 is no value, the write stays a timeout", "[bus_analysis][raw_write]") {
+    baWriteStart();
+    handleBusAnalysisFrame(0x180, baAck4);
+    fake_millis() = 2000;
+    rawStep();
+    CHECK(handleBusAnalysisFrame(0x180, {0xD2, 0x00, 0x13, 0x80, 0x00, 0x00, 0x00}));
+    CHECK(baRawResult()->payload == "{\"op\":\"write\",\"id\":\"0x180\",\"index\":\"0x0013\",\"value\":\"0x0208\",\"status\":\"timeout\",\"ack\":4}");
+    baRawReset();
+}
+
+TEST_CASE("raw write: PC id, busy, second operation and passive mode are rejected, nothing sent", "[bus_analysis][raw_write]") {
+    baReset();
+    baRawReset();
+    const std::string rejected = "{\"op\":\"write\",\"id\":\"0x180\",\"index\":\"0x0013\",\"value\":\"0x0208\",\"status\":\"rejected\"}";
+    rawWriteCommand("0x680 0x0013 0x0208");
+    CHECK(baRawResult()->payload == "{\"op\":\"write\",\"id\":\"0x680\",\"index\":\"0x0013\",\"value\":\"0x0208\",\"status\":\"rejected\"}");
+    CHECK(fake_can().sent.empty());
+
+    startScan("HEIZMODUL 0x07a8 0x07a8");
+    rawWriteCommand("0x180 0x0013 0x0208");
+    CHECK(baRawResult()->payload == rejected);
+    scanState = ScanState{};
+
+    rawWriteCommand("0x180 0x0013 0x0208");   // first write opened
+    REQUIRE(fake_can().sent.size() == 1);
+    rawWriteCommand("0x180 0x0014 0x0208");
+    CHECK(baRawResult()->payload == "{\"op\":\"write\",\"id\":\"0x180\",\"index\":\"0x0014\",\"value\":\"0x0208\",\"status\":\"rejected\"}");
+    CHECK(fake_can().sent.size() == 1);
+    baRawReset();
+
+    disableCanRequests = true;
+    rawWriteCommand("0x180 0x0013 0x0208");
+    CHECK(baRawResult()->payload == rejected);
+    CHECK(fake_can().sent.size() == 1);
+    disableCanRequests = false;
+    baRawReset();
+}
+
+TEST_CASE("raw write: invalid payload gives no result and sends nothing", "[bus_analysis][raw_write]") {
+    baReset();
+    baRawReset();
+    rawWriteCommand("0x180 0x0013");
+    rawWriteCommand("0x180 0x0013 0x10000");
+    CHECK(fake_can().sent.empty());
+    CHECK(baRawResult() == nullptr);
+}
+#else  // HA_CAN_RAW_WRITE_true not set: can_raw_write off (default firmware)
+TEST_CASE("raw write: without can_raw_write the write is rejected and nothing is sent", "[bus_analysis][raw_write]") {
+    baReset();
+    baRawReset();
+    rawWriteCommand("0x180 0x0013 0x0208");
+    CHECK(fake_can().sent.empty());
+    CHECK(baRawResult()->payload == "{\"op\":\"write\",\"id\":\"0x180\",\"index\":\"0x0013\",\"value\":\"0x0208\",\"status\":\"rejected\"}");
+    CHECK_FALSE(rawOpActive());
+    baRawReset();
+}
+#endif  // HA_CAN_RAW_WRITE_true
+
+#else  // HA_CAN_DEBUG_true not set (default): no members scan, no raw operations
+TEST_CASE("bus analysis: without can_debug the members scan and raw read start nothing", "[bus_analysis][members][raw]") {
+    baReset();
+    startMemberScan("0x100 0x102 0x000b");
+    CHECK_FALSE(scanState.active);
+    rawReadCommand("0x180 0x0013");
+    CHECK(fake_can().sent.empty());
+    CHECK(baLastTopic("raw/result") == nullptr);
+}
+#endif  // HA_CAN_DEBUG_true

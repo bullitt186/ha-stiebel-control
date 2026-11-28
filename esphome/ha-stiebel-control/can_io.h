@@ -207,6 +207,20 @@ inline bool elsterShortForm(uint16_t index, uint8_t switchByte = ELSTER_SWITCH_V
     return switchByte == ELSTER_SWITCH_VALUE && (index >> 8) == 0 && !(lo >= 0xF7 && lo <= 0xFA);
 }
 
+// Write request frame (value write, no send): header from generate_write_id(canId), then the
+// short layout {id1, id2, idx_lo, val_hi, val_lo, 0, 0} when elsterShortForm(index), otherwise
+// the long layout {id1, id2, 0xFA, idx_hi, idx_lo, val_hi, val_lo}.
+inline std::vector<uint8_t> buildWriteFrame(uint16_t canId, uint16_t index, uint16_t value) {
+    const CanIdBytes writeId = generate_write_id(canId);
+    const uint8_t valHi = static_cast<uint8_t>(value >> 8);
+    const uint8_t valLo = static_cast<uint8_t>(value & 0xFF);
+    if (elsterShortForm(index)) {
+        return {writeId.first, writeId.second, static_cast<uint8_t>(index & 0xFF), valHi, valLo, 0x00, 0x00};
+    }
+    return {writeId.first, writeId.second, ELSTER_SWITCH_VALUE, static_cast<uint8_t>(index >> 8),
+            static_cast<uint8_t>(index & 0xFF), valHi, valLo};
+}
+
 void readSignalRaw(const CanMember *cm, uint16_t index, [[maybe_unused]] const char *name = "?",
                    uint8_t switchByte = ELSTER_SWITCH_VALUE)
 {

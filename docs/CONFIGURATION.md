@@ -51,8 +51,9 @@ See the [migration instructions](INSTALLATION.md#ota-encryption-migration) and
 | `can_bit_rate` | CAN bus speed: `20kbps` (CAN-A: WPL13E/WPF10/WPC7) or `50kbps` (CAN-B: WPL17/WPL23/WPL10AC/WPLA7) | `20kbps` |
 | `disable_sg_ready` | `"true"` hides all SG Ready entities (models without SG Ready input) | `"false"` |
 | `read_only` | `"true"`: never write to the heat pump — no setpoint/mode/climate entities, clock buttons hidden; reading and bus scan keep working | `"false"` |
-| `can_debug` | `"true"` builds in the raw CAN frame stream and its RX/TX observers (see [CAN frame stream](#can-frame-stream-bus-analysis)); `"false"` leaves them out of the firmware | `"false"` |
+| `can_debug` | `"true"` builds in the raw CAN frame stream and its RX/TX observers (see [CAN frame stream](#can-frame-stream)); `"false"` leaves them out of the firmware | `"false"` |
 | `can_debug_queue_size` | Frames the CAN frame stream buffers (16 bytes each, plus a 2 KB JSON buffer); RAM is used only while the stream is on. Lower it (minimum 8) on boards with little free RAM | `"256"` |
+| `can_raw_write` | `"true"` allows free writes via `<root>/raw/write` to any CAN id (see [Raw write](#raw-write)); needs `can_debug: "true"`. No whitelist: any MQTT client with broker access can write any value. Keep it off unless needed | `"false"` |
 | `network_package` | Network package from `ha-stiebel-control/`: `network_wifi.yaml` (WiFi + captive portal) or `network_ethernet_w5500.yaml` (W5500 Ethernet) | `"network_wifi.yaml"` |
 | `eth_clk_pin` … `eth_rst_pin` | W5500 SPI pins (`eth_clk_pin`, `eth_mosi_pin`, `eth_miso_pin`, `eth_cs_pin`, `eth_int_pin`, `eth_rst_pin`), only with `network_ethernet_w5500.yaml` | Waveshare ESP32-S3-POE-ETH: GPIO13/11/12/14/10/9 |
 
@@ -507,18 +508,54 @@ the low byte is not part of it. The `abhilfe` attribute holds a short remedy
 (`heatingpump/<MEMBER>/FEHLERMELDUNG/attributes`). WPL13E requests the heat pump module (IWS);
 the WPMW II manager answers 69 (`0x0045`, no fault) on this index, so it is not requested.
 
-## Bus scan
+## Bus analysis
 
-Asks one CAN member for every index of the signal table (about 3,600, ~9 min at 150 ms per
-request) or for a hex range, and publishes every index that answers with a real value.
-Normal polling pauses during the scan.
+Tools to look at the CAN bus with one ESP: scan one member for indices, read one index from any CAN id,
+write one index (opt-in), and stream every raw frame. `<root>` is the MQTT root, `heatingpump` by default
+(substitution `device_name`). The design and the safety rules for raw writes are recorded in
+[ADR-0005](adr/0005-bus-analysis-raw-access.md).
+
+| Tool | Needs | Topics |
+|------|-------|--------|
+| Bus scan | default build | `<root>/scan/start`, `<root>/scan/stop`, `<root>/scan/status`, `<root>/scan/<name>/0x<idx>` |
+| Member scan | `can_debug: "true"` | `<root>/scan/members`, `<root>/scan/members/0x<id>` |
+| Raw read | `can_debug: "true"` | `<root>/raw/read`, `<root>/raw/result` |
+| Raw write | `can_debug: "true"` and `can_raw_write: "true"` | `<root>/raw/write`, `<root>/raw/result` |
+| CAN frame stream | `can_debug: "true"` | `<root>/can_debug/set`, `<root>/can_debug/state`, `<root>/can_debug/frames` |
+
+Without the build flag, the MQTT commands only log that the function is not built in.
+
+### Bus scan
+
+Asks one CAN member for every index of the signal table (about 3,600, ~9 min at 150 ms per request), for
+a hex range, and publishes every index that answers with a real value. Normal polling pauses during the scan.
 
 | Topic | Payload |
 |-------|---------|
-| `heatingpump/scan/start` | `HEIZMODUL` (table) or `MANAGER 0xfd00 0xfdff` (range) |
-| `heatingpump/scan/stop` | anything |
-| `heatingpump/scan/status` | `{"state":"running|done|stopped","member":…,"done":…,"total":…,"hits":…,"seconds":…}` |
-| `heatingpump/scan/<MEMBER>/0x<idx>` | `{"name":…,"raw":…,"value":…}` (retained) |
+| `<root>/scan/start` | `MEMBER\|0xID [0xLO 0xHI] [fa\|f8\|f9]` |
+| `<root>/scan/stop` | anything |
+| `<root>/scan/status` | `{"state":"running\|done\|stopped","mode":"table\|range\|members","member":…,"done":…,"total":…,"hits":…,"seconds":…}` (retained) |
+| `<root>/scan/<name>/0x<idx>` | `{"name":…,"raw":…,"value":…}` (retained) |
+| `<root>/scan/<name>/0x<idx>/f8`, `…/f9` | same, for the limit switch bytes |
+
+- `MEMBER` is either a member name from the table (case-insensitive, PC excluded) or a hex CAN id
+  `0x000`–`0x7FF` (not the PC id). A hex id that belongs to a table member scans that member under its
+  name. Any other hex id scans the target `0x%03x` (lower case) and publishes under that name.
+- Without a range the scan covers the whole table, also for a hex id. A range is exactly two hex numbers
+  `LO HI`, both at most `0xFFFF`, `HI >= LO`; it replaces the table.
+- Switch byte: `fa` (value, default), `f8` (minimum) or `f9` (maximum). At most one, at any position.
+- `<name>` is the member name, or `0x%03x` for a hex id without table entry. `name` in the result is the
+  signal name from the table, empty for an index that is not in the table. Answers with `raw` 0x8000 are
+  not published.
+- An invalid payload is logged and changes nothing. A valid start replaces a running scan.
+- `status` is published at the start, every 100 requests, and at the end. `member` is empty in members mode.
+
+```bash
+mosquitto_pub -h BROKER -u USER -P PASS -t heatingpump/scan/start -m HEIZMODUL
+mosquitto_pub -h BROKER -u USER -P PASS -t heatingpump/scan/start -m "MANAGER 0xfd00 0xfdff"
+mosquitto_pub -h BROKER -u USER -P PASS -t heatingpump/scan/start -m "0x180 0x0000 0x00ff f8"
+mosquitto_pub -h BROKER -u USER -P PASS -t heatingpump/scan/stop -m stop
+```
 
 The diagnostic buttons "Bus-Scan Manager/Heizmodul/Kessel" (disabled by default) start a table
 scan. Turn the results into a request block and a Markdown table:
@@ -528,7 +565,110 @@ mosquitto_sub -h BROKER -u USER -P PASS -t 'heatingpump/scan/#' -v -W 5 > scan.t
 python3 helperscripts/scan_report.py scan.txt
 ```
 
-## CAN frame stream (bus analysis)
+### Member scan
+
+Asks every CAN id of a range for one index (switch byte `fa` only) and publishes the answers. Needs
+`can_debug: "true"`.
+
+| Topic | Payload |
+|-------|---------|
+| `<root>/scan/members` | `[0xLO 0xHI] [0xIDX]`, defaults `0x000 0x7ff 0x000b` |
+| `<root>/scan/members/0x<id>` | `{"index":"0x<idx>","raw":<decimal>}` (retained) |
+
+- No token: all ids and the default index. One token: the index. Two tokens: the range. Three tokens:
+  range and index.
+- The own id (PC) is skipped. Progress and the end are reported on `<root>/scan/status` with `mode` `members`.
+
+```bash
+mosquitto_pub -h BROKER -u USER -P PASS -t heatingpump/scan/members -m "0x100 0x1ff 0x0013"
+```
+
+### Raw read
+
+Reads one index from one CAN id with switch byte `fa` (default), `f8` or `f9`. Needs `can_debug: "true"`.
+
+| Topic | Payload |
+|-------|---------|
+| `<root>/raw/read` | `0xID 0xIDX [fa\|f8\|f9]` |
+| `<root>/raw/result` | one JSON object per operation, not retained (see below) |
+
+```bash
+mosquitto_pub -h BROKER -u USER -P PASS -t heatingpump/raw/read -m "0x180 0x0013"
+mosquitto_pub -h BROKER -u USER -P PASS -t heatingpump/raw/read -m "0x180 0x0013 f8"
+```
+
+Result:
+
+```json
+{"op":"read","id":"0x180","index":"0x0013","switch":"fa","raw":"0x0208","status":"ok"}
+```
+
+| `status` | Meaning | `raw` field |
+|----------|---------|-------------|
+| `ok` | answer with a value | yes |
+| `unsupported` | answer with raw 0x8000 | yes (`"0x8000"`) |
+| `timeout` | no answer within 1 s | no |
+| `busy` | bus scan, another raw operation or passive listen mode (`disableCanRequests`) running | no |
+
+An invalid payload, or a read of the PC id, is only logged and publishes nothing.
+
+### Raw write
+
+Writes one index of one CAN id, then checks the result. Needs `can_debug: "true"` and `can_raw_write: "true"`.
+
+> **Security:** With `can_raw_write: "true"` any MQTT client with access to the broker can write
+> arbitrary raw values to any CAN id. There is no whitelist. Keep it off unless needed. It is a build
+> setting, so enabling or disabling it needs a reflash.
+
+| Topic | Payload |
+|-------|---------|
+| `<root>/raw/write` | `0xID 0xIDX 0xVALUE` |
+| `<root>/raw/result` | one JSON object per operation, not retained (see below) |
+
+```bash
+# Example only: this writes to the bus
+mosquitto_pub -h BROKER -u USER -P PASS -t heatingpump/raw/write -m "0x180 0x0013 0x0208"
+```
+
+Result:
+
+```json
+{"op":"write","id":"0x180","index":"0x0013","value":"0x0208","status":"verified","ack":4,"readback":"0x0208"}
+```
+
+Flow: the write frame goes to the target id. An ack window of 1 s follows; an ack frame of type 3, 4 or 5,
+or a type 2 answer echoing the same index from the target, is recorded in `ack` (the message type). Then the
+index is read back (switch byte `fa`) with a timeout of 1 s. Only one operation runs at a time.
+
+| `status` | Meaning | `ack` | `readback` |
+|----------|---------|-------|------------|
+| `verified` | read-back equals the written value | yes | yes |
+| `mismatch` | read-back answer differs from the written value | yes | yes |
+| `timeout` | ack seen, no read-back value | yes | no |
+| `no_ack` | no ack frame and no read-back value | no | no |
+| `rejected` | refused before anything was sent | no | no |
+
+A read-back of 0x8000 counts as no value (`timeout` or `no_ack`).
+
+Refused with `rejected`, nothing is sent:
+
+- `can_raw_write` is not `"true"` in the build
+- `read_only: "true"` in the build
+- target is the PC id
+- index low byte 0xF7 to 0xFA with value 0x8000
+- bus scan, another raw operation or passive listen mode running
+
+An invalid payload is only logged and publishes nothing.
+
+Substitutions for the raw write (default `"false"`):
+
+```yaml
+substitutions:
+  can_debug: "true"
+  can_raw_write: "true"   # needs can_debug "true"
+```
+
+### CAN frame stream
 
 Streams every raw frame on the bus over MQTT: all received frames (also requests of other nodes and
 frames the firmware ignores) and every frame this node sends. Opt-in: built in only with

@@ -14,7 +14,10 @@ CXX      ?= g++
 # Raw CAN frame stream (can_debug.h) and its observers (can_io.h). `make test CAN_DEBUG_TEST_FLAGS=`
 # tests without the stream, as in the default firmware build (substitution can_debug: "false").
 CAN_DEBUG_TEST_FLAGS ?= -DHA_CAN_DEBUG_true
-CXXFLAGS  = $(MODEL_TEST_FLAGS) $(CAN_DEBUG_TEST_FLAGS) -std=c++17 -Wall -Wextra \
+# Raw write (can_raw.h, substitution can_raw_write: "true"). `make test CAN_RAW_WRITE_TEST_FLAGS=`
+# tests the default build, where raw writes are refused ("rejected") and nothing is sent.
+CAN_RAW_WRITE_TEST_FLAGS ?= -DHA_CAN_RAW_WRITE_true
+CXXFLAGS  = $(MODEL_TEST_FLAGS) $(CAN_DEBUG_TEST_FLAGS) $(CAN_RAW_WRITE_TEST_FLAGS) -std=c++17 -Wall -Wextra \
             -I. -Itests \
             -Iesphome/ha-stiebel-control \
             -Iesphome/ha-stiebel-control/elster \
