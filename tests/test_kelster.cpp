@@ -315,9 +315,9 @@ TEST_CASE("TranslateString: et_little_bool off → 0", "[kelster]") {
     CHECK(TranslateString(s, et_little_bool) == 0);
 }
 TEST_CASE("TranslateString: et_betriebsart Automatik", "[kelster]") {
-    const char* s = LNAME_OPT_AUTOMATIK;   // "Programmierbetrieb" on the WPM3 (wpl10ac)
+    const char* s = BetriebsartList[2].Name;
     int result = TranslateString(s, et_betriebsart);
-    CHECK(result >= 0); // Valid betriebsart index
+    CHECK(result == 0x0200); // Valid betriebsart index
 }
 TEST_CASE("TranslateString: et_default parses integer", "[kelster]") {
     const char* s = "42";

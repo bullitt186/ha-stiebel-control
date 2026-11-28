@@ -27,6 +27,10 @@ jobs:
       - name: Build and run tests
         run: make test MODEL_TEST_FLAGS=-DHA_DEVICE_MODEL=${{ matrix.model }}
 
+      - name: Verify WPL9 polling sources
+        if: matrix.model == 'wpl9'
+        run: make test-wpl9-polling
+
       - name: Verify test count (regression guard)
         run: |
           COUNT=$(./tests/run_tests --reporter compact 2>&1 | grep -c "passed")

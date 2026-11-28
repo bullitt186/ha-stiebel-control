@@ -41,6 +41,12 @@
 #if HA_MODEL_ID == HA_MODEL_ID_wpl13e || HA_MODEL_ID == HA_MODEL_ID_wpl18e || HA_MODEL_ID == HA_MODEL_ID_ttl33
   #define HA_CONTROLLER_WPMW2
 #endif
+// Display-confirmed WPL9 electrical and lifetime counter family.
+#if HA_MODEL_ID == HA_MODEL_ID_wpl9
+  #define HA_HAS_WPM_PROGRAM_LABELS
+  #define HA_HAS_WPM_DISPLAY_COUNTERS
+#endif
+
 // WPM3 operating mode names (WPL 10 AC; WPL-A 07, whose display shows the same five names, #119)
 #if HA_MODEL_ID == HA_MODEL_ID_wpl10ac || HA_MODEL_ID == HA_MODEL_ID_wpla7
   #define HA_CONTROLLER_WPM3
@@ -77,12 +83,15 @@ struct ModelProfile {
     bool defrostFromKessel;       // HEIZMODUL answers ZEITDAUER_LETZTE_ABTAUUNG with a placeholder;
                                   // "defrost running" is KESSEL BETRIEBS_STATUS bit 0x0040 (TTL 33, #136)
 
+    bool wpmProgramLabels = false; // WPL9 controller mode vocabulary
+    bool wpmDisplayCounters = false; // WPM counter family at 0x514
+
     constexpr bool heatingCurveWritable() const { return canBRoutes || wpmw2WritesVerified; }
 };
 
 //                                       wpmw2  verified single canB   canBDhw perMember ignoreIws dhwActualCanb kesselVd kesselDefrost
 inline constexpr ModelProfile kProfileGeneric{false, false,   false, false, false,  false,    false,    false,        false,   false};
-inline constexpr ModelProfile kProfileWpl9   {false, false,   false, false, true,   false,    false,    false,        false,   false};
+inline constexpr ModelProfile kProfileWpl9   {false, false,   false, false, true,   false,    false,    false,        false,   false, true, true};
 inline constexpr ModelProfile kProfileWpl13e {true,  true,    false, false, false,  false,    true,     false,        false,   false};
 inline constexpr ModelProfile kProfileWpl17  {false, false,   true,  true,  false,  true,     false,    false,        false,   false};
 // WPL18E polls the wpl13e table; WPMW II writes are not checked on its display yet

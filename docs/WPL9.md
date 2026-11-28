@@ -1,5 +1,24 @@
 # WPL 09 ACS classic / WPM3 / FET
 
+> Electrical energy and display runtime sources were matched to WPM3 display
+> readings on 2026-11-15 and corrected to HEIZMODUL_WPL (0x514), with a hardware
+> lifetime-start counter. The 2026-10-29 source audit below is historical;
+> see [counter migration](WPL9_COUNTER_MIGRATION.md) before updating.
+> Thermal/COP corrections were deployed on 2026-11-17. Fresh MQTT and HA values
+> match the documented NHZ-inclusive formula; contemporaneous display comparison
+> of every register and active cooling/defrost/midnight validation remain open.
+
+Operating modes follow the WPL9 display: `Programmbetrieb` (0x0200),
+`Komfortbetrieb` (0x0300) and `ECO-Betrieb` (0x0400). Decoding, select, climate
+and SG Ready use the same names, including with an English interface. External
+MQTT commands and templates using the previous literal names need updating;
+CAN values and the operating-mode entity identities are unchanged.
+The owner transcribed all six display entries on 2026-11-21: Notbetrieb,
+Bereitschaftsbetrieb, Programmbetrieb, Komfortbetrieb, ECO-Betrieb and
+Warmwasserbetrieb. ECO was clarified explicitly. The two former short names
+Bereitschaft/Warmwasser remain MQTT command aliases for the migration release.
+
+
 The owner built and installed this profile with ESPHome 2026.10.1. Live MQTT
 observations and Home Assistant checks on 2026-10-29 confirmed fresh valid feedback
 for 44 of 45 periodic requests and three passive sources. ABTAUUNGAKTIV remains

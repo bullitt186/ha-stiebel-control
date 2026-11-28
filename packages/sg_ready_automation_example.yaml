@@ -135,7 +135,9 @@ automation:
 #
 # sensor.heatingpump_manager_programmschalter
 #   Read-only sensor showing current operating mode
-#   Values: "Bereitschaft", "Automatik", "Tagbetrieb", "Absenkbetrieb", "Warmwasser"
+#   WPL9: "Notbetrieb", "Bereitschaftsbetrieb", "Programmbetrieb",
+#         "Komfortbetrieb", "ECO-Betrieb", "Warmwasserbetrieb"
+#   WPMW II: "Bereitschaft", "Automatik", "Tagbetrieb", "Absenkbetrieb", "Warmwasser"
 #
 # sensor.heatingpump_manager_einstell_speichersolltemp / number.heatingpump_manager_einstell_speichersolltemp
 #   Current DHW setpoint (read from sensor, write via number)

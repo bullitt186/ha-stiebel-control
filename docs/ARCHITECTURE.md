@@ -143,6 +143,7 @@ modules and not listed.
 
 | Module | Responsibility | Includes (modules) |
 |---|---|---|
+| `wpl9_observed_counters.h` | Pure split-counter pairing and register constants |
 | `signal_route.h` | Signal key (`signalKey()`) and model route (`resolveSignalRoute()`), pure C++ | — |
 | `mqtt_publish.h` | `mqttPublish()` with failure counter, publish-on-change state cache | signal_route |
 | `can_io.h` | Frame decode, read/write requests, read-back after a write, clock/date writes, RX/TX frame observers | signal_route, mqtt_publish |
@@ -159,6 +160,7 @@ modules and not listed.
 | `set_commands.h` | Dispatcher of every `<root>/<A>/<B>/set` command | can_io, writables, sg_ready_io, time_programs |
 | `fault_list.h` | Fault list of the manager, remedy texts | can_io, bus_scan, mqtt_publish, discovery |
 | `republish.h` | Discovery and state republish after an MQTT connect or HA birth message | mqtt_publish, discovery, writables, calculated, energy, time_programs |
+| `wpm_display_counters.h` | WPM display counter integration; includes can_io, calculated and energy |
 | `ha-stiebel-control.h` | CAN entry points `processAndUpdate()`, `updateSensor()` | all of the above |
 
 `common.yaml` lists every module in `esphome: includes:` so ESPHome copies it.
@@ -269,7 +271,10 @@ mosquitto_pub -h BROKER -u USER -P PASS -t "heatingpump/republish_discoveries" -
 
 ## COP and booster energy
 
-COP = (heat yield + 2WE yield) / electrical consumption, per DHW, heating and total.
+For models other than WPL9, COP = (heat yield + 2WE yield) / electrical consumption, per DHW, heating and total.
+WPL9 adds NHZ heat to both the thermal and electrical sides (resistance heater,
+electrical energy approximated by thermal yield), requiring complete NHZ inputs;
+see [WPL9 counter migration](WPL9_COUNTER_MIGRATION.md) for the boundary and validation limits.
 `WAERMEERTRAG_2WE_*` is the second heat source, i.e. the electric booster (NHZ/DHC);
 kr0ner/OneESP32ToRuleThemAll names the same WPM3 registers `EL_ENERGIEAUFNAHME_*_NHZ`.
 For a resistive booster heat ≈ electricity, so adding it to the heat side is correct as

@@ -15,8 +15,10 @@ class ModelManifestTests(unittest.TestCase):
     def test_wpl9_excludes_disabled_ww_eco_and_requires_runtime_feedback(self):
         common, model = smoke.load_required_topics("wpl9")
         self.assertNotIn("heatingpump/MANAGER/WW_ECO/state", common + model)
-        self.assertIn("heatingpump/HEIZMODUL/LZ_VERD_1_HEIZBETRIEB/state", model)
-        self.assertIn("heatingpump/HEIZMODUL/LZ_VERD_1_KUEHLBETRIEB/state", model)
+        self.assertIn("heatingpump/HEIZMODUL_WPL/LAUFZEIT_VD_HEIZEN/state", model)
+        self.assertIn("heatingpump/HEIZMODUL_WPL/LZ_VERD_1_KUEHLBETRIEB/state", model)
+        self.assertNotIn("heatingpump/HEIZMODUL/EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH/state", common + model)
+        self.assertIn("heatingpump/HEIZMODUL_WPL/EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH/state", model)
 
     def test_existing_models_keep_common_ww_eco(self):
         for name in ["wpl13e", "wpl10ac", "wpl17", "wpf10"]:

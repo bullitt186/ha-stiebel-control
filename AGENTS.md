@@ -191,6 +191,7 @@ above it. The shared configuration is only the build flags, `config.h` (`HA_TOPI
 
 | Module | Owns |
 |---|---|
+| `wpl9_observed_counters.h` | Pure split-counter pairing and register constants |
 | `signal_route.h` | `SignalRoute`/`resolveSignalRoute()`, `isWpmw2Model()`, `elsterNameHash()`, `signalKey()` (pure C++) |
 | `mqtt_publish.h` | `mqttPublish()`, failure counter, publish-on-change state cache, `publishMqttState()` |
 | `can_io.h` | frame decode (`processCanMessage()`), `readSignal()`/`writeSignal()`, read-back queue, `disableCanRequests`, frame observers `canRxObserver`/`canTxObserver`, clock/date writes |
@@ -207,6 +208,7 @@ above it. The shared configuration is only the build flags, `config.h` (`HA_TOPI
 | `set_commands.h` | `handleSetCommand()`: every `<root>/<A>/<B>/set` topic |
 | `fault_list.h` | manager fault list, `faultRemedy()` |
 | `republish.h` | discovery and state republish after an MQTT connect or HA birth message |
+| `wpm_display_counters.h` | WPM display counter integration; includes can_io, calculated and energy |
 
 **Adding code:** put it in the module that owns the data; `ha-stiebel-control.h` stays below
 800 lines. A module may include only modules higher up in this table, never one that includes

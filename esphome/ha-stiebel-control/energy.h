@@ -15,6 +15,7 @@
 #include <string>
 #include <unordered_map>
 #include "calculated.h"
+#include "wpl9_observed_counters.h"
 
 // COP discovery configs sent (reset by a discovery republish)
 static bool copDiscoveryPublished = false;
@@ -23,6 +24,7 @@ static bool copDiscoveryPublished = false;
 
 // Track which COP values we have valid data for
 static std::unordered_map<std::string, float> copEnergyValues;
+static std::unordered_map<std::string, Wpl9EnergyPair> wpl9EnergyPairs;
 
 // Publish MQTT discovery for COP sensors
 void publishCOPDiscovery() {
@@ -68,6 +70,73 @@ void storeCOPEnergyValue(const char* signalName, const std::string &value) {
 
 // Vorwaertsdeklaration: publiziert kombinierte Energie-Gesamtwerte (MWh*1000 + kWh)
 void publishCombinedEnergySensors();
+inline bool wplBaseTotal(int, const char*, const char*, const char*, const char*, float&);
+
+void publishWpmDisplayCOP() {
+    // WPM documents electrical VD energy separately from NHZ heat. For the
+    // electric booster, electrical energy is approximated by its heat yield.
+    // Include NHZ on BOTH sides; these are cumulative energy ratios, not live
+    // COP or a complete system boundary (external auxiliary loads are absent).
+    float totals[4] = {};
+    const char* bases[] = {"EL_AUFNAHMELEISTUNG_HEIZ", "EL_AUFNAHMELEISTUNG_WW",
+                           "WAERMEERTRAG_HEIZ", "WAERMEERTRAG_WW"};
+    bool have[4];
+    for (int i = 0; i < 4; ++i) {
+        const std::string b(bases[i]);
+        // Require current-boot SUM and TAG parts, even when an NVS base exists.
+        have[i] = copEnergyValues.count(b+"_SUM_MWH") && copEnergyValues.count(b+"_SUM_KWH") &&
+                  copEnergyValues.count(b+"_TAG_KWH") && copEnergyValues.count(b+"_TAG_WH") &&
+                  wplBaseTotal(i, (b+"_SUM_MWH").c_str(), (b+"_SUM_KWH").c_str(),
+                               (b+"_TAG_KWH").c_str(), (b+"_TAG_WH").c_str(), totals[i]);
+    }
+    auto publish = [](int idx, bool ready, float heat, float electricity) {
+        char value[24];
+        if (ready && electricity > 0.001f && std::isfinite(heat) && std::isfinite(electricity))
+            snprintf(value, sizeof(value), "%.2f", heat/electricity);
+        else snprintf(value, sizeof(value), "unknown");
+        publishCalculatedState(calculatedSensors[idx].stateTopic, value);
+    };
+    float nhz[2] = {};
+    bool haveNhz[2] = {};
+    const char* nhzBases[] = {"WAERMEERTRAG_2WE_HEIZ", "WAERMEERTRAG_2WE_WW"};
+    for (int i = 0; i < 2; ++i) {
+        const std::string b(nhzBases[i]);
+        auto hi = copEnergyValues.find(b+"_SUM_MWH");
+        auto lo = copEnergyValues.find(b+"_SUM_KWH");
+        // Missing NHZ inputs must not silently become zero after a reboot.
+        haveNhz[i] = hi != copEnergyValues.end() && lo != copEnergyValues.end();
+        if (haveNhz[i]) {
+            nhz[i] = hi->second*1000.0f + lo->second;
+            haveNhz[i] = std::isfinite(nhz[i]) && nhz[i] >= 0.0f;
+        }
+    }
+    publish(CALC_IDX_COP_HEIZ, have[0] && have[2] && haveNhz[0],
+            totals[2]+nhz[0], totals[0]+nhz[0]);
+    publish(CALC_IDX_COP_WW, have[1] && have[3] && haveNhz[1],
+            totals[3]+nhz[1], totals[1]+nhz[1]);
+    publish(CALC_IDX_COP_GESAMT, have[0] && have[1] && have[2] && have[3] && haveNhz[0] && haveNhz[1],
+            totals[2]+totals[3]+nhz[0]+nhz[1], totals[0]+totals[1]+nhz[0]+nhz[1]);
+}
+
+void publishWpmDisplayNhz() {
+    // NHZ counters have no fractional-day requirement: expose the complete
+    // SUM (including its kWh remainder) separately from the compressor totals.
+    const char* nhzBases[] = {"WAERMEERTRAG_2WE_HEIZ", "WAERMEERTRAG_2WE_WW"};
+    const int nhzIndices[] = {CALC_IDX_WPL9_NHZ_HEIZ, CALC_IDX_WPL9_NHZ_WW};
+    for (int i = 0; i < 2; ++i) {
+        const std::string b(nhzBases[i]);
+        auto hi = copEnergyValues.find(b+"_SUM_MWH");
+        auto lo = copEnergyValues.find(b+"_SUM_KWH");
+        if (hi == copEnergyValues.end() || lo == copEnergyValues.end()) continue;
+        const auto& cfg = calculatedSensors[nhzIndices[i]];
+        char value[24];
+        snprintf(value, sizeof(value), "%.3f", hi->second*1000.0f+lo->second);
+        publishCalculatedSensorDiscovery(cfg, false);
+        publishCalculatedState(cfg.stateTopic, value);
+    }
+}
+
+
 
 // Energy in MWh incl. the kWh remainder register when the model provides it
 // (e.g. WPL13E: SUM_MWH is whole MWh only, SUM_KWH holds the 0..999 kWh part).
@@ -92,6 +161,11 @@ static bool copKwhIncomplete() {
 // Calculate and publish COP values if all required data is available
 void updateCOPCalculations() {
     publishCOPDiscovery();
+    if (kModel.wpmDisplayCounters) {
+        publishWpmDisplayCOP();
+        publishCombinedEnergySensors();
+        return;
+    }
     if (copKwhIncomplete()) {
         publishCombinedEnergySensors();
         return;
@@ -173,10 +247,11 @@ void updateCOPCalculations() {
 //   - jede Verkleinerung oder ein Sprung > MAX_SMALL_STEP gilt als verdaechtig;
 //     der letzte gute Wert wird weiter gesendet, bis der neue Wert CONFIRM_MS
 //     lang stabil bleibt (ein Glitch verschwindet lange vorher).
+static std::unordered_map<std::string, float> stableValue;    // zuletzt akzeptierter Wert
+static std::unordered_map<std::string, float> pendingValue;   // verdaechtiger Kandidat
+static std::unordered_map<std::string, unsigned long> pendingSince;
+
 static bool sanitizeEnergyTotal(const char* key, float raw, float& out) {
-    static std::unordered_map<std::string, float> stableValue;    // zuletzt akzeptierter Wert
-    static std::unordered_map<std::string, float> pendingValue;   // verdaechtiger Kandidat
-    static std::unordered_map<std::string, unsigned long> pendingSince;
 
     // Toleranz "gleicher Wert": SUM fuehrt nur ganze kWh, beim Tageswechsel faellt
     // der Wh-Anteil weg. Solche Ruecksprunge bleiben unsichtbar (der Wert bleibt stehen).
@@ -283,7 +358,9 @@ static bool energyBaseReady = false;
 inline void ensureEnergyBase() {
     if (energyBaseReady) return;
     energyBaseReady = true;
-    energyBasePref = global_preferences->make_preference<EnergyBaseStorage>(0x454E4B42u, true);
+    energyBasePref = global_preferences->make_preference<EnergyBaseStorage>(
+        kModel.wpmDisplayCounters ? 0x574C3945u : 0x454E4B42u,
+        true);
     EnergyBaseStorage tmp;
     if (energyBasePref.load(&tmp) && tmp.magic == 0x454E4B42u) energyBase = tmp;
 }
@@ -298,6 +375,74 @@ static float energyTagLast[4]   = {0.0f, 0.0f, 0.0f, 0.0f};   // letzter Tagesan
 static float energyTagFolded[4] = {0.0f, 0.0f, 0.0f, 0.0f};   // in SUM bereits enthaltener Anteil
 static bool  energyTagValid[4]  = {false, false, false, false};
 
+// One atomic NVS record for the four accepted combined totals AND the associated
+// SUM/TAG folding state. Restoring just the floor would still double-count TAG
+// when rebooting between the midnight SUM step and the later TAG reset.
+struct WpmEnergyCheckpoint {
+    uint32_t magic = 0x57454331u; // WEC1, independent of the existing base record
+    uint32_t totalMask = 0, tagMask = 0;
+    float total[4] = {}, base[4] = {}, tag[4] = {}, folded[4] = {};
+};
+static const char* const wpmEnergyKeys[] = {
+    "combined_energie_heiz", "combined_energie_ww", "combined_waerme_heiz", "combined_waerme_ww"
+};
+static WpmEnergyCheckpoint wpmEnergyCheckpoint;
+static ESPPreferenceObject wpmEnergyCheckpointPref;
+static bool wpmEnergyCheckpointLoaded = false;
+
+inline bool validWpmEnergyCheckpoint(const WpmEnergyCheckpoint& c) {
+    if (c.magic != 0x57454331u || (c.totalMask & ~15u) || (c.tagMask & ~15u)) return false;
+    for (int i = 0; i < 4; ++i) {
+        for (float v : {c.total[i], c.base[i], c.tag[i], c.folded[i]})
+            if (!std::isfinite(v) || v < 0 || v >= 1000000.0f) return false;
+    }
+    return true;
+}
+
+inline void ensureWpmEnergyCheckpoint() {
+    if (!kModel.wpmDisplayCounters || wpmEnergyCheckpointLoaded) return;
+    wpmEnergyCheckpointLoaded = true;
+    wpmEnergyCheckpointPref = global_preferences->make_preference<WpmEnergyCheckpoint>(0x57454331u, true);
+    WpmEnergyCheckpoint saved;
+    if (!wpmEnergyCheckpointPref.load(&saved) || !validWpmEnergyCheckpoint(saved)) return;
+    wpmEnergyCheckpoint = saved;
+    for (int i = 0; i < 4; ++i) {
+        if (saved.totalMask & (1u << i)) stableValue[wpmEnergyKeys[i]] = saved.total[i];
+        energyBase.v[i] = saved.base[i];
+        energyTagLast[i] = saved.tag[i];
+        energyTagFolded[i] = saved.folded[i];
+        energyTagValid[i] = (saved.tagMask & (1u << i)) != 0;
+    }
+}
+
+inline bool checkpointWpmEnergy(int slot, float total) {
+    if (!kModel.wpmDisplayCounters) return true;
+    ensureWpmEnergyCheckpoint();
+    WpmEnergyCheckpoint next = wpmEnergyCheckpoint;
+    next.totalMask |= 1u << slot;
+    next.total[slot] = total;
+    next.tagMask = 0;
+    bool changed = next.totalMask != wpmEnergyCheckpoint.totalMask ||
+                   total != wpmEnergyCheckpoint.total[slot];
+    for (int i = 0; i < 4; ++i) {
+        next.base[i] = energyBase.v[i]; next.tag[i] = energyTagLast[i]; next.folded[i] = energyTagFolded[i];
+        if (energyTagValid[i]) next.tagMask |= 1u << i;
+        changed = changed || next.base[i] != wpmEnergyCheckpoint.base[i] ||
+                  next.tag[i] != wpmEnergyCheckpoint.tag[i] || next.folded[i] != wpmEnergyCheckpoint.folded[i];
+    }
+    changed = changed || next.tagMask != wpmEnergyCheckpoint.tagMask;
+    if (!changed) return true;
+    // Only changed counter/folding data writes flash (normally at ten-minute
+    // counter polls). Commit BEFORE publishing so even abrupt power loss cannot
+    // discard a value that Home Assistant has already received.
+    if (!wpmEnergyCheckpointPref.save(&next) || !global_preferences->sync()) {
+        ESP_LOGW("ENERGIE", "WPM checkpoint not durable; delaying combined total publication");
+        return false;
+    }
+    wpmEnergyCheckpoint = next;
+    return true;
+}
+
 // Member mit den Energiezaehlern: WPL17 0x514, WPMW II 0x500.
 inline const char* energyMemberName() { return isWpmw2Model() ? "HEIZMODUL" : "HEIZMODUL_WPL"; }
 
@@ -305,11 +450,14 @@ inline const char* energyMemberName() { return isWpmw2Model() ? "HEIZMODUL" : "H
 inline bool wplBaseTotal(int slot, const char* sumMwh, const char* sumKwh,
                          const char* tagKwh, const char* tagWh, float& out) {
     ensureEnergyBase();
+    ensureWpmEnergyCheckpoint();
     float sm, sk, tk, tw;
 
     // Tagesanteil (TAG_KWH + TAG_WH/1000) lesen. Er ist innerhalb eines Tages
     // monoton und faellt nur beim Tageswechsel (~23:51) auf 0 zurueck.
     const char* member = energyMemberName();
+    if (kModel.wpmDisplayCounters &&
+        (!getEnergyForMember(member, sumMwh, sm) || !getEnergyForMember(member, sumKwh, sk))) return false;
     bool haveTag = getEnergyForMember(member, tagKwh, tk) &&
                    getEnergyForMember(member, tagWh, tw);
     float tag = haveTag ? (tk + tw / 1000.0f) : 0.0f;
@@ -333,13 +481,13 @@ inline bool wplBaseTotal(int slot, const char* sumMwh, const char* sumKwh,
     // nicht doppelt addiert wird.
     if (getEnergyForMember(member, sumMwh, sm) && getEnergyForMember(member, sumKwh, sk)) {
         float base = sm * 1000.0f + sk;
-        if (base > 0.0f && base != energyBase.v[slot]) {   // nur bei Aenderung schreiben (NVS-Schonung)
+        if ((base > 0.0f || (kModel.wpmDisplayCounters && base == 0.0f)) && base != energyBase.v[slot]) {   // nur bei Aenderung schreiben (NVS-Schonung)
             if (energyBase.v[slot] > 0.0f && haveTag) energyTagFolded[slot] = tag;
             energyBase.v[slot] = base;
             energyBasePref.save(&energyBase);
         }
     }
-    if (energyBase.v[slot] <= 0.0f) return false;
+    if (energyBase.v[slot] <= 0.0f && !kModel.wpmDisplayCounters) return false;
     // Nach einem Neustart kommt der NVS-Sockel vor dem Tagesanteil: ohne ihn waere der
     // Wert um den heutigen Verbrauch zu klein (Ruecksprung). Dann lieber nichts senden.
     if (!haveTag) return false;
@@ -349,10 +497,13 @@ inline bool wplBaseTotal(int slot, const char* sumMwh, const char* sumKwh,
     return true;
 }
 
+
+
 // Publiziert kombinierte Gesamt-kWh-Werte aus den einzelnen MWh- und kWh-Registern.
 // Formel: Gesamt_kWh = MWh_Reg * 1000 + kWh_Reg
 // Die Einzelregister (MWh, kWh) werden weiterhin separat veroeffentlicht.
 void publishCombinedEnergySensors() {
+    if (kModel.wpmDisplayCounters) publishWpmDisplayNhz();
     // Gesamtwert = SUM (MWh*1000 + kWh) + heutiger Tagesanteil (kWh + Wh/1000),
     // gelesen vom Member HEIZMODUL_WPL; Fallback auf den Namen-gekeyten SUM
     // anderer Modelle (ohne WPL-Member).
@@ -368,7 +519,7 @@ void publishCombinedEnergySensors() {
         float rawTotal; bool have = false;
         if (wplBaseTotal(slot, sumMwh, sumKwh, tagKwh, tagWh, rawTotal)) {
             have = true;   // WPL-Basis (NVS-Sockel + Tagesanteil), sobald SUM bekannt
-        } else if (energyBase.v[slot] <= 0.0f &&   // Geraet ohne Tageszaehler-Sockel
+        } else if (!kModel.wpmDisplayCounters && energyBase.v[slot] <= 0.0f &&   // Geraet ohne Tageszaehler-Sockel
                    copEnergyValues.find(sumMwh) != copEnergyValues.end() &&
                    copEnergyValues.find(sumKwh) != copEnergyValues.end()) {
             rawTotal = copEnergyValues[sumMwh] * 1000.0f + copEnergyValues[sumKwh];
@@ -377,22 +528,23 @@ void publishCombinedEnergySensors() {
         if (!have) return;
         float total;
         if (!sanitizeEnergyTotal(key, rawTotal, total)) return;   // kein Wert -> nicht senden
+        if (!checkpointWpmEnergy(slot, total)) return;
         char valueStr[32];
         snprintf(valueStr, sizeof(valueStr), "%.3f", total);
         publishCalculatedSensorDiscovery(cfg, false);
         publishCalculatedState(topic, valueStr);
         ESP_LOGD("ENERGIE", "Gesamt (%s): %.3f kWh", key, total);
     };
-    publishTotal(calculatedSensors[CALC_IDX_ENERGIE_HEIZ_TOTAL_KWH], HA_TOPIC_ROOT "/calculated/energie_heiz_total_kwh/state", "combined_energie_heiz", 0,
+    publishTotal(calculatedSensors[CALC_IDX_ENERGIE_HEIZ_TOTAL_KWH], ENERGY_CALC_TOPIC("energie_heiz_total_kwh"), "combined_energie_heiz", 0,
                  "EL_AUFNAHMELEISTUNG_HEIZ_SUM_MWH", "EL_AUFNAHMELEISTUNG_HEIZ_SUM_KWH",
                  "EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", "EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH");
-    publishTotal(calculatedSensors[CALC_IDX_ENERGIE_WW_TOTAL_KWH], HA_TOPIC_ROOT "/calculated/energie_ww_total_kwh/state", "combined_energie_ww", 1,
+    publishTotal(calculatedSensors[CALC_IDX_ENERGIE_WW_TOTAL_KWH], ENERGY_CALC_TOPIC("energie_ww_total_kwh"), "combined_energie_ww", 1,
                  "EL_AUFNAHMELEISTUNG_WW_SUM_MWH", "EL_AUFNAHMELEISTUNG_WW_SUM_KWH",
                  "EL_AUFNAHMELEISTUNG_WW_TAG_KWH", "EL_AUFNAHMELEISTUNG_WW_TAG_WH");
-    publishTotal(calculatedSensors[CALC_IDX_WAERME_HEIZ_TOTAL_KWH], HA_TOPIC_ROOT "/calculated/waerme_heiz_total_kwh/state", "combined_waerme_heiz", 2,
+    publishTotal(calculatedSensors[CALC_IDX_WAERME_HEIZ_TOTAL_KWH], ENERGY_CALC_TOPIC("waerme_heiz_total_kwh"), "combined_waerme_heiz", 2,
                  "WAERMEERTRAG_HEIZ_SUM_MWH", "WAERMEERTRAG_HEIZ_SUM_KWH",
                  "WAERMEERTRAG_HEIZ_TAG_KWH", "WAERMEERTRAG_HEIZ_TAG_WH");
-    publishTotal(calculatedSensors[CALC_IDX_WAERME_WW_TOTAL_KWH], HA_TOPIC_ROOT "/calculated/waerme_ww_total_kwh/state", "combined_waerme_ww", 3,
+    publishTotal(calculatedSensors[CALC_IDX_WAERME_WW_TOTAL_KWH], ENERGY_CALC_TOPIC("waerme_ww_total_kwh"), "combined_waerme_ww", 3,
                  "WAERMEERTRAG_WW_SUM_MWH", "WAERMEERTRAG_WW_SUM_KWH",
                  "WAERMEERTRAG_WW_TAG_KWH", "WAERMEERTRAG_WW_TAG_WH");
 
@@ -494,10 +646,10 @@ void publishCombinedEnergySensors() {
             publishCalculatedSensorDiscovery(cfg, false);
             publishCalculatedState(topic, s);
         };
-        pubDaily("EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", "EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH", calculatedSensors[CALC_IDX_ENERGIE_HEIZ_TAG_KWH], HA_TOPIC_ROOT "/calculated/energie_heiz_tag_kwh/state");
-        pubDaily("EL_AUFNAHMELEISTUNG_WW_TAG_KWH",   "EL_AUFNAHMELEISTUNG_WW_TAG_WH",   calculatedSensors[CALC_IDX_ENERGIE_WW_TAG_KWH], HA_TOPIC_ROOT "/calculated/energie_ww_tag_kwh/state");
-        pubDaily("WAERMEERTRAG_HEIZ_TAG_KWH",        "WAERMEERTRAG_HEIZ_TAG_WH",        calculatedSensors[CALC_IDX_WAERME_HEIZ_TAG_KWH], HA_TOPIC_ROOT "/calculated/waerme_heiz_tag_kwh/state");
-        pubDaily("WAERMEERTRAG_WW_TAG_KWH",          "WAERMEERTRAG_WW_TAG_WH",          calculatedSensors[CALC_IDX_WAERME_WW_TAG_KWH], HA_TOPIC_ROOT "/calculated/waerme_ww_tag_kwh/state");
+        pubDaily("EL_AUFNAHMELEISTUNG_HEIZ_TAG_KWH", "EL_AUFNAHMELEISTUNG_HEIZ_TAG_WH", calculatedSensors[CALC_IDX_ENERGIE_HEIZ_TAG_KWH], ENERGY_CALC_TOPIC("energie_heiz_tag_kwh"));
+        pubDaily("EL_AUFNAHMELEISTUNG_WW_TAG_KWH",   "EL_AUFNAHMELEISTUNG_WW_TAG_WH",   calculatedSensors[CALC_IDX_ENERGIE_WW_TAG_KWH], ENERGY_CALC_TOPIC("energie_ww_tag_kwh"));
+        pubDaily("WAERMEERTRAG_HEIZ_TAG_KWH",        "WAERMEERTRAG_HEIZ_TAG_WH",        calculatedSensors[CALC_IDX_WAERME_HEIZ_TAG_KWH], ENERGY_CALC_TOPIC("waerme_heiz_tag_kwh"));
+        pubDaily("WAERMEERTRAG_WW_TAG_KWH",          "WAERMEERTRAG_WW_TAG_WH",          calculatedSensors[CALC_IDX_WAERME_WW_TAG_KWH], ENERGY_CALC_TOPIC("waerme_ww_tag_kwh"));
     }
 }
 

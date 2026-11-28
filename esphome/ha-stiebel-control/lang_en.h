@@ -462,4 +462,24 @@
 #define LNAME_CLIMATE_HEIZUNG_HK2              "Heating HC2"
 #undef  LNAME_CLIMATE_WARMWASSER
 #define LNAME_CLIMATE_WARMWASSER               "Hot Water"
+#undef LNAME_WPL9_RUNTIME_HEAT
+#define LNAME_WPL9_RUNTIME_HEAT "Compressor heating runtime (WPM)"
+
+#undef LNAME_WPL9_RUNTIME_DHW
+#define LNAME_WPL9_RUNTIME_DHW "Compressor DHW runtime (WPM)"
+
+#undef LNAME_WPL9_RUNTIME_DEFROST
+#define LNAME_WPL9_RUNTIME_DEFROST "Compressor defrost runtime (WPM)"
+
+#undef LNAME_WPL9_STARTS
+#define LNAME_WPL9_STARTS "Compressor lifetime starts (WPM)"
 #endif // HA_LANGUAGE_EN
+
+#ifdef HA_LANGUAGE_EN
+#undef LNAME_CALC_NHZ_HEAT
+#define LNAME_CALC_NHZ_HEAT "Booster heating total (WPM)"
+#endif
+#ifdef HA_LANGUAGE_EN
+#undef LNAME_CALC_NHZ_DHW
+#define LNAME_CALC_NHZ_DHW "Booster DHW total (WPM)"
+#endif
